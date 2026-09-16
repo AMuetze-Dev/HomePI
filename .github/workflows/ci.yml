@@ -22,6 +22,7 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
+      core: ${{ steps.filter.outputs.core }}
       api: ${{ steps.filter.outputs.api }}
       web: ${{ steps.filter.outputs.web }}
       infra: ${{ steps.filter.outputs.infra }}
@@ -31,8 +32,12 @@ jobs:
         id: filter
         with:
           filters: |
+            core:
+              - 'packages/homepi-core/**'
+              - '.github/workflows/ci.yml'
             api:
               - 'services/api/**'
+              - 'packages/homepi-core/**'
               - '.github/workflows/ci.yml'
             web:
               - 'services/web/**'
@@ -82,6 +87,83 @@ jobs:
             echo "::error::.env.example enthaelt offenbar einen echten Wert"
             exit 1
           fi
+
+  # -------------------------------------------------------------------------
+  core:
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/homepi-core
+
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://app:app@127.0.0.1:5432/app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: packages/homepi-core/uv.lock
+
+      - run: uv sync --frozen --all-extras
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check --output-format=github .
+
+      - name: Typen
+        run: uv run mypy
+
+      - name: Tests inklusive Integration
+        run: |
+          uv run pytest -m 'not smoke'             --cov=homepi_core --cov-report=term-missing             --cov-fail-under=80
+
+      # Beweist, dass das Paket tatsaechlich einen lauffaehigen Dienst ergibt -
+      # und dass die Rauchtests gegen eine echte Instanz durchlaufen. Genau
+      # dieselben Tests laufen spaeter gegen den Pi, nur mit anderer Basis-URL.
+      - name: Rauchtests gegen eine echte Instanz
+        run: |
+          cat > /tmp/probe.py <<'PY'
+          from fastapi import APIRouter
+          from homepi_core import Modul, ServiceSettings, create_service, register_aus
+
+          router = APIRouter()
+
+          @router.get("/", summary="Probe")
+          async def liste() -> list[str]:
+              return ["probe"]
+
+          register = register_aus([Modul(id="probe", titel="Probe", router=router)])
+          app = create_service(
+              ServiceSettings(service_name="probe", service_version="0.0.1"),
+              module=register,
+          )
+          PY
+          PYTHONPATH=/tmp uv run uvicorn probe:app --host 127.0.0.1 --port 8000 &
+          for _ in $(seq 1 40); do
+            curl -sf http://127.0.0.1:8000/info >/dev/null && break
+            sleep 0.5
+          done
+          HOMEPI_BASIS_URL=http://127.0.0.1:8000 uv run pytest -m smoke
 
   # -------------------------------------------------------------------------
   api:
@@ -224,7 +306,7 @@ jobs:
   # neue Job einzeln in den Einstellungen nachgetragen werden - und ein
   # uebersprungener Job wuerde faelschlich als Erfolg zaehlen.
   ci:
-    needs: [infra, api, web, docker, secrets]
+    needs: [infra, core, api, web, docker, secrets]
     if: always()
     runs-on: ubuntu-latest
     steps:
