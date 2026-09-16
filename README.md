@@ -14,9 +14,11 @@ stacks/        Docker-Compose-Stacks, einer pro Verantwortungsbereich
   data/          PostgreSQL, pgAdmin, Redis
   home/          Home Assistant, Mosquitto
   apps/          eigene Anwendung (API + Web)
+packages/      wiederverwendbare Bausteine
+  homepi-core/   Grundgeruest jedes Microservice + homepi-CLI
 services/      Quellcode der eigenen Anwendung
   api/           Python / FastAPI
-  web/           TypeScript / React
+  web/           TypeScript / React (die Huelle mit der Startseite)
 scripts/       Einrichtung, Backup, Diagnose
 docs/          Architektur, Inbetriebnahme, Runbook, Arbeitsweise
 ```
@@ -34,6 +36,7 @@ Pi-hole anzufassen.
 | [docs/03-architecture.md](docs/03-architecture.md) | Netztopologie und die Begründung hinter jeder Entscheidung |
 | [docs/04-runbook.md](docs/04-runbook.md) | Backup, Restore, Updates, Troubleshooting |
 | [docs/05-workflow.md](docs/05-workflow.md) | Branch-Modell, TDD-Schleife, CI/CD |
+| [docs/06-artefakte.md](docs/06-artefakte.md) | Wie neue Artefakte dazukommen, ohne dass ein Container dazukommt |
 
 ## Schnellstart auf dem Pi
 
