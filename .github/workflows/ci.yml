@@ -75,6 +75,20 @@ jobs:
             exit 1
           fi
 
+      - name: Skripte sind ausfuehrbar
+        # core.fileMode ist unter Windows aus - ein "chmod +x" landet dort nie
+        # im Index. Ohne diese Pruefung faellt das erst auf, wenn der Pi das
+        # Skript nicht starten kann, oder hier mit "Permission denied".
+        run: |
+          nicht_ausfuehrbar=$(git ls-files -s '*.sh' | awk '$1 != "100755" {print $4}')
+          if [ -n "$nicht_ausfuehrbar" ]; then
+            echo "::error::Diese Skripte sind nicht ausfuehrbar:"
+            echo "$nicht_ausfuehrbar"
+            echo "Beheben mit:  git update-index --chmod=+x <datei>"
+            exit 1
+          fi
+          echo "Alle Skripte haben das Ausfuehrbar-Bit."
+
       - name: Compose-Dateien validieren
         run: |
           cp .env.example .env
