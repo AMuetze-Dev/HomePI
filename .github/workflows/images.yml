@@ -1,0 +1,100 @@
+name: Images
+
+# Baut die arm64-Images fuer den Pi und legt sie in der GitHub Container
+# Registry ab. Auf dem Pi danach nur noch:  make deploy-apps
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Welchen Dienst bauen"
+        type: choice
+        options: [beide, api, web]
+        default: beide
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, web]
+
+    steps:
+      - name: Diesen Dienst ueberspringen?
+        id: gate
+        run: |
+          wunsch='${{ github.event.inputs.service }}'
+          if [ -n "$wunsch" ] && [ "$wunsch" != "beide" ] && [ "$wunsch" != "${{ matrix.service }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.skip != 'true'
+
+      # Nur die API braucht QEMU: ihre Wheels sind architekturspezifisch.
+      # Das Frontend baut dank --platform=$BUILDPLATFORM nativ auf amd64 und
+      # legt nur die fertigen Dateien in eine arm64-nginx-Schicht.
+      - uses: docker/setup-qemu-action@v3
+        if: steps.gate.outputs.skip != 'true' && matrix.service == 'api'
+        with:
+          platforms: arm64
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.gate.outputs.skip != 'true'
+
+      - uses: docker/login-action@v3
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        if: steps.gate.outputs.skip != 'true'
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/homepi-${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v6
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          context: services/${{ matrix.service }}
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=release-${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=release-${{ matrix.service }}
+          # VITE_API_URL landet zur Build-Zeit im Bundle. Als Repository-
+          # Variable hinterlegen: Settings -> Variables -> VITE_API_URL
+          build-args: |
+            VITE_API_URL=${{ vars.VITE_API_URL }}
+
+      - name: Ergebnis
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          {
+            echo "### homepi-${{ matrix.service }}"
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo "Auf dem Pi einspielen mit \`make deploy-apps\`."
+          } >> "$GITHUB_STEP_SUMMARY"

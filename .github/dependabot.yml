@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule: { interval: "monthly" }
+    commit-message: { prefix: "chore(ci)" }
+
+  - package-ecosystem: "uv"
+    directory: "/services/api"
+    schedule: { interval: "weekly" }
+    commit-message: { prefix: "chore(api)" }
+    groups:
+      dev-abhaengigkeiten:
+        dependency-type: "development"
+
+  - package-ecosystem: "npm"
+    directory: "/services/web"
+    schedule: { interval: "weekly" }
+    commit-message: { prefix: "chore(web)" }
+    groups:
+      dev-abhaengigkeiten:
+        dependency-type: "development"
+
+  # Basis-Images der Dockerfiles
+  - package-ecosystem: "docker"
+    directories: ["/services/api", "/services/web"]
+    schedule: { interval: "monthly" }
+    commit-message: { prefix: "chore(docker)" }

@@ -109,5 +109,51 @@ cert:
 	@echo | openssl s_client -connect $(PI_IP):443 -servername traefik.$(DOMAIN) 2>/dev/null \
 		| openssl x509 -noout -subject -issuer -dates
 
-.PHONY: help up up-core up-dns up-data up-home up-apps down render \
-        deploy-apps pull update ps logs stats psql pg-tunnel backup check verify cert
+# ---------------------------------------------------------------- Entwicklung
+API := services/api
+WEB := services/web
+
+## test: alles pruefen, was die CI auch prueft
+test: test-infra test-api-full test-web
+
+## test-infra: Shell-Skripte und Compose-Dateien validieren
+test-infra: render verify
+	@shellcheck --severity=warning scripts/*.sh stacks/data/initdb/*.sh 		&& echo "shellcheck ok"
+
+## test-api: Format, Lint, Typen und Unit-Tests des Backends
+test-api:
+	cd $(API) && uv run ruff format --check .
+	cd $(API) && uv run ruff check .
+	cd $(API) && uv run mypy
+	cd $(API) && uv run pytest
+
+## test-api-full: wie in der CI, inklusive Integrationstests gegen Postgres
+test-api-full:
+	@./scripts/run-api-tests.sh
+
+## test-web: Format, Lint, Typen und Tests des Frontends
+test-web:
+	cd $(WEB) && npx prettier --check src *.ts *.js
+	cd $(WEB) && npx eslint .
+	cd $(WEB) && npm run typecheck
+	cd $(WEB) && npm run test:coverage
+
+## tdd-api: pytest im Watch-Modus, nur Unit-Tests
+tdd-api:
+	cd $(API) && uv run ptw . --now
+
+## tdd-web: vitest im Watch-Modus
+tdd-web:
+	cd $(WEB) && npm run test:watch
+
+## fmt: Quellcode formatieren und automatisch behebbare Funde beheben
+fmt:
+	cd $(API) && uv run ruff format . && uv run ruff check --fix .
+	cd $(WEB) && npm run format && npm run lint:fix
+
+## install: Entwicklungsabhaengigkeiten beider Dienste einrichten
+install:
+	cd $(API) && uv sync
+	cd $(WEB) && npm ci
+
+.PHONY: help up up-core up-dns up-data up-home up-apps down render         deploy-apps pull update ps logs stats psql pg-tunnel backup check verify cert         test test-infra test-api test-api-full test-web tdd-api tdd-web fmt install

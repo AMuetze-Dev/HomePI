@@ -1,0 +1,73 @@
+name: Deploy
+
+# Ausrollen auf den Pi. Bewusst NUR manuell ausloesbar und bewusst ueber einen
+# selbst gehosteten Runner auf dem Pi - damit muss kein SSH-Zugang und kein
+# privater Schluessel bei GitHub liegen. Der Pi holt, GitHub schiebt nicht.
+#
+# Einrichtung, sobald der Pi laeuft:
+#   1. Repo -> Settings -> Actions -> Runners -> New self-hosted runner (ARM64)
+#      Label vergeben:  homepi
+#   2. Repo -> Settings -> Variables:  DEPLOY_ENABLED = true
+#   3. Auf dem Pi einmalig:  echo $TOKEN | docker login ghcr.io -u USER --password-stdin
+#
+# Bis dahin ist der Weg von Hand:  ssh pi && cd ~/homelab && make deploy-apps
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: "Welchen Stack neu starten"
+        type: choice
+        options: [apps, core, dns, data, home, alle]
+        default: apps
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # Solange die Variable nicht gesetzt ist, laeuft dieser Job gar nicht erst
+    # los und bleibt nicht minutenlang auf einen Runner wartend haengen.
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: [self-hosted, linux, ARM64, homepi]
+    environment: produktion
+
+    steps:
+      - name: Stand des Repos auf dem Pi aktualisieren
+        run: |
+          cd "$HOME/homelab"
+          git fetch --prune origin
+          git checkout main
+          git reset --hard origin/main
+
+      - name: Sichern, bevor etwas ersetzt wird
+        run: |
+          cd "$HOME/homelab"
+          ./scripts/backup.sh
+
+      - name: Ausrollen
+        run: |
+          cd "$HOME/homelab"
+          if [ "${{ github.event.inputs.stack }}" = "alle" ]; then
+            make pull && make up
+          elif [ "${{ github.event.inputs.stack }}" = "apps" ]; then
+            make deploy-apps
+          else
+            make "up-${{ github.event.inputs.stack }}"
+          fi
+
+      - name: Nachsehen, ob es auch laeuft
+        run: |
+          cd "$HOME/homelab"
+          sleep 15
+          make ps
+          # Ein Container, der sofort wieder neu startet, ist kein Erfolg
+          if docker ps --filter 'status=restarting' --format '{{.Names}}' | grep -q .; then
+            echo "::error::Mindestens ein Container startet dauernd neu"
+            docker ps --filter 'status=restarting' --format '{{.Names}}'
+            exit 1
+          fi
