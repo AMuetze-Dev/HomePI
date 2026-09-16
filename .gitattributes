@@ -1,0 +1,27 @@
+# Entwickelt wird unter Windows, ausgefuehrt wird unter Linux.
+# Ohne diese Datei checkt Git Shell-Skripte mit CRLF aus und der Pi antwortet
+# mit "bad interpreter: /bin/bash^M". Der Makefile bricht genauso.
+* text=auto eol=lf
+
+*.sh      text eol=lf
+*.py      text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.tmpl    text eol=lf
+*.conf    text eol=lf
+*.toml    text eol=lf
+*.json    text eol=lf
+*.ts      text eol=lf
+*.tsx     text eol=lf
+*.md      text eol=lf
+Makefile        text eol=lf
+Dockerfile      text eol=lf
+.env.example    text eol=lf
+.gitignore      text eol=lf
+
+# Binaerdateien nicht anfassen
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
