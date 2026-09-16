@@ -1,0 +1,21 @@
+from httpx import AsyncClient
+
+
+async def test_health_ist_ok_ohne_abhaengigkeiten(client: AsyncClient) -> None:
+    antwort = await client.get("/health")
+
+    assert antwort.status_code == 200
+    assert antwort.json()["status"] == "ok"
+
+
+async def test_info_nennt_service_und_version(client: AsyncClient) -> None:
+    koerper = (await client.get("/info")).json()
+
+    assert koerper["service"] == "{{service}}"
+    assert koerper["version"]
+
+
+async def test_wurzel_antwortet(client: AsyncClient) -> None:
+    antwort = await client.get("/")
+
+    assert antwort.status_code == 200

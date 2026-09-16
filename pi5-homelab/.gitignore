@@ -1,0 +1,10 @@
+# Secrets - niemals einchecken
+.env
+
+# aus *.yml.tmpl gerendert, enthaelt die Domain
+core/dynamic/*.yml
+!core/dynamic/*.yml.tmpl
+
+# lokale Notizen
+*.local
+*.log

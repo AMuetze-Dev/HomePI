@@ -1,0 +1,37 @@
+# Fragment fuer den apps-Stack. Wird ueber "include:" in
+# stacks/apps/docker-compose.yml eingebunden.
+services:
+  {{service}}:
+    image: ${{{MODUL}}_IMAGE:-ghcr.io/{{besitzer}}/homepi-{{service}}:latest}
+    container_name: {{service}}
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      SERVICE_NAME: {{service}}
+      ENVIRONMENT: produktion
+      LOG_LEVEL: info
+      WEB_CONCURRENCY: 1
+      {{db_zeile}}
+      CORS_ORIGINS: https://app.${DOMAIN}
+    networks:
+      - edge
+      - data
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.{{service}}.rule: "Host(`api.${DOMAIN}`) && PathPrefix(`/{{service}}`)"
+      traefik.http.routers.{{service}}.entrypoints: "websecure"
+      traefik.http.routers.{{service}}.middlewares: "{{service}}-strip,api-cors@file,rate-limit@file"
+      traefik.http.middlewares.{{service}}-strip.stripprefix.prefixes: "/{{service}}"
+      traefik.http.services.{{service}}.loadbalancer.server.port: "{{port}}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:{{port}}/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  edge:
+    external: true
+  data:
+    external: true

@@ -1,28 +1,70 @@
+# Ziel: höchstens vier Pull Requests im Monat, nicht zwanzig.
+#
+# Die Standardwerte von Dependabot (fünf offene PRs je Ökosystem, wöchentlich,
+# ein PR je Abhängigkeit) erzeugen in einem Repo dieser Größe mehr Rauschen als
+# Nutzen. Deshalb: alles gruppiert, monatlich, und Major-Updates werden gar
+# nicht vorgeschlagen - die will man lesen und von Hand machen, nicht mergen.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
-    schedule: { interval: "monthly" }
-    commit-message: { prefix: "chore(ci)" }
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 1
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns: ["*"]
 
   - package-ecosystem: "uv"
-    directory: "/services/api"
-    schedule: { interval: "weekly" }
-    commit-message: { prefix: "chore(api)" }
+    directories:
+      - "/services/api"
+      - "/packages/homepi-core"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 1
+    commit-message:
+      prefix: "chore(python)"
     groups:
-      dev-abhaengigkeiten:
-        dependency-type: "development"
+      python:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      # Major-Updates von Pydantic, SQLAlchemy oder FastAPI ändern Verhalten.
+      # Die gehören in einen eigenen Branch mit gelesenen Release Notes.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "npm"
     directory: "/services/web"
-    schedule: { interval: "weekly" }
-    commit-message: { prefix: "chore(web)" }
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 1
+    commit-message:
+      prefix: "chore(web)"
     groups:
-      dev-abhaengigkeiten:
-        dependency-type: "development"
+      npm:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
-  # Basis-Images der Dockerfiles
   - package-ecosystem: "docker"
-    directories: ["/services/api", "/services/web"]
-    schedule: { interval: "monthly" }
-    commit-message: { prefix: "chore(docker)" }
+    directories:
+      - "/services/api"
+      - "/services/web"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 1
+    commit-message:
+      prefix: "chore(docker)"
+    groups:
+      basis-images:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      # python:3.14 oder node:26 sind bewusste Entscheidungen, keine Updates.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
