@@ -1,0 +1,29 @@
+# homepi-{{service}}
+
+HomePI-Microservice. Das Grundgeruest kommt aus `homepi-core`:
+Einstellungen, Logging, `/health`, `/info`, Fehlerformat und Anfrage-Kennung
+sind bereits da.
+
+## Entwickeln
+
+```bash
+uv sync
+uv run pytest            # Unit-Tests, ohne Datenbank
+uv run ptw . --now       # Watch-Modus
+uv run uvicorn homepi_{{modul}}.main:app --reload
+```
+
+## Ausrollen
+
+```bash
+homepi deploy -s {{service}}
+```
+
+Stoesst die Pipeline an: arm64-Image bauen, in die GHCR legen, Pi zieht es.
+Voraussetzung: der Stand liegt auf `main` und `gh auth status` ist gruen.
+
+## Konfiguration
+
+Alles Allgemeine erbt von `ServiceSettings` - `DATABASE_URL`, `REDIS_URL`,
+`LOG_LEVEL`, `CORS_ORIGINS`, `PORT`, `WEB_CONCURRENCY`. Eigene Felder
+kommen in `src/homepi_{{modul}}/settings.py` dazu.

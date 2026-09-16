@@ -1,0 +1,21 @@
+from collections.abc import AsyncIterator
+
+import pytest
+from homepi_core import create_service
+from httpx import ASGITransport, AsyncClient
+
+from homepi_{{modul}}.settings import Settings
+
+
+@pytest.fixture
+def settings() -> Settings:
+    """Ohne DATABASE_URL: die Unit-Tests sollen keine Datenbank brauchen."""
+    return Settings(database_url=None, redis_url=None)
+
+
+@pytest.fixture
+async def client(settings: Settings) -> AsyncIterator[AsyncClient]:
+    app = create_service(settings)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c

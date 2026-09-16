@@ -1,0 +1,18 @@
+from homepi_core import ServiceSettings
+
+from . import __version__
+
+
+class Settings(ServiceSettings):
+    """Einstellungen dieses Service.
+
+    Alles Allgemeine (DATABASE_URL, LOG_LEVEL, CORS_ORIGINS, PORT ...) kommt
+    aus ServiceSettings. Hier stehen nur die eigenen Felder.
+    """
+
+    service_name: str = "{{service}}"
+    service_version: str = __version__
+    port: int = {{port}}
+
+    # Beispiel fuer ein eigenes Feld - Umgebungsvariable: MEINE_OPTION
+    # meine_option: int = 5

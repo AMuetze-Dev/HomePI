@@ -1,0 +1,1 @@
+"""CLI von homepi-core."""

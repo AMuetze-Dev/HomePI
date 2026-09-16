@@ -1,0 +1,110 @@
+name: data
+
+services:
+  postgres:
+    image: postgres:17-bookworm
+    container_name: postgres
+    restart: unless-stopped
+    shm_size: 256mb
+    ports:
+      # Bewusst NUR Loopback. Zugriff vom Desktop per SSH-Tunnel (make pg-tunnel).
+      # Home Assistant laeuft im Host-Netz und erreicht die DB hierueber.
+      - "127.0.0.1:5432:5432"
+    environment:
+      TZ: ${TZ}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      HA_DB_PASSWORD: ${HA_DB_PASSWORD}
+      # scram-sha-256 statt md5
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --data-checksums"
+    command:
+      - postgres
+      # Tuning fuer Pi 5 / 16 GB / NVMe. Konservativ, aber deutlich besser als Default.
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=4GB
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - max_connections=100
+      # SSD: zufaellige Zugriffe kosten fast nichts mehr
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - wal_compression=on
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - max_wal_size=2GB
+      - -c
+      - timezone=${TZ}
+    volumes:
+      - ${DATA_ROOT}/postgres/data:/var/lib/postgresql/data
+      # laeuft nur beim allerersten Start auf einem leeren Datenverzeichnis
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_DISABLE_POSTFIX: "True"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      # hinter Traefik korrekt Schema/Host erkennen
+      PGADMIN_CONFIG_PROXY_X_HOST_COUNT: "1"
+      PGADMIN_CONFIG_PROXY_X_PREFIX_COUNT: "1"
+    volumes:
+      # Achtung: Container laeuft als uid 5050 -> Verzeichnis muss ihm gehoeren.
+      # Macht scripts/10-os-bootstrap.sh.
+      - ${DATA_ROOT}/pgadmin:/var/lib/pgadmin
+    networks:
+      - edge
+      - data
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.pgadmin.rule: "Host(`pgadmin.${DOMAIN}`)"
+      traefik.http.routers.pgadmin.entrypoints: "websecure"
+      traefik.http.routers.pgadmin.middlewares: "lan-only@file"
+      traefik.http.services.pgadmin.loadbalancer.server.port: "80"
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "900", "1", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "no"]
+    volumes:
+      - ${DATA_ROOT}/redis:/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+networks:
+  edge:
+    external: true
+  data:
+    external: true

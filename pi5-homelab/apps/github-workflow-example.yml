@@ -1,0 +1,66 @@
+# .github/workflows/build.yml im jeweiligen Anwendungs-Repo.
+# Baut ein arm64-Image und schiebt es nach GHCR. Auf dem Pi danach nur noch:
+#   make deploy-apps
+name: build-and-push
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository }}
+
+jobs:
+  build:
+    # Oeffentliche Repos: "ubuntu-24.04-arm" nutzen - nativer ARM-Runner, kein QEMU,
+    # deutlich schneller. Fuer private Repos ubuntu-latest + QEMU (siehe unten).
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Nur noetig, wenn NICHT auf einem ARM-Runner gebaut wird:
+      # - uses: docker/setup-qemu-action@v3
+      #   with: { platforms: arm64 }
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Frontend: API-URL landet zur Build-Zeit im Bundle
+          # build-args: |
+          #   VITE_API_URL=https://api.home.example.com
+
+# Auf dem Pi einmalig gegen GHCR anmelden (Token mit read:packages):
+#   echo $GHCR_TOKEN | docker login ghcr.io -u DEINUSER --password-stdin
+#
+# Optional statt manuellem "make deploy-apps": einen selbst gehosteten Runner
+# oder einen Webhook-Listener auf dem Pi. Fuer den Anfang reicht der Handgriff.
