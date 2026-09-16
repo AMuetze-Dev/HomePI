@@ -48,19 +48,42 @@ describe("Geräteseite", () => {
 
     render(<GeraeteSeite />);
 
-    expect(
-      await screen.findByText(/1 Geräte, davon 0 eingeschaltet/),
-    ).toBeInTheDocument();
+    // Zahl und Bezeichnung gehören zusammen - genau so liest ein
+    // Screenreader die Kennzahl vor.
+    expect(await screen.findByRole("listitem", { name: "1 Geräte" })).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "0 eingeschaltet" })).toBeInTheDocument();
+
     const tabelle = screen.getByRole("table");
     expect(within(tabelle).getByText("Stehlampe")).toBeInTheDocument();
   });
 
-  it("nennt die Wartungsgeräte nur, wenn es welche gibt", async () => {
-    mitDaten([geraet()], uebersicht({ in_wartung: 2 }));
+  it("zählt Wartungsgeräte und Räume", async () => {
+    mitDaten([geraet()], uebersicht({ in_wartung: 2, raeume: { Küche: 1, Bad: 2 } }));
 
     render(<GeraeteSeite />);
 
-    expect(await screen.findByText(/2 in Wartung/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("listitem", { name: "2 in Wartung" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "2 Räume" })).toBeInTheDocument();
+  });
+
+  it("zeigt den Zustand als Etikett statt als nacktes Wort", async () => {
+    mitDaten([geraet({ eingeschaltet: true })]);
+
+    render(<GeraeteSeite />);
+
+    const tabelle = await screen.findByRole("table");
+    expect(within(tabelle).getByText("An")).toBeInTheDocument();
+  });
+
+  it("weist ein Wartungsgerät als solches aus", async () => {
+    mitDaten([geraet({ zustand: "wartung" })]);
+
+    render(<GeraeteSeite />);
+
+    const tabelle = await screen.findByRole("table");
+    expect(within(tabelle).getByText("Wartung")).toBeInTheDocument();
   });
 
   it("sagt im Erstzustand, was zu tun ist", async () => {

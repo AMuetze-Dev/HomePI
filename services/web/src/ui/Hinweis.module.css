@@ -1,0 +1,44 @@
+.hinweis {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--raum-3);
+  padding: var(--raum-3) var(--raum-4);
+  border: 1px solid transparent;
+  border-radius: var(--rundung-md);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-normal);
+  animation: einblenden var(--dauer-normal) var(--verlauf-eintritt);
+}
+
+.punkt {
+  margin-top: 0.4375rem;
+}
+
+.fehler {
+  background: var(--signal-fehler-flaeche);
+  border-color: color-mix(in srgb, var(--signal-fehler) 24%, transparent);
+  color: color-mix(in srgb, var(--signal-fehler) 82%, var(--farbe-text));
+}
+
+.warnung {
+  background: var(--signal-warnung-flaeche);
+  border-color: color-mix(in srgb, var(--signal-warnung) 24%, transparent);
+  color: color-mix(in srgb, var(--signal-warnung) 82%, var(--farbe-text));
+}
+
+.neutral {
+  background: var(--farbe-flaeche-gedaempft);
+  border-color: var(--farbe-rand);
+  color: var(--farbe-text-gedaempft);
+}
+
+@keyframes einblenden {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

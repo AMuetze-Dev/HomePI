@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
 import {
   entferneGeraet,
   ladeGeraete,
@@ -9,6 +10,7 @@ import {
   type Geraet,
   type Zusammenfassung,
 } from "./api";
+import stil from "./GeraeteSeite.module.css";
 
 type Daten = { geraete: Geraet[]; uebersicht: Zusammenfassung };
 
@@ -60,8 +62,22 @@ export function GeraeteSeite() {
     }
   }
 
-  if (zustand.phase === "laedt") return <p role="status">Geräte werden geladen …</p>;
-  if (zustand.phase === "fehler") return <p role="alert">{zustand.nachricht}</p>;
+  if (zustand.phase === "laedt") {
+    return (
+      <div className={stil.laden} role="status" aria-label="Geräte werden geladen">
+        <Platzhalter breite="100%" hoehe="5rem" />
+        <Platzhalter breite="100%" hoehe="12rem" />
+      </div>
+    );
+  }
+
+  if (zustand.phase === "fehler") {
+    return (
+      <Hinweis ton="fehler" dringend>
+        {zustand.nachricht}
+      </Hinweis>
+    );
+  }
 
   const { geraete, uebersicht } = zustand.daten;
 
@@ -69,7 +85,11 @@ export function GeraeteSeite() {
     <>
       <Uebersicht daten={uebersicht} />
 
-      {aktionsfehler && <p role="alert">{aktionsfehler}</p>}
+      {aktionsfehler && (
+        <Hinweis ton="fehler" dringend>
+          {aktionsfehler}
+        </Hinweis>
+      )}
 
       <Liste
         geraete={geraete}
@@ -86,22 +106,45 @@ export function GeraeteSeite() {
 
 function Uebersicht({ daten }: { daten: Zusammenfassung }) {
   return (
-    <section aria-labelledby="uebersicht">
-      <h2 id="uebersicht">Überblick</h2>
-      <p>
-        {daten.anzahl} Geräte, davon {daten.eingeschaltet} eingeschaltet
-        {daten.in_wartung > 0 && ` und ${daten.in_wartung} in Wartung`}.
-      </p>
-      {Object.keys(daten.raeume).length > 0 && (
-        <ul aria-label="Räume">
-          {Object.entries(daten.raeume).map(([raum, anzahl]) => (
-            <li key={raum}>
-              {raum}: {anzahl}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <ul className={stil.kennzahlen} aria-label="Überblick">
+      <Kennzahl wert={daten.anzahl} name="Geräte" />
+      <Kennzahl wert={daten.eingeschaltet} name="eingeschaltet" ton="gut" />
+      <Kennzahl wert={daten.in_wartung} name="in Wartung" ton="warnung" />
+      <Kennzahl wert={Object.keys(daten.raeume).length} name="Räume" />
+    </ul>
+  );
+}
+
+function Kennzahl({
+  wert,
+  name,
+  ton = "neutral",
+}: {
+  wert: number;
+  name: string;
+  ton?: "neutral" | "gut" | "warnung";
+}) {
+  // Eine Null wird nicht eingefärbt: sie ist keine Meldung, sondern die
+  // Abwesenheit einer.
+  const eingefaerbt = ton !== "neutral" && wert > 0;
+
+  return (
+    // Zahl und Bezeichnung stehen optisch untereinander; aria-label fasst
+    // beides zu dem zusammen, was ein Screenreader vorlesen soll - sonst
+    // kommt "1" und "Geräte" als zwei zusammenhanglose Fetzen an.
+    <li className={stil.eintrag} aria-label={`${wert} ${name}`}>
+      <Karte className={stil.kennzahl}>
+        <span
+          className={`${stil.wert} ${eingefaerbt ? stil[ton] : ""}`}
+          aria-hidden="true"
+        >
+          {wert}
+        </span>
+        <span className={stil.name} aria-hidden="true">
+          {name}
+        </span>
+      </Karte>
+    </li>
   );
 }
 
@@ -115,47 +158,72 @@ function Liste({
   onEntfernen: (g: Geraet) => void;
 }) {
   if (geraete.length === 0) {
-    return <p>Noch kein Gerät angelegt. Unten kannst du das erste eintragen.</p>;
+    return (
+      <Leerzustand titel="Noch kein Gerät angelegt">
+        Trage unten das erste ein. Danach lässt es sich hier ein- und ausschalten.
+      </Leerzustand>
+    );
   }
 
   return (
-    <table>
-      <caption>Geräte</caption>
-      <thead>
-        <tr>
-          <th scope="col">Name</th>
-          <th scope="col">Raum</th>
-          <th scope="col">Zustand</th>
-          <th scope="col">Aktion</th>
-        </tr>
-      </thead>
-      <tbody>
-        {geraete.map((geraet) => (
-          <tr key={geraet.id}>
-            <td>{geraet.name}</td>
-            <td>{geraet.raum}</td>
-            <td>{geraet.eingeschaltet ? "an" : "aus"}</td>
-            <td>
-              <button
-                type="button"
-                onClick={() => onSchalten(geraet)}
-                disabled={geraet.zustand === "wartung"}
-                aria-label={`${geraet.name} ${geraet.eingeschaltet ? "ausschalten" : "einschalten"}`}
-              >
-                {geraet.eingeschaltet ? "Ausschalten" : "Einschalten"}
-              </button>
-              <button
-                type="button"
-                onClick={() => onEntfernen(geraet)}
-                aria-label={`${geraet.name} entfernen`}
-              >
-                Entfernen
-              </button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <Karte blank>
+      <div className={stil.rollbereich}>
+        <table className={stil.tabelle} role="table">
+          <caption className="nur-vorlesen">Geräte</caption>
+          <thead>
+            <tr role="row">
+              <th scope="col">Name</th>
+              <th scope="col">Raum</th>
+              <th scope="col">Zustand</th>
+              <th scope="col">
+                <span className="nur-vorlesen">Aktion</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {geraete.map((geraet) => (
+              <tr key={geraet.id} role="row">
+                <td className={stil.geraetname} role="cell">
+                  {geraet.name}
+                </td>
+                <td className={stil.raum} role="cell">
+                  {geraet.raum}
+                </td>
+                <td role="cell" className={stil.zustandszelle}>
+                  {geraet.zustand === "wartung" ? (
+                    <Etikett ton="warnung">Wartung</Etikett>
+                  ) : (
+                    <Etikett ton={geraet.eingeschaltet ? "gut" : "neutral"}>
+                      {geraet.eingeschaltet ? "An" : "Aus"}
+                    </Etikett>
+                  )}
+                </td>
+                <td role="cell" className={stil.aktionszelle}>
+                  <div className={stil.aktionen}>
+                    <Knopf
+                      groesse="sm"
+                      onClick={() => onSchalten(geraet)}
+                      disabled={geraet.zustand === "wartung"}
+                      aria-label={`${geraet.name} ${geraet.eingeschaltet ? "ausschalten" : "einschalten"}`}
+                    >
+                      {geraet.eingeschaltet ? "Ausschalten" : "Einschalten"}
+                    </Knopf>
+                    <Knopf
+                      groesse="sm"
+                      auspraegung="leise"
+                      onClick={() => onEntfernen(geraet)}
+                      aria-label={`${geraet.name} entfernen`}
+                    >
+                      Entfernen
+                    </Knopf>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Karte>
   );
 }
 
@@ -188,25 +256,39 @@ function Anlegen({
   }
 
   return (
-    <form onSubmit={(e) => void absenden(e)} aria-labelledby="anlegen">
-      <h2 id="anlegen">Gerät anlegen</h2>
-      <label htmlFor="feld-name">Name</label>
-      <input
-        id="feld-name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-      />
-      <label htmlFor="feld-raum">Raum</label>
-      <input
-        id="feld-raum"
-        value={raum}
-        onChange={(e) => setRaum(e.target.value)}
-        required
-      />
-      <button type="submit" disabled={!vollstaendig || laeuft}>
-        {laeuft ? "Wird angelegt …" : "Anlegen"}
-      </button>
-    </form>
+    <section aria-labelledby="anlegen">
+      <h2 id="anlegen" className={stil.abschnittstitel}>
+        Gerät anlegen
+      </h2>
+
+      <Karte>
+        <form onSubmit={(e) => void absenden(e)} className={stil.formular}>
+          <Feld
+            beschriftung="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Stehlampe"
+            autoComplete="off"
+            required
+          />
+          <Feld
+            beschriftung="Raum"
+            value={raum}
+            onChange={(e) => setRaum(e.target.value)}
+            placeholder="Wohnzimmer"
+            autoComplete="off"
+            required
+          />
+          <Knopf
+            type="submit"
+            auspraegung="primaer"
+            disabled={!vollstaendig || laeuft}
+            className={stil.absenden}
+          >
+            {laeuft ? "Wird angelegt …" : "Anlegen"}
+          </Knopf>
+        </form>
+      </Karte>
+    </section>
   );
 }

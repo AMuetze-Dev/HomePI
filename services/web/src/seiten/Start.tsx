@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 
 import { fetchModule, type ModulEintrag } from "../api/client";
 import { SystemStatus } from "../components/SystemStatus";
+import { Etikett, Karte, Leerzustand, Platzhalter, Seitenkopf, Statuspunkt } from "../ui";
+import stil from "./Start.module.css";
 
 type Zustand =
   | { phase: "laedt" }
@@ -27,41 +29,76 @@ export function Start() {
   }, []);
 
   return (
-    <main>
-      <header>
-        <h1>HomePI</h1>
-        <SystemStatus />
-      </header>
+    <>
+      <Seitenkopf
+        titel="Übersicht"
+        beschreibung="Alle Dienste dieser Installation an einem Ort. Neue Artefakte erscheinen hier, sobald das Gateway sie geladen hat."
+      />
 
-      <section aria-labelledby="artefakte">
-        <h2 id="artefakte">Artefakte</h2>
-        {zustand.phase === "laedt" && <p role="status">Artefakte werden geladen …</p>}
+      <Karte className={stil.statuskarte}>
+        <SystemStatus />
+      </Karte>
+
+      <section className={stil.bereich} aria-labelledby="artefakte">
+        <div className={stil.bereichskopf}>
+          <h2 id="artefakte" className={stil.bereichstitel}>
+            Artefakte
+          </h2>
+          {zustand.phase === "fertig" && zustand.module.length > 0 && (
+            <span className={stil.anzahl}>{zustand.module.length}</span>
+          )}
+        </div>
+
+        {zustand.phase === "laedt" && <Ladegitter />}
+
         {zustand.phase === "fehler" && (
-          <p role="alert">Manifest nicht abrufbar: {zustand.nachricht}</p>
+          <Leerzustand titel="Manifest nicht abrufbar">
+            Das Gateway hat nicht geantwortet: {zustand.nachricht}
+          </Leerzustand>
         )}
+
         {zustand.phase === "fertig" && <Kacheln module={zustand.module} />}
       </section>
-    </main>
+    </>
+  );
+}
+
+function Ladegitter() {
+  return (
+    <div className={stil.gitter} aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <Karte key={i}>
+          <Platzhalter breite="7rem" hoehe="1rem" />
+          <div className={stil.ladezeile}>
+            <Platzhalter breite="100%" hoehe="0.75rem" />
+          </div>
+          <Platzhalter breite="4rem" hoehe="0.75rem" />
+        </Karte>
+      ))}
+    </div>
   );
 }
 
 function Kacheln({ module }: { module: ModulEintrag[] }) {
   if (module.length === 0) {
-    // Der Erstzustand. Eine leere Fläche ohne Erklärung lässt einen ratlos
-    // zurück - hier steht, was als Nächstes zu tun ist.
     return (
-      <p>
-        Noch kein Artefakt angemeldet. Ein neues legst du mit{" "}
-        <code>homepi new &lt;name&gt;</code> an; nach dem Deploy erscheint es hier von
-        selbst.
-      </p>
+      <Leerzustand titel="Noch kein Artefakt angemeldet">
+        Ein neues legst du mit <code>homepi new &lt;name&gt;</code> an. Nach dem Deploy
+        erscheint es hier von selbst — am Frontend ist dafür nichts zu ändern.
+      </Leerzustand>
     );
   }
 
   return (
-    <ul aria-label="Artefakte">
-      {module.map((modul) => (
-        <li key={modul.id}>
+    <ul className={stil.gitter} aria-label="Artefakte">
+      {module.map((modul, index) => (
+        <li
+          key={modul.id}
+          className={stil.eintrag}
+          /* Gestaffeltes Erscheinen, gedeckelt: bei zwanzig Kacheln wuerde
+             sonst die letzte erst nach zwei Sekunden auftauchen. */
+          style={{ animationDelay: `${Math.min(index, 6) * 40}ms` }}
+        >
           <Kachel modul={modul} />
         </li>
       ))}
@@ -72,20 +109,33 @@ function Kacheln({ module }: { module: ModulEintrag[] }) {
 function Kachel({ modul }: { modul: ModulEintrag }) {
   if (modul.status === "fehler") {
     return (
-      <article aria-labelledby={`t-${modul.id}`} data-status="fehler">
-        <h3 id={`t-${modul.id}`}>{modul.titel}</h3>
-        <p role="alert">Konnte nicht geladen werden: {modul.beschreibung}</p>
-      </article>
+      <Karte className={stil.kachel}>
+        <div className={stil.kachelkopf}>
+          <h3 className={stil.kacheltitel}>{modul.titel}</h3>
+          <Etikett ton="fehler">Fehler</Etikett>
+        </div>
+        <p className={stil.kacheltext} role="alert">
+          {modul.beschreibung || "Das Modul konnte nicht geladen werden."}
+        </p>
+      </Karte>
     );
   }
 
   return (
-    <article aria-labelledby={`t-${modul.id}`} data-status="bereit">
-      <h3 id={`t-${modul.id}`}>
-        <Link to={`/modul/${modul.id}`}>{modul.titel}</Link>
-      </h3>
-      {modul.beschreibung && <p>{modul.beschreibung}</p>}
-      <p>Version {modul.version}</p>
-    </article>
+    <Link to={`/modul/${modul.id}`} className={stil.verweis}>
+      <Karte className={`${stil.kachel} ${stil.klickbar}`}>
+        <div className={stil.kachelkopf}>
+          <h3 className={stil.kacheltitel}>{modul.titel}</h3>
+          <Statuspunkt ton="gut" />
+        </div>
+
+        {modul.beschreibung && <p className={stil.kacheltext}>{modul.beschreibung}</p>}
+
+        <div className={stil.kachelfuss}>
+          <Etikett mono>v{modul.version}</Etikett>
+          <span className={stil.pfad}>{modul.pfad}</span>
+        </div>
+      </Karte>
+    </Link>
   );
 }

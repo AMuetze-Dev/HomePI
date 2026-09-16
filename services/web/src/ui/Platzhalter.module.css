@@ -1,0 +1,22 @@
+.platzhalter {
+  border-radius: var(--rundung-sm);
+  background: linear-gradient(
+    90deg,
+    var(--farbe-flaeche-gedaempft) 0%,
+    color-mix(in srgb, var(--farbe-rand) 60%, var(--farbe-flaeche-gedaempft)) 50%,
+    var(--farbe-flaeche-gedaempft) 100%
+  );
+  background-size: 200% 100%;
+  /* Langsam und mit wenig Kontrast: ein hektisches Schimmern laesst die
+     Anwendung nervoeser wirken, als sie ist. */
+  animation: wandern 1.6s var(--verlauf) infinite;
+}
+
+@keyframes wandern {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}

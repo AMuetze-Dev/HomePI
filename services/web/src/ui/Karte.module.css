@@ -1,0 +1,31 @@
+.karte {
+  background: var(--farbe-flaeche);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-lg);
+  box-shadow: var(--schatten-sm);
+}
+
+.innen {
+  padding: var(--raum-5);
+}
+
+/* Anklickbare Karten heben sich beim Zeigen minimal - ein Millimeter, nicht
+   mehr. Der Rand traegt den groesseren Teil der Rueckmeldung. */
+.klickbar {
+  display: block;
+  transition:
+    border-color var(--dauer-normal) var(--verlauf),
+    box-shadow var(--dauer-normal) var(--verlauf),
+    transform var(--dauer-normal) var(--verlauf);
+}
+
+.klickbar:hover {
+  border-color: var(--farbe-rand-stark);
+  box-shadow: var(--schatten-md);
+  transform: translateY(-1px);
+}
+
+.klickbar:active {
+  transform: translateY(0);
+  transition-duration: var(--dauer-sofort);
+}

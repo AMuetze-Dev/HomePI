@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { fetchEndpunkte, type Endpunkt, type ModulEintrag } from "../api/client";
+import { Karte, Leerzustand, Platzhalter } from "../ui";
+import stil from "./GenerischeAnsicht.module.css";
 
 /**
  * Was ein Artefakt bekommt, solange es keine eigene Oberfläche hat.
@@ -24,41 +26,57 @@ export function GenerischeAnsicht({ modul }: { modul: ModulEintrag }) {
     return () => controller.abort();
   }, [modul.pfad]);
 
-  if (endpunkte === null) return <p role="status">Schnittstelle wird gelesen …</p>;
+  if (endpunkte === null) {
+    return (
+      <div role="status" aria-label="Schnittstelle wird gelesen">
+        <Platzhalter breite="100%" hoehe="10rem" />
+      </div>
+    );
+  }
 
   if (endpunkte.length === 0) {
     return (
-      <p>
-        Dieses Artefakt hat noch keine eigene Oberfläche und meldet auch keine Endpunkte.
-        Eine eigene Ansicht trägst du in <code>src/module/register.ts</code> ein.
-      </p>
+      <Leerzustand titel="Noch keine Oberfläche">
+        Dieses Artefakt bringt keine eigene Ansicht mit und meldet auch keine Endpunkte.
+        Eine eigene Oberfläche trägst du in <code>src/module/register.ts</code> ein.
+      </Leerzustand>
     );
   }
 
   return (
-    <section aria-labelledby="endpunkte">
-      <h2 id="endpunkte">Schnittstelle</h2>
-      <p>Noch ohne eigene Oberfläche — hier steht, was das Artefakt anbietet.</p>
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Methode</th>
-            <th scope="col">Pfad</th>
-            <th scope="col">Zweck</th>
-          </tr>
-        </thead>
-        <tbody>
-          {endpunkte.map((e) => (
-            <tr key={`${e.methode} ${e.pfad}`}>
-              <td>{e.methode}</td>
-              <td>
-                <code>{e.pfad}</code>
-              </td>
-              <td>{e.beschreibung}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <section className={stil.bereich} aria-labelledby="endpunkte">
+      <h2 id="endpunkte" className="nur-vorlesen">
+        Schnittstelle
+      </h2>
+      <p className={stil.einleitung}>
+        Dieses Artefakt hat noch keine eigene Oberfläche. Solange das so ist, steht hier,
+        was es anbietet — direkt aus seinem Schema gelesen.
+      </p>
+
+      <Karte blank>
+        <div className={stil.rollbereich}>
+          <table className={stil.tabelle}>
+            <thead>
+              <tr>
+                <th scope="col">Methode</th>
+                <th scope="col">Pfad</th>
+                <th scope="col">Zweck</th>
+              </tr>
+            </thead>
+            <tbody>
+              {endpunkte.map((e) => (
+                <tr key={`${e.methode} ${e.pfad}`}>
+                  <td className={stil.methode}>{e.methode}</td>
+                  <td>
+                    <code className={stil.pfad}>{e.pfad}</code>
+                  </td>
+                  <td className={stil.zweck}>{e.beschreibung || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Karte>
     </section>
   );
 }

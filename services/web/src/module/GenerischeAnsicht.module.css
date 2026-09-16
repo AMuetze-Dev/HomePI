@@ -1,0 +1,75 @@
+.bereich {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+.einleitung {
+  max-width: var(--breite-text);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-gedaempft);
+}
+
+.tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.tabelle th {
+  padding: var(--raum-3) var(--raum-4);
+  border-bottom: 1px solid var(--farbe-rand);
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: var(--gewicht-mittel);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--farbe-text-leise);
+}
+
+.tabelle td {
+  padding: var(--raum-3) var(--raum-4);
+  border-bottom: 1px solid var(--farbe-rand);
+  vertical-align: middle;
+}
+
+/* Die letzte Zeile braucht keine Trennlinie - darunter kommt schon der
+   Kartenrand. */
+.tabelle tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tabelle tbody tr {
+  transition: background-color var(--dauer-schnell) var(--verlauf);
+}
+
+.tabelle tbody tr:hover {
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+.methode {
+  font-family: var(--schrift-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--gewicht-mittel);
+  color: var(--farbe-text-gedaempft);
+  white-space: nowrap;
+}
+
+.pfad {
+  font-family: var(--schrift-mono);
+  font-size: var(--text-xs);
+  color: var(--farbe-text);
+  word-break: break-all;
+}
+
+.zweck {
+  color: var(--farbe-text-gedaempft);
+}
+
+/* Auf schmalen Geraeten darf die Tabelle scrollen statt zu brechen -
+   umgebrochene Pfade sind unlesbar. */
+.rollbereich {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}

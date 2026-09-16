@@ -1,0 +1,168 @@
+/**
+ * Design-Tokens.
+ *
+ * Alles Visuelle steht hier und nirgendwo sonst. Eine Komponente greift nie
+ * zu einem festen Farbwert, sondern immer zu einem Token - sonst driftet das
+ * Erscheinungsbild auseinander, sobald die dritte Ansicht dazukommt.
+ *
+ * Die Namen beschreiben die ROLLE, nicht den Wert: --farbe-text-leise statt
+ * --grau-500. Damit bleibt der Dunkelmodus eine Frage der Werte.
+ *
+ * Hell und Dunkel stehen dank light-dark() in einer einzigen Deklaration
+ * nebeneinander. Die Alternative wäre, jeden Wert zweimal zu pflegen - und
+ * genau dort entstehen die Abweichungen, die man später nicht mehr findet.
+ */
+
+:root {
+  /* light-dark() richtet sich nach diesem Wert. Der Umschalter überschreibt
+   * ihn weiter unten, mehr braucht es dafür nicht. */
+  color-scheme: light dark;
+
+  /* ---------------------------------------------------------------- Palette
+   * Neutrale Skala, bewusst eng gestuft: die Wertigkeit entsteht aus feinen
+   * Abstufungen, nicht aus Kontrastsprüngen.
+   */
+  --neutral-0: #ffffff;
+  --neutral-25: #fcfcfd;
+  --neutral-50: #f7f7f8;
+  --neutral-100: #f0f0f2;
+  --neutral-150: #e7e7ea;
+  --neutral-200: #dedee2;
+  --neutral-300: #c6c6cd;
+  --neutral-400: #9b9ba4;
+  --neutral-500: #74747e;
+  --neutral-600: #55555e;
+  --neutral-700: #3b3b43;
+  --neutral-800: #26262b;
+  --neutral-900: #18181b;
+  --neutral-950: #0b0b0d;
+
+  --dunkel-flaeche: #141417;
+  --dunkel-flaeche-erhoben: #1b1b1f;
+  --dunkel-flaeche-gedaempft: #18181b;
+  --dunkel-rand: #27272d;
+  --dunkel-rand-stark: #35353d;
+
+  /* ------------------------------------------------------------- Flächen */
+  --farbe-grund: light-dark(var(--neutral-25), var(--neutral-950));
+  --farbe-flaeche: light-dark(var(--neutral-0), var(--dunkel-flaeche));
+  --farbe-flaeche-erhoben: light-dark(var(--neutral-0), var(--dunkel-flaeche-erhoben));
+  --farbe-flaeche-gedaempft: light-dark(
+    var(--neutral-50),
+    var(--dunkel-flaeche-gedaempft)
+  );
+
+  --farbe-rand: light-dark(var(--neutral-150), var(--dunkel-rand));
+  --farbe-rand-stark: light-dark(var(--neutral-200), var(--dunkel-rand-stark));
+
+  /* --------------------------------------------------------------- Schrift */
+  --farbe-text: light-dark(var(--neutral-950), #f2f2f4);
+  --farbe-text-gedaempft: light-dark(var(--neutral-600), #a6a6ae);
+  --farbe-text-leise: light-dark(var(--neutral-500), #7c7c85);
+
+  /* Die Primäraktion ist schlicht die kontrastreichste Fläche. Ein bunter
+   * Knopf wäre hier das erste, was billig wirkt. */
+  --farbe-aktion: light-dark(var(--neutral-950), #f2f2f4);
+  --farbe-aktion-schrift: light-dark(var(--neutral-0), var(--neutral-950));
+  --farbe-aktion-hover: light-dark(var(--neutral-800), #ffffff);
+
+  --farbe-fokus: light-dark(#3b6ee0, #6a93f0);
+
+  /* -------------------------------------------------------------- Signale
+   * Entsättigt: sie sollen etwas mitteilen, nicht um Aufmerksamkeit kämpfen.
+   */
+  --signal-gut: light-dark(#1a7f52, #45b884);
+  --signal-gut-flaeche: light-dark(#e9f5ef, #112420);
+  --signal-warnung: light-dark(#8a6212, #d2a44e);
+  --signal-warnung-flaeche: light-dark(#fbf3e2, #292114);
+  --signal-fehler: light-dark(#a32b21, #e0736a);
+  --signal-fehler-flaeche: light-dark(#fbecea, #2a1817);
+
+  /* ------------------------------------------------------------ Typografie
+   * Kein Webfont: der Systemstapel rendert auf jeder Plattform nativ
+   * optimiert, lädt in null Millisekunden und braucht keine Verbindung nach
+   * außen - auf einem Pi ohne Internetzwang die richtige Wahl. Wie man
+   * stattdessen Inter einbindet, steht in docs/08-design.md.
+   */
+  --schrift:
+    ui-sans-serif, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --schrift-mono:
+    ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.1875rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+
+  --zeile-eng: 1.25;
+  --zeile-normal: 1.5;
+  --zeile-weit: 1.65;
+
+  /* Negative Laufweite erst ab Überschriftengröße - im Fließtext macht sie
+   * die Zeile schlechter lesbar, nicht besser. */
+  --laufweite-eng: -0.011em;
+  --laufweite-enger: -0.022em;
+
+  --gewicht-normal: 400;
+  --gewicht-mittel: 500;
+  --gewicht-halbfett: 600;
+
+  /* ------------------------------------------------------------------- Maß
+   * Vierer-Raster. Jeder Abstand im Produkt ist ein Vielfaches davon.
+   */
+  --raum-1: 0.25rem;
+  --raum-2: 0.5rem;
+  --raum-3: 0.75rem;
+  --raum-4: 1rem;
+  --raum-5: 1.25rem;
+  --raum-6: 1.5rem;
+  --raum-8: 2rem;
+  --raum-10: 2.5rem;
+  --raum-12: 3rem;
+  --raum-16: 4rem;
+  --raum-20: 5rem;
+
+  --rundung-sm: 6px;
+  --rundung-md: 8px;
+  --rundung-lg: 12px;
+  --rundung-voll: 999px;
+
+  /* Schatten sind hier fast unsichtbar. Sie trennen Ebenen, sie inszenieren
+   * nichts. Im Dunkeln trägt die Fläche, nicht der Schatten. */
+  --schatten-sm: 0 1px 2px light-dark(rgb(0 0 0 / 4%), rgb(0 0 0 / 30%));
+  --schatten-md:
+    0 1px 2px light-dark(rgb(0 0 0 / 4%), rgb(0 0 0 / 30%)),
+    0 4px 12px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 25%));
+  --schatten-lg:
+    0 1px 2px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 35%)),
+    0 12px 32px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 35%));
+
+  --breite-inhalt: 68rem;
+  --breite-text: 40rem;
+  --hoehe-kopf: 3.5rem;
+
+  /* --------------------------------------------------------------- Bewegung
+   * Kurz und ohne Nachschwingen. Über 250 ms wirkt träge, mit Überschwingen
+   * wirkt verspielt - beides untergräbt genau den Eindruck, um den es geht.
+   */
+  --dauer-sofort: 80ms;
+  --dauer-schnell: 140ms;
+  --dauer-normal: 220ms;
+  --verlauf: cubic-bezier(0.2, 0, 0, 1);
+  --verlauf-eintritt: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Ausdrückliche Wahl des Benutzers. Weil sämtliche Werte über light-dark()
+ * laufen, genügt das Umstellen von color-scheme - es gibt keinen zweiten
+ * Satz Farben, der auseinanderlaufen könnte. */
+:root[data-thema="hell"] {
+  color-scheme: light;
+}
+
+:root[data-thema="dunkel"] {
+  color-scheme: dark;
+}

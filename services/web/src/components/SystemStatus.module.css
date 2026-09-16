@@ -1,0 +1,33 @@
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-3);
+  flex-wrap: wrap;
+  min-height: 1.25rem;
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.text {
+  font-weight: var(--gewicht-mittel);
+  color: var(--farbe-text);
+}
+
+.detail {
+  color: var(--signal-fehler);
+}
+
+/* Die Version haengt hinten und tritt zurueck - man sucht sie, man liest sie
+   nicht nebenbei. */
+.version {
+  margin-left: auto;
+  font-family: var(--schrift-mono);
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+}
+
+@media (width < 30rem) {
+  .version {
+    margin-left: 0;
+  }
+}

@@ -1,0 +1,54 @@
+.gruppe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  min-width: 0;
+}
+
+.beschriftung {
+  font-size: var(--text-sm);
+  font-weight: var(--gewicht-mittel);
+  color: var(--farbe-text-gedaempft);
+  letter-spacing: 0;
+}
+
+.eingabe {
+  width: 100%;
+  height: 2.25rem;
+  padding-inline: var(--raum-3);
+  background: var(--farbe-flaeche);
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-md);
+  color: var(--farbe-text);
+  font-size: var(--text-md);
+  transition:
+    border-color var(--dauer-schnell) var(--verlauf),
+    box-shadow var(--dauer-schnell) var(--verlauf);
+}
+
+.eingabe::placeholder {
+  color: var(--farbe-text-leise);
+}
+
+.eingabe:hover:not(:disabled) {
+  border-color: var(--farbe-text-leise);
+}
+
+/* Der Fokusring liegt hier als Schatten an, nicht als outline: so folgt er
+   exakt der Rundung des Feldes. */
+.eingabe:focus-visible {
+  outline: none;
+  border-color: var(--farbe-fokus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--farbe-fokus) 18%, transparent);
+}
+
+.eingabe:disabled {
+  background: var(--farbe-flaeche-gedaempft);
+  color: var(--farbe-text-leise);
+  cursor: not-allowed;
+}
+
+.hinweis {
+  font-size: var(--text-sm);
+  color: var(--farbe-text-leise);
+}

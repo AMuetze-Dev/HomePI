@@ -45,7 +45,9 @@ describe("Startseite", () => {
     const liste = await screen.findByRole("list", { name: "Artefakte" });
 
     expect(within(liste).getAllByRole("listitem")).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "Geräte" })).toHaveAttribute(
+    // Der Verweis umschliesst die ganze Kachel; sein zugaenglicher Name ist
+    // deshalb der Kachelinhalt, nicht nur die Ueberschrift.
+    expect(screen.getByRole("link", { name: /Geräte/ })).toHaveAttribute(
       "href",
       "/modul/geraete",
     );
@@ -72,7 +74,8 @@ describe("Startseite", () => {
 
     expect(meldung).toHaveTextContent(/ImportError/);
     // Eine kaputte Kachel darf nicht anklickbar sein
-    expect(screen.queryByRole("link", { name: "Kaputt" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Kaputt/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Fehler")).toBeInTheDocument();
   });
 
   it("zeigt zuerst einen Ladehinweis", () => {

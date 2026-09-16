@@ -39,7 +39,19 @@ describe("App", () => {
   it("zeigt unter / die Startseite", async () => {
     zeige("/");
 
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("HomePI");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(
+      "Übersicht",
+    );
+  });
+
+  it("zeigt die Hülle mit Marke und Themenwechsel um jede Ansicht", async () => {
+    zeige("/");
+
+    expect(await screen.findByRole("link", { name: /HomePI/ })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    expect(screen.getByRole("button", { name: /Erscheinungsbild/ })).toBeInTheDocument();
   });
 
   it("zeigt unter /modul/:id die Modulseite", async () => {
@@ -51,6 +63,8 @@ describe("App", () => {
   it("führt einen unbekannten Pfad zur Startseite statt ins Leere", async () => {
     zeige("/voellig/woanders");
 
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("HomePI");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(
+      "Übersicht",
+    );
   });
 });

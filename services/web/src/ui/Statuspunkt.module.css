@@ -1,0 +1,46 @@
+.punkt {
+  display: inline-block;
+  flex: none;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: var(--rundung-voll);
+  /* Der Hof erzeugt Tiefe, ohne dass der Punkt groesser wirkt. */
+  box-shadow: 0 0 0 3px currentcolor;
+  color: transparent;
+}
+
+.gut {
+  background: var(--signal-gut);
+  color: color-mix(in srgb, var(--signal-gut) 14%, transparent);
+}
+
+.warnung {
+  background: var(--signal-warnung);
+  color: color-mix(in srgb, var(--signal-warnung) 14%, transparent);
+}
+
+.fehler {
+  background: var(--signal-fehler);
+  color: color-mix(in srgb, var(--signal-fehler) 14%, transparent);
+}
+
+.neutral {
+  background: var(--farbe-text-leise);
+  color: color-mix(in srgb, var(--farbe-text-leise) 14%, transparent);
+}
+
+/* Nur der Wartezustand pulsiert - und selbst der kaum wahrnehmbar. Ein
+   dauerhaft blinkendes Element zieht den Blick permanent auf sich. */
+.laedt {
+  animation: pulsieren 1.8s var(--verlauf) infinite;
+}
+
+@keyframes pulsieren {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}

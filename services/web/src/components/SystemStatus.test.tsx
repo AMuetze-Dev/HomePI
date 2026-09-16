@@ -20,30 +20,53 @@ describe("SystemStatus", () => {
 
     render(<SystemStatus />);
 
-    expect(screen.getByRole("status")).toHaveTextContent(/geladen/i);
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
-  it("zeigt den Zustand, sobald er da ist", async () => {
+  it("beruhigt, wenn alles läuft", async () => {
     vi.spyOn(client, "fetchHealth").mockResolvedValue(gesund);
 
     render(<SystemStatus />);
 
-    expect(await screen.findByRole("heading")).toHaveTextContent("Alle Systeme laufen");
-    expect(screen.getByText(/Version 0\.1\.0/)).toBeInTheDocument();
-    expect(screen.getByText(/database: in Ordnung/)).toBeInTheDocument();
+    expect(await screen.findByText(/Alle Systeme betriebsbereit/)).toBeInTheDocument();
+    expect(screen.getByText("v0.1.0")).toBeInTheDocument();
+  });
+
+  it("nennt im Normalfall keine einzelne Abhängigkeit", async () => {
+    // Die Zeile soll beruhigen, nicht aufzählen. Erst wenn etwas nicht
+    // stimmt, wird sie konkret.
+    vi.spyOn(client, "fetchHealth").mockResolvedValue(gesund);
+
+    render(<SystemStatus />);
+    await screen.findByText(/Alle Systeme betriebsbereit/);
+
+    expect(screen.queryByText(/database/)).not.toBeInTheDocument();
   });
 
   it("benennt die gestörte Abhängigkeit statt nur 'Fehler'", async () => {
     vi.spyOn(client, "fetchHealth").mockResolvedValue({
       status: "down",
       version: "0.1.0",
-      checks: { database: false },
+      checks: { database: false, cache: true },
     });
 
     render(<SystemStatus />);
 
-    expect(await screen.findByRole("heading")).toHaveTextContent("Ausfall");
-    expect(screen.getByText(/database: gestört/)).toBeInTheDocument();
+    expect(await screen.findByText(/Störung/)).toBeInTheDocument();
+    expect(screen.getByText(/gestört: database/)).toBeInTheDocument();
+  });
+
+  it("unterscheidet eingeschränkt von Störung", async () => {
+    vi.spyOn(client, "fetchHealth").mockResolvedValue({
+      status: "degraded",
+      version: "0.1.0",
+      checks: { database: true, cache: false },
+    });
+
+    render(<SystemStatus />);
+
+    expect(await screen.findByText(/Eingeschränkt betriebsbereit/)).toBeInTheDocument();
+    expect(screen.getByText(/gestört: cache/)).toBeInTheDocument();
   });
 
   it("meldet, wenn das Backend gar nicht antwortet", async () => {
@@ -51,6 +74,8 @@ describe("SystemStatus", () => {
 
     render(<SystemStatus />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/Network down/);
+    const meldung = await screen.findByRole("alert");
+    expect(meldung).toHaveTextContent(/nicht erreichbar/);
+    expect(meldung).toHaveTextContent(/Network down/);
   });
 });

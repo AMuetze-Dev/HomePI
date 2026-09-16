@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { fetchHealth, type Health } from "../api/client";
+import { Platzhalter, Statuspunkt, type Ton } from "../ui";
+import stil from "./SystemStatus.module.css";
 
 type Zustand =
   | { phase: "laedt" }
@@ -8,11 +10,23 @@ type Zustand =
   | { phase: "fehler"; nachricht: string };
 
 const BESCHRIFTUNG: Record<Health["status"], string> = {
-  ok: "Alle Systeme laufen",
-  degraded: "Eingeschränkt",
-  down: "Ausfall",
+  ok: "Alle Systeme betriebsbereit",
+  degraded: "Eingeschränkt betriebsbereit",
+  down: "Störung",
 };
 
+const TON: Record<Health["status"], Ton> = {
+  ok: "gut",
+  degraded: "warnung",
+  down: "fehler",
+};
+
+/**
+ * Eine Zeile, die den Gesamtzustand zusammenfasst.
+ *
+ * Bewusst knapp: im Normalfall soll sie beruhigen, nicht informieren. Erst
+ * wenn etwas nicht stimmt, nennt sie die betroffene Abhängigkeit beim Namen.
+ */
 export function SystemStatus() {
   const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
 
@@ -31,25 +45,37 @@ export function SystemStatus() {
   }, []);
 
   if (zustand.phase === "laedt") {
-    return <p role="status">Status wird geladen …</p>;
+    return (
+      <div className={stil.status} role="status">
+        <Statuspunkt ton="neutral" laedt />
+        <Platzhalter breite="11rem" hoehe="0.875rem" />
+      </div>
+    );
   }
 
   if (zustand.phase === "fehler") {
-    return <p role="alert">Backend nicht erreichbar: {zustand.nachricht}</p>;
+    return (
+      <p className={stil.status} role="alert">
+        <Statuspunkt ton="fehler" />
+        <span className={stil.text}>Backend nicht erreichbar</span>
+        <span className={stil.detail}>{zustand.nachricht}</span>
+      </p>
+    );
   }
 
   const { health } = zustand;
+  const gestoert = Object.entries(health.checks)
+    .filter(([, gesund]) => !gesund)
+    .map(([name]) => name);
+
   return (
-    <section aria-labelledby="status-titel">
-      <h2 id="status-titel">{BESCHRIFTUNG[health.status]}</h2>
-      <p>Version {health.version}</p>
-      <ul>
-        {Object.entries(health.checks).map(([name, gesund]) => (
-          <li key={name}>
-            {name}: {gesund ? "in Ordnung" : "gestört"}
-          </li>
-        ))}
-      </ul>
-    </section>
+    <p className={stil.status}>
+      <Statuspunkt ton={TON[health.status]} />
+      <span className={stil.text}>{BESCHRIFTUNG[health.status]}</span>
+      {gestoert.length > 0 && (
+        <span className={stil.detail}>gestört: {gestoert.join(", ")}</span>
+      )}
+      <span className={stil.version}>v{health.version}</span>
+    </p>
   );
 }

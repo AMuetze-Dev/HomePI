@@ -1,0 +1,28 @@
+.leer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--raum-3);
+  padding: var(--raum-12) var(--raum-6);
+  text-align: center;
+  border: 1px dashed var(--farbe-rand-stark);
+  border-radius: var(--rundung-lg);
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+.titel {
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-halbfett);
+  color: var(--farbe-text);
+}
+
+.text {
+  max-width: 34ch;
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+  line-height: var(--zeile-weit);
+}
+
+.aktion {
+  margin-top: var(--raum-2);
+}
