@@ -5,11 +5,19 @@ sobald ``homepi-core[test]`` installiert ist - kein ``pytest_plugins`` nötig.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
-import httpx
 import pytest
 
-from .ziel import Ziel, ziel_aus_umgebung
+if TYPE_CHECKING:
+    import httpx
+
+    from .ziel import Ziel
+
+# Absichtlich KEIN Import auf Modulebene ausser pytest: dieses Modul wird
+# ueber den pytest11-Entry-Point beim Start JEDES Projekts geladen, das
+# homepi-core[test] installiert hat. Httpx und die Zielaufloesung kommen erst,
+# wenn eine Fixture sie wirklich braucht.
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -21,6 +29,8 @@ def pytest_configure(config: pytest.Config) -> None:
 
 @pytest.fixture(scope="session")
 def ziel() -> Ziel:
+    from .ziel import ziel_aus_umgebung
+
     return ziel_aus_umgebung()
 
 
@@ -31,6 +41,8 @@ async def smoke_client(ziel: Ziel) -> AsyncIterator[httpx.AsyncClient]:
     Läuft dort nichts, scheitert der Test mit einer Meldung, die den Grund
     nennt - nicht mit einem nackten ConnectError, den man erst zuordnen muss.
     """
+    import httpx
+
     async with httpx.AsyncClient(
         base_url=ziel.basis_url,
         timeout=ziel.timeout,

@@ -1,3 +1,4 @@
+import { GeraeteSeite } from "./geraete/GeraeteSeite";
 import type { ModulOberflaeche } from "./typen";
 
 /**
@@ -13,7 +14,7 @@ import type { ModulOberflaeche } from "./typen";
  * dem Manifest des Gateways und erscheinen ohne Frontend-Änderung.
  */
 export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
-  // { id: "geraete", Komponente: GeraeteSeite },
+  { id: "geraete", Komponente: GeraeteSeite },
 ];
 
 export function oberflaecheFuer(id: string): ModulOberflaeche | undefined {

@@ -1,0 +1,37 @@
+# syntax=docker/dockerfile:1
+# Nur fuer die lokale Entwicklung auf dem Windows-Rechner.
+# Build-Kontext ist die REPO-WURZEL:
+#   docker build -f services/gateway/Dockerfile.dev .
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+ENV UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    # Bind-Mounts von Windows reichen keine inotify-Ereignisse durch.
+    # Ohne Polling bemerkt --reload keine einzige Aenderung.
+    WATCHFILES_FORCE_POLLING=true
+
+WORKDIR /app
+
+# Projektdateien zuerst: die Abhaengigkeitsschicht bleibt im Cache, solange
+# sich pyproject.toml und uv.lock nicht aendern.
+COPY packages/homepi-core/pyproject.toml packages/homepi-core/README.md /app/packages/homepi-core/
+COPY packages/homepi-core/src /app/packages/homepi-core/src
+COPY modules /app/modules
+COPY services/gateway/pyproject.toml services/gateway/uv.lock /app/services/gateway/
+
+WORKDIR /app/services/gateway
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen
+
+COPY services/gateway/src ./src
+
+EXPOSE 8000
+
+# Alle drei Quellverzeichnisse beobachten: eine Aenderung an homepi-core oder
+# an einem Modul soll den Server genauso neu laden wie eine am Gateway.
+CMD ["uv", "run", "uvicorn", "homepi_gateway.main:app", \
+     "--host", "0.0.0.0", "--port", "8000", "--reload", \
+     "--reload-dir", "/app/services/gateway/src", \
+     "--reload-dir", "/app/packages/homepi-core/src", \
+     "--reload-dir", "/app/modules"]

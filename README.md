@@ -16,9 +16,11 @@ stacks/        Docker-Compose-Stacks, einer pro Verantwortungsbereich
   apps/          eigene Anwendung (API + Web)
 packages/      wiederverwendbare Bausteine
   homepi-core/   Grundgeruest jedes Microservice + homepi-CLI
-services/      Quellcode der eigenen Anwendung
-  api/           Python / FastAPI
-  web/           TypeScript / React (die Huelle mit der Startseite)
+modules/       Artefakte, die im Gateway laufen
+  geraete/       Geraete im Haus (FastAPI-Router + Fachlogik)
+services/      lauffaehige Dienste
+  gateway/       Python / FastAPI - laedt die Artefakte
+  web/           TypeScript / React - die Huelle mit der Startseite
 scripts/       Einrichtung, Backup, Diagnose
 docs/          Architektur, Inbetriebnahme, Runbook, Arbeitsweise
 ```
@@ -37,6 +39,7 @@ Pi-hole anzufassen.
 | [docs/04-runbook.md](docs/04-runbook.md) | Backup, Restore, Updates, Troubleshooting |
 | [docs/05-workflow.md](docs/05-workflow.md) | Branch-Modell, TDD-Schleife, CI/CD |
 | [docs/06-artefakte.md](docs/06-artefakte.md) | Wie neue Artefakte dazukommen, ohne dass ein Container dazukommt |
+| [docs/07-lokale-entwicklung.md](docs/07-lokale-entwicklung.md) | Die Docker-Umgebung auf dem Windows-Rechner |
 
 ## Schnellstart auf dem Pi
 
@@ -74,18 +77,28 @@ erreichbar sein.
 
 ```
 ha.$DOMAIN        Home Assistant     pgadmin.$DOMAIN   pgAdmin
-app.$DOMAIN       Frontend           logs.$DOMAIN      Dozzle
-api.$DOMAIN       Backend            status.$DOMAIN    Uptime-Kuma
+app.$DOMAIN       Huelle/Startseite  logs.$DOMAIN      Dozzle
+api.$DOMAIN       Gateway            status.$DOMAIN    Uptime-Kuma
 pihole.$DOMAIN    Pi-hole            traefik.$DOMAIN   Traefik-Dashboard
 ```
 
+Die Artefakte bekommen keine eigenen Hostnamen: sie laufen als Module im
+Gateway und sind unter `api.$DOMAIN/<artefakt>` erreichbar. Warum das so ist,
+steht in [docs/06-artefakte.md](docs/06-artefakte.md).
+
 ## Entwicklung
 
+Der Pi wird nicht gebraucht — die komplette Anwendung läuft lokal in Docker:
+
 ```bash
+make dev           # Frontend 5173, API 18000, Postgres 15432
 make test          # alles, was die CI auch prüft
-make tdd-api       # pytest im Watch-Modus
+make smoke         # Rauchtests gegen die laufende Umgebung
 make tdd-web       # vitest im Watch-Modus
+make tdd-api P=modules/geraete
 ```
+
+Details in [docs/07-lokale-entwicklung.md](docs/07-lokale-entwicklung.md).
 
 Branch-Modell und die genaue TDD-Schleife stehen in
 [docs/05-workflow.md](docs/05-workflow.md).

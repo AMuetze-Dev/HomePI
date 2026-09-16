@@ -18,26 +18,29 @@ permissions:
 
 jobs:
   # Nur bauen, was sich geaendert hat. Eine Aenderung an docs/ soll nicht
-  # 10 Minuten CI ausloesen.
+  # zehn Minuten CI ausloesen.
   changes:
     runs-on: ubuntu-latest
     outputs:
-      core: ${{ steps.filter.outputs.core }}
-      api: ${{ steps.filter.outputs.api }}
+      gateway: ${{ steps.filter.outputs.gateway }}
       web: ${{ steps.filter.outputs.web }}
       infra: ${{ steps.filter.outputs.infra }}
+      python: ${{ steps.filter.outputs.python }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
-            core:
-              - 'packages/homepi-core/**'
+            python:
+              - 'packages/**'
+              - 'modules/**'
+              - 'services/gateway/**'
               - '.github/workflows/ci.yml'
-            api:
-              - 'services/api/**'
-              - 'packages/homepi-core/**'
+            gateway:
+              - 'packages/**'
+              - 'modules/**'
+              - 'services/gateway/**'
               - '.github/workflows/ci.yml'
             web:
               - 'services/web/**'
@@ -45,6 +48,7 @@ jobs:
             infra:
               - 'stacks/**'
               - 'scripts/**'
+              - 'compose.dev.yml'
               - 'Makefile'
               - '.env.example'
               - '.github/workflows/ci.yml'
@@ -79,6 +83,8 @@ jobs:
             echo "--- $stack"
             docker compose --env-file .env -f "stacks/$stack/docker-compose.yml" config -q
           done
+          echo "--- Entwicklungsumgebung"
+          docker compose -f compose.dev.yml config -q
 
       - name: Keine Klartext-Geheimnisse in .env.example
         run: |
@@ -89,13 +95,32 @@ jobs:
           fi
 
   # -------------------------------------------------------------------------
-  core:
+  # Alle drei Python-Projekte in einer Matrix: derselbe Ablauf, andere
+  # Verzeichnisse. Drei fast gleiche Jobs waeren drei Stellen zum Vergessen.
+  python:
     needs: changes
-    if: needs.changes.outputs.core == 'true'
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: homepi-core
+            pfad: packages/homepi-core
+            paket: homepi_core
+            mindest_coverage: 80
+          - name: geraete
+            pfad: modules/geraete
+            paket: homepi_geraete
+            mindest_coverage: 85
+          - name: gateway
+            pfad: services/gateway
+            paket: homepi_gateway
+            mindest_coverage: 90
+
     defaults:
       run:
-        working-directory: packages/homepi-core
+        working-directory: ${{ matrix.pfad }}
 
     services:
       postgres:
@@ -103,7 +128,7 @@ jobs:
         env:
           POSTGRES_USER: app
           POSTGRES_PASSWORD: app
-          POSTGRES_DB: app
+          POSTGRES_DB: test
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U app"
@@ -112,7 +137,7 @@ jobs:
           --health-retries 10
 
     env:
-      DATABASE_URL: postgresql+asyncpg://app:app@127.0.0.1:5432/app
+      DATABASE_URL: postgresql+asyncpg://app:app@127.0.0.1:5432/test
 
     steps:
       - uses: actions/checkout@v4
@@ -120,86 +145,9 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          cache-dependency-glob: packages/homepi-core/uv.lock
+          cache-dependency-glob: ${{ matrix.pfad }}/uv.lock
 
       - run: uv sync --frozen --all-extras
-
-      - name: Format
-        run: uv run ruff format --check .
-
-      - name: Lint
-        run: uv run ruff check --output-format=github .
-
-      - name: Typen
-        run: uv run mypy
-
-      - name: Tests inklusive Integration
-        run: |
-          uv run pytest -m 'not smoke'             --cov=homepi_core --cov-report=term-missing             --cov-fail-under=80
-
-      # Beweist, dass das Paket tatsaechlich einen lauffaehigen Dienst ergibt -
-      # und dass die Rauchtests gegen eine echte Instanz durchlaufen. Genau
-      # dieselben Tests laufen spaeter gegen den Pi, nur mit anderer Basis-URL.
-      - name: Rauchtests gegen eine echte Instanz
-        run: |
-          cat > /tmp/probe.py <<'PY'
-          from fastapi import APIRouter
-          from homepi_core import Modul, ServiceSettings, create_service, register_aus
-
-          router = APIRouter()
-
-          @router.get("/", summary="Probe")
-          async def liste() -> list[str]:
-              return ["probe"]
-
-          register = register_aus([Modul(id="probe", titel="Probe", router=router)])
-          app = create_service(
-              ServiceSettings(service_name="probe", service_version="0.0.1"),
-              module=register,
-          )
-          PY
-          PYTHONPATH=/tmp uv run uvicorn probe:app --host 127.0.0.1 --port 8000 &
-          for _ in $(seq 1 40); do
-            curl -sf http://127.0.0.1:8000/info >/dev/null && break
-            sleep 0.5
-          done
-          HOMEPI_BASIS_URL=http://127.0.0.1:8000 uv run pytest -m smoke
-
-  # -------------------------------------------------------------------------
-  api:
-    needs: changes
-    if: needs.changes.outputs.api == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/api
-
-    services:
-      postgres:
-        image: postgres:17-bookworm
-        env:
-          POSTGRES_USER: app
-          POSTGRES_PASSWORD: app
-          POSTGRES_DB: app
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U app"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      DATABASE_URL: postgresql+asyncpg://app:app@127.0.0.1:5432/app
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-          cache-dependency-glob: services/api/uv.lock
-
-      - run: uv sync --frozen
 
       # Reihenfolge ist Absicht: Format und Lint sind in Sekunden durch und
       # geben die praezisere Fehlermeldung als ein fehlgeschlagener Test.
@@ -213,22 +161,21 @@ jobs:
         run: uv run mypy
 
       - name: Tests inklusive Integration
-        # -m '' hebt den Standardfilter auf, hier ist Postgres ja vorhanden.
-        # Die Schwelle steht hier und nicht in pyproject.toml, damit ein
-        # einzelner Test im Watch-Modus nicht an der Coverage scheitert.
+        # -m 'not smoke' hebt den Standardfilter auf: Postgres ist hier da,
+        # eine laufende Instanz nicht.
         run: |
-          uv run pytest -m '' \
-            --cov=homepi_api --cov-report=term-missing --cov-report=xml \
-            --cov-fail-under=85 \
+          uv run pytest -m 'not smoke' \
+            --cov=${{ matrix.paket }} --cov-report=term-missing --cov-report=xml \
+            --cov-fail-under=${{ matrix.mindest_coverage }} \
             --junitxml=junit.xml
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: api-testreport
+          name: testbericht-${{ matrix.name }}
           path: |
-            services/api/junit.xml
-            services/api/coverage.xml
+            ${{ matrix.pfad }}/junit.xml
+            ${{ matrix.pfad }}/coverage.xml
           retention-days: 7
 
   # -------------------------------------------------------------------------
@@ -268,26 +215,92 @@ jobs:
         run: npm run build
 
   # -------------------------------------------------------------------------
+  # Der eigentliche Beweis, dass alles zusammenpasst: die komplette
+  # Entwicklungsumgebung hochfahren und die Rauchtests dagegen laufen lassen.
+  # Genau diese Tests laufen spaeter gegen den Pi, nur mit anderer Basis-URL.
+  stack:
+    needs: changes
+    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/gateway/uv.lock
+
+      - name: Entwicklungsumgebung hochfahren
+        run: docker compose -f compose.dev.yml up -d --build --wait --wait-timeout 300
+
+      - name: Rauchtests gegen die laufende Instanz
+        working-directory: services/gateway
+        run: |
+          uv sync --frozen --all-extras
+          HOMEPI_BASIS_URL=http://127.0.0.1:18000 uv run pytest -m smoke -v
+
+      - name: Frontend liefert aus und erreicht die API
+        run: |
+          curl -sf http://127.0.0.1:5173/ >/dev/null
+          # Der Vite-Proxy ist der Weg, den auch der Browser nimmt
+          curl -sf http://127.0.0.1:5173/api/module | grep -q '"geraete"'
+
+      - name: Logs bei Fehlschlag
+        if: failure()
+        run: docker compose -f compose.dev.yml logs --tail 100
+
+      - name: Abbauen
+        if: always()
+        run: docker compose -f compose.dev.yml down -v
+
+  # -------------------------------------------------------------------------
   # Faengt Dockerfile-Fehler frueh, ohne den langsamen arm64-Build. Der echte
   # Release-Build fuer den Pi laeuft in images.yml.
   docker:
     needs: changes
-    if: needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true'
+    if: needs.changes.outputs.gateway == 'true' || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        service: [api, web]
+        include:
+          # Das Gateway braucht die Repo-Wurzel als Kontext: packages/ und
+          # modules/ liegen ausserhalb seines Verzeichnisses.
+          - name: gateway
+            context: .
+            file: services/gateway/Dockerfile
+          - name: web
+            context: services/web
+            file: services/web/Dockerfile
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
-          context: services/${{ matrix.service }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           platforms: linux/amd64
           push: false
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          load: true
+          tags: probe-${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      # Ein Image, das baut, aber nicht startet, ist kein gebautes Image.
+      # Genau dieser Fall - venv an den falschen Pfad kopiert, Shebangs zeigen
+      # ins Leere, "exec: uvicorn: not found" - ist hier schon durchgerutscht.
+      - name: Startet das Image ueberhaupt?
+        if: matrix.name == 'gateway'
+        run: |
+          docker run --rm -d --name probe -p 8000:8000 \
+            -e SERVICE_NAME=gateway -e ENVIRONMENT=entwicklung \
+            probe-gateway:ci
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/info >/dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8000/info | grep -q '"geraete"'
+          docker rm -f probe
 
   # -------------------------------------------------------------------------
   secrets:
@@ -306,7 +319,7 @@ jobs:
   # neue Job einzeln in den Einstellungen nachgetragen werden - und ein
   # uebersprungener Job wuerde faelschlich als Erfolg zaehlen.
   ci:
-    needs: [infra, core, api, web, docker, secrets]
+    needs: [infra, python, web, stack, docker, secrets]
     if: always()
     runs-on: ubuntu-latest
     steps:

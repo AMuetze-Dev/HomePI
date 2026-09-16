@@ -11,7 +11,7 @@ from homepi_core.db import Database
 
 pytestmark = pytest.mark.integration
 
-URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://app:app@127.0.0.1:5432/app")
+URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://app:app@127.0.0.1:15432/test")
 
 
 @pytest.fixture

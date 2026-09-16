@@ -82,7 +82,7 @@ stats:
 
 ## psql: psql-Shell in der App-Datenbank
 psql:
-	@docker exec -it -e PGPASSWORD='$(APP_PW)' postgres psql -U app -d app
+	@docker exec -it -e PGPASSWORD=app homepi-dev-postgres psql -U app -d app
 
 ## pg-tunnel: Befehl fuer den SSH-Tunnel vom Desktop ausgeben
 pg-tunnel:
@@ -110,26 +110,21 @@ cert:
 		| openssl x509 -noout -subject -issuer -dates
 
 # ---------------------------------------------------------------- Entwicklung
-API := services/api
-WEB := services/web
+WEB    := services/web
+# Die Integrationstests laufen gegen die Datenbank der Dev-Umgebung -
+# aber gegen "test", nicht gegen "app": sie legen Tabellen an und loeschen sie wieder.
+TESTDB := postgresql+asyncpg://app:app@127.0.0.1:15432/test
 
 ## test: alles pruefen, was die CI auch prueft
-test: test-infra test-api-full test-web
+test: test-infra test-python test-web
 
 ## test-infra: Shell-Skripte und Compose-Dateien validieren
 test-infra: render verify
 	@shellcheck --severity=warning scripts/*.sh stacks/data/initdb/*.sh 		&& echo "shellcheck ok"
 
-## test-api: Format, Lint, Typen und Unit-Tests des Backends
-test-api:
-	cd $(API) && uv run ruff format --check .
-	cd $(API) && uv run ruff check .
-	cd $(API) && uv run mypy
-	cd $(API) && uv run pytest
-
-## test-api-full: wie in der CI, inklusive Integrationstests gegen Postgres
-test-api-full:
-	@./scripts/run-api-tests.sh
+## test-python: Format, Lint, Typen und Tests aller drei Python-Projekte
+test-python:
+	@for p in packages/homepi-core modules/geraete services/gateway; do 		echo "=== $$p"; 		( cd $$p 		  && uv run ruff format --check . 		  && uv run ruff check . 		  && uv run mypy 		  && DATABASE_URL=$(TESTDB) uv run pytest -m 'not smoke' --cov --cov-report=term ) 		|| exit 1; 	done
 
 ## test-web: Format, Lint, Typen und Tests des Frontends
 test-web:
@@ -138,9 +133,9 @@ test-web:
 	cd $(WEB) && npm run typecheck
 	cd $(WEB) && npm run test:coverage
 
-## tdd-api: pytest im Watch-Modus, nur Unit-Tests
+## tdd-api: pytest im Watch-Modus (Verzeichnis ueber P=..., Standard: geraete)
 tdd-api:
-	cd $(API) && uv run ptw . --now
+	cd $(or $(P),modules/geraete) && uv run ptw . --now
 
 ## tdd-web: vitest im Watch-Modus
 tdd-web:
@@ -148,12 +143,43 @@ tdd-web:
 
 ## fmt: Quellcode formatieren und automatisch behebbare Funde beheben
 fmt:
-	cd $(API) && uv run ruff format . && uv run ruff check --fix .
+	@for p in packages/homepi-core modules/geraete services/gateway; do 		( cd $$p && uv run ruff format . && uv run ruff check --fix . ); 	done
 	cd $(WEB) && npm run format && npm run lint:fix
 
-## install: Entwicklungsabhaengigkeiten beider Dienste einrichten
+## install: Entwicklungsabhaengigkeiten aller Projekte einrichten
 install:
-	cd $(API) && uv sync
+	@for p in packages/homepi-core modules/geraete services/gateway; do 		echo "=== $$p"; ( cd $$p && uv sync --all-extras ) || exit 1; 	done
 	cd $(WEB) && npm ci
 
-.PHONY: help up up-core up-dns up-data up-home up-apps down render         deploy-apps pull update ps logs stats psql pg-tunnel backup check verify cert         test test-infra test-api test-api-full test-web tdd-api tdd-web fmt install
+# ---------------------------------------------------------------- Entwicklung (lokal)
+DEV := docker compose -f compose.dev.yml
+
+## dev: lokale Umgebung starten (Frontend 5173, API 18000, DB 15432)
+dev:
+	$(DEV) up -d --build
+	@echo
+	@echo "  Frontend  http://localhost:5173"
+	@echo "  API       http://localhost:18000/docs"
+	@echo "  Postgres  localhost:15432  (app/app/app, Testdatenbank: test)"
+
+## dev-stop: lokale Umgebung stoppen (Daten bleiben)
+dev-stop:
+	$(DEV) down
+
+## dev-reset: lokale Umgebung samt Datenbank wegwerfen
+dev-reset:
+	$(DEV) down -v
+
+## dev-logs: Logs der lokalen Umgebung folgen
+dev-logs:
+	$(DEV) logs -f
+
+## dev-ps: Zustand der lokalen Container
+dev-ps:
+	$(DEV) ps
+
+## smoke: Rauchtests gegen die laufende lokale Umgebung
+smoke:
+	cd services/gateway && uv run pytest -m smoke -v
+
+.PHONY: help up up-core up-dns up-data up-home up-apps down render         deploy-apps pull update ps logs stats psql pg-tunnel backup check verify cert         test test-infra test-python test-web tdd-api tdd-web fmt install dev dev-stop dev-reset dev-logs dev-ps smoke

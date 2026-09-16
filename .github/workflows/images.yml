@@ -11,7 +11,7 @@ on:
       service:
         description: "Welchen Dienst bauen"
         type: choice
-        options: [beide, api, web]
+        options: [beide, gateway, web]
         default: beide
 
 concurrency:
@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, web]
+        service: [gateway, web]
 
     steps:
       - name: Diesen Dienst ueberspringen?
@@ -42,11 +42,11 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.gate.outputs.skip != 'true'
 
-      # Nur die API braucht QEMU: ihre Wheels sind architekturspezifisch.
+      # Nur das Gateway braucht QEMU: seine Wheels sind architekturspezifisch.
       # Das Frontend baut dank --platform=$BUILDPLATFORM nativ auf amd64 und
       # legt nur die fertigen Dateien in eine arm64-nginx-Schicht.
       - uses: docker/setup-qemu-action@v3
-        if: steps.gate.outputs.skip != 'true' && matrix.service == 'api'
+        if: steps.gate.outputs.skip != 'true' && matrix.service == 'gateway'
         with:
           platforms: arm64
 
@@ -75,7 +75,10 @@ jobs:
       - uses: docker/build-push-action@v6
         if: steps.gate.outputs.skip != 'true'
         with:
-          context: services/${{ matrix.service }}
+          # Das Gateway braucht die Repo-Wurzel als Kontext: packages/ und
+          # modules/ liegen ausserhalb seines Verzeichnisses.
+          context: ${{ matrix.service == 'gateway' && '.' || 'services/web' }}
+          file: services/${{ matrix.service }}/Dockerfile
           platforms: linux/arm64
           push: true
           provenance: false
