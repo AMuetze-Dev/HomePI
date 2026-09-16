@@ -13,7 +13,9 @@
 
     "strict": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+
+    "types": ["node"]
   },
   "include": ["vite.config.ts", "eslint.config.js"]
 }

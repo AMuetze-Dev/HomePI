@@ -1,0 +1,99 @@
+# Lokale Entwicklung auf dem Windows-Rechner.
+#
+#   docker compose -f compose.dev.yml up --build
+#
+#   Frontend  http://localhost:5173
+#   API       http://localhost:18000       (/docs für die Swagger-Oberfläche)
+#   Postgres  localhost:15432              (app / app / app)
+#
+# Die Ports 3000, 5432 und 8000 sind auf diesem Rechner bereits belegt -
+# deshalb 15432 und 18000. Traefik, TLS und Pi-hole fehlen hier bewusst: die
+# gehören zum Pi und würden lokal nur Zertifikatswarnungen erzeugen.
+name: homepi-dev
+
+services:
+  postgres:
+    image: postgres:17-bookworm
+    container_name: homepi-dev-postgres
+    restart: unless-stopped
+    ports:
+      - "${DEV_DB_PORT:-15432}:5432"
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - dev-postgres:/var/lib/postgresql/data
+      # Legt beim allerersten Start zusaetzlich die Datenbank "test" an.
+      - ./dev/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile.dev
+    container_name: homepi-dev-gateway
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${DEV_API_PORT:-18000}:8000"
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      SERVICE_NAME: gateway
+      ENVIRONMENT: entwicklung
+      LOG_LEVEL: info
+      LOG_FORMAT: text
+      DATABASE_URL: postgresql+asyncpg://app:app@postgres:5432/app
+      # Legt fehlende Tabellen beim Start an. Ein Startwerkzeug, kein
+      # Migrationssystem - sobald sich ein Schema ändert, kommt Alembic.
+      DB_SCHEMA_ANLEGEN: "true"
+      # Leer: der Browser spricht nur mit dem Vite-Server, der proxyt.
+      CORS_ORIGINS: ""
+    volumes:
+      # Quellcode live einhängen - der Reload beobachtet genau diese Pfade.
+      - ./services/gateway/src:/app/services/gateway/src
+      - ./packages/homepi-core/src:/app/packages/homepi-core/src
+      - ./modules:/app/modules
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen('http://localhost:8000/health')
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  web:
+    build:
+      context: .
+      dockerfile: services/web/Dockerfile.dev
+    container_name: homepi-dev-web
+    restart: unless-stopped
+    depends_on:
+      - gateway
+    ports:
+      - "${DEV_WEB_PORT:-5173}:5173"
+    environment:
+      # Zur Build-Zeit des Bundles gelesen; im Dev-Server bei jedem Start.
+      # "/api" geht an den Vite-Proxy, der es an das Gateway weiterreicht -
+      # damit gibt es lokal kein CORS.
+      VITE_API_URL: /api
+      VITE_PROXY_TARGET: http://gateway:8000
+    volumes:
+      - ./services/web:/app
+      # Anonymes Volume: sonst überdeckt das node_modules vom Windows-Host
+      # das im Image installierte, und esbuild findet seine Linux-Binärdatei
+      # nicht.
+      - /app/node_modules
+
+volumes:
+  dev-postgres:

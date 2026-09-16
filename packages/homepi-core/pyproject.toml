@@ -63,6 +63,18 @@ markers = [
 [tool.coverage.run]
 source = ["homepi_core"]
 branch = true
+omit = [
+    # Beides wird ueber den pytest11-Entry-Point geladen, also BEVOR
+    # pytest-cov aktiv ist - coverage kann davon nichts sehen. Gedeckt ist
+    # der Code trotzdem: die acht Rauchtests laufen im stack-Job gegen eine
+    # echte Instanz.
+    #
+    # Aus demselben Grund meldet ziel.py rund 72%, obwohl test_ziel.py jede
+    # Verzweigung abdeckt: die Importzeilen laufen vor der Messung. Es bleibt
+    # sichtbar statt in omit, damit echte Luecken dort auffallen wuerden.
+    "*/homepi_core/testing/plugin.py",
+    "*/homepi_core/testing/smoke.py",
+]
 
 [tool.coverage.report]
 show_missing = true

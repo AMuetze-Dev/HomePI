@@ -5,9 +5,11 @@
 
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS build
 
-ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=never
+# UV_PROJECT_ENVIRONMENT legt die venv direkt dort an, wo sie spaeter liegt.
+# Kopiert man sie an einen anderen Pfad, zeigen die Shebangs ihrer Skripte
+# (bin/uvicorn) noch auf den alten - das Image startet dann mit
+# "exec: uvicorn: not found".
+ENV UV_COMPILE_BYTECODE=1     UV_LINK_MODE=copy     UV_PYTHON_DOWNLOADS=never     UV_PROJECT_ENVIRONMENT=/app/.venv
 
 WORKDIR /app
 
@@ -33,7 +35,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 RUN useradd --create-home --uid 10001 appuser
 
-COPY --from=build --chown=appuser:appuser /app/services/{{service}}/.venv /app/.venv
+COPY --from=build --chown=appuser:appuser /app/.venv /app/.venv
 
 USER appuser
 WORKDIR /app

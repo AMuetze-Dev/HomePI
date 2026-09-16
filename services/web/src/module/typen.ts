@@ -13,5 +13,5 @@ import type { ModulEintrag } from "../api/client";
 export interface ModulOberflaeche {
   /** Muss der Kennung aus dem Backend-Manifest entsprechen. */
   id: string;
-  Komponente: ComponentType<{ modul: ModulEintrag }>;
+  Komponente: ComponentType<{ modul?: ModulEintrag }>;
 }

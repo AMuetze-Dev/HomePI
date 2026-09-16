@@ -1,0 +1,139 @@
+# 07 — Lokale Entwicklung auf Windows
+
+Der Pi ist noch nicht da. Entwickelt und getestet wird deshalb vollständig in
+Docker auf dem Windows-Rechner — mit derselben Software, die später auf dem Pi
+läuft, nur ohne Traefik, TLS und Pi-hole. Die gehören zum Pi und würden lokal
+nur Zertifikatswarnungen erzeugen.
+
+## Start
+
+```bash
+make dev
+```
+
+| | Adresse |
+|---|---|
+| Frontend | http://localhost:5173 |
+| API | http://localhost:18000 (`/docs` für Swagger) |
+| Postgres | localhost:15432, `app` / `app`, Datenbanken `app` und `test` |
+
+**Warum diese Ports:** 3000, 5432 und 8000 sind auf diesem Rechner schon belegt.
+Über `DEV_WEB_PORT`, `DEV_API_PORT` und `DEV_DB_PORT` lassen sie sich ändern.
+
+```bash
+make dev-logs     # folgen
+make dev-ps       # Zustand
+make dev-stop     # stoppen, Daten bleiben
+make dev-reset    # stoppen und Datenbank wegwerfen
+```
+
+## Was lokal anders ist als auf dem Pi
+
+| | lokal | Pi |
+|---|---|---|
+| Plattform | amd64, nativ | arm64 |
+| Reverse Proxy | Vite-Proxy `/api` | Traefik mit TLS |
+| Zertifikate | keine, alles HTTP | Wildcard von Let's Encrypt |
+| Schema | `DB_SCHEMA_ANLEGEN=true` beim Start | `false`, Migration |
+| Logformat | lesbarer Text | JSON |
+| Worker | 1, mit `--reload` | 1, ohne Reload |
+
+Der Vite-Proxy leitet `/api/...` an das Gateway weiter. Dadurch spricht der
+Browser nur mit einer Adresse und es gibt lokal **kein CORS** — dieselbe Rolle,
+die auf dem Pi Traefik übernimmt.
+
+Wenn das Gateway gerade neu startet, antwortet der Proxy mit `problem+json` und
+Status 503, also im selben Format wie das Backend. So sieht man lokal genau die
+Meldung, die die Oberfläche später auch zeigen würde.
+
+## Hot Reload
+
+Beides funktioniert durch den Windows-Bind-Mount, aber nur mit Polling:
+Docker Desktop reicht keine inotify-Ereignisse vom Host durch.
+
+- **Backend:** `WATCHFILES_FORCE_POLLING=true` im Dockerfile.dev. Beobachtet
+  werden `services/gateway/src`, `packages/homepi-core/src` **und** `modules/` —
+  eine Änderung am Basispaket oder an einem Artefakt lädt den Server also
+  genauso neu. Gemessen: rund 6 Sekunden.
+- **Frontend:** `server.watch.usePolling` in `vite.config.ts`. HMR greift sofort.
+
+Ohne diese beiden Einstellungen merkt keines der Werkzeuge, dass du etwas
+geändert hast — und man sucht den Fehler an der völlig falschen Stelle.
+
+## Tests
+
+```bash
+make test           # alles, was die CI auch prüft
+make test-python    # die drei Python-Projekte
+make test-web       # Frontend
+make smoke          # gegen die laufende Dev-Umgebung
+make tdd-web        # vitest im Watch-Modus
+make tdd-api P=modules/geraete
+```
+
+Drei Arten, bewusst getrennt:
+
+| | wo | wann |
+|---|---|---|
+| Unit | `tests/unit/` | bei jeder Änderung, Millisekunden |
+| Integration | `tests/integration/`, Marker `integration` | mit laufender Datenbank |
+| Rauchtest | `tests/smoke/`, Marker `smoke` | gegen eine laufende Instanz |
+
+Unit-Tests laufen immer. Integration und Rauchtest sind standardmäßig
+abgewählt — sonst würde ein Testlauf ohne Datenbank scheitern und man gewöhnt
+sich an rote Läufe.
+
+**Die Integrationstests benutzen die Datenbank `test`, nicht `app`.** Sie legen
+Tabellen an und löschen sie wieder; liefen sie auf `app`, wären die Daten der
+laufenden Entwicklungsumgebung nach jedem Testlauf weg.
+
+Die Rauchtests sind dieselben, die später gegen den Pi laufen. Was sich
+unterscheidet, ist die Basis-URL aus `homepi.toml`:
+
+```bash
+make smoke                              # [ziele.standard] -> localhost:18000
+HOMEPI_ZIEL=pi pytest -m smoke          # -> der Pi
+```
+
+## Ein neues Artefakt
+
+```bash
+homepi new messwerte          # legt modules/... bzw. services/... an
+```
+
+Als **Modul** (Standard, ein Prozess für alle Artefakte):
+
+1. Paket unter `modules/<name>/` mit einem `APIRouter`
+2. Entry Point in der `pyproject.toml`:
+   ```toml
+   [project.entry-points."homepi.module"]
+   messwerte = "homepi_messwerte:modul"
+   ```
+3. Als Abhängigkeit in `services/gateway/pyproject.toml` eintragen
+4. `make dev` neu bauen — die Kachel erscheint von selbst auf der Startseite
+
+Schritt 4 braucht **keine** Frontend-Änderung. Eine eigene Oberfläche ist
+optional; ohne sie zeigt die generische Ansicht die Endpunkte aus dem
+OpenAPI-Schema. Wer mehr will, trägt eine Komponente in
+`services/web/src/module/register.ts` ein.
+
+Begründung für Modul statt eigenem Container: [06-artefakte.md](06-artefakte.md).
+
+## Fallstricke, die hier schon zugeschlagen haben
+
+**`exec: uvicorn: not found` im Produktions-Image.** Die venv wurde unter
+`/app/services/gateway/.venv` gebaut und nach `/app/.venv` kopiert — die
+Shebangs der Skripte zeigten danach ins Leere. Lösung: `UV_PROJECT_ENVIRONMENT`
+setzt den Zielpfad direkt. Die CI startet das Image jetzt testweise, weil ein
+Image, das baut, aber nicht startet, kein gebautes Image ist.
+
+**node_modules vom Host.** Im Dev-Container liegt ein anonymes Volume auf
+`/app/node_modules`. Ohne das überdeckt das Windows-`node_modules` das im Image
+installierte, und esbuild findet seine Linux-Binärdatei nicht.
+
+**CRLF.** `.gitattributes` erzwingt LF. Ohne das startet auf dem Pi kein
+einziges Shell-Skript (`bad interpreter: /bin/bash^M`).
+
+**Port 8000 ist belegt.** Auf diesem Rechner lauscht dort bereits etwas anderes.
+Deshalb 18000 — und deshalb prüft man das besser vorher, statt sich zu wundern,
+warum `curl` eine fremde Antwort liefert.

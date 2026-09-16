@@ -1,0 +1,47 @@
+# Das Gateway. Ein Prozess fuer alle Artefakte, die als Modul laufen -
+# Begruendung in docs/06-artefakte.md.
+services:
+  gateway:
+    image: ${GATEWAY_IMAGE}
+    container_name: gateway
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      SERVICE_NAME: gateway
+      ENVIRONMENT: produktion
+      LOG_LEVEL: info
+      # Ein Worker. Jeder weitere kostet auf dem Pi rund 120 MB, ohne bei
+      # I/O-gebundener Last etwas zu bringen.
+      WEB_CONCURRENCY: 1
+      # Service Discovery ist Docker-DNS: "postgres" ist der Containername
+      # im Netz "data".
+      DATABASE_URL: postgresql+asyncpg://app:${APP_DB_PASSWORD}@postgres:5432/app
+      CORS_ORIGINS: https://app.${DOMAIN}
+      # In Produktion aus: ein Schema aendert man mit einer Migration, nicht
+      # beim Start. Siehe docs/04-runbook.md.
+      DB_SCHEMA_ANLEGEN: "false"
+    networks:
+      - edge
+      - data
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.gateway.rule: "Host(`api.${DOMAIN}`)"
+      traefik.http.routers.gateway.entrypoints: "websecure"
+      traefik.http.routers.gateway.middlewares: "api-cors@file,rate-limit@file"
+      traefik.http.services.gateway.loadbalancer.server.port: "8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;urllib.request.urlopen('http://localhost:8000/health')
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  edge:
+    external: true
+  data:
+    external: true

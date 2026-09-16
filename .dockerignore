@@ -1,0 +1,17 @@
+# Build-Kontext ist die Repo-Wurzel (wegen packages/ und modules/).
+# Ohne diese Liste wandern mehrere hundert MB in jeden Build.
+**/.venv/
+**/node_modules/
+**/dist/
+**/.git/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.coverage
+**/coverage/
+**/htmlcov/
+**/*.pyc
+.env
+stacks/
+docs/
