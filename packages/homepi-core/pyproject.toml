@@ -19,9 +19,16 @@ dependencies = [
 [project.optional-dependencies]
 # Nur Services, die wirklich einen Cache brauchen.
 cache = ["redis>=5.2"]
+# Rauchtests gegen eine laufende Instanz (homepi_core.testing).
+test = ["httpx>=0.28", "pytest>=8.3", "pytest-asyncio>=0.25"]
 
 [project.scripts]
 homepi = "homepi_core.cli.main:main"
+
+[project.entry-points.pytest11]
+# Damit stehen die Fixtures "ziel" und "smoke_client" in jedem Projekt zur
+# Verfuegung, das homepi-core[test] installiert hat - ohne pytest_plugins.
+homepi = "homepi_core.testing.plugin"
 
 [build-system]
 requires = ["hatchling"]
@@ -47,9 +54,10 @@ dev = [
 testpaths = ["tests"]
 pythonpath = ["src"]
 asyncio_mode = "auto"
-addopts = "-q --strict-markers --strict-config -m 'not integration'"
+addopts = "-q --strict-markers --strict-config -m 'not integration and not smoke'"
 markers = [
     "integration: braucht eine echte Postgres-Instanz (DATABASE_URL)",
+    "smoke: spricht mit einer laufenden Instanz (HOMEPI_ZIEL / HOMEPI_BASIS_URL)",
 ]
 
 [tool.coverage.run]

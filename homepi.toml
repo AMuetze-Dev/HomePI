@@ -1,0 +1,22 @@
+# Ziele fuer die Rauchtests (pytest -m smoke).
+# Dieselben Tests laufen gegen jedes davon - es aendert sich nur die Basis-URL.
+#
+#   pytest -m smoke                  gegen [ziele.standard]
+#   HOMEPI_ZIEL=pi pytest -m smoke   gegen den Pi
+#   HOMEPI_BASIS_URL=... pytest -m smoke
+
+[ziele.standard]
+# Lokal gestartetes Gateway: uv run uvicorn homepi_gateway.main:app
+basis_url = "http://127.0.0.1:8000"
+timeout = 5
+
+[ziele.ci]
+# Dienst im Service-Container der GitHub-Action
+basis_url = "http://127.0.0.1:8000"
+timeout = 15
+
+[ziele.pi]
+# Nach dem Deploy, ueber Traefik. Domain an die eigene anpassen.
+basis_url = "https://api.home.example.com"
+timeout = 10
+tls_pruefen = true

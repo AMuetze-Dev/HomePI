@@ -81,3 +81,14 @@ async def test_jede_fehlerantwort_traegt_die_request_id(client: AsyncClient) -> 
     koerper = (await client.get("/fachlich", headers={"X-Request-ID": "xyz"})).json()
 
     assert koerper["request_id"] == "xyz"
+
+
+async def test_unbekannter_pfad_liefert_problem_json(client: AsyncClient) -> None:
+    """Fuer nicht gefundene Routen wirft Starlette seine eigene HTTPException.
+    Ein Handler, der nur auf FastAPIs Variante haengt, verpasst genau die -
+    also ausgerechnet den haeufigsten Fehlerfall."""
+    antwort = await client.get("/diesen-pfad-gibt-es-nicht")
+
+    assert antwort.status_code == 404
+    assert antwort.headers["content-type"].startswith(PROBLEM_JSON)
+    assert antwort.json()["title"]

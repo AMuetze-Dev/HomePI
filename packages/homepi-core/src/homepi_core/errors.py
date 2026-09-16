@@ -19,9 +19,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException
 
 from .logging import request_id_var
 
@@ -80,6 +81,10 @@ def install_error_handlers(app: FastAPI) -> None:
             **exc.zusatz,
         )
 
+    # Bewusst Starlettes HTTPException und nicht die von FastAPI: fuer eine
+    # nicht gefundene Route wirft Starlette seine eigene Klasse, und die
+    # Handler-Suche geht nicht die Basisklassen hoch. Mit FastAPIs Variante
+    # haetten ausgerechnet alle 404 das falsche Format.
     @app.exception_handler(HTTPException)
     async def _http_error(request: Request, exc: HTTPException) -> JSONResponse:
         return _problem(
