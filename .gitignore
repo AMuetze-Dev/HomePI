@@ -1,0 +1,35 @@
+# --- Secrets: niemals einchecken ---
+.env
+*.pem
+*.key
+acme.json
+
+# --- aus *.yml.tmpl gerendert, enthaelt die Domain ---
+stacks/core/dynamic/*.yml
+!stacks/core/dynamic/*.yml.tmpl
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# --- Node ---
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# --- Werkzeuge / Editor ---
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.local
+*.log
+.DS_Store
