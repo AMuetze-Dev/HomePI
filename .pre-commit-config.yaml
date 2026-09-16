@@ -1,0 +1,55 @@
+# Einmalig einrichten:
+#   uv tool install pre-commit
+#   pre-commit install
+#
+# Absicht: nur schnelle Prüfungen. Alles, was länger als ein paar Sekunden
+# braucht, gehört in die CI - ein Commit-Hook, der nervt, wird umgangen.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+        # Die Traefik-Templates sind vor dem Rendern kein gültiges YAML
+        exclude: '\.yml\.tmpl$'
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^services/api/
+      - id: ruff-format
+        files: ^services/api/
+
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.10.0
+    hooks:
+      - id: shellcheck
+        args: [--severity=warning]
+
+  - repo: local
+    hooks:
+      # Die wichtigste Zeile dieser Datei: ein versehentlich committetes .env
+      # ist ein Vorfall, kein Versehen.
+      - id: keine-env-datei
+        name: .env darf nicht eingecheckt werden
+        entry: 'bash -c ''echo "FEHLER: .env gehoert nicht ins Repo"; exit 1'''
+        language: system
+        files: '^\.env$'
+
+      - id: web-typen
+        name: TypeScript-Typen prüfen
+        entry: bash -c 'cd services/web && npm run typecheck'
+        language: system
+        files: ^services/web/.*\.(ts|tsx)$
+        pass_filenames: false

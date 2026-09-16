@@ -1,0 +1,242 @@
+name: CI
+
+# Laeuft auf jedem Feature-Branch, nicht erst im Pull Request. Ein roter Test
+# soll innerhalb von Minuten sichtbar sein, nicht erst beim Merge.
+on:
+  push:
+    branches: [develop, main, "feature/**", "fix/**", "chore/**"]
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Nur bauen, was sich geaendert hat. Eine Aenderung an docs/ soll nicht
+  # 10 Minuten CI ausloesen.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'services/api/**'
+              - '.github/workflows/ci.yml'
+            web:
+              - 'services/web/**'
+              - '.github/workflows/ci.yml'
+            infra:
+              - 'stacks/**'
+              - 'scripts/**'
+              - 'Makefile'
+              - '.env.example'
+              - '.github/workflows/ci.yml'
+
+  # -------------------------------------------------------------------------
+  infra:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell-Skripte pruefen
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck --severity=warning scripts/*.sh stacks/data/initdb/*.sh
+
+      - name: Skripte ohne CRLF
+        # Ein einziges Carriage Return macht das Skript auf dem Pi unbrauchbar
+        run: |
+          if grep -rlU $'\r' scripts/ stacks/ Makefile 2>/dev/null | grep -q .; then
+            echo "::error::CRLF gefunden - .gitattributes pruefen"
+            grep -rlU $'\r' scripts/ stacks/ Makefile
+            exit 1
+          fi
+
+      - name: Compose-Dateien validieren
+        run: |
+          cp .env.example .env
+          ./scripts/40-render-config.sh
+          for stack in core dns data home apps; do
+            echo "--- $stack"
+            docker compose --env-file .env -f "stacks/$stack/docker-compose.yml" config -q
+          done
+
+      - name: Keine Klartext-Geheimnisse in .env.example
+        run: |
+          if grep -Ev '^\s*#|^\s*$' .env.example | grep -Eiv "change-me|example\.com|^\w+='?(1000|Europe/Berlin|/srv/homelab|postgres|info)" \
+             | grep -Ei "(password|token|secret)=" ; then
+            echo "::error::.env.example enthaelt offenbar einen echten Wert"
+            exit 1
+          fi
+
+  # -------------------------------------------------------------------------
+  api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api
+
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://app:app@127.0.0.1:5432/app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/api/uv.lock
+
+      - run: uv sync --frozen
+
+      # Reihenfolge ist Absicht: Format und Lint sind in Sekunden durch und
+      # geben die praezisere Fehlermeldung als ein fehlgeschlagener Test.
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check --output-format=github .
+
+      - name: Typen
+        run: uv run mypy
+
+      - name: Tests inklusive Integration
+        # -m '' hebt den Standardfilter auf, hier ist Postgres ja vorhanden.
+        # Die Schwelle steht hier und nicht in pyproject.toml, damit ein
+        # einzelner Test im Watch-Modus nicht an der Coverage scheitert.
+        run: |
+          uv run pytest -m '' \
+            --cov=homepi_api --cov-report=term-missing --cov-report=xml \
+            --cov-fail-under=85 \
+            --junitxml=junit.xml
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-testreport
+          path: |
+            services/api/junit.xml
+            services/api/coverage.xml
+          retention-days: 7
+
+  # -------------------------------------------------------------------------
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/web/package-lock.json
+
+      - run: npm ci
+
+      - name: Format
+        run: npx prettier --check src *.ts *.js
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Typen
+        run: npm run typecheck
+
+      - name: Tests
+        # Die Schwellen stehen in vite.config.ts und lassen den Lauf scheitern
+        run: npm run test:coverage
+
+      - name: Produktionsbuild
+        run: npm run build
+
+  # -------------------------------------------------------------------------
+  # Faengt Dockerfile-Fehler frueh, ohne den langsamen arm64-Build. Der echte
+  # Release-Build fuer den Pi laeuft in images.yml.
+  docker:
+    needs: changes
+    if: needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: services/${{ matrix.service }}
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # -------------------------------------------------------------------------
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Nach Geheimnissen in der Historie suchen
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --source=/repo --no-banner --redact --verbose
+
+  # -------------------------------------------------------------------------
+  # Ein einziger Status fuer den Branch-Schutz. Ohne diesen Job muesste jeder
+  # neue Job einzeln in den Einstellungen nachgetragen werden - und ein
+  # uebersprungener Job wuerde faelschlich als Erfolg zaehlen.
+  ci:
+    needs: [infra, api, web, docker, secrets]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ergebnis auswerten
+        run: |
+          echo '${{ toJSON(needs) }}'
+          if echo '${{ toJSON(needs) }}' | grep -q '"result": *"failure"'; then
+            echo "::error::Mindestens ein Job ist fehlgeschlagen"
+            exit 1
+          fi
+          if echo '${{ toJSON(needs) }}' | grep -q '"result": *"cancelled"'; then
+            echo "::error::Mindestens ein Job wurde abgebrochen"
+            exit 1
+          fi
+          echo "Alles gruen (uebersprungene Jobs sind in Ordnung)."
