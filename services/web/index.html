@@ -3,7 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Selbst gehostete Dienste auf einem Raspberry Pi." />
+    <!-- Faerbt die Systemleiste mobiler Browser passend zum Thema. -->
+    <meta name="theme-color" content="#fcfcfd" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>HomePI</title>
+    <script>
+      // Vor dem ersten Anstrich: sonst blitzt beim Laden kurz das helle
+      // Schema auf, bevor React das Attribut setzt.
+      try {
+        var t = localStorage.getItem("homepi.thema");
+        if (t === "hell" || t === "dunkel")
+          document.documentElement.setAttribute("data-thema", t);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,0 +1,63 @@
+.kopf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  margin-bottom: var(--raum-8);
+  /* Ein kurzes Aufziehen beim Betreten der Seite. Zwei Pixel Weg, mehr
+     wuerde nach Praesentation aussehen statt nach Software. */
+  animation: eintreten var(--dauer-normal) var(--verlauf-eintritt);
+}
+
+.zeile {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-3);
+  flex-wrap: wrap;
+}
+
+.titel {
+  font-size: var(--text-2xl);
+  letter-spacing: var(--laufweite-enger);
+}
+
+.beschreibung {
+  max-width: var(--breite-text);
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-md);
+  line-height: var(--zeile-weit);
+}
+
+.zurueck {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--raum-2);
+  margin-bottom: var(--raum-4);
+  font-size: var(--text-sm);
+  color: var(--farbe-text-leise);
+  transition: color var(--dauer-schnell) var(--verlauf);
+}
+
+.zurueck:hover {
+  color: var(--farbe-text);
+}
+
+.pfeil {
+  width: 0.875rem;
+  height: 0.875rem;
+  transition: transform var(--dauer-schnell) var(--verlauf);
+}
+
+.zurueck:hover .pfeil {
+  transform: translateX(-2px);
+}
+
+@keyframes eintreten {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

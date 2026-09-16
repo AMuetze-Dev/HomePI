@@ -40,6 +40,7 @@ Pi-hole anzufassen.
 | [docs/05-workflow.md](docs/05-workflow.md) | Branch-Modell, TDD-Schleife, CI/CD |
 | [docs/06-artefakte.md](docs/06-artefakte.md) | Wie neue Artefakte dazukommen, ohne dass ein Container dazukommt |
 | [docs/07-lokale-entwicklung.md](docs/07-lokale-entwicklung.md) | Die Docker-Umgebung auf dem Windows-Rechner |
+| [docs/08-design.md](docs/08-design.md) | Designsystem: Tokens, Bausteine, Verhalten, Zugänglichkeit |
 
 ## Schnellstart auf dem Pi
 

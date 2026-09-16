@@ -1,0 +1,76 @@
+.knopf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--raum-2);
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: var(--rundung-md);
+  font-size: var(--text-md);
+  font-weight: var(--gewicht-mittel);
+  letter-spacing: var(--laufweite-eng);
+  transition:
+    background-color var(--dauer-schnell) var(--verlauf),
+    border-color var(--dauer-schnell) var(--verlauf),
+    color var(--dauer-schnell) var(--verlauf),
+    opacity var(--dauer-schnell) var(--verlauf);
+}
+
+/* Der Druckpunkt: ein Hauch Verkleinerung beim Klick. Mehr wuerde spielerisch
+   wirken, ganz ohne fehlt die Rueckmeldung. */
+.knopf:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+/* Deaktiviert heisst gedaempft, nicht durchscheinend: blosse Transparenz
+   macht aus einem dunklen Primaerknopf einen schweren grauen Block, der
+   mehr Aufmerksamkeit zieht als der aktive daneben. */
+.knopf:disabled {
+  background: var(--farbe-flaeche-gedaempft);
+  border-color: var(--farbe-rand);
+  color: var(--farbe-text-leise);
+  cursor: not-allowed;
+}
+
+/* --- Groessen --- */
+.md {
+  height: 2.25rem;
+  padding-inline: var(--raum-4);
+}
+
+.sm {
+  height: 1.875rem;
+  padding-inline: var(--raum-3);
+  font-size: var(--text-sm);
+}
+
+/* --- Auspraegungen --- */
+.primaer {
+  background: var(--farbe-aktion);
+  color: var(--farbe-aktion-schrift);
+}
+
+.primaer:hover:not(:disabled) {
+  background: var(--farbe-aktion-hover);
+}
+
+.sekundaer {
+  background: var(--farbe-flaeche);
+  border-color: var(--farbe-rand-stark);
+  color: var(--farbe-text);
+}
+
+.sekundaer:hover:not(:disabled) {
+  background: var(--farbe-flaeche-gedaempft);
+  border-color: var(--farbe-text-leise);
+}
+
+.leise {
+  background: transparent;
+  color: var(--farbe-text-gedaempft);
+}
+
+.leise:hover:not(:disabled) {
+  background: var(--farbe-flaeche-gedaempft);
+  color: var(--farbe-text);
+}

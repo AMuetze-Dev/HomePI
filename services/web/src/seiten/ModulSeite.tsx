@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { fetchModule, type ModulEintrag } from "../api/client";
 import { GenerischeAnsicht } from "../module/GenerischeAnsicht";
 import { oberflaecheFuer } from "../module/register";
+import { Etikett, Hinweis, Leerzustand, Platzhalter, Seitenkopf } from "../ui";
+import stil from "./ModulSeite.module.css";
 
 type Zustand =
   | { phase: "laedt" }
   | { phase: "gefunden"; modul: ModulEintrag }
   | { phase: "unbekannt" }
   | { phase: "fehler"; nachricht: string };
+
+const ZURUECK = { ziel: "/", text: "Übersicht" };
 
 export function ModulSeite() {
   const { id = "" } = useParams();
@@ -33,19 +37,36 @@ export function ModulSeite() {
     return () => controller.abort();
   }, [id]);
 
-  if (zustand.phase === "laedt") return <p role="status">Wird geladen …</p>;
+  if (zustand.phase === "laedt") {
+    return (
+      <div className={stil.laden} role="status" aria-label="Wird geladen">
+        <Platzhalter breite="9rem" hoehe="0.8125rem" />
+        <Platzhalter breite="14rem" hoehe="1.75rem" />
+        <Platzhalter breite="100%" hoehe="12rem" />
+      </div>
+    );
+  }
 
-  if (zustand.phase === "fehler") return <p role="alert">{zustand.nachricht}</p>;
+  if (zustand.phase === "fehler") {
+    return (
+      <>
+        <Seitenkopf titel="Nicht erreichbar" zurueck={ZURUECK} />
+        <Hinweis ton="fehler" dringend>
+          {zustand.nachricht}
+        </Hinweis>
+      </>
+    );
+  }
 
   if (zustand.phase === "unbekannt") {
     return (
-      <main>
-        <h1>Unbekanntes Artefakt</h1>
-        <p role="alert">
-          Das Gateway kennt kein Modul mit der Kennung <code>{id}</code>.
-        </p>
-        <Link to="/">Zur Startseite</Link>
-      </main>
+      <>
+        <Seitenkopf titel="Unbekanntes Artefakt" zurueck={ZURUECK} />
+        <Leerzustand titel={`Kein Modul mit der Kennung „${id}“`}>
+          Das Gateway kennt dieses Artefakt nicht. Vermutlich wurde es umbenannt oder ist
+          noch nicht ausgerollt.
+        </Leerzustand>
+      </>
     );
   }
 
@@ -53,12 +74,21 @@ export function ModulSeite() {
   const eigene = oberflaecheFuer(modul.id);
 
   return (
-    <main>
-      <nav>
-        <Link to="/">Zurück</Link>
-      </nav>
-      <h1>{modul.titel}</h1>
-      {eigene ? <eigene.Komponente modul={modul} /> : <GenerischeAnsicht modul={modul} />}
-    </main>
+    <>
+      <Seitenkopf
+        titel={modul.titel}
+        beschreibung={modul.beschreibung || undefined}
+        zurueck={ZURUECK}
+        neben={<Etikett mono>v{modul.version}</Etikett>}
+      />
+
+      <div className={stil.inhalt}>
+        {eigene ? (
+          <eigene.Komponente modul={modul} />
+        ) : (
+          <GenerischeAnsicht modul={modul} />
+        )}
+      </div>
+    </>
   );
 }

@@ -1,0 +1,38 @@
+.knopf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid transparent;
+  border-radius: var(--rundung-md);
+  background: transparent;
+  color: var(--farbe-text-gedaempft);
+  transition:
+    background-color var(--dauer-schnell) var(--verlauf),
+    color var(--dauer-schnell) var(--verlauf);
+}
+
+.knopf:hover {
+  background: var(--farbe-flaeche-gedaempft);
+  color: var(--farbe-text);
+}
+
+.symbol {
+  width: 1rem;
+  height: 1rem;
+  /* Der Wechsel selbst bekommt eine kurze Drehung - das ist die eine Stelle,
+     an der eine Animation Freude macht, ohne aufdringlich zu sein. */
+  animation: drehen var(--dauer-normal) var(--verlauf-eintritt);
+}
+
+@keyframes drehen {
+  from {
+    opacity: 0;
+    transform: rotate(-35deg) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -73,10 +73,11 @@ describe("Modulseite", () => {
 
     zeige("geraete");
 
-    // Die Geräteseite zeigt eine Tabelle mit den Geräten - die generische
-    // Ansicht zeigt eine Tabelle mit Endpunkten. Der Inhalt unterscheidet sie.
+    // Die Geräteseite zeigt Kennzahlen und eine Tabelle mit den Geräten -
+    // die generische Ansicht zeigt eine Tabelle mit Endpunkten. Der Inhalt
+    // unterscheidet sie, nicht die Struktur.
     expect(await screen.findByText("Stehlampe")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Überblick" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Überblick" })).toBeInTheDocument();
   });
 
   it("bevorzugt eine eingetragene eigene Oberfläche", async () => {
@@ -97,8 +98,10 @@ describe("Modulseite", () => {
 
     zeige("gibtsnicht");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/kein Modul/);
-    expect(screen.getByRole("link", { name: /Startseite/ })).toBeInTheDocument();
+    // Kein Alarm, sondern ein Leerzustand: ein aufgerufener Pfad, den es
+    // nicht gibt, ist kein Fehler des Systems.
+    expect(await screen.findByText(/Kein Modul mit der Kennung/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Übersicht/ })).toBeInTheDocument();
   });
 
   it("erklärt sich, wenn ein Artefakt weder Oberfläche noch Endpunkte hat", async () => {
@@ -107,6 +110,6 @@ describe("Modulseite", () => {
 
     zeige("messwerte");
 
-    expect(await screen.findByText(/keine eigene Oberfläche/)).toBeInTheDocument();
+    expect(await screen.findByText(/Noch keine Oberfläche/)).toBeInTheDocument();
   });
 });

@@ -1,0 +1,122 @@
+.statuskarte {
+  margin-bottom: var(--raum-10);
+  animation: eintreten var(--dauer-normal) var(--verlauf-eintritt) 40ms backwards;
+}
+
+.bereich {
+  animation: eintreten var(--dauer-normal) var(--verlauf-eintritt) 80ms backwards;
+}
+
+.bereichskopf {
+  display: flex;
+  align-items: baseline;
+  gap: var(--raum-3);
+  margin-bottom: var(--raum-5);
+}
+
+.bereichstitel {
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.anzahl {
+  font-size: var(--text-sm);
+  color: var(--farbe-text-leise);
+  font-variant-numeric: tabular-nums;
+}
+
+/* auto-fill statt auto-fit: eine einzelne Kachel bleibt damit schmal, statt
+   sich ueber die ganze Breite zu ziehen. */
+.gitter {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--raum-4);
+  list-style: none;
+  padding: 0;
+}
+
+.eintrag {
+  animation: eintreten var(--dauer-normal) var(--verlauf-eintritt) backwards;
+}
+
+.verweis {
+  display: block;
+  height: 100%;
+  border-radius: var(--rundung-lg);
+}
+
+.kachel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  height: 100%;
+}
+
+.klickbar {
+  transition:
+    border-color var(--dauer-normal) var(--verlauf),
+    box-shadow var(--dauer-normal) var(--verlauf),
+    transform var(--dauer-normal) var(--verlauf);
+}
+
+.verweis:hover .klickbar {
+  border-color: var(--farbe-rand-stark);
+  box-shadow: var(--schatten-md);
+  transform: translateY(-2px);
+}
+
+.verweis:active .klickbar {
+  transform: translateY(0);
+  transition-duration: var(--dauer-sofort);
+}
+
+.kachelkopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+}
+
+.kacheltitel {
+  font-size: var(--text-md);
+  font-weight: var(--gewicht-halbfett);
+  letter-spacing: var(--laufweite-eng);
+}
+
+.kacheltext {
+  flex: 1;
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-gedaempft);
+}
+
+.kachelfuss {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+  margin-top: var(--raum-1);
+}
+
+.pfad {
+  font-family: var(--schrift-mono);
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+}
+
+.ladezeile {
+  display: flex;
+  flex: 1;
+  align-items: center;
+}
+
+@keyframes eintreten {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
