@@ -35,6 +35,7 @@ from .errors import install_error_handlers
 from .health import HealthRegistry
 from .logging import configure_logging
 from .middleware import AccessLogMiddleware, RequestIdMiddleware
+from .modules import Modulregister
 from .settings import ServiceSettings
 
 log = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ class ServiceContext:
     health: HealthRegistry
     db: Database | None = None
     cache: Cache | None = None
+    module: Modulregister | None = None
 
     def require_db(self) -> Database:
         if self.db is None:
@@ -67,6 +69,7 @@ class ServiceContext:
 def create_service(
     settings: ServiceSettings,
     *,
+    module: Modulregister | None = None,
     on_startup: Callable[[ServiceContext], AsyncIterator[None]] | None = None,
     **fastapi_kwargs: object,
 ) -> FastAPI:
@@ -77,7 +80,7 @@ def create_service(
         format_=settings.effektives_log_format,
     )
 
-    kontext = ServiceContext(settings=settings, health=HealthRegistry())
+    kontext = ServiceContext(settings=settings, health=HealthRegistry(), module=module)
 
     if settings.database_url:
         kontext.db = Database(settings.database_url)
@@ -133,7 +136,22 @@ def create_service(
 
     install_error_handlers(app)
     _install_standard_routen(app, kontext)
+
+    if module is not None:
+        _mounte_module(app, module)
+
     return app
+
+
+def _mounte_module(app: FastAPI, register: Modulregister) -> None:
+    for modul in register.module:
+        app.include_router(modul.router, prefix=modul.praefix, tags=[modul.id])
+    if register.defekte:
+        log.error(
+            "%d Modul(e) konnten nicht geladen werden: %s",
+            len(register.defekte),
+            ", ".join(d.id for d in register.defekte),
+        )
 
 
 @asynccontextmanager
@@ -175,4 +193,18 @@ def _install_standard_routen(app: FastAPI, kontext: ServiceContext) -> None:
             "version": einstellungen.service_version,
             "environment": einstellungen.environment.value,
             "abhaengigkeiten": sorted(kontext.health.names),
+            "module": kontext.module.ids if kontext.module else [],
         }
+
+    if kontext.module is not None:
+        register = kontext.module
+
+        @app.get("/module", tags=["betrieb"], summary="Welche Artefakte hier laufen")
+        async def module() -> list[dict[str, object]]:
+            """Die Startseite baut ihre Kacheln aus genau dieser Liste.
+
+            Ein neues Artefakt erscheint dort, sobald das Gateway es geladen
+            hat - ohne Änderung am Frontend. Defekte Module stehen mit
+            status='fehler' drin, damit sie nicht stillschweigend fehlen.
+            """
+            return register.manifest()
