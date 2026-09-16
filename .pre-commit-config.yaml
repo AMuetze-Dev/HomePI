@@ -21,6 +21,9 @@ repos:
       - id: mixed-line-ending
         args: [--fix=lf]
       - id: detect-private-key
+      # Faengt genau den Fehler, der die CI lahmgelegt hat: eine Datei mit
+      # Shebang, der unter Windows das Ausfuehrbar-Bit fehlt.
+      - id: check-shebang-scripts-are-executable
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.9.6
