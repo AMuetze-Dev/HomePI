@@ -1,10 +1,35 @@
 # Artefakt „staffelpilot" — Auftrag für den Agenten
 
-Dieses Verzeichnis ist ein **lauffähiges, leeres Artefakt**. Verdrahtung,
-Tests und Deploy stehen bereits. Du füllst die Fachlichkeit ein.
+Dieses Artefakt ist **gefüllt und läuft**. Was es kann und warum es so
+entschieden ist, steht in [README.md](README.md); dieser Text beschreibt, wie
+hier gearbeitet wird und was noch aussteht.
 
 Lies zuerst [`../../docs/06-artefakte.md`](../../docs/06-artefakte.md) — dort
-steht, warum ein Artefakt ein Modul im Gateway ist und kein eigener Container.
+steht, warum ein Artefakt ein Modul im Gateway ist und kein eigener Container —
+und [`../../docs/12-testen.md`](../../docs/12-testen.md) für die Prüfebenen.
+
+## Stand (17.09.2026)
+
+Gebaut: Staffeln, Warteschlange mit Fälligkeit, Spielberichte und Befunde,
+Abhaken, Einstellungen, Mannschaften mit geratenem Aufbau, Regelkatalog,
+Vorgänge (Mahnung und Sportgerichtsantrag als Entwurf). 146 Tests, 100 %
+Zeilen und Zweige; Oberfläche mit fünf Reitern, 265 Frontend-Tests.
+
+Offen, in der Reihenfolge, in der es sich lohnt:
+
+| | |
+|---|---|
+| **DFBnet-Prüfdienst** | eigener Container mit Playwright. Er füllt `POST /import`, `PUT /regeln` und `PUT /staffeln/{id}/mannschaften`. Das ist das größte fehlende Stück — ohne ihn kommen keine Daten herein |
+| **Mahnung als PDF** | der Vordruck des Verbandes. Text und Felder stehen, das Formular fehlt. Vorlage: `D:/DevLibrary/StaffelPilot/src/core/mahnung.py` |
+| **Ergebnisse eines Prüflaufs** | Fortschritt und Protokoll, solange der Dienst läuft |
+
+**Zwei Zusagen sind nicht verhandelbar** und gehören in jede Änderung:
+
+1. Ein Bericht wird erst abgehakt, wenn zu **jedem** Befund eine Entscheidung
+   vorliegt.
+2. **Es wird nichts verschickt.** Entwürfe entstehen aus Vorlagen, Wort für
+   Wort vorhersagbar — kein erzeugter Text, kein Mailversand. „Versandt" hält
+   fest, was ein Mensch getan hat.
 
 ---
 
