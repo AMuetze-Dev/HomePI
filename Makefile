@@ -118,8 +118,12 @@ TESTDB := postgresql+asyncpg://app:app@127.0.0.1:15432/test
 ## test: alles pruefen, was die CI auch prueft
 test: test-infra test-python test-web
 
+## lint-ci: GitHub-Workflows pruefen, bevor sie einen Lauf kosten
+lint-ci:
+	docker run --rm -v "$(CURDIR):/repo" -w /repo rhysd/actionlint:latest -color
+
 ## test-infra: Shell-Skripte und Compose-Dateien validieren
-test-infra: render verify
+test-infra: render verify lint-ci
 	@shellcheck --severity=warning scripts/*.sh stacks/data/initdb/*.sh 		&& echo "shellcheck ok"
 
 ## test-python: Format, Lint, Typen und Tests aller drei Python-Projekte
@@ -207,4 +211,4 @@ dev-ps:
 smoke:
 	cd services/gateway && uv run pytest -m smoke -v
 
-.PHONY: help up up-core up-dns up-data up-home up-apps down render         deploy-apps pull update ps logs stats psql pg-tunnel backup check verify cert         test test-infra test-python test-web tdd-api tdd-web fmt install dev dev-stop dev-reset dev-logs dev-ps smoke
+.PHONY: artefakt backup cert check deploy-apps dev dev-logs dev-ps dev-reset dev-stop down fmt help install lint-ci logs modul pg-tunnel ps psql pull render smoke stats tdd-api tdd-web test test-infra test-modul test-python test-web up up-apps up-core up-data up-dns up-home update verify
