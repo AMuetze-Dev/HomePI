@@ -72,6 +72,9 @@ async function anfrage<T>(pfad: string, init: RequestInit = {}, signal?: AbortSi
   const antwort = await fetch(`${BASE_URL}/staffelpilot${pfad}`, {
     ...init,
     signal: signal ?? null,
+    // Das Artefakt ist geschuetzt. Ohne das Sitzungscookie antwortet das
+    // Gateway mit 401, egal was hier steht.
+    credentials: "include",
     headers: { Accept: "application/json", ...init.headers },
   });
 

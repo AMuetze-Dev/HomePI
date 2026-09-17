@@ -24,6 +24,7 @@ import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,11 +35,22 @@ from .db import Database
 from .errors import install_error_handlers
 from .health import HealthRegistry
 from .logging import configure_logging
-from .middleware import AccessLogMiddleware, RequestIdMiddleware
-from .modules import Modulregister
+from .middleware import (
+    AccessLogMiddleware,
+    KeinZwischenspeicherMiddleware,
+    RequestIdMiddleware,
+)
+from .modules import Modul, Modulregister, Zugang
 from .settings import ServiceSettings
 
 log = logging.getLogger(__name__)
+
+MANIFEST_BESCHREIBUNG = (
+    "Die Startseite baut ihre Kacheln aus genau dieser Liste. Ein neues Artefakt "
+    "erscheint dort, sobald das Gateway es geladen hat - ohne Änderung am "
+    "Frontend. Defekte Module stehen mit status='fehler' drin, damit sie nicht "
+    "stillschweigend fehlen."
+)
 
 
 @dataclass
@@ -70,6 +82,7 @@ def create_service(
     settings: ServiceSettings,
     *,
     module: Modulregister | None = None,
+    anmeldung: bool = False,
     on_startup: Callable[[ServiceContext], AsyncIterator[None]] | None = None,
     **fastapi_kwargs: object,
 ) -> FastAPI:
@@ -85,6 +98,21 @@ def create_service(
     if settings.database_url:
         kontext.db = Database(settings.database_url)
         kontext.health.register("database", kontext.db.ping, essential=True)
+        # Nicht essenziell, aber sichtbar: eine fehlende Spalte laesst jede
+        # Abfrage auf diese Tabelle scheitern. Ohne diesen Check faellt das
+        # erst auf, wenn jemand die betroffene Seite aufruft - und sieht dann
+        # aus, als waeren die Daten weg.
+        from .schema import probe as schema_probe
+
+        kontext.health.register("schema", schema_probe(kontext.db), essential=False)
+
+    if anmeldung and kontext.db is None:
+        # Frueh und deutlich: Benutzer und Sitzungen liegen in der Datenbank,
+        # ohne sie kaeme der Fehler erst beim ersten Anmeldeversuch.
+        raise RuntimeError(
+            "anmeldung=True braucht eine DATABASE_URL - Benutzer und "
+            "Sitzungen liegen in der Datenbank."
+        )
 
     if settings.redis_url:
         kontext.cache = Cache(settings.redis_url)
@@ -102,14 +130,25 @@ def create_service(
         )
         if on_startup is not None:
             async with _als_kontext(on_startup, kontext):
+                # Nach on_startup: dort legt das Gateway die Tabellen an, und
+                # ohne sie liesse sich nicht nachsehen, ob es einen Verwalter
+                # gibt.
+                await _einrichtung_vorbereiten(kontext, anmeldung=anmeldung)
                 yield
         else:
+            await _einrichtung_vorbereiten(kontext, anmeldung=anmeldung)
             yield
         log.info("%s fährt herunter", settings.service_name)
         if kontext.db is not None:
             await kontext.db.dispose()
         if kontext.cache is not None:
             await kontext.cache.dispose()
+
+    if anmeldung and settings.ist_produktion and "openapi_url" not in fastapi_kwargs:
+        # Das OpenAPI-Schema listet jeden Pfad jedes Artefakts, auch die, die
+        # der Aufrufer nicht sehen darf. Auf einem Dienst mit Anmeldung ist das
+        # ein Verzeichnis der internen Artefakte - in Produktion zu.
+        fastapi_kwargs["openapi_url"] = None
 
     app = FastAPI(
         title=settings.service_name,
@@ -124,6 +163,9 @@ def create_service(
     # gesetzt sein. Starlette führt zuletzt hinzugefügte Middleware zuerst aus.
     app.add_middleware(AccessLogMiddleware)
     app.add_middleware(RequestIdMiddleware)
+    # Zuletzt hinzugefuegt heisst zuerst ausgefuehrt - der Header sitzt damit
+    # auf jeder Antwort, auch auf denen der Fehlerbehandlung.
+    app.add_middleware(KeinZwischenspeicherMiddleware)
 
     if settings.cors_origin_list:
         app.add_middleware(
@@ -135,23 +177,99 @@ def create_service(
         )
 
     install_error_handlers(app)
-    _install_standard_routen(app, kontext)
+    _install_standard_routen(app, kontext, anmeldung=anmeldung)
+
+    if anmeldung:
+        # Erst hier importieren: ein Service ohne Anmeldung soll weder
+        # argon2 noch die Auth-Tabellen laden.
+        from .auth import anmelde_router
+        from .auth.einrichtung import router as einrichtungs_router
+
+        app.include_router(anmelde_router, prefix="/auth")
+        # Prueft bei jedem Aufruf selbst, ob die Einrichtung noch offen ist -
+        # deshalb darf er dauerhaft haengen bleiben.
+        app.include_router(einrichtungs_router, prefix="/auth")
 
     if module is not None:
-        _mounte_module(app, module)
+        _mounte_module(app, module, anmeldung=anmeldung)
 
     return app
 
 
-def _mounte_module(app: FastAPI, register: Modulregister) -> None:
+def _mounte_module(app: FastAPI, register: Modulregister, *, anmeldung: bool) -> None:
+    if register.braucht_anmeldung and not anmeldung:
+        # Lieber gar nicht starten als offen stehen. Ein Artefakt ist per
+        # Voreinstellung geschuetzt; ohne Anmeldung gaebe es niemanden, der
+        # das pruefen koennte - und die Pruefung fiele stillschweigend aus.
+        verschlossen = [m.id for m in register.module if m.zugang.braucht_anmeldung]
+        raise RuntimeError(
+            f"Die Artefakte {', '.join(sorted(verschlossen))} sind nicht öffentlich. "
+            "Dieser Service braucht create_service(..., anmeldung=True), sonst "
+            "wäre die Zugriffsprüfung wirkungslos."
+        )
+
     for modul in register.module:
-        app.include_router(modul.router, prefix=modul.praefix, tags=[modul.id])
+        app.include_router(
+            modul.router,
+            prefix=modul.praefix,
+            tags=[modul.id],
+            dependencies=_zugriffspruefung(modul),
+        )
     if register.defekte:
         log.error(
             "%d Modul(e) konnten nicht geladen werden: %s",
             len(register.defekte),
             ", ".join(d.id for d in register.defekte),
         )
+
+
+def _zugriffspruefung(modul: Modul) -> list[Any]:
+    """Die Pruefung haengt am ganzen Router, nicht an einzelnen Endpunkten.
+
+    Ein Artefakt bekommt im Lauf der Zeit Endpunkte dazu; haenge die Pruefung
+    an jedem einzelnen, ist der vergessene der, der das Loch reisst.
+    """
+    if modul.zugang is not Zugang.GESCHUETZT:
+        return []
+
+    from .auth import erfordert
+
+    return [erfordert(modul.id, modul.mindestrolle)]
+
+
+async def _einrichtung_vorbereiten(kontext: ServiceContext, *, anmeldung: bool) -> None:
+    """Solange es keinen Verwalter gibt: ein frisches Einrichtungstoken ins Log.
+
+    Nur so kommt jemand an die Ersteinrichtung - und nur, wer das Log lesen
+    kann, also Zugriff auf die Maschine hat. Bei jedem Start ein neues Token:
+    damit ist im Log immer das gueltige zu finden, und ein mitgelesenes von
+    vorgestern ist wertlos.
+
+    Scheitert das - etwa weil die Datenbank noch nicht da ist -, wird es
+    gemeldet und der Dienst startet trotzdem. Ein Gateway, das wegen der
+    Ersteinrichtung nicht hochkommt, waere die schlechtere Antwort.
+    """
+    if not anmeldung or kontext.db is None:
+        return
+
+    from .auth import speicher
+
+    try:
+        async with kontext.db.session() as sitzung:
+            if not await speicher.einrichtung_noetig(sitzung):
+                return
+            token = await speicher.setze_einrichtungstoken(sitzung)
+    except Exception:
+        log.exception("Einrichtungstoken liess sich nicht anlegen")
+        return
+
+    log.warning(
+        "Diese Installation hat noch keinen Verwalter.\n"
+        "  Einrichtung öffnen:  <adresse>/einrichtung\n"
+        "  Einrichtungstoken:   %s\n"
+        "  Das Token gilt bis zum nächsten Start und wird danach ersetzt.",
+        token,
+    )
 
 
 @asynccontextmanager
@@ -169,7 +287,7 @@ async def _als_kontext(
             await anext(generator)
 
 
-def _install_standard_routen(app: FastAPI, kontext: ServiceContext) -> None:
+def _install_standard_routen(app: FastAPI, kontext: ServiceContext, *, anmeldung: bool) -> None:
     einstellungen = kontext.settings
 
     @app.get("/health", tags=["betrieb"], summary="Zustand des Service")
@@ -193,18 +311,31 @@ def _install_standard_routen(app: FastAPI, kontext: ServiceContext) -> None:
             "version": einstellungen.service_version,
             "environment": einstellungen.environment.value,
             "abhaengigkeiten": sorted(kontext.health.names),
-            "module": kontext.module.ids if kontext.module else [],
+            # Bewusst nur die Anzahl: /info braucht keine Anmeldung, und die
+            # Namen der Artefakte gehen nur den etwas an, der sie sehen darf.
+            # Wer wissen will, welche es sind, fragt /module.
+            "module": len(kontext.module.ids) if kontext.module else 0,
         }
 
     if kontext.module is not None:
         register = kontext.module
 
-        @app.get("/module", tags=["betrieb"], summary="Welche Artefakte hier laufen")
-        async def module() -> list[dict[str, object]]:
-            """Die Startseite baut ihre Kacheln aus genau dieser Liste.
+        if anmeldung:
+            # Gefiltert, nicht gesperrt: ein Artefakt, fuer das dieser Benutzer
+            # kein Recht hat, taucht gar nicht erst auf. Es soll fuer ihn nicht
+            # existieren - auch nicht als graue Kachel.
+            from .auth.manifest import manifest_router
 
-            Ein neues Artefakt erscheint dort, sobald das Gateway es geladen
-            hat - ohne Änderung am Frontend. Defekte Module stehen mit
-            status='fehler' drin, damit sie nicht stillschweigend fehlen.
-            """
+            app.include_router(manifest_router(register))
+            return
+
+        @app.get(
+            "/module",
+            tags=["betrieb"],
+            summary="Welche Artefakte hier laufen",
+            description=MANIFEST_BESCHREIBUNG,
+        )
+        async def module() -> list[dict[str, object]]:
+            # Ohne Anmeldung gibt es keine Rechte, nach denen sich filtern
+            # liesse. Ein solcher Dienst ist per Definition intern.
             return register.manifest()

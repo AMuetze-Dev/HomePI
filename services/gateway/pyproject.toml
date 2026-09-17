@@ -9,6 +9,9 @@ dependencies = [
     # Die Artefakte. Jedes meldet sich ueber einen Entry Point an und wird
     # beim Start automatisch eingehaengt - hier steht nur, dass es mitkommt.
     "homepi-geraete",
+    # Ohne dieses Artefakt kann niemand Konten anlegen oder Rechte vergeben.
+    # Es gehoert damit zum Gateway wie die Anmeldung selbst.
+    "homepi-verwaltung",
 ]
 
 [tool.homepi]
@@ -19,6 +22,7 @@ stack = "apps"
 homepi-core = { path = "../../packages/homepi-core", editable = true }
 homepi-staffelpilot = { path = "../../modules/staffelpilot", editable = true }
 homepi-geraete = { path = "../../modules/geraete", editable = true }
+homepi-verwaltung = { path = "../../modules/verwaltung", editable = true }
 
 [build-system]
 requires = ["hatchling"]

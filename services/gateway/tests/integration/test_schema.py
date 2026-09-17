@@ -7,16 +7,18 @@ Tabellen da.
 
 from __future__ import annotations
 
-import os
-
 import pytest
 from homepi_core import Base
+from homepi_core.testing.datenbank import datenbank_fuer_tests
 from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 pytestmark = pytest.mark.integration
 
-URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://app:app@127.0.0.1:15432/test")
+#: Nur eine Datenbank, die erkennbar zum Testen da ist - diese Tests
+#: rufen drop_all auf.
+URL = datenbank_fuer_tests()
+PASSWORT = "korrekt-pferd-batterie-heftklammer"
 
 
 @pytest.fixture
@@ -98,18 +100,30 @@ async def test_zweiter_start_ist_unschaedlich(
 async def test_gateway_arbeitet_nach_dem_start(
     monkeypatch: pytest.MonkeyPatch, leere_datenbank: None
 ) -> None:
+    """Der ganze Weg: Tabellen anlegen, Konto anlegen, anmelden, Artefakt
+    aufrufen. Genau das passiert beim ersten Start auf dem Pi."""
+    from homepi_core.auth import Rolle
+    from homepi_core.auth import speicher as auth_speicher
     from httpx import ASGITransport, AsyncClient
 
     app = await _app_starten(monkeypatch, anlegen=True)
 
     async with app.router.lifespan_context(app):
+        kontext = app.state.homepi
+        async with kontext.db.session() as sitzung:
+            benutzer = await auth_speicher.lege_benutzer_an(sitzung, "pruefer", PASSWORT, "Prüfer")
+            await auth_speicher.setze_recht(sitzung, benutzer.id, "geraete", Rolle.VERWALTER)
+
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             gesundheit = await client.get("/health")
+            ohne_anmeldung = await client.get("/geraete/")
+            await client.post("/auth/anmelden", json={"name": "pruefer", "passwort": PASSWORT})
             geraete = await client.get("/geraete/")
 
     assert gesundheit.status_code == 200
     assert gesundheit.json()["checks"]["database"] is True
+    assert ohne_anmeldung.status_code == 401
     assert geraete.status_code == 200
     assert geraete.json() == []
 

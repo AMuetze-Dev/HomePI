@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import deploy, scaffold
+from . import benutzer, deploy, scaffold, schema
 from .project import projekt_ermitteln
 from .shell import CliFehler, erfolg, fehler, hinweis, lauf, schritt, warnung
 
@@ -17,6 +17,8 @@ Werkzeug für HomePI-Microservices.
   homepi deploy         über die GitHub-Pipeline auf den Pi bringen
   homepi info           erkanntes Projekt anzeigen
   homepi doctor         Voraussetzungen prüfen
+  homepi benutzer       Konten und Rechte verwalten
+  homepi schema         Tabellen anlegen (Startwerkzeug, keine Migration)
 """
 
 
@@ -35,6 +37,14 @@ def _parser() -> argparse.ArgumentParser:
     p_deploy = unterbefehle.add_parser("deploy", help="Service auf den Pi bringen")
     deploy.argumente(p_deploy)
     p_deploy.set_defaults(fn=deploy.ausfuehren)
+
+    p_benutzer = unterbefehle.add_parser("benutzer", help="Konten und Rechte verwalten")
+    benutzer.argumente(p_benutzer)
+    p_benutzer.set_defaults(fn=benutzer.ausfuehren)
+
+    p_schema = unterbefehle.add_parser("schema", help="Tabellen anlegen und nachsehen")
+    schema.argumente(p_schema)
+    p_schema.set_defaults(fn=schema.ausfuehren)
 
     p_info = unterbefehle.add_parser("info", help="erkanntes Projekt anzeigen")
     p_info.add_argument("-s", "--service", help="Servicename überschreiben")
@@ -134,6 +144,18 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         fehler("Abgebrochen.")
         return 130
+    except Exception as problem:
+        # Fachliche Fehler teilt sich die CLI mit der API: "Benutzername
+        # vergeben" oder "letzter Verwalter" sind fuer den Benutzer gedacht und
+        # nicht fuer einen Stacktrace. Der Import steht hier drin und nicht
+        # oben, weil er FastAPI mitzieht - auf dem Fehlerweg ist das egal,
+        # beim "homepi deploy" waere es verschenkte Startzeit.
+        from homepi_core.errors import ServiceError
+
+        if isinstance(problem, ServiceError):
+            fehler(str(problem))
+            return 1
+        raise
 
 
 if __name__ == "__main__":  # pragma: no cover

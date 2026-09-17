@@ -1,0 +1,238 @@
+/* Mobile first. Die schmale Fassung ist die Voreinstellung, breiter wird
+   darüber ergänzt - andersherum braucht jede Regel ein Gegenstück, und das
+   Gegenstück ist die, die man vergisst. */
+
+.laden {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+/* --- Kennzahlen --- */
+
+.kennzahlen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--raum-3);
+  margin-bottom: var(--raum-8);
+}
+
+.kennzahleintrag {
+  display: block;
+}
+
+.kennzahl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+  padding: var(--raum-4);
+}
+
+.wert {
+  font-size: var(--text-2xl);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--laufweite-enger);
+}
+
+.warnung {
+  color: var(--farbe-warnung, #b8860b);
+}
+
+.kennzahlname {
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-sm);
+}
+
+/* --- Abschnitte --- */
+
+.abschnittstitel {
+  font-size: var(--text-lg);
+  margin-bottom: var(--raum-4);
+}
+
+.liste {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  margin-bottom: var(--raum-8);
+}
+
+/* --- Ein Konto --- */
+
+.konto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+.kopfzeile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+.namen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+  min-width: 0;
+}
+
+.anzeigename {
+  font-weight: var(--gewicht-halbfett);
+  overflow-wrap: anywhere;
+}
+
+.benutzername {
+  color: var(--farbe-text-leise);
+  font-family: var(--schrift-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.etiketten {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+}
+
+.aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+}
+
+.selbsthinweis {
+  color: var(--farbe-text-leise);
+  font-size: var(--text-xs);
+  line-height: var(--zeile-weit);
+}
+
+/* --- Rechte --- */
+
+.rechte {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  border-top: 1px solid var(--farbe-rand);
+  padding-top: var(--raum-4);
+}
+
+.rechtzeile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+.artefaktname {
+  font-size: var(--text-sm);
+}
+
+.offen {
+  color: var(--farbe-text-leise);
+}
+
+.auswahl {
+  width: 100%;
+  padding: var(--raum-2) var(--raum-3);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-sm);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.auswahl:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 1px;
+}
+
+.auswahl:disabled {
+  background: var(--farbe-flaeche-gedaempft);
+  color: var(--farbe-text-leise);
+  cursor: not-allowed;
+}
+
+/* --- Passwort --- */
+
+.passwortzeile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  border-top: 1px solid var(--farbe-rand);
+  padding-top: var(--raum-4);
+}
+
+.passworttext {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+  min-width: 0;
+}
+
+.passworttitel {
+  font-size: var(--text-sm);
+  font-weight: var(--gewicht-halbfett);
+}
+
+/* --- Anlegen --- */
+
+.formular {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  align-items: flex-start;
+}
+
+.felder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  width: 100%;
+}
+
+.leerhinweis {
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+}
+
+/* --- Ab Tablet --- */
+
+@media (min-width: 40rem) {
+  .kopfzeile {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--raum-4);
+  }
+
+  .rechtzeile {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--raum-4);
+  }
+
+  .auswahl {
+    width: auto;
+    min-width: 10rem;
+  }
+
+  .passwortzeile {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--raum-4);
+  }
+
+  .felder {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .felder > * {
+    flex: 1 1 12rem;
+  }
+}

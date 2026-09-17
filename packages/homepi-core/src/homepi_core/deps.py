@@ -45,4 +45,19 @@ async def hole_sitzung(request: Request) -> AsyncIterator[AsyncSession]:
 
 Kontext = Annotated["ServiceContext", Depends(hole_kontext)]
 Einstellungen = Annotated["ServiceSettings", Depends(hole_einstellungen)]
-DbSitzung = Annotated[AsyncSession, Depends(hole_sitzung)]
+# scope="function" ist hier kein Feinschliff, sondern die halbe Miete.
+#
+# Voreingestellt ist "request": FastAPI beendet eine yield-Dependency erst,
+# NACHDEM die Antwort beim Aufrufer ist. Der Commit liefe damit hinter dem
+# Statuscode her, und beides ginge schief:
+#
+#   * Der Aufrufer bekommt 204, fragt sofort nach - und liest den Stand von
+#     vorher. Genau so ist ein Oberflaechentest hier ins Leere gelaufen:
+#     Passwort gesetzt, Antwort da, naechste Abfrage sagt "noch nicht".
+#   * Scheitert der Commit, ist die Erfolgsmeldung schon raus. Die Aenderung
+#     ist weg, und niemand erfaehrt es.
+#
+# Mit "function" endet die Sitzung zwischen Endpunkt und Antwort: erst
+# committen, dann antworten. Scheitert der Commit, wird daraus ein Fehler,
+# den der Aufrufer sieht.
+DbSitzung = Annotated[AsyncSession, Depends(hole_sitzung, scope="function")]

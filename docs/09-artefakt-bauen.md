@@ -2,7 +2,8 @@
 
 Vom leeren Verzeichnis bis zur Kachel auf dem Pi. Warum ein Artefakt ein Modul
 im Gateway ist und kein eigener Container, steht in
-[06-artefakte.md](06-artefakte.md) — hier geht es nur ums Wie.
+[06-artefakte.md](06-artefakte.md) — hier geht es nur ums Wie. Wer das
+Artefakt am Ende sehen darf, steht in [11-anmeldung.md](11-anmeldung.md).
 
 ## Erzeugen
 
@@ -53,8 +54,18 @@ cd services/gateway && uv sync    # Modul in die Umgebung holen
 make dev
 ```
 
-`http://localhost:5173` zeigt die Kachel, `http://localhost:18000/module`
-listet das Artefakt mit `status: "bereit"`.
+Artefakte sind per Voreinstellung verschlossen. Einmalig ein Konto anlegen,
+sonst bleibt die Startseite beim Anmeldeformular:
+
+```bash
+export DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/app'
+cd packages/homepi-core
+uv run homepi benutzer anlegen entwickler --artefakt messwerte --rolle verwalter
+```
+
+Danach zeigt `http://localhost:5173` nach der Anmeldung die Kachel, und
+`GET /module` listet das Artefakt mit `status: "bereit"`. Ist die Liste leer,
+fehlt das Recht — nicht das Artefakt.
 
 ## Bauen
 

@@ -31,8 +31,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
   gap: var(--raum-4);
-  list-style: none;
-  padding: 0;
 }
 
 .eintrag {
@@ -119,4 +117,12 @@
     opacity: 1;
     transform: none;
   }
+}
+
+/* Solange unklar ist, ob hier eine Übersicht oder ein Anmeldeformular steht:
+   ein neutraler Platzhalter statt einer Überschrift, die gleich wieder weg ist. */
+.laden {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-8);
 }

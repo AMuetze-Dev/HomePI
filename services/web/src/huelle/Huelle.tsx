@@ -1,11 +1,16 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { Benutzerleiste } from "./Benutzerleiste";
 import stil from "./Huelle.module.css";
 import { Themenwechsel } from "./Themenwechsel";
 
 interface Props {
   children: ReactNode;
+  /** Ohne Benutzerleiste. Fuer die Ersteinrichtung: dort gibt es noch
+   *  kein Konto, und ein 'Anmelden' daneben waere eine Einladung ins
+   *  Leere. */
+  schlicht?: boolean;
 }
 
 /**
@@ -14,7 +19,7 @@ interface Props {
  * Die Hülle kennt keine Fachlichkeit. Sie legt nur fest, wie breit Inhalt
  * werden darf und wo er sitzt - alles Weitere bringen die Ansichten mit.
  */
-export function Huelle({ children }: Props) {
+export function Huelle({ children, schlicht = false }: Props) {
   return (
     <div className={stil.huelle}>
       <a className={stil.sprung} href="#inhalt">
@@ -31,6 +36,7 @@ export function Huelle({ children }: Props) {
           </Link>
 
           <div className={stil.werkzeuge}>
+            {!schlicht && <Benutzerleiste />}
             <Themenwechsel />
           </div>
         </div>

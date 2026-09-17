@@ -1,0 +1,66 @@
+/* Wie das Anmeldeformular, nur breiter: hier stehen fünf Felder statt zwei,
+   und das Einrichtungstoken ist lang. */
+
+.karte {
+  width: 100%;
+  max-width: 30rem;
+  /* Mittig in der Inhaltsspalte, nicht am linken Rand klebend. */
+  margin: var(--raum-8) auto;
+  animation: eintreten var(--dauer-normal) var(--verlauf-eintritt);
+}
+
+.formular {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+.kopf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  margin-bottom: var(--raum-2);
+}
+
+.titel {
+  font-size: var(--text-xl);
+  letter-spacing: var(--laufweite-enger);
+}
+
+.beschreibung {
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-md);
+  line-height: var(--zeile-weit);
+}
+
+.knopf {
+  /* Die eine Handlung auf dieser Fläche - sie bekommt die volle Breite. */
+  width: 100%;
+  margin-top: var(--raum-2);
+}
+
+.fuss {
+  color: var(--farbe-text-leise);
+  font-size: var(--text-xs);
+  line-height: var(--zeile-weit);
+  border-top: 1px solid var(--farbe-rand);
+  padding-top: var(--raum-4);
+}
+
+@keyframes eintreten {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .karte {
+    animation: none;
+  }
+}
+
+.fuss code {
+  /* Der Befehl darf umbrechen - auf einem Telefon passt er sonst nicht. */
+  overflow-wrap: anywhere;
+}

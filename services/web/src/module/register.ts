@@ -1,6 +1,7 @@
 import { GeraeteSeite } from "./geraete/GeraeteSeite";
 import type { ModulOberflaeche } from "./typen";
 import { StaffelpilotSeite } from "./staffelpilot/StaffelpilotSeite";
+import { VerwaltungSeite } from "./verwaltung/VerwaltungSeite";
 
 /**
  * Eigene Oberflächen der Artefakte.
@@ -17,6 +18,7 @@ import { StaffelpilotSeite } from "./staffelpilot/StaffelpilotSeite";
 export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
   { id: "staffelpilot", Komponente: StaffelpilotSeite },
   { id: "geraete", Komponente: GeraeteSeite },
+  { id: "verwaltung", Komponente: VerwaltungSeite },
 ];
 
 export function oberflaecheFuer(id: string): ModulOberflaeche | undefined {

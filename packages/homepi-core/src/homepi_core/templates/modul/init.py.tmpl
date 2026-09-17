@@ -1,6 +1,6 @@
 """HomePI-Artefakt: {{titel}}."""
 
-from homepi_core import Modul
+from homepi_core import Modul, Zugang
 
 from .router import router
 
@@ -16,6 +16,12 @@ modul = Modul(
     beschreibung="{{beschreibung}}",
     icon="kachel",
     version=__version__,
+    # Wer darf das sehen und benutzen?
+    #   Zugang.GESCHUETZT  - nur mit Recht "{{service}}" (Voreinstellung)
+    #   Zugang.OEFFENTLICH - ohne Anmeldung, fuer jeden sichtbar
+    #   Zugang.SELBST      - das Artefakt prueft Endpunkt fuer Endpunkt
+    # Rechte vergeben: homepi benutzer recht <name> {{service}} <rolle>
+    zugang=Zugang.GESCHUETZT,
 )
 
 __all__ = ["__version__", "modul", "router"]

@@ -12,7 +12,7 @@ import pytest
 from fastapi import APIRouter, FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from homepi_core import Modul, ServiceSettings, create_service, register_aus
+from homepi_core import Modul, ServiceSettings, Zugang, create_service, register_aus
 from homepi_core.deps import DbSitzung, Einstellungen, Kontext
 
 TOTE_DB = "postgresql+asyncpg://app:app@127.0.0.1:59999/nix"
@@ -33,7 +33,9 @@ def _modul_mit_deps() -> Modul:
     async def sitzung(s: DbSitzung) -> dict[str, bool]:
         return {"sitzung": s is not None}
 
-    return Modul(id="probe", titel="Probe", router=router)
+    # Hier geht es um die Dependencies, nicht um Zugriffsrechte - deshalb
+    # offen, sonst braeuchte jeder dieser Tests eine Anmeldung.
+    return Modul(id="probe", titel="Probe", router=router, zugang=Zugang.OEFFENTLICH)
 
 
 async def _client(app: FastAPI) -> AsyncIterator[AsyncClient]:

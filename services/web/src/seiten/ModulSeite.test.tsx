@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import * as client from "../api/client";
 import * as geraeteApi from "../module/geraete/api";
 import * as register from "../module/register";
+import { mitAnmeldung } from "../testhilfen";
 import { ModulSeite } from "./ModulSeite";
 
 afterEach(() => {
@@ -21,14 +22,18 @@ const ohneOberflaeche: client.ModulEintrag = {
   icon: "kachel",
   version: "1.0.0",
   status: "bereit",
+  zugang: "geschuetzt",
 };
 
-function zeige(id: string) {
+function zeige(id: string, angemeldet = true) {
   render(
     <MemoryRouter initialEntries={[`/modul/${id}`]}>
-      <Routes>
-        <Route path="/modul/:id" element={<ModulSeite />} />
-      </Routes>
+      {mitAnmeldung(
+        <Routes>
+          <Route path="/modul/:id" element={<ModulSeite />} />
+        </Routes>,
+        angemeldet ? undefined : null,
+      )}
     </MemoryRouter>,
   );
 }
@@ -102,6 +107,19 @@ describe("Modulseite", () => {
     // nicht gibt, ist kein Fehler des Systems.
     expect(await screen.findByText(/Kein Modul mit der Kennung/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Übersicht/ })).toBeInTheDocument();
+  });
+
+  it("bietet abgemeldet die Anmeldung an, statt 'gibt es nicht' zu behaupten", async () => {
+    // Ein Artefakt ohne Recht steht gar nicht erst im Manifest - von hier aus
+    // ist es von einem nicht vorhandenen nicht zu unterscheiden.
+    vi.spyOn(client, "fetchModule").mockResolvedValue([]);
+
+    zeige("staffelpilot", false);
+
+    expect(
+      await screen.findByRole("heading", { name: "Anmeldung nötig" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Kein Modul mit der Kennung/)).not.toBeInTheDocument();
   });
 
   it("erklärt sich, wenn ein Artefakt weder Oberfläche noch Endpunkte hat", async () => {

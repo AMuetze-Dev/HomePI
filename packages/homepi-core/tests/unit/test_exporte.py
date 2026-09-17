@@ -14,6 +14,12 @@ import pytest
 import homepi_core
 
 
+def _auth_namen() -> list[str]:
+    from homepi_core import auth
+
+    return sorted(auth._HERKUNFT)
+
+
 def test_all_und_herkunft_stimmen_ueberein() -> None:
     assert set(homepi_core.__all__) - {"__version__"} == set(homepi_core._HERKUNFT)
 
@@ -60,3 +66,44 @@ def test_zugriff_laedt_nach_und_merkt_sich_das() -> None:
     )
 
     assert ergebnis.stdout.strip() == "False True"
+
+
+class TestAuthFassade:
+    """homepi_core.auth ist aus demselben Grund lazy: modules braucht Rolle,
+    und ein Dienst ohne Anmeldung soll darueber weder argon2 noch die
+    Auth-Tabellen laden."""
+
+    def test_all_und_herkunft_stimmen_ueberein(self) -> None:
+        from homepi_core import auth
+
+        assert set(auth.__all__) == set(auth._HERKUNFT)
+
+    @pytest.mark.parametrize("name", sorted(_auth_namen()))
+    def test_jeder_export_ist_erreichbar(self, name: str) -> None:
+        from homepi_core import auth
+
+        assert getattr(auth, name) is not None
+
+    def test_unbekannter_name_wirft_attributeerror(self) -> None:
+        from homepi_core import auth
+
+        with pytest.raises(AttributeError, match="gibtsnicht"):
+            _ = auth.gibtsnicht  # type: ignore[attr-defined]
+
+    def test_der_anmelde_router_ist_ein_router_und_kein_modul(self) -> None:
+        """Er heisst absichtlich nicht 'router': sonst haengt es von der
+        Importreihenfolge ab, ob man den APIRouter oder das Untermodul
+        bekommt."""
+        from fastapi import APIRouter
+
+        from homepi_core.auth import anmelde_router
+
+        assert isinstance(anmelde_router, APIRouter)
+
+    def test_import_der_module_zieht_argon2_nicht_mit(self) -> None:
+        quelltext = "import sys, homepi_core.modules;print('argon2' in sys.modules)"
+        ergebnis = subprocess.run(
+            [sys.executable, "-c", quelltext], capture_output=True, text=True, check=True
+        )
+
+        assert ergebnis.stdout.strip() == "False"

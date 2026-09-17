@@ -169,6 +169,11 @@ Kein Zusatz, sondern Teil der Qualität:
 - **Kennzahlen** tragen ein `aria-label`, das Zahl und Bezeichnung
   zusammenfasst — sonst kommt „1" und „Geräte" als zwei zusammenhanglose
   Fetzen an.
+- **Kachelraster, Kennzahlen und Kartenlisten sind `<ul>`**, damit ein
+  Screenreader „Liste, 5 Einträge" ansagt. Punkte und Einzug tragen dazu
+  nichts bei und brechen das Raster: `basis.css` nimmt sie allen Listen ab.
+  Eine echte Aufzählung im Fließtext holt sie sich mit `list-style: disc`
+  zurück.
 - **`prefers-reduced-motion`** schaltet alle Übergänge ab. Für Menschen mit
   vestibulären Beschwerden sind Animationen ein echtes Problem, keine
   Geschmacksfrage.

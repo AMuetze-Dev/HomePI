@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from homepi_core import Modul
+from homepi_core import Modul, Zugang
+from homepi_core.auth import Rolle
 
 
 def test_modul_ist_korrekt_beschrieben(modul: Modul) -> None:
@@ -10,6 +11,14 @@ def test_modul_ist_korrekt_beschrieben(modul: Modul) -> None:
     assert modul.titel == "{{titel}}"
     assert modul.praefix == "/{{service}}"
     assert modul.version
+
+
+def test_der_zugang_ist_bewusst_gesetzt(modul: Modul) -> None:
+    """Waere das Artefakt versehentlich oeffentlich, saehe es jeder Besucher -
+    auch die, fuer die es nicht gedacht ist."""
+    assert modul.zugang is Zugang.GESCHUETZT
+    assert not modul.sichtbar_fuer(None)
+    assert modul.sichtbar_fuer({"{{service}}": Rolle.LESER})
 
 
 def test_manifest_hat_die_felder_der_kachel(modul: Modul) -> None:
