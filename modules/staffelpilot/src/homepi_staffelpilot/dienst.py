@@ -33,6 +33,11 @@ class BefundUnbekannt(ServiceError):
     title = "Befund unbekannt"
 
 
+class RegelUnbekannt(ServiceError):
+    status = 404
+    title = "Regel unbekannt"
+
+
 class StaffelVergeben(ServiceError):
     status = 409
     title = "Staffel bereits angelegt"

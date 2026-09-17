@@ -21,6 +21,7 @@ import {
 import { alsDatum } from "./datum";
 import { EinstellungenTafel } from "./EinstellungenTafel";
 import { MannschaftenTafel } from "./MannschaftenTafel";
+import { RegelnTafel } from "./RegelnTafel";
 import { VorgaengeTafel } from "./VorgaengeTafel";
 import stil from "./StaffelpilotSeite.module.css";
 
@@ -37,6 +38,7 @@ const REITER = [
   ["spiele", "Spielberichte"],
   ["vorgaenge", "Vorgänge"],
   ["mannschaften", "Mannschaften"],
+  ["regeln", "Regeln"],
   ["einstellungen", "Einstellungen"],
 ] as const;
 
@@ -67,36 +69,41 @@ export function StaffelpilotSeite() {
   const [reiter, setReiter] = useState<ReiterId>("spiele");
   const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
   const [staffelFilter, setStaffelFilter] = useState<string>("");
+  // Der haeufigste Handgriff am Montag: was ist seit dem Wochenende faellig.
+  const [nurFaellig, setNurFaellig] = useState(false);
   const [offenesSpiel, setOffenesSpiel] = useState<Spiel | null>(null);
   // Getrennt vom Ladezustand: ein Fehler beim Abhaken darf die Liste nicht
   // gegen eine Fehlerseite austauschen.
   const [aktionsfehler, setAktionsfehler] = useState<string>("");
 
-  const laden = useCallback(async (staffelId: string, signal?: AbortSignal) => {
-    try {
-      const [staffeln, spiele, uebersicht] = await Promise.all([
-        ladeStaffeln(signal),
-        ladeWarteschlange(staffelId || undefined, signal),
-        ladeZusammenfassung(signal),
-      ]);
-      setZustand({ phase: "fertig", daten: { staffeln, spiele, uebersicht } });
-    } catch (fehler) {
-      if (signal?.aborted) return;
-      setZustand({ phase: "fehler", nachricht: meldung(fehler) });
-    }
-  }, []);
+  const laden = useCallback(
+    async (staffelId: string, faellig: boolean, signal?: AbortSignal) => {
+      try {
+        const [staffeln, spiele, uebersicht] = await Promise.all([
+          ladeStaffeln(signal),
+          ladeWarteschlange(staffelId || undefined, signal, faellig),
+          ladeZusammenfassung(signal),
+        ]);
+        setZustand({ phase: "fertig", daten: { staffeln, spiele, uebersicht } });
+      } catch (fehler) {
+        if (signal?.aborted) return;
+        setZustand({ phase: "fehler", nachricht: meldung(fehler) });
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
-    void laden(staffelFilter, controller.signal);
+    void laden(staffelFilter, nurFaellig, controller.signal);
     return () => controller.abort();
-  }, [laden, staffelFilter]);
+  }, [laden, staffelFilter, nurFaellig]);
 
   async function mitFehlerbehandlung(aktion: () => Promise<unknown>): Promise<boolean> {
     setAktionsfehler("");
     try {
       await aktion();
-      await laden(staffelFilter);
+      await laden(staffelFilter, nurFaellig);
       return true;
     } catch (fehler) {
       setAktionsfehler(meldung(fehler));
@@ -183,6 +190,15 @@ export function StaffelpilotSeite() {
     );
   }
 
+  if (reiter === "regeln") {
+    return (
+      <>
+        {leiste}
+        <RegelnTafel />
+      </>
+    );
+  }
+
   if (reiter === "vorgaenge") {
     return (
       <>
@@ -220,6 +236,20 @@ export function StaffelpilotSeite() {
               }}
             />
           )}
+
+          <div className={stil.filterZeile}>
+            <Knopf
+              groesse="sm"
+              auspraegung={nurFaellig ? "primaer" : "leise"}
+              aria-pressed={nurFaellig}
+              onClick={() => {
+                setOffenesSpiel(null);
+                setNurFaellig(!nurFaellig);
+              }}
+            >
+              Nur fällige
+            </Knopf>
+          </div>
 
           {spiele.length === 0 ? (
             <Leerzustand titel="Keine Spielberichte">
@@ -346,6 +376,9 @@ function SpielKarte({
           <span className={stil.datum}>{alsDatum(zeile.datum)}</span>
           {zeile.ergebnis && <span className={stil.datum}>{zeile.ergebnis}</span>}
           {zeile.abgehakt && <Etikett ton="gut">abgehakt</Etikett>}
+          {!zeile.faellig && !zeile.abgehakt && (
+            <Etikett>außerhalb des Prüfzeitraums</Etikett>
+          )}
           {zeile.kritische_befunde > 0 && (
             <Etikett ton="fehler">{zeile.kritische_befunde} kritisch</Etikett>
           )}

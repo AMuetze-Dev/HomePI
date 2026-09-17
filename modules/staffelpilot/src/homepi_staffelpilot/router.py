@@ -8,6 +8,7 @@ Route `/{id}` auf oberster Ebene - genau die waere der Fall, in dem FastAPI
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from dataclasses import asdict
 from typing import Annotated
@@ -22,11 +23,12 @@ from .dienst import (
     SpielSicht,
     darf_abgehakt_werden,
     entscheidung_pruefen,
+    ist_faellig,
     mannschaft_unsicher,
     sortiert,
     zusammenfassen,
 )
-from .modelle import Befund, Mannschaft, Vorgang
+from .modelle import Befund, Mannschaft, Regel, Vorgang
 from .schemas import (
     BefundAusgabe,
     EinstellungenAusgabe,
@@ -36,6 +38,9 @@ from .schemas import (
     ImportErgebnis,
     MannschaftAusgabe,
     MannschaftenSetzen,
+    RegelAusgabe,
+    RegelkatalogSetzen,
+    RegelUmschalten,
     SpielAusgabe,
     SpielZeile,
     StaffelAendern,
@@ -102,9 +107,19 @@ def _vorgang(v: Vorgang) -> VorgangAusgabe:
 async def warteschlange(
     sitzung: DbSitzung,
     staffel_id: Annotated[uuid.UUID | None, Query(description="Nur diese Staffel")] = None,
+    nur_faellig: Annotated[bool, Query(description="Nur Spiele im Prüfzeitraum")] = False,
 ) -> list[SpielZeile]:
+    """Die tägliche Liste.
+
+    `faellig` steht an jeder Zeile und wird nicht gespeichert: der
+    Prüfzeitraum verschiebt sich mit jedem Tag, und ein geschriebener Wert
+    wäre am Morgen darauf falsch.
+    """
     berichte = await speicher.spiele(sitzung, staffel_id)
-    return [
+    tage = (await speicher.einstellungen(sitzung)).pruefzeitraum_tage
+    heute = dt.date.today()
+
+    zeilen = [
         SpielZeile(
             id=b.id,
             dfbnet_id=b.dfbnet_id,
@@ -117,9 +132,11 @@ async def warteschlange(
             kritische_befunde=sum(
                 1 for x in b.befunde if x.schwere == "kritisch" and x.entscheidung == "offen"
             ),
+            faellig=ist_faellig(b.datum, heute, tage),
         )
         for b in berichte
     ]
+    return [z for z in zeilen if z.faellig] if nur_faellig else zeilen
 
 
 @router.get("/zusammenfassung", summary="Überblick für die Kachel")
@@ -340,3 +357,40 @@ async def vorgang_anlegen(
     behaelt seine Fassung.
     """
     return _vorgang(await speicher.vorgang_anlegen(sitzung, befund_id, daten))
+
+
+# ── Regelkatalog ──────────────────────────────────────────────────────────
+
+
+def _regel(r: Regel) -> RegelAusgabe:
+    return RegelAusgabe.model_validate(r)
+
+
+@router.get("/regeln", summary="Was geprüft wird")
+async def regeln(sitzung: DbSitzung) -> list[RegelAusgabe]:
+    return [_regel(r) for r in await speicher.regeln(sitzung)]
+
+
+@router.put("/regeln", summary="Den Regelkatalog einspielen")
+async def regelkatalog_setzen(daten: RegelkatalogSetzen, sitzung: DbSitzung) -> list[RegelAusgabe]:
+    """Der Prüfdienst meldet, was es gibt.
+
+    Was er nicht mehr meldet, verschwindet -- ein Schalter für eine Regel, die
+    niemand mehr prüft, verspricht etwas, das nicht passiert. Die Schalter der
+    übrigen bleiben stehen: `aktiv` gehört dem Staffelleiter, nicht dem
+    Katalog.
+    """
+    return [_regel(r) for r in await speicher.regelkatalog_setzen(sitzung, daten.regeln)]
+
+
+@router.patch("/regeln/{regel_id}", summary="Eine Regel an- oder abschalten")
+async def regel_umschalten(
+    regel_id: uuid.UUID, daten: RegelUmschalten, sitzung: DbSitzung
+) -> RegelAusgabe:
+    """Die eine Entscheidung, die dem Staffelleiter gehört.
+
+    Geprüft wird trotzdem im Prüfdienst -- der liest hier nach, was er melden
+    soll. Dass eine abgeschaltete Regel keine Befunde mehr erzeugt, passiert
+    dort und nicht hier.
+    """
+    return _regel(await speicher.regel_umschalten(sitzung, regel_id, daten.aktiv))

@@ -179,3 +179,24 @@ class Vorgang(Base, ZeitstempelMixin):
     versandt_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     befund: Mapped[Befund] = relationship()
+
+
+class Regel(Base, ZeitstempelMixin):
+    """Was der Pruefdienst prueft, und ob der Staffelleiter das will.
+
+    Der Katalog kommt von aussen: dieses Artefakt kennt die Spielordnung
+    nicht. Was es haelt, ist die eine Entscheidung, die dem Staffelleiter
+    gehoert -- `aktiv`. Ein erneutes Einspielen des Katalogs laesst sie
+    stehen, sonst waere jedes Abschalten bis zum naechsten Start haltbar.
+    """
+
+    __tablename__ = "staffelpilot_regeln"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    #: Die technische Kennung, wie sie auch am Befund steht.
+    schluessel: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    beschreibung: Mapped[str] = mapped_column(String(1000), nullable=False, default="")
+    schwere: Mapped[str] = mapped_column(String(20), nullable=False, default="hinweis")
+    weg: Mapped[str] = mapped_column(String(20), nullable=False, default="kein")
+    aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

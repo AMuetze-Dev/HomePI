@@ -214,6 +214,9 @@ class SpielZeile(BaseModel):
     abgehakt: bool
     offene_befunde: int
     kritische_befunde: int
+    #: Ob das Spiel im Pruefzeitraum liegt. Berechnet, nicht gespeichert -
+    #: sonst waere der Wert am Tag nach dem Schreiben falsch.
+    faellig: bool
 
 
 class Zusammenfassung(BaseModel):
@@ -392,3 +395,48 @@ class VorgangZeile(BaseModel):
     betroffener: str
     betreff: str
     zustand: VorgangZustand
+
+
+# ── Regelkatalog ──────────────────────────────────────────────────────────
+
+
+class RegelEingang(BaseModel):
+    """Eine Regel, wie sie der Prüfdienst meldet."""
+
+    schluessel: NameFeld
+    name: NameFeld
+    beschreibung: Annotated[str, Field(max_length=1000)] = ""
+    schwere: Schwere = "hinweis"
+    weg: Weg = "kein"
+
+    @field_validator("schluessel", "name", "beschreibung", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
+
+
+class RegelkatalogSetzen(BaseModel):
+    """Der Katalog als Ganzes.
+
+    Vollstaendig und nicht als Aenderung: eine Regel, die der Pruefdienst
+    nicht mehr kennt, gibt es nicht mehr, und sie in der Liste stehen zu
+    lassen hiesse, einen Schalter anzubieten, der nichts mehr schaltet.
+    """
+
+    regeln: list[RegelEingang]
+
+
+class RegelAusgabe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    schluessel: str
+    name: str
+    beschreibung: str
+    schwere: Schwere
+    weg: Weg
+    aktiv: bool
+
+
+class RegelUmschalten(BaseModel):
+    aktiv: bool

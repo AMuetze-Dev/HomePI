@@ -30,6 +30,7 @@ function zeile(rest: Partial<api.SpielZeile> = {}): api.SpielZeile {
     abgehakt: false,
     offene_befunde: 1,
     kritische_befunde: 1,
+    faellig: true,
     ...rest,
   };
 }
@@ -105,6 +106,7 @@ beforeEach(() => {
   });
   vi.spyOn(api, "ladeVorgaenge").mockResolvedValue([]);
   vi.spyOn(api, "ladeMannschaften").mockResolvedValue([]);
+  vi.spyOn(api, "ladeRegeln").mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -402,7 +404,11 @@ describe("Staffeln", () => {
     await userEvent.selectOptions(filter, "s2");
 
     await waitFor(() =>
-      expect(api.ladeWarteschlange).toHaveBeenLastCalledWith("s2", expect.anything()),
+      expect(api.ladeWarteschlange).toHaveBeenLastCalledWith(
+        "s2",
+        expect.anything(),
+        false,
+      ),
     );
   });
 });
@@ -514,5 +520,54 @@ describe("Aus einem Befund einen Entwurf machen", () => {
 
     expect(await screen.findByText(/Entwurf angelegt/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /entwerfen/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("Nur fällige", () => {
+  it("fragt die Warteschlange gefiltert ab", async () => {
+    // Der haeufigste Handgriff am Montag: was ist seit dem Wochenende faellig.
+    mitDaten();
+    render(<StaffelpilotSeite />);
+    await screen.findByText("SG Gittersee – SV Fortschritt");
+
+    await userEvent.click(screen.getByRole("button", { name: "Nur fällige" }));
+
+    await waitFor(() =>
+      expect(api.ladeWarteschlange).toHaveBeenLastCalledWith(
+        undefined,
+        expect.anything(),
+        true,
+      ),
+    );
+  });
+
+  it("markiert ein Spiel außerhalb des Prüfzeitraums", async () => {
+    mitDaten([staffel()], [zeile({ faellig: false })]);
+    render(<StaffelpilotSeite />);
+
+    expect(await screen.findByText("außerhalb des Prüfzeitraums")).toBeInTheDocument();
+  });
+
+  it("markiert ein abgehaktes Spiel nicht zusätzlich", async () => {
+    // Zwei Etiketten fuer denselben Umstand sind eines zu viel: abgehakt
+    // heisst erledigt, und dann ist der Zeitraum keine Auskunft mehr.
+    mitDaten([staffel()], [zeile({ faellig: false, abgehakt: true })]);
+    render(<StaffelpilotSeite />);
+
+    const liste = await screen.findByRole("list", { name: "Spielberichte" });
+    expect(within(liste).getByText("abgehakt")).toBeInTheDocument();
+    expect(
+      within(liste).queryByText("außerhalb des Prüfzeitraums"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("führt zu den Regeln", async () => {
+    mitDaten();
+    render(<StaffelpilotSeite />);
+    await screen.findByText("SG Gittersee – SV Fortschritt");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Regeln" }));
+
+    expect(await screen.findByText("Kein Regelkatalog")).toBeInTheDocument();
   });
 });

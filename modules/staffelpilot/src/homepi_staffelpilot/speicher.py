@@ -13,17 +13,19 @@ from sqlalchemy.orm import selectinload
 from . import dienst
 from .dienst import (
     BefundUnbekannt,
+    RegelUnbekannt,
     SpielUnbekannt,
     StaffelUnbekannt,
     StaffelVergeben,
     VorgangUnbekannt,
     VorgangVergeben,
 )
-from .modelle import Befund, Einstellung, Mannschaft, Spielbericht, Staffel, Vorgang
+from .modelle import Befund, Einstellung, Mannschaft, Regel, Spielbericht, Staffel, Vorgang
 from .schemas import (
     EinstellungenSetzen,
     ImportAuftrag,
     MannschaftEingang,
+    RegelEingang,
     StaffelAnlegen,
     VorgangAnlegen,
 )
@@ -426,3 +428,48 @@ async def vorgaenge_zu_befunden(
         select(Vorgang.befund_id, Vorgang.id).where(Vorgang.befund_id.in_(befund_ids))
     )
     return {befund_id: vorgang_id for befund_id, vorgang_id in ergebnis.all()}
+
+
+# ── Regelkatalog ──────────────────────────────────────────────────────────
+
+
+async def regeln(sitzung: AsyncSession) -> list[Regel]:
+    ergebnis = await sitzung.execute(select(Regel).order_by(Regel.name))
+    return list(ergebnis.scalars())
+
+
+async def regel(sitzung: AsyncSession, regel_id: uuid.UUID) -> Regel:
+    gefunden = await sitzung.get(Regel, regel_id)
+    if gefunden is None:
+        raise RegelUnbekannt(f"Es gibt keine Regel mit der Kennung {regel_id}")
+    return gefunden
+
+
+async def regelkatalog_setzen(sitzung: AsyncSession, eingang: list[RegelEingang]) -> list[Regel]:
+    """Den Katalog als Ganzes uebernehmen, ohne die Schalter zu verlieren.
+
+    `aktiv` gehoert dem Staffelleiter. Wer den Katalog neu einspielt, meldet
+    was es gibt -- nicht, was jemand davon sehen will.
+    """
+    vorher = {r.schluessel: r.aktiv for r in await regeln(sitzung)}
+    gemeldet = {r.schluessel for r in eingang}
+
+    await sitzung.execute(delete(Regel).where(Regel.schluessel.notin_(gemeldet or {""})))
+    vorhanden = {r.schluessel: r for r in await regeln(sitzung)}
+
+    for r in eingang:
+        ziel = vorhanden.get(r.schluessel)
+        if ziel is None:
+            sitzung.add(Regel(**r.model_dump(), aktiv=vorher.get(r.schluessel, True)))
+        else:
+            ziel.name, ziel.beschreibung = r.name, r.beschreibung
+            ziel.schwere, ziel.weg = r.schwere, r.weg
+    await sitzung.flush()
+    return await regeln(sitzung)
+
+
+async def regel_umschalten(sitzung: AsyncSession, regel_id: uuid.UUID, aktiv: bool) -> Regel:
+    gefunden = await regel(sitzung, regel_id)
+    gefunden.aktiv = aktiv
+    await sitzung.flush()
+    return gefunden

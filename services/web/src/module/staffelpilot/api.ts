@@ -45,9 +45,26 @@ export interface SpielZeile {
   abgehakt: boolean;
   offene_befunde: number;
   kritische_befunde: number;
+  /** Ob das Spiel im Prüfzeitraum liegt. Berechnet, nicht gespeichert. */
+  faellig: boolean;
 }
 
-export interface Spiel extends Omit<SpielZeile, "offene_befunde" | "kritische_befunde"> {
+export interface Regel {
+  id: string;
+  schluessel: string;
+  name: string;
+  beschreibung: string;
+  schwere: Schwere;
+  weg: Weg;
+  aktiv: boolean;
+}
+
+// `faellig` faellt weg: der einzelne Bericht wird geoeffnet, weil jemand ihn
+// sehen will - ob er im Pruefzeitraum liegt, entscheidet nur die Liste.
+export interface Spiel extends Omit<
+  SpielZeile,
+  "offene_befunde" | "kritische_befunde" | "faellig"
+> {
   staffel_id: string;
   abgehakt_am: string | null;
   befunde: Befund[];
@@ -164,8 +181,12 @@ export function legeStaffelAn(daten: NeueStaffel): Promise<Staffel> {
 export function ladeWarteschlange(
   staffelId?: string,
   signal?: AbortSignal,
+  nurFaellig = false,
 ): Promise<SpielZeile[]> {
-  const frage = staffelId ? `?staffel_id=${encodeURIComponent(staffelId)}` : "";
+  const teile = [];
+  if (staffelId) teile.push(`staffel_id=${encodeURIComponent(staffelId)}`);
+  if (nurFaellig) teile.push("nur_faellig=true");
+  const frage = teile.length > 0 ? `?${teile.join("&")}` : "";
   return anfrage<SpielZeile[]>(`/${frage}`, {}, signal);
 }
 
@@ -274,4 +295,15 @@ export function setzeVorgangZustand(
 
 export function verwerfeVorgang(id: string): Promise<void> {
   return anfrage<void>(`/vorgaenge/${id}`, { method: "DELETE" });
+}
+
+// ── Regelkatalog ─────────────────────────────────────────────────────────
+
+export function ladeRegeln(signal?: AbortSignal): Promise<Regel[]> {
+  return anfrage<Regel[]>("/regeln", {}, signal);
+}
+
+/** Der Schalter gehört dem Staffelleiter; geprüft wird trotzdem im Prüfdienst. */
+export function schalteRegel(id: string, aktiv: boolean): Promise<Regel> {
+  return anfrage<Regel>(`/regeln/${id}`, mitKoerper("PATCH", { aktiv }));
 }
