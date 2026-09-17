@@ -2,14 +2,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../api/client";
 import {
+  aendereVorgang,
   entscheide,
   hakeAb,
   ladeSpiel,
   ladeStaffeln,
   ladeWarteschlange,
   ladeZusammenfassung,
+  ladeEinstellungen,
+  ladeMannschaften,
+  ladeVorgaenge,
   legeStaffelAn,
+  legeVorgangAn,
   loeseHaken,
+  setzeVorgangZustand,
+  speichereEinstellungen,
+  speichereMannschaften,
+  verwerfeVorgang,
   type Staffel,
 } from "./api";
 
@@ -206,5 +215,112 @@ describe("Fehler", () => {
     );
 
     await expect(loeseHaken("m1")).resolves.toBeUndefined();
+  });
+});
+
+describe("Einstellungen, Mannschaften und Vorgänge", () => {
+  const werte = {
+    staffelleiter: "Aaron Mütze",
+    verband: "",
+    absender: "",
+    pruefzeitraum_tage: 30,
+    frist_tage: 14,
+  };
+
+  it("lädt die Einstellungen", async () => {
+    const holen = antworteMit(werte);
+
+    await expect(ladeEinstellungen()).resolves.toEqual(werte);
+    expect(holen.mock.calls[0]?.[0]).toContain("/staffelpilot/einstellungen");
+  });
+
+  it("schickt nur die geänderten Felder", async () => {
+    // Ein ausgelassenes Feld bleibt im Backend stehen. Alles mitzuschicken
+    // hiesse, einen alten Wert zurueckzuschreiben.
+    const holen = antworteMit(werte);
+
+    await speichereEinstellungen({ frist_tage: 21 });
+
+    expect(holen.mock.calls[0]?.[1]).toMatchObject({
+      method: "PUT",
+      body: JSON.stringify({ frist_tage: 21 }),
+    });
+  });
+
+  it("lädt die Mannschaften einer Staffel", async () => {
+    const holen = antworteMit([]);
+
+    await ladeMannschaften("s1");
+
+    expect(holen.mock.calls[0]?.[0]).toContain("/staffelpilot/staffeln/s1/mannschaften");
+  });
+
+  it("schickt die Mannschaften als vollständige Meldung", async () => {
+    const holen = antworteMit([]);
+
+    await speichereMannschaften("s1", [
+      { name: "SV Loschwitz 2", hoehere: ["SV Loschwitz"] },
+    ]);
+
+    expect(holen.mock.calls[0]?.[1]).toMatchObject({ method: "PUT" });
+    expect(String(holen.mock.calls[0]?.[1]?.body)).toContain("SV Loschwitz");
+  });
+
+  it("filtert die Vorgänge nach Zustand", async () => {
+    const holen = antworteMit([]);
+
+    await ladeVorgaenge("entwurf");
+
+    expect(holen.mock.calls[0]?.[0]).toContain("/vorgaenge?zustand=entwurf");
+  });
+
+  it("legt einen Vorgang am Befund an", async () => {
+    const holen = antworteMit({});
+
+    await legeVorgangAn("b1", { grund: "Tätlichkeit" });
+
+    expect(holen.mock.calls[0]?.[0]).toContain("/befunde/b1/vorgang");
+    expect(holen.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+  });
+
+  it("ändert einen Vorgang mit PATCH", async () => {
+    const holen = antworteMit({});
+
+    await aendereVorgang("v1", { text: "Eigene Fassung." });
+
+    expect(holen.mock.calls[0]?.[1]).toMatchObject({ method: "PATCH" });
+  });
+
+  it("stellt einen Vorgang weiter", async () => {
+    const holen = antworteMit({});
+
+    await setzeVorgangZustand("v1", "versandt");
+
+    expect(holen.mock.calls[0]?.[0]).toContain("/vorgaenge/v1/zustand");
+    expect(String(holen.mock.calls[0]?.[1]?.body)).toContain("versandt");
+  });
+
+  it("verwirft einen Vorgang und erwartet keinen Körper", async () => {
+    antworteMit(null, 204);
+
+    await expect(verwerfeVorgang("v1")).resolves.toBeUndefined();
+  });
+
+  it("gibt die Meldung des Backends weiter", async () => {
+    antworteMit({ detail: "'frist_tage' muss zwischen 1 und 90 liegen" }, 422);
+
+    await expect(speichereEinstellungen({ frist_tage: 0 })).rejects.toThrow(
+      /zwischen 1 und 90/,
+    );
+  });
+
+  it("schickt bei jedem Aufruf das Sitzungscookie mit", async () => {
+    // Ohne `credentials` antwortet das Gateway mit 401, egal was sonst
+    // stimmt - das Artefakt ist geschuetzt.
+    const holen = antworteMit(werte);
+
+    await ladeEinstellungen();
+
+    expect(holen.mock.calls[0]?.[1]).toMatchObject({ credentials: "include" });
   });
 });

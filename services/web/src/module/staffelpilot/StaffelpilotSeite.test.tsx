@@ -45,6 +45,8 @@ function befund(rest: Partial<api.Befund> = {}): api.Befund {
     mannschaft: "SG Gittersee",
     entscheidung: "offen",
     grund: "",
+    weg: "kein",
+    vorgang_id: null,
     ...rest,
   };
 }
@@ -73,6 +75,7 @@ function uebersicht(rest: Partial<api.Zusammenfassung> = {}): api.Zusammenfassun
     befunde_offen: 1,
     befunde_kritisch: 1,
     staffeln_aktiv: 1,
+    vorgaenge_entwurf: 0,
     ...rest,
   };
 }
@@ -93,6 +96,15 @@ beforeEach(() => {
   vi.spyOn(api, "hakeAb").mockResolvedValue(spiel({ abgehakt: true }));
   vi.spyOn(api, "loeseHaken").mockResolvedValue(spiel());
   vi.spyOn(api, "legeStaffelAn").mockResolvedValue(staffel());
+  vi.spyOn(api, "ladeEinstellungen").mockResolvedValue({
+    staffelleiter: "",
+    verband: "",
+    absender: "",
+    pruefzeitraum_tage: 30,
+    frist_tage: 14,
+  });
+  vi.spyOn(api, "ladeVorgaenge").mockResolvedValue([]);
+  vi.spyOn(api, "ladeMannschaften").mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -392,5 +404,115 @@ describe("Staffeln", () => {
     await waitFor(() =>
       expect(api.ladeWarteschlange).toHaveBeenLastCalledWith("s2", expect.anything()),
     );
+  });
+});
+
+describe("Die Reiter", () => {
+  it("fangen bei den Spielberichten an", async () => {
+    mitDaten();
+    render(<StaffelpilotSeite />);
+
+    expect(await screen.findByText("SG Gittersee – SV Fortschritt")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Spielberichte" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("führen zu den Vorgängen", async () => {
+    mitDaten();
+    render(<StaffelpilotSeite />);
+    await screen.findByText("SG Gittersee – SV Fortschritt");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Vorgänge" }));
+
+    expect(await screen.findByText("Keine Vorgänge")).toBeInTheDocument();
+  });
+
+  it("führen zu den Einstellungen", async () => {
+    mitDaten();
+    render(<StaffelpilotSeite />);
+    await screen.findByText("SG Gittersee – SV Fortschritt");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Einstellungen" }));
+
+    expect(await screen.findByLabelText(/Staffelleiter/)).toBeInTheDocument();
+  });
+
+  it("führen zu den Mannschaften", async () => {
+    mitDaten();
+    render(<StaffelpilotSeite />);
+    await screen.findByText("SG Gittersee – SV Fortschritt");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Mannschaften" }));
+
+    expect(await screen.findByText("Keine Mannschaften gemeldet")).toBeInTheDocument();
+  });
+});
+
+describe("Aus einem Befund einen Entwurf machen", () => {
+  it("bietet nichts an, wenn der Prüflauf keinen Weg gemeldet hat", async () => {
+    // Die meisten Befunde sind Hinweise. Fuer sie einen Knopf anzubieten
+    // hiesse, Arbeit vorzuschlagen, die es nicht gibt.
+    mitDaten();
+    render(<StaffelpilotSeite />);
+    await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
+
+    await screen.findByText("Feldverweis auf Dauer");
+    expect(screen.queryByRole("button", { name: /entwerfen/ })).not.toBeInTheDocument();
+  });
+
+  it("bietet die Mahnung an, wenn der Weg dorthin führt", async () => {
+    mitDaten();
+    vi.spyOn(api, "ladeSpiel").mockResolvedValue(
+      spiel({ befunde: [befund({ weg: "mahnung" })] }),
+    );
+    render(<StaffelpilotSeite />);
+    await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
+
+    expect(
+      await screen.findByRole("button", { name: "Mahnung entwerfen" }),
+    ).toBeInTheDocument();
+  });
+
+  it("legt den Entwurf an", async () => {
+    mitDaten();
+    vi.spyOn(api, "ladeSpiel").mockResolvedValue(
+      spiel({ befunde: [befund({ weg: "sportgericht" })] }),
+    );
+    const anlegen = vi.spyOn(api, "legeVorgangAn").mockResolvedValue({
+      id: "v1",
+      befund_id: "b1",
+      art: "sportgericht",
+      aktenzeichen: "26-27-0001",
+      verein: "SG Gittersee",
+      betroffener: "Max Müller",
+      betreff: "Antrag",
+      zustand: "entwurf",
+      grund: "",
+      empfaenger: "",
+      text: "",
+      versandt_am: null,
+    });
+    render(<StaffelpilotSeite />);
+    await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Antrag entwerfen" }),
+    );
+
+    await waitFor(() => expect(anlegen).toHaveBeenCalledWith("b1"));
+  });
+
+  it("zeigt statt des Knopfes, dass der Entwurf schon steht", async () => {
+    mitDaten();
+    vi.spyOn(api, "ladeSpiel").mockResolvedValue(
+      spiel({ befunde: [befund({ weg: "mahnung", vorgang_id: "v1" })] }),
+    );
+    render(<StaffelpilotSeite />);
+    await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
+
+    expect(await screen.findByText(/Entwurf angelegt/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /entwerfen/ })).not.toBeInTheDocument();
   });
 });

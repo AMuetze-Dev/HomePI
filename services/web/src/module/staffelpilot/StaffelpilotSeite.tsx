@@ -6,6 +6,7 @@ import {
   hakeAb,
   ladeSpiel,
   ladeStaffeln,
+  legeVorgangAn,
   ladeWarteschlange,
   ladeZusammenfassung,
   legeStaffelAn,
@@ -18,9 +19,28 @@ import {
   type Zusammenfassung,
 } from "./api";
 import { alsDatum } from "./datum";
+import { EinstellungenTafel } from "./EinstellungenTafel";
+import { MannschaftenTafel } from "./MannschaftenTafel";
+import { VorgaengeTafel } from "./VorgaengeTafel";
 import stil from "./StaffelpilotSeite.module.css";
 
 type Daten = { staffeln: Staffel[]; spiele: SpielZeile[]; uebersicht: Zusammenfassung };
+
+/**
+ * Vier Flaechen, und die erste ist die taegliche Arbeit.
+ *
+ * Reiter und keine Unterseiten: ein Staffelleiter springt zwischen Befund und
+ * Entwurf hin und her, und jeder Seitenwechsel waere ein neuer Ladevorgang
+ * samt verlorener Stelle in der Liste.
+ */
+const REITER = [
+  ["spiele", "Spielberichte"],
+  ["vorgaenge", "Vorgänge"],
+  ["mannschaften", "Mannschaften"],
+  ["einstellungen", "Einstellungen"],
+] as const;
+
+type ReiterId = (typeof REITER)[number][0];
 
 type Zustand =
   | { phase: "laedt" }
@@ -44,6 +64,7 @@ function meldung(fehler: unknown): string {
 }
 
 export function StaffelpilotSeite() {
+  const [reiter, setReiter] = useState<ReiterId>("spiele");
   const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
   const [staffelFilter, setStaffelFilter] = useState<string>("");
   const [offenesSpiel, setOffenesSpiel] = useState<Spiel | null>(null);
@@ -108,6 +129,23 @@ export function StaffelpilotSeite() {
     return geklappt;
   }
 
+  const leiste = (
+    <div className={stil.reiter} role="tablist" aria-label="Bereiche">
+      {REITER.map(([id, wort]) => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={reiter === id}
+          className={reiter === id ? stil.reiterAktiv : stil.reiterKnopf}
+          onClick={() => setReiter(id)}
+        >
+          {wort}
+        </button>
+      ))}
+    </div>
+  );
+
   if (zustand.phase === "laedt") {
     return (
       <div className={stil.laden} role="status" aria-label="Spielberichte werden geladen">
@@ -127,8 +165,36 @@ export function StaffelpilotSeite() {
 
   const { staffeln, spiele, uebersicht } = zustand.daten;
 
+  if (reiter === "einstellungen") {
+    return (
+      <>
+        {leiste}
+        <EinstellungenTafel />
+      </>
+    );
+  }
+
+  if (reiter === "mannschaften") {
+    return (
+      <>
+        {leiste}
+        <MannschaftenTafel staffeln={staffeln} />
+      </>
+    );
+  }
+
+  if (reiter === "vorgaenge") {
+    return (
+      <>
+        {leiste}
+        <VorgaengeTafel />
+      </>
+    );
+  }
+
   return (
     <>
+      {leiste}
       <Uebersicht daten={uebersicht} />
 
       {aktionsfehler && (
@@ -177,6 +243,9 @@ export function StaffelpilotSeite() {
                         zeile.abgehakt ? loeseHaken(zeile.id) : hakeAb(zeile.id),
                       )
                     }
+                    onEntwurf={(befundId) =>
+                      nachAktion(zeile.id, () => legeVorgangAn(befundId))
+                    }
                   />
                 </li>
               ))}
@@ -198,6 +267,7 @@ function Uebersicht({ daten }: { daten: Zusammenfassung }) {
       <Kennzahl wert={daten.offen} name="zu prüfen" />
       <Kennzahl wert={daten.befunde_kritisch} name="kritische Befunde" ton="fehler" />
       <Kennzahl wert={daten.befunde_offen} name="offene Befunde" />
+      <Kennzahl wert={daten.vorgaenge_entwurf} name="Entwürfe" />
       <Kennzahl wert={daten.abgehakt} name="abgehakt" />
     </ul>
   );
@@ -248,6 +318,7 @@ function SpielKarte({
   onOeffnen,
   onEntscheiden,
   onAbhaken,
+  onEntwurf,
 }: {
   zeile: SpielZeile;
   offen: Spiel | null;
@@ -258,6 +329,7 @@ function SpielKarte({
     grund: string,
   ) => Promise<boolean>;
   onAbhaken: () => void;
+  onEntwurf: (befundId: string) => Promise<boolean>;
 }) {
   return (
     <Karte>
@@ -293,7 +365,11 @@ function SpielKarte({
             <ul className={stil.befunde} aria-label="Befunde">
               {offen.befunde.map((b) => (
                 <li key={b.id}>
-                  <BefundZeile befund={b} onEntscheiden={onEntscheiden} />
+                  <BefundZeile
+                    befund={b}
+                    onEntscheiden={onEntscheiden}
+                    onEntwurf={onEntwurf}
+                  />
                 </li>
               ))}
             </ul>
@@ -319,9 +395,15 @@ function SpielKarte({
   );
 }
 
+const WEG_WORT = {
+  mahnung: "Mahnung entwerfen",
+  sportgericht: "Antrag entwerfen",
+} as const;
+
 function BefundZeile({
   befund,
   onEntscheiden,
+  onEntwurf,
 }: {
   befund: Befund;
   onEntscheiden: (
@@ -329,6 +411,7 @@ function BefundZeile({
     art: "kenntnis" | "verworfen",
     grund: string,
   ) => Promise<boolean>;
+  onEntwurf: (befundId: string) => Promise<boolean>;
 }) {
   const [grund, setGrund] = useState("");
   const [fragtNachGrund, setFragtNachGrund] = useState(false);
@@ -404,6 +487,24 @@ function BefundZeile({
             {befund.grund && `: ${befund.grund}`}
           </p>
         )}
+
+        {befund.weg !== "kein" &&
+          (befund.vorgang_id === null ? (
+            <div className={stil.knoepfe}>
+              <Knopf
+                groesse="sm"
+                auspraegung="sekundaer"
+                onClick={() => void onEntwurf(befund.id)}
+              >
+                {WEG_WORT[befund.weg]}
+              </Knopf>
+            </div>
+          ) : (
+            <p className={stil.erledigt}>
+              Entwurf angelegt — steht unter „Vorgänge". Verschickt wird er dort nicht,
+              sondern von Hand.
+            </p>
+          ))}
       </div>
     </Karte>
   );

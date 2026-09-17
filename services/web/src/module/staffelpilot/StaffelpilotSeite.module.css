@@ -243,3 +243,122 @@
   letter-spacing: var(--laufweite-eng);
   color: var(--farbe-text);
 }
+
+/* ── Reiter ──────────────────────────────────────────────────────────── */
+
+/* Waagerecht scrollbar statt umbrechend: auf einem Telefon brechen vier
+   Woerter sonst in zwei Zeilen um, und die Liste darunter rutscht bei jedem
+   Wechsel hoch und runter. */
+.reiter {
+  display: flex;
+  gap: var(--raum-1);
+  overflow-x: auto;
+  padding-bottom: var(--raum-1);
+  margin-bottom: var(--raum-4);
+  border-bottom: 1px solid var(--farbe-rand);
+  scrollbar-width: none;
+}
+
+.reiter::-webkit-scrollbar {
+  display: none;
+}
+
+.reiterKnopf,
+.reiterAktiv {
+  flex: 0 0 auto;
+  padding: var(--raum-2) var(--raum-3);
+  border: none;
+  border-radius: var(--rundung-sm) var(--rundung-sm) 0 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+  cursor: pointer;
+  /* Der aktive Reiter ist halbfett. Waere nur die Farbe anders, bliebe der
+     Unterschied bei jeder zweiten Sehschwaeche unsichtbar. */
+  border-bottom: 2px solid transparent;
+  transition: color var(--dauer-schnell) var(--verlauf);
+}
+
+.reiterKnopf:hover {
+  color: var(--farbe-text);
+}
+
+.reiterAktiv {
+  color: var(--farbe-text);
+  font-weight: var(--gewicht-halbfett);
+  border-bottom-color: var(--farbe-aktion);
+}
+
+.reiterKnopf:focus-visible,
+.reiterAktiv:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+/* ── Vorgänge ────────────────────────────────────────────────────────── */
+
+.filterZeile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+  margin-bottom: var(--raum-4);
+}
+
+.vorgangHinweis {
+  margin: var(--raum-2) 0 0;
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-gedaempft);
+}
+
+.textfeldEtikett {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+  margin-top: var(--raum-3);
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+}
+
+/* Monospace, weil der Entwurf in Spalten steht ("Spiel:", "Spieltag:") und
+   die Ausrichtung in einer Proportionalschrift zerfaellt. */
+.textfeld {
+  width: 100%;
+  padding: var(--raum-3);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  font-family: var(--schrift-mono);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-normal);
+  resize: vertical;
+}
+
+.textfeld:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 1px;
+}
+
+/* ── Mannschaften ────────────────────────────────────────────────────── */
+
+.auswahlListe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+  margin: var(--raum-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ankreuz {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+  /* Fingerziel: 44 px hoch, auch wenn das Kaestchen kleiner ist. */
+  min-height: 2.75rem;
+  font-size: var(--text-sm);
+  color: var(--farbe-text);
+  cursor: pointer;
+}
