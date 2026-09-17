@@ -217,9 +217,36 @@ Die Prüfung sitzt in `hole_benutzer` — also an der Stelle, über die **jedes*
 Artefakt seinen Benutzer bekommt, auch ein selbstprüfendes. Die Maske im
 Frontend führt dorthin; sie sichert nichts.
 
-Dasselbe gilt, wenn ein Verwalter ein Passwort zurücksetzt: am **fremden**
-Konto ist das Ergebnis immer ein Startpasswort. Am eigenen nicht — dort ist es
-schlicht das neue Passwort.
+### Ein Verwalter tippt nie ein Passwort
+
+Weder beim Anlegen noch beim Zurücksetzen. Beides erzeugt ein Startpasswort,
+zeigt es einmal an und stellt das Konto auf Wechsel — am fremden Konto wie am
+eigenen, ohne Ausnahme.
+
+Der Grund: ein Passwort, das ein Verwalter tippt, kennt er danach. Er hätte
+Zugang zu einem fremden Konto, und niemand könnte unterscheiden, wer gehandelt
+hat. Erzeugen, einmal anzeigen, weitergeben lassen — damit endet sein Wissen
+darüber beim nächsten Anmelden des Benutzers.
+
+Die Regel steht nicht nur in der Oberfläche, sondern im Vertrag:
+
+| | |
+|---|---|
+| `POST /verwaltung/benutzer` | kennt kein Feld `passwort`; wer eines mitschickt, bekommt **422** |
+| `PUT /verwaltung/benutzer/<id>/passwort` | nimmt **keinen Körper**; die Antwort enthält das erzeugte |
+
+Abgelehnt statt still verworfen, und das ist der Unterschied, auf den es
+ankommt: still verworfen gäbe der Verwalter ein Passwort weiter, das nie
+gesetzt wurde, und der Benutzer stünde vor einer Anmeldung, die ihn nicht
+kennt.
+
+Am eigenen Konto gilt dieselbe Regel, mit spürbarer Folge: die laufende
+Sitzung bleibt, kommt aber an kein Artefakt mehr, bis das Passwort ersetzt ist.
+Genau das führt zur Wechselmaske. Ein Passwort, das einmal auf einem Bildschirm
+stand, ist keines zum Behalten.
+
+Das eigene Passwort zu **ändern** — mit dem alten als Nachweis — geht
+weiterhin über `POST /auth/passwort`.
 
 Der Wechsel beendet alle **anderen** Sitzungen des Kontos. Die laufende bleibt:
 wer gerade sein Passwort geändert hat, sitzt davor und hat sich ausgewiesen.
@@ -227,7 +254,8 @@ Ihn hinauszuwerfen hieße, ihn nach einem erzwungenen Erstwechsel auf die
 Anmeldeseite zu schicken.
 
 Dasselbe in der Oberfläche: Artefakt **Verwaltung**. Dort lassen sich Konten
-anlegen, sperren, löschen, Passwörter setzen und Rollen je Artefakt vergeben.
+anlegen, sperren, löschen, Passwörter zurücksetzen und Rollen je Artefakt
+vergeben.
 Sichtbar ist es nur für Verwalter — wie jedes andere Artefakt auch.
 
 `sperren` statt `loeschen` ist der uebliche Fall: jemand ist ausgeschieden,

@@ -21,8 +21,7 @@ NEUES_PASSWORT = "ein-anderes-langes-passwort"
 
 async def _anlegen(client: AsyncClient, name: str) -> dict:
     antwort = await client.post(
-        "/verwaltung/benutzer",
-        json={"name": name, "passwort": "korrekt-pferd-batterie-42", "anzeigename": name.title()},
+        "/verwaltung/benutzer", json={"name": name, "anzeigename": name.title()}
     )
     assert antwort.status_code == 201, antwort.text
     return antwort.json()
@@ -138,26 +137,25 @@ class TestAnlegen:
     async def test_doppelter_name_wird_abgelehnt(self, client: AsyncClient) -> None:
         await _anlegen(client, "neuling")
 
-        antwort = await client.post(
-            "/verwaltung/benutzer",
-            json={"name": "neuling", "passwort": "korrekt-pferd-batterie-42"},
-        )
+        antwort = await client.post("/verwaltung/benutzer", json={"name": "neuling"})
 
         assert antwort.status_code == 409
 
-    async def test_zu_kurzes_passwort_nennt_den_grund(self, client: AsyncClient) -> None:
+    async def test_ein_mitgeschicktes_passwort_wird_abgelehnt(self, client: AsyncClient) -> None:
+        """Nicht still verworfen, sondern abgelehnt.
+
+        Still verworfen waere das gefaehrlichere von beiden: der Verwalter
+        gaebe ein Passwort weiter, das nie gesetzt wurde, und der Benutzer
+        stuende vor einer Anmeldung, die ihn nicht kennt.
+        """
         antwort = await client.post(
-            "/verwaltung/benutzer", json={"name": "neuling", "passwort": "kurz"}
+            "/verwaltung/benutzer", json={"name": "neuling", "passwort": "vom-verwalter-getippt"}
         )
 
         assert antwort.status_code == 422
-        assert "Zeichen" in antwort.json()["detail"]
 
     async def test_unbrauchbarer_name_nennt_die_regel(self, client: AsyncClient) -> None:
-        antwort = await client.post(
-            "/verwaltung/benutzer",
-            json={"name": "Mit Leerzeichen", "passwort": "korrekt-pferd-batterie-42"},
-        )
+        antwort = await client.post("/verwaltung/benutzer", json={"name": "Mit Leerzeichen"})
 
         assert antwort.status_code == 422
 
@@ -216,61 +214,79 @@ class TestAendern:
 
 
 class TestPasswort:
-    async def test_setzen_und_anmelden(
+    """Zuruecksetzen erzeugt - es setzt nicht, was jemand vorgibt.
+
+    Der Grund ist keine Bequemlichkeit: ein Verwalter, der das Passwort
+    tippt, kennt danach ein fremdes Konto. Erzeugen und einmal anzeigen
+    laesst ihn weitergeben, ohne dass er Zugang behaelt.
+    """
+
+    async def test_es_entsteht_ein_startpasswort_und_kommt_zurueck(
         self, client: AsyncClient, anonym: AsyncClient, gast
     ) -> None:
-        antwort = await client.put(
-            f"/verwaltung/benutzer/{gast.id}/passwort", json={"passwort": NEUES_PASSWORT}
-        )
+        antwort = await client.put(f"/verwaltung/benutzer/{gast.id}/passwort")
+
         assert antwort.status_code == 200
-
-        neu = await anonym.post("/auth/anmelden", json={"name": "gast", "passwort": NEUES_PASSWORT})
-        assert neu.status_code == 200
-
-    async def test_ohne_angabe_entsteht_ein_startpasswort(
-        self, client: AsyncClient, anonym: AsyncClient, gast
-    ) -> None:
-        antwort = await client.put(f"/verwaltung/benutzer/{gast.id}/passwort", json={})
-
         start = antwort.json()["startpasswort"]
         assert start
+
         neu = await anonym.post("/auth/anmelden", json={"name": "gast", "passwort": start})
         assert neu.status_code == 200
         assert neu.json()["passwort_wechseln"] is True
 
-    async def test_ein_selbst_getipptes_kommt_nicht_zurueck(
-        self, client: AsyncClient, gast
-    ) -> None:
-        """Der Verwalter kennt es - zurueck kommt nur, was der Dienst erzeugt hat."""
-        antwort = await client.put(
-            f"/verwaltung/benutzer/{gast.id}/passwort", json={"passwort": NEUES_PASSWORT}
-        )
+    async def test_zweimal_ergibt_zweimal_verschiedenes(self, client: AsyncClient, gast) -> None:
+        # Ein festes Standardpasswort waere nach dem ersten Aushang keines mehr.
+        erstes = (await client.put(f"/verwaltung/benutzer/{gast.id}/passwort")).json()
+        zweites = (await client.put(f"/verwaltung/benutzer/{gast.id}/passwort")).json()
 
-        assert antwort.json()["startpasswort"] is None
+        assert erstes["startpasswort"] != zweites["startpasswort"]
+
+    async def test_das_alte_passwort_gilt_nicht_mehr(
+        self, client: AsyncClient, anonym: AsyncClient, gast
+    ) -> None:
+        await client.put(f"/verwaltung/benutzer/{gast.id}/passwort")
+
+        vorher = await anonym.post("/auth/anmelden", json={"name": "gast", "passwort": PASSWORT})
+        assert vorher.status_code == 401
 
     async def test_am_fremden_konto_muss_gewechselt_werden(self, client: AsyncClient, gast) -> None:
-        """Ein Passwort, das ein Verwalter kennt, soll nicht das bleibende sein."""
-        await client.put(
-            f"/verwaltung/benutzer/{gast.id}/passwort", json={"passwort": NEUES_PASSWORT}
-        )
+        """Ein Passwort, das ein Verwalter gesehen hat, soll nicht das
+        bleibende sein."""
+        await client.put(f"/verwaltung/benutzer/{gast.id}/passwort")
 
         eintrag = (await client.get(f"/verwaltung/benutzer/{gast.id}")).json()
         assert eintrag["passwort_wechseln"] is True
 
-    async def test_am_eigenen_konto_nicht(self, client: AsyncClient, chefin) -> None:
-        await client.put(
-            f"/verwaltung/benutzer/{chefin.id}/passwort", json={"passwort": NEUES_PASSWORT}
-        )
+    async def test_am_eigenen_konto_gilt_dasselbe(self, client: AsyncClient, chefin) -> None:
+        """Keine Ausnahme fuer sich selbst: ein Passwort, das einmal auf einem
+        Bildschirm stand, ist keines zum Behalten.
 
-        eintrag = (await client.get(f"/verwaltung/benutzer/{chefin.id}")).json()
-        assert eintrag["passwort_wechseln"] is False
+        Die Folge ist spuerbar und gewollt - die eigene Sitzung laeuft weiter,
+        kommt aber an kein Artefakt mehr, bis das Passwort ersetzt ist. Genau
+        das fuehrt die Oberflaeche zur Wechselmaske.
+        """
+        antwort = await client.put(f"/verwaltung/benutzer/{chefin.id}/passwort")
+        assert antwort.json()["startpasswort"]
 
-    async def test_zu_kurzes_passwort_wird_abgelehnt(self, client: AsyncClient, gast) -> None:
+        weiter = await client.get(f"/verwaltung/benutzer/{chefin.id}")
+
+        assert weiter.status_code == 403
+        assert "Startpasswort" in weiter.json()["detail"]
+
+    async def test_ein_mitgeschicktes_passwort_aendert_nichts(
+        self, client: AsyncClient, anonym: AsyncClient, gast
+    ) -> None:
+        """Der Endpunkt nimmt keinen Koerper an - wer trotzdem einen schickt,
+        bekommt das erzeugte Passwort und nicht sein eigenes."""
         antwort = await client.put(
-            f"/verwaltung/benutzer/{gast.id}/passwort", json={"passwort": "kurz"}
+            f"/verwaltung/benutzer/{gast.id}/passwort", json={"passwort": NEUES_PASSWORT}
         )
 
-        assert antwort.status_code == 422
+        assert antwort.json()["startpasswort"] != NEUES_PASSWORT
+        versuch = await anonym.post(
+            "/auth/anmelden", json={"name": "gast", "passwort": NEUES_PASSWORT}
+        )
+        assert versuch.status_code == 401
 
     async def test_alle_sitzungen_des_kontos_enden(
         self, client: AsyncClient, anonym: AsyncClient, gast
@@ -280,9 +296,7 @@ class TestPasswort:
         await anonym.post("/auth/anmelden", json={"name": "gast", "passwort": PASSWORT})
         assert (await anonym.get("/auth/ich")).status_code == 200
 
-        await client.put(
-            f"/verwaltung/benutzer/{gast.id}/passwort", json={"passwort": NEUES_PASSWORT}
-        )
+        await client.put(f"/verwaltung/benutzer/{gast.id}/passwort")
 
         assert (await anonym.get("/auth/ich")).status_code == 401
 

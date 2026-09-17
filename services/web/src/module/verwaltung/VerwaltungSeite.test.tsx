@@ -27,7 +27,7 @@ function konto(rest: Partial<Konto> = {}): Konto {
 }
 
 function angelegt(rest: Partial<KontoAngelegt> = {}): KontoAngelegt {
-  return { ...konto(), startpasswort: null, ...rest };
+  return { ...konto(), startpasswort: "abcd-efgh-ijkl-mnop", ...rest };
 }
 
 const ICH = konto({
@@ -218,6 +218,59 @@ describe("Verwaltungsseite", () => {
     });
   });
 
+  describe("Passwort zuruecksetzen", () => {
+    async function oeffne(name = "gast") {
+      zeige();
+      await userEvent.click(
+        await screen.findByRole("button", { name: new RegExp(`Rechte von ${name}`) }),
+      );
+    }
+
+    it("bietet kein Feld an, in das sich eines tippen liesse", async () => {
+      // Der Kern der Regel: was ein Verwalter tippt, kennt er danach. Es gibt
+      // deshalb nichts einzugeben - weder hier noch im Backend.
+      await oeffne();
+
+      expect(screen.queryByLabelText(/Neues Passwort/)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/Passwort für/)).not.toBeInTheDocument();
+    });
+
+    it("erzeugt eines und zeigt es genau einmal", async () => {
+      const setzen = vi
+        .spyOn(api, "setzePasswort")
+        .mockResolvedValue({ startpasswort: "qrst-uvwx-yzab-cdef" });
+      await oeffne();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Passwort von gast zurücksetzen/ }),
+      );
+
+      expect(setzen).toHaveBeenCalledWith(konto().id);
+      expect(await screen.findByText("qrst-uvwx-yzab-cdef")).toBeInTheDocument();
+    });
+
+    it("sagt, dass alle Sitzungen dieses Kontos enden", async () => {
+      await oeffne();
+
+      expect(screen.getByText(/Sitzungen dieses Kontos enden/)).toBeInTheDocument();
+    });
+
+    it("zeigt den Fehler des Backends, statt ihn zu verschlucken", async () => {
+      vi.spyOn(api, "setzePasswort").mockRejectedValue(
+        new ApiError("geht gerade nicht", 409),
+      );
+      await oeffne();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Passwort von gast zurücksetzen/ }),
+      );
+
+      await waitFor(() =>
+        expect(screen.getByRole("alert")).toHaveTextContent(/geht gerade nicht/),
+      );
+    });
+  });
+
   describe("Anlegen", () => {
     it("legt ein Konto an", async () => {
       const anlegen = vi.spyOn(api, "legeKontoAn").mockResolvedValue(angelegt());
@@ -225,13 +278,18 @@ describe("Verwaltungsseite", () => {
       await screen.findByRole("list", { name: "Konten" });
 
       await userEvent.type(screen.getByLabelText("Benutzername"), "neuling");
-      await userEvent.type(screen.getByLabelText("Passwort"), "korrekt-pferd-batterie");
       await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
 
-      expect(anlegen).toHaveBeenCalledWith({
-        name: "neuling",
-        passwort: "korrekt-pferd-batterie",
-      });
+      expect(anlegen).toHaveBeenCalledWith({ name: "neuling" });
+    });
+
+    it("bietet gar kein Passwortfeld an", async () => {
+      // Was ein Verwalter tippt, kennt er auch. Das Startpasswort erzeugt
+      // der Dienst - hier gibt es nichts einzugeben.
+      zeige();
+      await screen.findByRole("list", { name: "Konten" });
+
+      expect(screen.queryByLabelText("Passwort")).not.toBeInTheDocument();
     });
 
     it("lässt sich leer nicht absenden", async () => {
@@ -247,7 +305,6 @@ describe("Verwaltungsseite", () => {
       await screen.findByRole("list", { name: "Konten" });
 
       await userEvent.type(screen.getByLabelText("Benutzername"), "gast");
-      await userEvent.type(screen.getByLabelText("Passwort"), "korrekt-pferd-batterie");
       await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
 
       await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
@@ -258,18 +315,6 @@ describe("Verwaltungsseite", () => {
       zeige();
 
       expect(await screen.findByText(/Rechte hat ein neues Konto/)).toBeInTheDocument();
-    });
-
-    it("braucht kein Passwort", async () => {
-      // Der Name genuegt - den Rest erzeugt der Dienst.
-      const anlegen = vi.spyOn(api, "legeKontoAn").mockResolvedValue(angelegt());
-      zeige();
-      await screen.findByRole("list", { name: "Konten" });
-
-      await userEvent.type(screen.getByLabelText("Benutzername"), "neuling");
-      await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
-
-      expect(anlegen).toHaveBeenCalledWith({ name: "neuling" });
     });
 
     it("zeigt das Startpasswort genau einmal", async () => {
