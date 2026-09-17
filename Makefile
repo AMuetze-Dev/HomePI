@@ -115,6 +115,10 @@ WEB    := services/web
 # aber gegen "test", nicht gegen "app": sie legen Tabellen an und loeschen sie wieder.
 # Ueber HOMEPI_TEST_DATABASE_URL, nicht ueber DATABASE_URL: so kann daneben
 # die Arbeitsdatenbank gesetzt sein, ohne dass ein Testlauf sie trifft.
+#
+# "test" ist dabei nur die Vorlage. Das pytest-Plugin legt beim Start jedes
+# Laufs eine eigene Datenbank an ("<projekt>_test") und wirft sie am Ende
+# wieder weg - damit sieht kein Lauf, was der vorige hinterlassen hat.
 TESTDB := postgresql+asyncpg://app:app@127.0.0.1:15432/test
 
 ## test: alles pruefen, was die CI auch prueft

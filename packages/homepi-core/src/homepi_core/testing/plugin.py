@@ -4,6 +4,7 @@ sobald ``homepi-core[test]`` installiert ist - kein ``pytest_plugins`` nötig.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 
@@ -12,12 +13,17 @@ import pytest
 if TYPE_CHECKING:
     import httpx
 
+    from .datenbank import Lauf
     from .ziel import Ziel
 
-# Absichtlich KEIN Import auf Modulebene ausser pytest: dieses Modul wird
-# ueber den pytest11-Entry-Point beim Start JEDES Projekts geladen, das
-# homepi-core[test] installiert hat. Httpx und die Zielaufloesung kommen erst,
-# wenn eine Fixture sie wirklich braucht.
+# Absichtlich KEIN Import auf Modulebene ausser pytest und asyncio: dieses
+# Modul wird ueber den pytest11-Entry-Point beim Start JEDES Projekts geladen,
+# das homepi-core[test] installiert hat. Httpx, asyncpg und die Zielaufloesung
+# kommen erst, wenn sie wirklich gebraucht werden.
+
+#: Der Lauf, zu dem die angelegte Datenbank gehoert. Modulweit, weil
+#: pytest_configure und pytest_sessionfinish sich nichts uebergeben koennen.
+_lauf: Lauf | None = None
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -25,15 +31,116 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "smoke: spricht mit einer laufenden Instanz (HOMEPI_ZIEL / HOMEPI_BASIS_URL)",
     )
+    _datenbank_vorbereiten(config)
+
+
+def pytest_report_header() -> list[str]:
+    """Sagt im Kopf des Laufs, wohin geschrieben wird.
+
+    Ohne das muesste man raten, ob dieser Lauf gerade eine eigene Datenbank
+    benutzt oder die vorgegebene - und genau diese Frage war der Grund fuer
+    das Ganze.
+    """
+    if _lauf is None:
+        return []
+    return [f"Testdatenbank: {_lauf.name} (neu angelegt, wird am Ende weggeworfen)"]
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    # Bei rotem Lauf bleibt sie stehen: dann will man hineinsehen koennen. Der
+    # naechste Lauf legt sie ohnehin neu an, es haeuft sich also nichts an.
+    _datenbank_abraeumen(behalten=exitstatus != 0)
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    # Netz fuer den Fall, dass die Sitzung gar nicht erst zustande kam.
+    _datenbank_abraeumen(behalten=True)
+
+
+def _datenbank_vorbereiten(config: pytest.Config) -> None:
+    """Legt fuer diesen Lauf eine eigene Datenbank an und stellt sie ein.
+
+    Hier und nicht in einer Fixture: die Integrationstests halten die URL als
+    Modulkonstante, und die steht schon beim Einlesen der Testdatei fest -
+    lange bevor die erste Fixture laeuft.
+    """
+    global _lauf
+    import os
+
+    from .datenbank import VARIABLE, Lauf, abgeschaltet, anlegen, datenbank_fuer_tests, name_fuer
+
+    if abgeschaltet() or not _braucht_datenbank(config):
+        return
+
+    # Laeuft die Umgebung auf eine Arbeitsdatenbank, soll das hier abbrechen
+    # und nicht erst beim ersten drop_all.
+    vorlage = datenbank_fuer_tests()
+    name = name_fuer(config.rootpath.name)
+
+    try:
+        url = asyncio.run(anlegen(vorlage, name))
+    except Exception as problem:
+        # Kein Abbruch: ohne erreichbare Postgres laeuft dieser Lauf genau so
+        # wie vor dieser Erweiterung - gegen die vorgegebene Datenbank. Die
+        # Integrationstests scheitern dann mit ihrer eigenen, deutlicheren
+        # Meldung, und Unit-Tests brauchen ueberhaupt keine Datenbank.
+        config.issue_config_time_warning(
+            pytest.PytestWarning(
+                f"Eigene Testdatenbank '{name}' liess sich nicht anlegen ({problem}). "
+                f"Dieser Lauf benutzt '{vorlage.rsplit('/', 1)[-1]}'."
+            ),
+            stacklevel=1,
+        )
+        return
+
+    _lauf = Lauf(vorlage=vorlage, name=name, url=url, vorher=os.environ.get(VARIABLE))
+    os.environ[VARIABLE] = url
+
+
+def _datenbank_abraeumen(*, behalten: bool) -> None:
+    """Stellt die vorherige Datenbank wieder ein und raeumt die eigene weg."""
+    global _lauf
+    import os
+
+    from .datenbank import VARIABLE, wegwerfen
+
+    if _lauf is None or not _lauf.offen:
+        return
+    _lauf.offen = False
+
+    if _lauf.vorher is None:
+        os.environ.pop(VARIABLE, None)
+    else:
+        os.environ[VARIABLE] = _lauf.vorher
+
+    if behalten:
+        print(f"\nTestdatenbank '{_lauf.name}' bleibt stehen - zum Hineinsehen:\n  {_lauf.url}")
+        return
+
+    try:
+        asyncio.run(wegwerfen(_lauf.vorlage, _lauf.name))
+    # Aufraeumen darf keinen Lauf umwerfen - auch nicht einen gruenen.
+    except Exception as problem:
+        print(f"\nTestdatenbank '{_lauf.name}' liess sich nicht wegwerfen: {problem}")
+
+
+def _braucht_datenbank(config: pytest.Config) -> bool:
+    """Ob dieser Lauf ueberhaupt eine Datenbank anfassen kann.
+
+    ``-m smoke`` waehlt ausschliesslich die Tests, die mit einer laufenden
+    Instanz sprechen. Die haben ihre eigene Datenbank - hier eine anzulegen
+    waere ein Zugriff auf fremdes Gebiet, und auf dem Pi scheitert er.
+    """
+    return (config.option.markexpr or "").strip() != "smoke"
 
 
 @pytest.fixture(scope="session")
 def testdatenbank() -> str:
     """Die URL, gegen die Integrationstests laufen duerfen.
 
-    Sie bricht ab, wenn die Umgebung auf eine Arbeitsdatenbank zeigt -
-    Integrationstests rufen drop_all auf, und das waere dort der Verlust aller
-    Konten.
+    Das ist die zu Beginn des Laufs angelegte, leere Datenbank - oder, falls
+    sich keine anlegen liess, die vorgegebene. In beiden Faellen bricht sie
+    ab, wenn die Umgebung auf eine Arbeitsdatenbank zeigt.
     """
     from .datenbank import datenbank_fuer_tests
 

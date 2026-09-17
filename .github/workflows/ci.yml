@@ -194,7 +194,12 @@ jobs:
           --health-retries 10
 
     env:
-      DATABASE_URL: postgresql+asyncpg://app:app@127.0.0.1:5432/test
+      # HOMEPI_TEST_DATABASE_URL, nicht DATABASE_URL: die Tests sollen nur
+      # ueber die Variable an eine Datenbank kommen, die ausdruecklich zum
+      # Testen da ist. Sie ist die Vorlage, nicht das Ziel - das pytest-Plugin
+      # legt daneben je Lauf eine eigene an ("<projekt>_test") und wirft sie
+      # am Ende wieder weg.
+      HOMEPI_TEST_DATABASE_URL: postgresql+asyncpg://app:app@127.0.0.1:5432/test
 
     steps:
       - uses: actions/checkout@v4
@@ -381,6 +386,9 @@ jobs:
           $GATEWAY uv run homepi benutzer recht rauchtest verwaltung verwalter
 
       - name: Rauchtests gegen die laufende Instanz
+        # "-m smoke" waehlt ausschliesslich Tests gegen eine laufende Instanz.
+        # Das Plugin legt dafuer bewusst keine eigene Datenbank an: diese hier
+        # gehoert der Umgebung, die oben hochgefahren wurde.
         working-directory: services/gateway
         run: |
           uv sync --frozen --all-extras

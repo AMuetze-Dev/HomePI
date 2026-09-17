@@ -108,6 +108,7 @@ hat die falsche Datei geöffnet.
 ```bash
 make dev             # Umgebung: Frontend 5173, API 18000, Postgres 15432
 make test            # alles, was die CI auch prüft
+make e2e             # Oberflächentests gegen eine eigene, frische Umgebung
 make smoke           # gegen die laufende Umgebung
 make fmt
 ```
@@ -122,8 +123,12 @@ make tdd-web N=<name>      # vitest nur für dessen Oberfläche
 make test-modul N=<name>   # beide Hälften vollständig prüfen
 ```
 
-Integrationstests laufen gegen die Datenbank `test`, nicht `app` — sie legen
-Tabellen an und löschen sie wieder.
+Integrationstests fassen niemals `app` an — sie legen Tabellen an und löschen
+sie wieder. Jeder Lauf bekommt eine **eigene, frisch angelegte** Datenbank
+(`<projekt>_test`), die am Ende weggeworfen wird; nach einem roten Lauf bleibt
+sie zum Hineinsehen stehen. Die Oberflächentests bekommen mit `make e2e` sogar
+eine eigene Umgebung und brechen ab, wenn die Installation schon einen
+Verwalter hat. Beides steht in [docs/07-lokale-entwicklung.md](docs/07-lokale-entwicklung.md).
 
 ---
 

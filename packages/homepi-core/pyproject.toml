@@ -117,3 +117,10 @@ disallow_untyped_defs = false
 # redis ist ein optionales Extra; ohne Installation gibt es keine Stubs.
 module = "redis.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# asyncpg liefert keine Typen mit. Normalerweise spricht nur SQLAlchemy damit;
+# die Testdatenbank legt es direkt an, weil CREATE DATABASE nicht in eine
+# Transaktion passt.
+module = "asyncpg.*"
+ignore_missing_imports = true
