@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import deploy, scaffold
+from . import benutzer, deploy, scaffold
 from .project import projekt_ermitteln
 from .shell import CliFehler, erfolg, fehler, hinweis, lauf, schritt, warnung
 
@@ -17,6 +17,7 @@ Werkzeug für HomePI-Microservices.
   homepi deploy         über die GitHub-Pipeline auf den Pi bringen
   homepi info           erkanntes Projekt anzeigen
   homepi doctor         Voraussetzungen prüfen
+  homepi benutzer       Konten und Rechte verwalten
 """
 
 
@@ -35,6 +36,10 @@ def _parser() -> argparse.ArgumentParser:
     p_deploy = unterbefehle.add_parser("deploy", help="Service auf den Pi bringen")
     deploy.argumente(p_deploy)
     p_deploy.set_defaults(fn=deploy.ausfuehren)
+
+    p_benutzer = unterbefehle.add_parser("benutzer", help="Konten und Rechte verwalten")
+    benutzer.argumente(p_benutzer)
+    p_benutzer.set_defaults(fn=benutzer.ausfuehren)
 
     p_info = unterbefehle.add_parser("info", help="erkanntes Projekt anzeigen")
     p_info.add_argument("-s", "--service", help="Servicename überschreiben")
