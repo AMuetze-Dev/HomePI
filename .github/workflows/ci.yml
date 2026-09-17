@@ -302,21 +302,11 @@ jobs:
           cache: npm
           cache-dependency-path: services/web/package-lock.json
 
-      - name: Entwicklungsumgebung hochfahren
-        run: docker compose -f compose.dev.yml up -d --build --wait --wait-timeout 300
-
-      # Erst die Oberflaechentests: sie brauchen eine Installation ohne
-      # Verwalter, weil sie bei der Ersteinrichtung anfangen. Danach legt der
-      # Schritt darunter das Rauchtest-Konto an.
-      - name: Einrichtungstoken aus dem Log holen
-        # Es steht dort, sobald das Gateway ohne Verwalter startet - und nur
-        # wer das Log lesen kann, kommt an die Ersteinrichtung.
-        run: |
-          docker compose -f compose.dev.yml logs gateway > gateway.log
-          token=$(sed -n 's/.*Einrichtungstoken:[[:space:]]*//p' gateway.log | tail -1 | tr -d '\r')
-          test -n "$token" || { echo "::error::kein Einrichtungstoken im Log"; exit 1; }
-          echo "EINRICHTUNGSTOKEN=$token" >> "$GITHUB_ENV"
-
+      # VOR dem Hochfahren der Umgebung, und das ist kein Zufall:
+      # compose haengt ein anonymes Volume auf /app/node_modules. Docker
+      # legt den Einhaengepunkt dafuer auf dem Host an - als root. Ein
+      # spaeteres 'npm ci' liefe dann als 'runner' gegen ein Verzeichnis,
+      # das ihm nicht gehoert, und scheiterte an der Berechtigung.
       - name: Abhaengigkeiten des Frontends
         working-directory: services/web
         run: npm ci
@@ -342,6 +332,21 @@ jobs:
             sleep 15
           done
           exit 1
+
+      - name: Entwicklungsumgebung hochfahren
+        run: docker compose -f compose.dev.yml up -d --build --wait --wait-timeout 300
+
+      # Erst die Oberflaechentests: sie brauchen eine Installation ohne
+      # Verwalter, weil sie bei der Ersteinrichtung anfangen. Danach legt der
+      # Schritt darunter das Rauchtest-Konto an.
+      - name: Einrichtungstoken aus dem Log holen
+        # Es steht dort, sobald das Gateway ohne Verwalter startet - und nur
+        # wer das Log lesen kann, kommt an die Ersteinrichtung.
+        run: |
+          docker compose -f compose.dev.yml logs gateway > gateway.log
+          token=$(sed -n 's/.*Einrichtungstoken:[[:space:]]*//p' gateway.log | tail -1 | tr -d '\r')
+          test -n "$token" || { echo "::error::kein Einrichtungstoken im Log"; exit 1; }
+          echo "EINRICHTUNGSTOKEN=$token" >> "$GITHUB_ENV"
 
       - name: Oberflaechentests
         working-directory: services/web
