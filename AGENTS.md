@@ -53,6 +53,9 @@ make dev                          # Kachel erscheint
 
 Rezept mit allen Schritten: [docs/09-artefakt-bauen.md](docs/09-artefakt-bauen.md).
 
+**Einen Agenten damit beauftragen:** [docs/10-auftrag-artefakt.md](docs/10-auftrag-artefakt.md)
+ist als alleinige Arbeitsanweisung gedacht — vollständig, ohne weiteren Kontext.
+
 ---
 
 ## Regeln, die nicht verhandelbar sind
@@ -133,3 +136,4 @@ ist alles ohne horizontales Scrollen erreichbar.
 | Lokale Umgebung, Fallstricke unter Windows | [docs/07-lokale-entwicklung.md](docs/07-lokale-entwicklung.md) |
 | Designsystem, Tokens, Zugänglichkeit | [docs/08-design.md](docs/08-design.md) |
 | Artefakt bauen, Schritt für Schritt | [docs/09-artefakt-bauen.md](docs/09-artefakt-bauen.md) |
+| Auftrag zum Übergeben an einen Agenten | [docs/10-auftrag-artefakt.md](docs/10-auftrag-artefakt.md) |
