@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 
 from homepi_core.auth import Rolle
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BenutzerAusgabe(BaseModel):
@@ -32,13 +32,18 @@ class BenutzerAusgabe(BaseModel):
 class NeuerBenutzer(BaseModel):
     """Zum Anlegen genuegen Name und Anzeigename.
 
-    Ohne Passwort erzeugt der Dienst ein Startpasswort und gibt es genau
-    einmal zurueck. Der Benutzer muss es beim ersten Anmelden ersetzen -
-    ein Passwort, das jemand anders kennt, soll nicht das bleibende sein.
+    **Kein Passwortfeld, und das ist Absicht.** Das Startpasswort erzeugt der
+    Dienst und gibt es genau einmal zurueck; der Benutzer ersetzt es beim
+    ersten Anmelden. Ein Passwort, das ein Verwalter tippt, kennt er auch -
+    und ein getipptes waere ausserdem das schwaechere von beiden.
     """
 
+    #: Ein mitgeschicktes "passwort" wird nicht still verworfen, sondern
+    #: abgelehnt. Still verworfen waere schlimmer als verboten: der Verwalter
+    #: gaebe ein Passwort weiter, das nie gesetzt wurde.
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(min_length=1, max_length=32)
-    passwort: str | None = Field(default=None, min_length=1, max_length=200)
     anzeigename: str | None = Field(default=None, max_length=100)
 
 
@@ -54,12 +59,6 @@ class BenutzerAenderung(BaseModel):
     aktiv: bool | None = None
 
 
-class PasswortSetzen(BaseModel):
-    """Ohne Angabe entsteht ein neues Startpasswort."""
-
-    passwort: str | None = Field(default=None, min_length=1, max_length=200)
-
-
 class KontoAngelegt(BenutzerAusgabe):
     """Die Antwort aufs Anlegen - einmalig mit dem Startpasswort.
 
@@ -67,13 +66,17 @@ class KontoAngelegt(BenutzerAusgabe):
     Wer das Konto anlegt, gibt es weiter; danach ist es nicht mehr abrufbar.
     """
 
-    startpasswort: str | None = None
+    startpasswort: str
 
 
 class PasswortGesetzt(BaseModel):
-    """Auch hier einmalig: das Startpasswort, das der Verwalter weitergibt."""
+    """Auch hier einmalig: das Startpasswort, das der Verwalter weitergibt.
 
-    startpasswort: str | None = None
+    Nicht optional: aus diesem Endpunkt kommt immer ein erzeugtes Passwort,
+    weil es keinen Weg gibt, eines vorzugeben.
+    """
+
+    startpasswort: str
 
 
 class RechtSetzen(BaseModel):

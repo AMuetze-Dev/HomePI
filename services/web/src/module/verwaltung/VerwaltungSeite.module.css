@@ -159,14 +159,21 @@
 .passwortzeile {
   display: flex;
   flex-direction: column;
-  gap: var(--raum-2);
+  gap: var(--raum-3);
   border-top: 1px solid var(--farbe-rand);
   padding-top: var(--raum-4);
 }
 
-.passwortfeld {
-  flex: 1;
+.passworttext {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
   min-width: 0;
+}
+
+.passworttitel {
+  font-size: var(--text-sm);
+  font-weight: var(--gewicht-halbfett);
 }
 
 /* --- Anlegen --- */
@@ -215,8 +222,9 @@
 
   .passwortzeile {
     flex-direction: row;
-    align-items: flex-start;
-    gap: var(--raum-3);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--raum-4);
   }
 
   .felder {

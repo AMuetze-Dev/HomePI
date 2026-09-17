@@ -22,7 +22,7 @@ export interface Konto {
 /** Die Antwort aufs Anlegen - einmalig mit dem Startpasswort. */
 export interface KontoAngelegt extends Konto {
   /** Nur hier. Danach ist es nicht mehr abrufbar. */
-  startpasswort: string | null;
+  startpasswort: string;
 }
 
 export interface Artefakt {
@@ -33,8 +33,6 @@ export interface Artefakt {
 
 export interface NeuesKonto {
   name: string;
-  /** Ohne Angabe erzeugt der Dienst ein Startpasswort. */
-  passwort?: string;
   anzeigename?: string;
 }
 
@@ -108,17 +106,15 @@ export function setzeAnzeigename(id: string, anzeigename: string): Promise<Konto
 }
 
 /**
- * Setzt ein Passwort zurück. Ohne Angabe erzeugt der Dienst ein Startpasswort
- * und gibt es einmalig zurück - der Benutzer muss es dann ersetzen.
+ * Setzt das Passwort zurück. Der Dienst erzeugt ein Startpasswort und gibt es
+ * einmalig zurück; der Benutzer ersetzt es beim nächsten Anmelden.
+ *
+ * Ohne Körper, und das ist der Punkt: ein Passwort vorzugeben ist hier nicht
+ * vorgesehen. Was ein Verwalter tippt, kennt er auch.
  */
-export function setzePasswort(
-  id: string,
-  passwort?: string,
-): Promise<{ startpasswort: string | null }> {
-  return anfrage<{ startpasswort: string | null }>(`/benutzer/${id}/passwort`, {
+export function setzePasswort(id: string): Promise<{ startpasswort: string }> {
+  return anfrage<{ startpasswort: string }>(`/benutzer/${id}/passwort`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(passwort === undefined ? {} : { passwort }),
   });
 }
 

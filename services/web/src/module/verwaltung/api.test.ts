@@ -65,11 +65,11 @@ describe("Verwaltungs-API", () => {
   it("legt ein Konto an", async () => {
     const spy = abfangen(antwort(KONTO, 201));
 
-    await legeKontoAn({ name: "gast", passwort: "langes-passwort" });
+    await legeKontoAn({ name: "gast" });
 
     const [, init] = aufruf(spy);
     expect(init.method).toBe("POST");
-    expect(init.body).toBe(JSON.stringify({ name: "gast", passwort: "langes-passwort" }));
+    expect(init.body).toBe(JSON.stringify({ name: "gast" }));
   });
 
   it("sperrt und entsperrt", async () => {
@@ -91,23 +91,25 @@ describe("Verwaltungs-API", () => {
     expect(aufruf(spy)[1].body).toBe(JSON.stringify({ anzeigename: "Gast im Haus" }));
   });
 
-  it("setzt ein Passwort", async () => {
-    const spy = abfangen(antwort({ startpasswort: null }));
-
-    await setzePasswort(KONTO.id, "langes-passwort");
-
-    const [pfad, init] = aufruf(spy);
-    expect(pfad).toContain("/passwort");
-    expect(init.body).toBe(JSON.stringify({ passwort: "langes-passwort" }));
-  });
-
-  it("laesst ohne Angabe ein Startpasswort erzeugen", async () => {
+  it("laesst ein Startpasswort erzeugen und gibt es zurueck", async () => {
     const spy = abfangen(antwort({ startpasswort: "abcd-efgh-ijkl-mnop" }));
 
     const ergebnis = await setzePasswort(KONTO.id);
 
-    expect(aufruf(spy)[1].body).toBe("{}");
+    const [pfad, init] = aufruf(spy);
+    expect(pfad).toContain("/passwort");
+    expect(init.method).toBe("PUT");
     expect(ergebnis.startpasswort).toBe("abcd-efgh-ijkl-mnop");
+  });
+
+  it("schickt dabei gar keinen Koerper", async () => {
+    // Kein Feld, in das ein Verwalter ein Passwort schreiben koennte - hier
+    // faengt die Regel an, und das Backend lehnt den Rest ab.
+    const spy = abfangen(antwort({ startpasswort: "abcd-efgh-ijkl-mnop" }));
+
+    await setzePasswort(KONTO.id);
+
+    expect(aufruf(spy)[1].body).toBeUndefined();
   });
 
   it("löscht ein Konto", async () => {

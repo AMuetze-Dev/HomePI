@@ -139,7 +139,7 @@ export function VerwaltungSeite() {
         onAnlegen={async (daten) =>
           mitFehlerbehandlung(async () => {
             const neu = await legeKontoAn(daten);
-            if (neu.startpasswort) setStart({ name: neu.name, wert: neu.startpasswort });
+            setStart({ name: neu.name, wert: neu.startpasswort });
           })
         }
       />
@@ -203,7 +203,6 @@ function Kontokarte({
   aufAktion: (aktion: () => Promise<unknown>) => Promise<boolean>;
   aufStartpasswort: (start: { name: string; wert: string }) => void;
 }) {
-  const [passwort, setPasswort] = useState("");
   const [offen, setOffen] = useState(false);
 
   return (
@@ -277,32 +276,26 @@ function Kontokarte({
           />
 
           <div className={stil.passwortzeile}>
-            <Feld
-              beschriftung={`Neues Passwort für ${konto.name}`}
-              type="password"
-              autoComplete="new-password"
-              value={passwort}
-              className={stil.passwortfeld}
-              hinweis="Leer lassen und ein Startpasswort erzeugen lassen. Beendet in jedem Fall alle Sitzungen dieses Kontos."
-              onChange={(e) => setPasswort(e.target.value)}
-            />
+            <div className={stil.passworttext}>
+              <span className={stil.passworttitel}>Passwort zurücksetzen</span>
+              <p className={stil.leerhinweis}>
+                Der Dienst erzeugt ein Startpasswort und zeigt es dir einmal. Du gibst es
+                weiter, {konto.anzeigename} ersetzt es beim nächsten Anmelden. Ein eigenes
+                vorzugeben ist nicht vorgesehen — was du tippst, kennst du auch. Alle
+                Sitzungen dieses Kontos enden dabei.
+              </p>
+            </div>
             <Knopf
               groesse="sm"
-              onClick={() => {
+              onClick={() =>
                 void aufAktion(async () => {
-                  const antwort = await setzePasswort(
-                    konto.id,
-                    passwort === "" ? undefined : passwort,
-                  );
-                  if (antwort.startpasswort) {
-                    aufStartpasswort({ name: konto.name, wert: antwort.startpasswort });
-                  }
-                }).then((ok) => {
-                  if (ok) setPasswort("");
-                });
-              }}
+                  const antwort = await setzePasswort(konto.id);
+                  aufStartpasswort({ name: konto.name, wert: antwort.startpasswort });
+                })
+              }
+              aria-label={`Passwort von ${konto.name} zurücksetzen`}
             >
-              {passwort === "" ? "Startpasswort erzeugen" : "Setzen"}
+              Startpasswort erzeugen
             </Knopf>
           </div>
         </>
@@ -377,19 +370,14 @@ function Rechte({
 function Anlegen({
   onAnlegen,
 }: {
-  onAnlegen: (daten: {
-    name: string;
-    passwort?: string;
-    anzeigename?: string;
-  }) => Promise<boolean>;
+  onAnlegen: (daten: { name: string; anzeigename?: string }) => Promise<boolean>;
 }) {
   const [name, setName] = useState("");
   const [anzeigename, setAnzeigename] = useState("");
-  const [passwort, setPasswort] = useState("");
   const [laeuft, setLaeuft] = useState(false);
 
-  // Der Name genuegt. Ohne Passwort erzeugt der Dienst ein Startpasswort -
-  // ein Passwort, das ein Verwalter tippt, kennt jemand anders.
+  // Der Name genuegt. Das Startpasswort erzeugt der Dienst - ein Passwort,
+  // das ein Verwalter tippt, kennt jemand anders.
   const vollstaendig = name.trim() !== "";
 
   async function absenden(ereignis: React.FormEvent) {
@@ -399,7 +387,6 @@ function Anlegen({
     setLaeuft(true);
     const geklappt = await onAnlegen({
       name: name.trim(),
-      ...(passwort ? { passwort } : {}),
       ...(anzeigename.trim() ? { anzeigename: anzeigename.trim() } : {}),
     });
     setLaeuft(false);
@@ -409,7 +396,6 @@ function Anlegen({
     if (geklappt) {
       setName("");
       setAnzeigename("");
-      setPasswort("");
     }
   }
 
@@ -436,19 +422,11 @@ function Anlegen({
               value={anzeigename}
               onChange={(e) => setAnzeigename(e.target.value)}
             />
-            <Feld
-              beschriftung="Passwort"
-              type="password"
-              autoComplete="new-password"
-              value={passwort}
-              hinweis="Optional. Leer lassen für ein Startpasswort."
-              onChange={(e) => setPasswort(e.target.value)}
-            />
           </div>
 
           <p className={stil.leerhinweis}>
-            Der Name genügt: ohne Passwort entsteht ein Startpasswort, das du weitergibst
-            und das der Benutzer beim ersten Anmelden ersetzt. Rechte hat ein neues Konto
+            Der Name genügt. Das Startpasswort erzeugt der Dienst; du gibst es weiter, und
+            der Benutzer ersetzt es beim ersten Anmelden. Rechte hat ein neues Konto
             zunächst keine — was es darf, vergibst du danach einzeln.
           </p>
 

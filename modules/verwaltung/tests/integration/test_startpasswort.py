@@ -63,15 +63,15 @@ class TestAnlegenOhnePasswort:
 
         assert erstes["startpasswort"] != zweites["startpasswort"]
 
-    async def test_ein_getipptes_passwort_geht_weiterhin(self, client: AsyncClient) -> None:
+    async def test_ein_getipptes_passwort_gibt_es_nicht(self, client: AsyncClient) -> None:
+        """Es gibt keinen Weg, eines vorzugeben - auch nicht an der Oberflaeche
+        vorbei, direkt gegen die API."""
         antwort = await client.post(
             "/verwaltung/benutzer",
             json={"name": "neuling", "passwort": "vom-verwalter-getippt-lang"},
         )
 
-        assert antwort.status_code == 201
-        # Auch dieses kennt jemand anders - also ebenfalls nur bis zum Wechsel.
-        assert antwort.json()["passwort_wechseln"] is True
+        assert antwort.status_code == 422
 
 
 # --- Das erste Anmelden ----------------------------------------------------
@@ -190,7 +190,7 @@ class TestWechsel:
             json={"altes_passwort": neu["startpasswort"], "neues_passwort": EIGENES},
         )
 
-        zurueck = await client.put(f"/verwaltung/benutzer/{neu['id']}/passwort", json={})
+        zurueck = await client.put(f"/verwaltung/benutzer/{neu['id']}/passwort")
 
         assert (await client.get(f"/verwaltung/benutzer/{neu['id']}")).json()[
             "passwort_wechseln"

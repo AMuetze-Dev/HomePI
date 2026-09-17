@@ -29,7 +29,6 @@ from .schemas import (
     KontoAngelegt,
     NeuerBenutzer,
     PasswortGesetzt,
-    PasswortSetzen,
     RechtSetzen,
     Ueberblick,
 )
@@ -88,16 +87,19 @@ async def liste(sitzung: DbSitzung) -> list[BenutzerAusgabe]:
 
 @router.post("/benutzer", status_code=status.HTTP_201_CREATED, summary="Konto anlegen")
 async def anlegen(daten: NeuerBenutzer, sitzung: DbSitzung) -> KontoAngelegt:
-    """Name genügt. Ohne Passwort entsteht ein Startpasswort.
+    """Name genügt. Das Startpasswort erzeugt der Dienst.
 
     Es steht **einmalig** in dieser Antwort - nicht in der Datenbank und in
     keiner weiteren Abfrage. Wer das Konto anlegt, gibt es weiter; der
     Benutzer ersetzt es beim ersten Anmelden.
 
+    Ein Passwort vorzugeben ist nicht möglich, und das ist keine Lücke,
+    sondern die Regel: was ein Verwalter tippt, kennt er auch.
+
     Ohne Rechte: was das Konto darf, wird danach einzeln vergeben - so steht
     die Entscheidung im Log und nicht in einer Voreinstellung.
     """
-    start = daten.passwort or neues_startpasswort()
+    start = neues_startpasswort()
     benutzer = await kern.lege_benutzer_an(
         sitzung, daten.name, start, daten.anzeigename, wechsel_erzwingen=True
     )
@@ -156,36 +158,36 @@ async def loeschen(benutzer_id: uuid.UUID, sitzung: DbSitzung, ich: AktuellerBen
 @router.put("/benutzer/{benutzer_id}/passwort", summary="Passwort zurücksetzen")
 async def passwort(
     benutzer_id: uuid.UUID,
-    daten: PasswortSetzen,
     request: Request,
     sitzung: DbSitzung,
-    ich: AktuellerBenutzer,
 ) -> PasswortGesetzt:
-    """Setzt ein neues Passwort. Ohne Angabe entsteht ein Startpasswort.
+    """Setzt ein erzeugtes Startpasswort. Ein eigenes lässt sich nicht vorgeben.
 
-    Am **fremden** Konto ist das Ergebnis immer ein Startpasswort: es muss
-    beim nächsten Anmelden ersetzt werden, denn ein Passwort, das ein
-    Verwalter kennt, soll nicht das bleibende sein. Am eigenen Konto nicht -
-    dort ist es schlicht das neue Passwort.
+    Der Endpunkt nimmt **keinen** Körper an. Ein Verwalter, der das Passwort
+    eines anderen tippt, kennt es danach - und Zugang zu einem fremden Konto
+    zu haben, ist genau das, was hier nicht entstehen soll. Er sieht das
+    erzeugte einmal, gibt es weiter, und der Benutzer ersetzt es beim
+    nächsten Anmelden.
 
-    Alle Sitzungen des Kontos enden dabei. Wer ein Passwort zurücksetzt, tut
-    das meist, weil etwas schiefging.
+    Dieselbe Regel am eigenen Konto: auch dort entsteht ein Startpasswort,
+    das anschließend zu ersetzen ist. Ein Passwort, das einmal auf einem
+    Bildschirm stand, ist keines zum Behalten.
+
+    Alle Sitzungen des Kontos enden dabei - die eigene laufende ausgenommen.
+    Wer ein Passwort zurücksetzt, tut das meist, weil etwas schiefging.
     """
     ziel = await speicher.finde(sitzung, benutzer_id)
-    fremd = ziel.id != ich.id
-    start = daten.passwort or neues_startpasswort()
+    start = neues_startpasswort()
 
     await speicher.setze_passwort(
         sitzung,
         ziel,
         start,
-        wechsel_erzwingen=fremd,
+        wechsel_erzwingen=True,
         laufendes_token=request.cookies.get(COOKIE),
     )
 
-    # Ein selbst getipptes Passwort gibt der Verwalter nicht zurueck - er
-    # kennt es. Zurueck kommt nur, was der Dienst erzeugt hat.
-    return PasswortGesetzt(startpasswort=start if daten.passwort is None else None)
+    return PasswortGesetzt(startpasswort=start)
 
 
 # --- Rechte ----------------------------------------------------------------
