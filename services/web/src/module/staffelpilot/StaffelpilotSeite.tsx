@@ -51,22 +51,19 @@ export function StaffelpilotSeite() {
   // gegen eine Fehlerseite austauschen.
   const [aktionsfehler, setAktionsfehler] = useState<string>("");
 
-  const laden = useCallback(
-    async (staffelId: string, signal?: AbortSignal) => {
-      try {
-        const [staffeln, spiele, uebersicht] = await Promise.all([
-          ladeStaffeln(signal),
-          ladeWarteschlange(staffelId || undefined, signal),
-          ladeZusammenfassung(signal),
-        ]);
-        setZustand({ phase: "fertig", daten: { staffeln, spiele, uebersicht } });
-      } catch (fehler) {
-        if (signal?.aborted) return;
-        setZustand({ phase: "fehler", nachricht: meldung(fehler) });
-      }
-    },
-    [],
-  );
+  const laden = useCallback(async (staffelId: string, signal?: AbortSignal) => {
+    try {
+      const [staffeln, spiele, uebersicht] = await Promise.all([
+        ladeStaffeln(signal),
+        ladeWarteschlange(staffelId || undefined, signal),
+        ladeZusammenfassung(signal),
+      ]);
+      setZustand({ phase: "fertig", daten: { staffeln, spiele, uebersicht } });
+    } catch (fehler) {
+      if (signal?.aborted) return;
+      setZustand({ phase: "fehler", nachricht: meldung(fehler) });
+    }
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -142,8 +139,8 @@ export function StaffelpilotSeite() {
 
       {staffeln.length === 0 ? (
         <Leerzustand titel="Noch keine Staffel angelegt">
-          Eine Staffel ist der Ort, an dem Spielberichte ankommen. Leg die erste an — Name und
-          Spielklasse genau so, wie sie in DFBnet heißen.
+          Eine Staffel ist der Ort, an dem Spielberichte ankommen. Leg die erste an — Name
+          und Spielklasse genau so, wie sie in DFBnet heißen.
         </Leerzustand>
       ) : (
         <>
@@ -160,8 +157,9 @@ export function StaffelpilotSeite() {
 
           {spiele.length === 0 ? (
             <Leerzustand titel="Keine Spielberichte">
-              Geprüfte Spielberichte kommen über <code>POST /staffelpilot/import</code> herein. Die
-              DFBnet-Automation läuft als eigener Dienst und schiebt sie dorthin.
+              Geprüfte Spielberichte kommen über <code>POST /staffelpilot/import</code>{" "}
+              herein. Die DFBnet-Automation läuft als eigener Dienst und schiebt sie
+              dorthin.
             </Leerzustand>
           ) : (
             <ul className={stil.liste} aria-label="Spielberichte">
@@ -187,7 +185,9 @@ export function StaffelpilotSeite() {
         </>
       )}
 
-      <StaffelAnlegen onAnlegen={(daten) => mitFehlerbehandlung(() => legeStaffelAn(daten))} />
+      <StaffelAnlegen
+        onAnlegen={(daten) => mitFehlerbehandlung(() => legeStaffelAn(daten))}
+      />
     </>
   );
 }
@@ -261,7 +261,12 @@ function SpielKarte({
 }) {
   return (
     <Karte>
-      <button type="button" className={stil.kopf} onClick={onOeffnen} aria-expanded={!!offen}>
+      <button
+        type="button"
+        className={stil.kopf}
+        onClick={onOeffnen}
+        aria-expanded={!!offen}
+      >
         <span className={stil.paarung}>
           {zeile.heim} – {zeile.gast}
         </span>
@@ -281,7 +286,9 @@ function SpielKarte({
       {offen && (
         <div className={stil.detail}>
           {offen.befunde.length === 0 ? (
-            <p className={stil.sauber}>Keine Befunde — alle Prüfschritte sind sauber gelaufen.</p>
+            <p className={stil.sauber}>
+              Keine Befunde — alle Prüfschritte sind sauber gelaufen.
+            </p>
           ) : (
             <ul className={stil.befunde} aria-label="Befunde">
               {offen.befunde.map((b) => (
@@ -335,7 +342,9 @@ function BefundZeile({
         </div>
         {befund.text && <p className={stil.befundText}>{befund.text}</p>}
         {(befund.person || befund.mannschaft) && (
-          <p className={stil.befundWer}>{[befund.person, befund.mannschaft].filter(Boolean).join(" · ")}</p>
+          <p className={stil.befundWer}>
+            {[befund.person, befund.mannschaft].filter(Boolean).join(" · ")}
+          </p>
         )}
 
         {befund.entscheidung === "offen" ? (
@@ -363,17 +372,28 @@ function BefundZeile({
                 <Knopf type="submit" auspraegung="primaer" groesse="sm">
                   Verwerfen
                 </Knopf>
-                <Knopf groesse="sm" auspraegung="leise" onClick={() => setFragtNachGrund(false)}>
+                <Knopf
+                  groesse="sm"
+                  auspraegung="leise"
+                  onClick={() => setFragtNachGrund(false)}
+                >
                   Abbrechen
                 </Knopf>
               </div>
             </form>
           ) : (
             <div className={stil.knoepfe}>
-              <Knopf groesse="sm" onClick={() => void onEntscheiden(befund.id, "kenntnis", "")}>
+              <Knopf
+                groesse="sm"
+                onClick={() => void onEntscheiden(befund.id, "kenntnis", "")}
+              >
                 Zur Kenntnis genommen
               </Knopf>
-              <Knopf groesse="sm" auspraegung="leise" onClick={() => setFragtNachGrund(true)}>
+              <Knopf
+                groesse="sm"
+                auspraegung="leise"
+                onClick={() => setFragtNachGrund(true)}
+              >
                 Kein Verstoß
               </Knopf>
             </div>

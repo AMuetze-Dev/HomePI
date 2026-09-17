@@ -133,7 +133,11 @@ describe("StaffelPilot — die vier Zustände", () => {
   });
 
   it("sagt ohne Staffel, was als Nächstes zu tun ist", async () => {
-    mitDaten([], [], uebersicht({ spiele: 0, offen: 0, befunde_offen: 0, befunde_kritisch: 0 }));
+    mitDaten(
+      [],
+      [],
+      uebersicht({ spiele: 0, offen: 0, befunde_offen: 0, befunde_kritisch: 0 }),
+    );
 
     render(<StaffelpilotSeite />);
 
@@ -165,7 +169,9 @@ describe("Ein Spielbericht", () => {
   it("klappt auf und zeigt seine Befunde", async () => {
     mitDaten();
     render(<StaffelpilotSeite />);
-    const kopf = await screen.findByRole("button", { name: /SG Gittersee – SV Fortschritt/ });
+    const kopf = await screen.findByRole("button", {
+      name: /SG Gittersee – SV Fortschritt/,
+    });
 
     await userEvent.click(kopf);
 
@@ -204,7 +210,9 @@ describe("Einen Befund entscheiden", () => {
     render(<StaffelpilotSeite />);
     await userEvent.click(await screen.findByRole("button", { name: /SG Gittersee/ }));
 
-    await userEvent.click(await screen.findByRole("button", { name: "Zur Kenntnis genommen" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Zur Kenntnis genommen" }),
+    );
 
     expect(api.entscheide).toHaveBeenCalledWith("b1", "kenntnis", "");
   });
@@ -232,7 +240,11 @@ describe("Einen Befund entscheiden", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Verwerfen" }));
 
-    expect(api.entscheide).toHaveBeenCalledWith("b1", "verworfen", "Spieler war spielberechtigt");
+    expect(api.entscheide).toHaveBeenCalledWith(
+      "b1",
+      "verworfen",
+      "Spieler war spielberechtigt",
+    );
   });
 
   it("behält die Eingabe, wenn das Verwerfen scheitert", async () => {
@@ -257,7 +269,9 @@ describe("Einen Befund entscheiden", () => {
   it("zeigt eine getroffene Entscheidung samt Grund", async () => {
     mitDaten();
     vi.spyOn(api, "ladeSpiel").mockResolvedValue(
-      spiel({ befunde: [befund({ entscheidung: "verworfen", grund: "war spielberechtigt" })] }),
+      spiel({
+        befunde: [befund({ entscheidung: "verworfen", grund: "war spielberechtigt" })],
+      }),
     );
     render(<StaffelpilotSeite />);
 
@@ -299,7 +313,10 @@ describe("Abhaken", () => {
   });
 
   it("löst den Haken wieder", async () => {
-    mitDaten([staffel()], [zeile({ abgehakt: true, offene_befunde: 0, kritische_befunde: 0 })]);
+    mitDaten(
+      [staffel()],
+      [zeile({ abgehakt: true, offene_befunde: 0, kritische_befunde: 0 })],
+    );
     render(<StaffelpilotSeite />);
     await userEvent.click(await screen.findByRole("button", { name: /SG Gittersee/ }));
 
@@ -315,8 +332,14 @@ describe("Staffeln", () => {
     render(<StaffelpilotSeite />);
     await screen.findByRole("heading", { name: "Staffel anlegen" });
 
-    await userEvent.type(screen.getByRole("textbox", { name: "Name" }), "Ü35 1. Stadtklasse");
-    await userEvent.type(screen.getByRole("textbox", { name: "Spielklasse" }), "1.Kreisklasse");
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Name" }),
+      "Ü35 1. Stadtklasse",
+    );
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Spielklasse" }),
+      "1.Kreisklasse",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
 
     expect(api.legeStaffelAn).toHaveBeenCalledWith({
@@ -325,7 +348,9 @@ describe("Staffeln", () => {
       spielklasse: "1.Kreisklasse",
       saison: "",
     });
-    await waitFor(() => expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue(""));
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue(""),
+    );
   });
 
   it("behält die Eingabe, wenn das Anlegen scheitert", async () => {
@@ -336,7 +361,10 @@ describe("Staffeln", () => {
     render(<StaffelpilotSeite />);
     await screen.findByRole("heading", { name: "Staffel anlegen" });
     await userEvent.type(screen.getByRole("textbox", { name: "Name" }), "Stadtliga C");
-    await userEvent.type(screen.getByRole("textbox", { name: "Spielklasse" }), "3.Kreisliga (C)");
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Spielklasse" }),
+      "3.Kreisliga (C)",
+    );
 
     await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
 
