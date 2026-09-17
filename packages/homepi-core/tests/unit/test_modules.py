@@ -10,7 +10,12 @@ from fastapi import APIRouter
 from httpx import ASGITransport, AsyncClient
 
 from homepi_core import Modul, ServiceSettings, create_service, register_aus
-from homepi_core.modules import DefektesModul, Modulregister, entdecke_module
+from homepi_core.modules import (
+    DefektesModul,
+    Modulregister,
+    entdecke_module,
+    gewuenschte_module,
+)
 
 
 def _modul(kennung: str, titel: str | None = None) -> Modul:
@@ -179,3 +184,73 @@ async def test_service_ohne_module_hat_keinen_modul_endpunkt() -> None:
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         assert (await c.get("/module")).status_code == 404
         assert (await c.get("/info")).json()["module"] == []
+
+
+# --- Auswahl beim Entwickeln ----------------------------------------------
+
+
+class TestAuswahl:
+    def test_ohne_variable_gilt_keine_einschraenkung(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("HOMEPI_MODULE", raising=False)
+
+        assert gewuenschte_module() is None
+
+    def test_leere_variable_zaehlt_wie_nicht_gesetzt(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Sonst wuerde ein versehentliches HOMEPI_MODULE= alle Module abschalten.
+        monkeypatch.setenv("HOMEPI_MODULE", "   ")
+
+        assert gewuenschte_module() is None
+
+    def test_liste_wird_zerlegt(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOMEPI_MODULE", " geraete , messwerte ,")
+
+        assert gewuenschte_module() == frozenset({"geraete", "messwerte"})
+
+    def test_nur_ausgewaehlte_werden_geladen(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOMEPI_MODULE", "geraete")
+        _mit_punkten(
+            monkeypatch,
+            _Punkt("geraete", _modul("geraete")),
+            _Punkt("messwerte", _modul("messwerte")),
+        )
+
+        assert entdecke_module().ids == ["geraete"]
+
+    def test_uebersprungene_werden_nicht_einmal_importiert(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Sonst spart die Auswahl keine Startzeit - genau dafuer ist sie da."""
+        geladen: list[str] = []
+
+        class _Zaehlend(_Punkt):
+            def load(self) -> object:
+                geladen.append(self.name)
+                return super().load()
+
+        monkeypatch.setenv("HOMEPI_MODULE", "geraete")
+        _mit_punkten(
+            monkeypatch,
+            _Zaehlend("geraete", _modul("geraete")),
+            _Zaehlend("messwerte", _modul("messwerte")),
+        )
+
+        entdecke_module()
+
+        assert geladen == ["geraete"]
+
+    def test_ein_kaputtes_modul_laesst_sich_ausblenden(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Der praktische Fall: ein Artefakt ist gerade kaputt und soll beim
+        Arbeiten am naechsten nicht im Weg stehen."""
+        monkeypatch.setenv("HOMEPI_MODULE", "geraete")
+        _mit_punkten(
+            monkeypatch,
+            _Punkt("geraete", _modul("geraete")),
+            _Punkt("kaputt", ImportError("kein pandas")),
+        )
+
+        register = entdecke_module()
+
+        assert register.ids == ["geraete"]
+        assert register.defekte == []

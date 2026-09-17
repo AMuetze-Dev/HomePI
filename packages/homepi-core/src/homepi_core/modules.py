@@ -32,6 +32,7 @@ nicht zu starten - siehe ``entdecke_module``.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -43,6 +44,9 @@ from fastapi import APIRouter
 log = logging.getLogger(__name__)
 
 GRUPPE = "homepi.module"
+
+#: Beschraenkt die Auswahl beim Entwickeln, z.B. HOMEPI_MODULE=geraete,messwerte
+AUSWAHL_VARIABLE = "HOMEPI_MODULE"
 
 #: Die Kennung landet in URLs, im Traefik-Pfad und im Frontend-Router.
 ID_MUSTER = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
@@ -122,16 +126,39 @@ class Modulregister:
         return sorted(eintraege, key=lambda e: str(e["titel"]).casefold())
 
 
+def gewuenschte_module() -> frozenset[str] | None:
+    """Die Auswahl aus HOMEPI_MODULE, oder None für alle.
+
+    Nur zum Entwickeln gedacht: mit zehn Artefakten dauert der Start des
+    Gateways spürbar, und beim Arbeiten an einem davon interessieren die
+    anderen neun nicht. In Produktion bleibt die Variable leer.
+    """
+    roh = os.environ.get(AUSWAHL_VARIABLE, "").strip()
+    if not roh:
+        return None
+    return frozenset(teil.strip() for teil in roh.split(",") if teil.strip())
+
+
 def entdecke_module(gruppe: str = GRUPPE) -> Modulregister:
     """Lädt alle angemeldeten Module.
 
     Ein Modul, das beim Laden wirft, wird übersprungen und vermerkt - sonst
     würde ein einziges fehlerhaftes Artefakt das gesamte Gateway blockieren.
+
+    ``HOMEPI_MODULE`` beschränkt die Auswahl beim Entwickeln.
     """
     register = Modulregister()
     gesehen: set[str] = set()
+    auswahl = gewuenschte_module()
+
+    if auswahl is not None:
+        log.warning("HOMEPI_MODULE ist gesetzt - es laufen nur: %s", ", ".join(sorted(auswahl)))
 
     for punkt in sorted(entry_points(group=gruppe), key=lambda p: p.name):
+        # Vor dem Laden filtern: ein uebersprungenes Modul soll auch nicht
+        # importiert werden, sonst spart die Auswahl keine Zeit.
+        if auswahl is not None and punkt.name not in auswahl:
+            continue
         try:
             geladen = punkt.load()
             modul = geladen() if callable(geladen) and not isinstance(geladen, Modul) else geladen

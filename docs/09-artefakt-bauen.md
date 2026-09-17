@@ -105,6 +105,34 @@ Braucht das Artefakt keine eigene Oberfläche, `--no-web` benutzen — die
 generische Ansicht liest die Endpunkte aus dem Schema und ist damit immer
 aktuell.
 
+## An einem einzelnen Artefakt arbeiten
+
+Mit wachsender Zahl an Artefakten will man nicht mehr alles laufen lassen.
+Drei Ebenen lassen sich einzeln ansprechen:
+
+```bash
+make modul N=messwerte        # wo liegen die beiden Hälften?
+make dev N=messwerte          # Gateway lädt NUR dieses Artefakt
+make tdd-api P=modules/messwerte
+make tdd-web N=messwerte      # vitest nur für dessen Oberfläche
+make test-modul N=messwerte   # beide Hälften vollständig prüfen
+```
+
+`make dev N=…` setzt `HOMEPI_MODULE`. Die Auswahl greift **vor** dem Import:
+ein übersprungenes Artefakt wird nicht geladen, sonst spart sie keine
+Startzeit — und genau dafür ist sie da.
+
+Zwei Nebenwirkungen, die im Alltag nützlich sind:
+
+- Ein Artefakt, das gerade kaputt ist, steht beim Arbeiten am nächsten nicht
+  im Weg. Es erscheint dann auch nicht als `status: "fehler"` — es ist
+  schlicht nicht dabei.
+- Die Startseite zeigt nur die ausgewählte Kachel. Das ist beim Entwickeln
+  gewollt und in Produktion falsch, deshalb bleibt die Variable dort leer.
+
+Das Gateway schreibt beim Start eine Warnung ins Log, solange die Auswahl
+aktiv ist — sonst sucht man irgendwann, warum eine Kachel fehlt.
+
 ## Abnahme
 
 ```bash

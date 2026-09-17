@@ -137,9 +137,28 @@ test-web:
 tdd-api:
 	cd $(or $(P),modules/geraete) && uv run ptw . --now
 
-## tdd-web: vitest im Watch-Modus
+## tdd-web: vitest im Watch-Modus; mit N=<modul> nur dessen Oberflaeche
 tdd-web:
-	cd $(WEB) && npm run test:watch
+	cd $(WEB) && npm run test:watch -- $(if $(N),src/module/$(N),)
+
+## modul: zeigt beide Haelften eines Artefakts, z.B. make modul N=geraete
+modul:
+	@test -n "$(N)" || { echo "Aufruf: make modul N=<name>"; exit 1; }
+	@echo "Backend   modules/$(N)/"
+	@ls modules/$(N)/src/homepi_*/ 2>/dev/null | sed 's/^/            /' || echo "            fehlt"
+	@echo "Frontend  $(WEB)/src/module/$(N)/"
+	@ls $(WEB)/src/module/$(N)/ 2>/dev/null | sed 's/^/            /' || echo "            keine eigene Oberflaeche"
+	@echo "Register  $$(grep -c '\"$(N)\"' $(WEB)/src/module/register.ts) Eintrag/Eintraege"
+
+## test-modul: ein Artefakt vollstaendig pruefen, beide Haelften
+test-modul:
+	@test -n "$(N)" || { echo "Aufruf: make test-modul N=<name>"; exit 1; }
+	cd modules/$(N) && uv run ruff format --check .
+	cd modules/$(N) && uv run ruff check .
+	cd modules/$(N) && uv run mypy
+	cd modules/$(N) && DATABASE_URL=$(TESTDB) uv run pytest -m 'not smoke' --cov
+	@test -d $(WEB)/src/module/$(N) || { echo "(keine eigene Oberflaeche)"; exit 0; }
+	cd $(WEB) && npx vitest run src/module/$(N)
 
 ## fmt: Quellcode formatieren und automatisch behebbare Funde beheben
 fmt:
@@ -159,9 +178,10 @@ artefakt:
 	@test -n "$(N)" || { echo "Aufruf: make artefakt N=<name> [T=\"Titel\"]"; exit 1; }
 	uv run --project packages/homepi-core homepi new $(N) $(if $(T),--titel "$(T)",)
 
-## dev: lokale Umgebung starten (Frontend 5173, API 18000, DB 15432)
+## dev: lokale Umgebung starten; mit N=<modul> nur dieses Artefakt laden
 dev:
-	$(DEV) up -d --build
+	HOMEPI_MODULE=$(N) $(DEV) up -d --build
+	@test -z "$(N)" || echo "  Nur geladen: $(N)"
 	@echo
 	@echo "  Frontend  http://localhost:5173"
 	@echo "  API       http://localhost:18000/docs"
