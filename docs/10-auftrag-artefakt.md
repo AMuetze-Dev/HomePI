@@ -211,7 +211,9 @@ Vier Regeln, alle schon einmal teuer gewesen:
    `/zusammenfassung` als UUID und antwortet `422`.
 3. Rückgabetypen annotieren, sonst fehlt das OpenAPI-Schema.
 4. Datenbank über `DbSitzung` aus `homepi_core.deps` — eine Transaktion je
-   Anfrage, Commit am Ende, Rollback bei Fehler.
+   Anfrage, Commit am Ende, Rollback bei Fehler. **Nie selbst committen** und
+   die Sitzung nicht selbst aufbauen: `DbSitzung` ist mit `scope="function"`
+   verdrahtet, damit der Commit vor der Antwort liegt und nicht dahinter.
 
 ### 4.5 Oberfläche — `api.ts`, `<Kennung>Seite.tsx`
 

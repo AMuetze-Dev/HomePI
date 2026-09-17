@@ -10,7 +10,9 @@ readme = "README.md"
 # und kein Click herein.
 dependencies = [
     "pydantic-settings>=2.6",
-    "fastapi>=0.115",
+    # Ab 0.116: Depends(..., scope="function"). Ohne das committet die
+    # Datenbanksitzung erst nach der Antwort - siehe deps.py.
+    "fastapi>=0.116.1",
     "uvicorn[standard]>=0.34",
     "sqlalchemy[asyncio]>=2.0",
     "asyncpg>=0.30",

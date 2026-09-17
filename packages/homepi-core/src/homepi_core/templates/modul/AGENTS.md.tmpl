@@ -21,7 +21,7 @@ Nicht neu bauen, nicht umbauen:
 | Health | `/health` und `/info` kommen aus `homepi-core` |
 | Fehlerformat | Jeder Fehler wird RFC 9457 `problem+json`. Eigene Fehler erben von `ServiceError` |
 | Logging | JSON in Produktion, Text lokal, `X-Request-ID` in jeder Zeile |
-| DB-Sitzung | `DbSitzung` aus `homepi_core.deps` — eine Transaktion je Anfrage |
+| DB-Sitzung | `DbSitzung` aus `homepi_core.deps` — eine Transaktion je Anfrage. Committet **vor** der Antwort; nie selbst committen |
 | Tabellen | erben von `homepi_core.Base`; das Gateway legt sie beim Start an |
 
 **Du schreibst nie selbst:** FastAPI-App, CORS, Middleware, Health-Endpunkt,

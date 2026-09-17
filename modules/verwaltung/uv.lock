@@ -517,7 +517,7 @@ dependencies = [
 requires-dist = [
     { name = "argon2-cffi", specifier = ">=25.1.0" },
     { name = "asyncpg", specifier = ">=0.30" },
-    { name = "fastapi", specifier = ">=0.115" },
+    { name = "fastapi", specifier = ">=0.116.1" },
     { name = "httpx", marker = "extra == 'test'", specifier = ">=0.28" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3" },
