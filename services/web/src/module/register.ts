@@ -1,5 +1,6 @@
 import { GeraeteSeite } from "./geraete/GeraeteSeite";
 import type { ModulOberflaeche } from "./typen";
+import { StaffelpilotSeite } from "./staffelpilot/StaffelpilotSeite";
 import { VerwaltungSeite } from "./verwaltung/VerwaltungSeite";
 
 /**
@@ -15,6 +16,7 @@ import { VerwaltungSeite } from "./verwaltung/VerwaltungSeite";
  * dem Manifest des Gateways und erscheinen ohne Frontend-Änderung.
  */
 export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
+  { id: "staffelpilot", Komponente: StaffelpilotSeite },
   { id: "geraete", Komponente: GeraeteSeite },
   { id: "verwaltung", Komponente: VerwaltungSeite },
 ];

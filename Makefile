@@ -134,7 +134,7 @@ test-infra: render verify lint-ci
 
 ## test-python: Format, Lint, Typen und Tests aller drei Python-Projekte
 test-python:
-	@for p in packages/homepi-core modules/geraete modules/verwaltung services/gateway; do 		echo "=== $$p"; 		( cd $$p 		  && uv run ruff format --check . 		  && uv run ruff check . 		  && uv run mypy 		  && HOMEPI_TEST_DATABASE_URL=$(TESTDB) uv run pytest -m 'not smoke' --cov --cov-report=term ) 		|| exit 1; 	done
+	@for p in packages/homepi-core modules/geraete modules/staffelpilot modules/verwaltung services/gateway; do 		echo "=== $$p"; 		( cd $$p 		  && uv run ruff format --check . 		  && uv run ruff check . 		  && uv run mypy 		  && HOMEPI_TEST_DATABASE_URL=$(TESTDB) uv run pytest -m 'not smoke' --cov --cov-report=term ) 		|| exit 1; 	done
 
 ## test-web: Format, Lint, Typen und Tests des Frontends
 test-web:
@@ -172,12 +172,12 @@ test-modul:
 
 ## fmt: Quellcode formatieren und automatisch behebbare Funde beheben
 fmt:
-	@for p in packages/homepi-core modules/geraete modules/verwaltung services/gateway; do 		( cd $$p && uv run ruff format . && uv run ruff check --fix . ); 	done
+	@for p in packages/homepi-core modules/geraete modules/staffelpilot modules/verwaltung services/gateway; do 		( cd $$p && uv run ruff format . && uv run ruff check --fix . ); 	done
 	cd $(WEB) && npm run format && npm run lint:fix
 
 ## install: Entwicklungsabhaengigkeiten aller Projekte einrichten
 install:
-	@for p in packages/homepi-core modules/geraete modules/verwaltung services/gateway; do 		echo "=== $$p"; ( cd $$p && uv sync --all-extras ) || exit 1; 	done
+	@for p in packages/homepi-core modules/geraete modules/staffelpilot modules/verwaltung services/gateway; do 		echo "=== $$p"; ( cd $$p && uv sync --all-extras ) || exit 1; 	done
 	cd $(WEB) && npm ci
 
 # ---------------------------------------------------------------- Entwicklung (lokal)
