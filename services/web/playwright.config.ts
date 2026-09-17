@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { BASIS_URL } from "./e2e/umgebung";
+
 /**
  * Oberflächentests gegen eine **laufende** Instanz.
  *
@@ -16,6 +18,9 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
+  // Prueft vorweg, dass die Installation frisch ist. Ohne das koennte ein
+  // falsch gesetztes E2E_URL die Konten treffen, mit denen jemand arbeitet.
+  globalSetup: "./e2e/wache.ts",
   // Sie teilen sich eine Datenbank und bauen aufeinander auf.
   fullyParallel: false,
   workers: 1,
@@ -26,7 +31,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
 
   use: {
-    baseURL: process.env.E2E_URL ?? "http://127.0.0.1:5273",
+    baseURL: BASIS_URL,
     // Beim Fehlschlag: Spur und Bild. Ein roter Oberflächentest ohne beides
     // kostet mehr Zeit, als er spart.
     trace: "retain-on-failure",
