@@ -37,6 +37,19 @@ export function Start() {
     return () => controller.abort();
   }, [anmeldung, benutzerId]);
 
+  // Solange das Manifest unterwegs ist, steht noch nicht fest, ob diese Seite
+  // eine Übersicht wird oder ein Anmeldeformular. Deshalb hier nur ein
+  // neutraler Platzhalter: eine Überschrift "Übersicht", die einen Wimpernschlag
+  // später vom Anmeldeformular abgelöst wird, ist schlechter als gar keine.
+  if (anmeldung === "laedt" || zustand.phase === "laedt") {
+    return (
+      <div className={stil.laden} role="status" aria-label="Wird geladen">
+        <Platzhalter breite="12rem" hoehe="2rem" />
+        <Ladegitter />
+      </div>
+    );
+  }
+
   // Nichts zu sehen und niemand angemeldet: dann ist die Anmeldung das, was
   // hier hingehört - und nicht der Hinweis, es sei kein Artefakt vorhanden.
   if (
@@ -67,8 +80,6 @@ export function Start() {
             <span className={stil.anzahl}>{zustand.module.length}</span>
           )}
         </div>
-
-        {zustand.phase === "laedt" && <Ladegitter />}
 
         {zustand.phase === "fehler" && (
           <Leerzustand titel="Manifest nicht abrufbar">

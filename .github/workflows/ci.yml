@@ -127,8 +127,22 @@ jobs:
         # Faengt Tippfehler in den Workflows, bevor sie einen Lauf kosten.
         # Achtung: bei einer Matrix aus fromJSON kennt actionlint die
         # Schluessel nicht - ein falscher matrix.<name> bleibt unentdeckt.
+        #
+        # Feste Version statt :latest - eine neue Fassung soll den Lauf nicht
+        # ueberraschend rot faerben. Zwei Versuche, weil ein Pull von Docker
+        # Hub gelegentlich scheitert (exit 125) und das mit dem Inhalt der
+        # Workflows nichts zu tun hat.
         run: |
-          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
+          for versuch in 1 2 3; do
+            docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color && exit 0
+            code=$?
+            # 125 heisst: der Container ist gar nicht erst gestartet. Alles
+            # andere ist ein echter Befund und soll sofort rot sein.
+            [ "$code" = "125" ] || exit "$code"
+            echo "::warning::actionlint liess sich nicht starten (Versuch $versuch)"
+            sleep 10
+          done
+          exit 1
 
       - name: Compose-Dateien validieren
         run: |
