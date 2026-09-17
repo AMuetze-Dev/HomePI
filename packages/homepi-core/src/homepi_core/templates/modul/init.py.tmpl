@@ -1,0 +1,21 @@
+"""HomePI-Artefakt: {{titel}}."""
+
+from homepi_core import Modul
+
+from .router import router
+
+__version__ = "0.1.0"
+
+#: Der Entry Point in pyproject.toml zeigt hierauf. Mehr braucht das Gateway
+#: nicht, um das Artefakt unter /{{service}} einzuhaengen und auf der
+#: Startseite als Kachel anzuzeigen.
+modul = Modul(
+    id="{{service}}",
+    titel="{{titel}}",
+    router=router,
+    beschreibung="{{beschreibung}}",
+    icon="kachel",
+    version=__version__,
+)
+
+__all__ = ["__version__", "modul", "router"]

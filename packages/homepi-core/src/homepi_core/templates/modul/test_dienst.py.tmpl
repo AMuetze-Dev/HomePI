@@ -1,0 +1,21 @@
+"""Reine Fachlogik - keine Datenbank, keine Fixtures, Millisekunden.
+
+Hier entsteht der Grossteil der Tests. Faengt ein Test hier an, eine Datenbank
+zu brauchen, gehoert die Logik nicht mehr in dienst.py.
+"""
+
+from __future__ import annotations
+
+from homepi_{{modul}}.dienst import normalisiere
+
+
+def test_mehrfache_leerzeichen_werden_zusammengefasst() -> None:
+    assert normalisiere("Zwei   Woerter") == "Zwei Woerter"
+
+
+def test_raender_werden_getrimmt() -> None:
+    assert normalisiere("  Rand  ") == "Rand"
+
+
+# TODO: Ab hier die echten Regeln des Artefakts. Rot zuerst:
+# erst den Test schreiben und scheitern sehen, dann dienst.py ergaenzen.

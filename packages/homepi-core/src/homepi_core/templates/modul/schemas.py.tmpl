@@ -1,0 +1,37 @@
+"""Der Vertrag nach aussen.
+
+Was hier steht, landet im OpenAPI-Schema - und damit in der generischen
+Ansicht des Frontends und in jedem erzeugten Client. Aenderungen hier sind
+Aenderungen an der Schnittstelle.
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# Ein Name aus Leerzeichen ist kein Name. min_length greift erst nach dem
+# Trimmen - deshalb der Validator, nicht nur die Laengenangabe.
+NameFeld = Annotated[str, Field(min_length=1, max_length=100)]
+
+
+class EintragAnlegen(BaseModel):
+    """TODO: durch die echten Eingabefelder ersetzen."""
+
+    name: NameFeld
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return wert.strip() if isinstance(wert, str) else wert
+
+
+class EintragAusgabe(BaseModel):
+    """TODO: durch die echte Ausgabe ersetzen."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str

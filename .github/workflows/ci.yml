@@ -26,6 +26,7 @@ jobs:
       web: ${{ steps.filter.outputs.web }}
       infra: ${{ steps.filter.outputs.infra }}
       python: ${{ steps.filter.outputs.python }}
+      projekte: ${{ steps.projekte.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -52,6 +53,28 @@ jobs:
               - 'Makefile'
               - '.env.example'
               - '.github/workflows/ci.yml'
+
+      # Die Python-Projekte werden gesucht, nicht aufgezaehlt: ein neues
+      # Artefakt unter modules/ soll geprueft werden, ohne dass jemand daran
+      # denkt, es hier nachzutragen.
+      - name: Python-Projekte finden
+        id: projekte
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, pathlib
+
+          projekte = []
+          for pyproject in sorted(pathlib.Path().glob("packages/*/pyproject.toml"))                          + sorted(pathlib.Path().glob("modules/*/pyproject.toml"))                          + [pathlib.Path("services/gateway/pyproject.toml")]:
+              verzeichnis = pyproject.parent
+              pakete = [p.name for p in (verzeichnis / "src").glob("homepi_*") if p.is_dir()]
+              if not pakete:
+                  continue
+              projekte.append(
+                  {"name": verzeichnis.name, "pfad": str(verzeichnis).replace("\\", "/"), "paket": pakete[0]}
+              )
+
+          print("matrix=" + json.dumps(projekte))
+          PY
 
   # -------------------------------------------------------------------------
   infra:
@@ -118,23 +141,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: homepi-core
-            pfad: packages/homepi-core
-            paket: homepi_core
-            mindest_coverage: 80
-          - name: geraete
-            pfad: modules/geraete
-            paket: homepi_geraete
-            mindest_coverage: 85
-          - name: gateway
-            pfad: services/gateway
-            paket: homepi_gateway
-            mindest_coverage: 90
+        projekt: ${{ fromJSON(needs.changes.outputs.projekte) }}
 
     defaults:
       run:
-        working-directory: ${{ matrix.pfad }}
+        working-directory: ${{ matrix.projekt.pfad }}
 
     services:
       postgres:
@@ -159,7 +170,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          cache-dependency-glob: ${{ matrix.pfad }}/uv.lock
+          cache-dependency-glob: ${{ matrix.projekt.pfad }}/uv.lock
 
       - run: uv sync --frozen --all-extras
 
@@ -186,10 +197,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: testbericht-${{ matrix.name }}
+          name: testbericht-${{ matrix.projekt.name }}
           path: |
-            ${{ matrix.pfad }}/junit.xml
-            ${{ matrix.pfad }}/coverage.xml
+            ${{ matrix.projekt.pfad }}/junit.xml
+            ${{ matrix.projekt.pfad }}/coverage.xml
           retention-days: 7
 
   # -------------------------------------------------------------------------

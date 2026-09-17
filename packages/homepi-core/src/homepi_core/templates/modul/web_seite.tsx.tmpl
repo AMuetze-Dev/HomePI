@@ -1,0 +1,172 @@
+import { useCallback, useEffect, useState } from "react";
+
+import { Feld, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import { entferneEintrag, ladeEintraege, legeEintragAn, type Eintrag } from "./api";
+import stil from "./{{Klasse}}Seite.module.css";
+
+type Zustand =
+  | { phase: "laedt" }
+  | { phase: "fertig"; eintraege: Eintrag[] }
+  | { phase: "fehler"; nachricht: string };
+
+function meldung(fehler: unknown): string {
+  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
+}
+
+export function {{Klasse}}Seite() {
+  const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
+  // Getrennt vom Ladezustand: ein Fehler beim Anlegen darf die Liste nicht
+  // gegen eine Fehlerseite austauschen.
+  const [aktionsfehler, setAktionsfehler] = useState("");
+
+  const laden = useCallback(async (signal?: AbortSignal) => {
+    try {
+      setZustand({ phase: "fertig", eintraege: await ladeEintraege(signal) });
+    } catch (fehler) {
+      if (signal?.aborted) return;
+      setZustand({ phase: "fehler", nachricht: meldung(fehler) });
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void laden(controller.signal);
+    return () => controller.abort();
+  }, [laden]);
+
+  /** true, wenn die Aktion geklappt hat - der Aufrufer braucht das, um zu
+   *  entscheiden, ob er sein Formular leeren darf. */
+  async function mitFehlerbehandlung(aktion: () => Promise<unknown>): Promise<boolean> {
+    setAktionsfehler("");
+    try {
+      await aktion();
+      await laden();
+      return true;
+    } catch (fehler) {
+      setAktionsfehler(meldung(fehler));
+      return false;
+    }
+  }
+
+  if (zustand.phase === "laedt") {
+    return (
+      <div role="status" aria-label="Wird geladen">
+        <Platzhalter breite="100%" hoehe="10rem" />
+      </div>
+    );
+  }
+
+  if (zustand.phase === "fehler") {
+    return (
+      <Hinweis ton="fehler" dringend>
+        {zustand.nachricht}
+      </Hinweis>
+    );
+  }
+
+  return (
+    <>
+      {aktionsfehler && (
+        <Hinweis ton="fehler" dringend>
+          {aktionsfehler}
+        </Hinweis>
+      )}
+
+      <Liste
+        eintraege={zustand.eintraege}
+        onEntfernen={(e) => void mitFehlerbehandlung(() => entferneEintrag(e.id))}
+      />
+
+      <Anlegen onAnlegen={(daten) => mitFehlerbehandlung(() => legeEintragAn(daten))} />
+    </>
+  );
+}
+
+function Liste({
+  eintraege,
+  onEntfernen,
+}: {
+  eintraege: Eintrag[];
+  onEntfernen: (e: Eintrag) => void;
+}) {
+  if (eintraege.length === 0) {
+    // Der Erstzustand ist der erste Eindruck. Eine leere Fläche ohne
+    // Erklärung lässt ratlos zurück.
+    return (
+      <Leerzustand titel="Noch nichts angelegt">
+        Trage unten den ersten Eintrag ein.
+      </Leerzustand>
+    );
+  }
+
+  return (
+    <Karte blank>
+      <ul className={stil.liste}>
+        {eintraege.map((eintrag) => (
+          <li key={eintrag.id} className={stil.zeile}>
+            <span className={stil.name}>{eintrag.name}</span>
+            <Knopf
+              groesse="sm"
+              auspraegung="leise"
+              onClick={() => onEntfernen(eintrag)}
+              aria-label={`${eintrag.name} entfernen`}
+            >
+              Entfernen
+            </Knopf>
+          </li>
+        ))}
+      </ul>
+    </Karte>
+  );
+}
+
+function Anlegen({
+  onAnlegen,
+}: {
+  onAnlegen: (daten: { name: string }) => Promise<boolean>;
+}) {
+  const [name, setName] = useState("");
+  const [laeuft, setLaeuft] = useState(false);
+
+  const vollstaendig = name.trim() !== "";
+
+  async function absenden(ereignis: React.FormEvent) {
+    ereignis.preventDefault();
+    if (!vollstaendig || laeuft) return;
+
+    setLaeuft(true);
+    const geklappt = await onAnlegen({ name: name.trim() });
+    setLaeuft(false);
+
+    // Nur leeren, wenn es geklappt hat - sonst tippt man alles neu.
+    if (geklappt) setName("");
+  }
+
+  return (
+    <section aria-labelledby="anlegen">
+      <h2 id="anlegen" className={stil.abschnittstitel}>
+        Eintrag anlegen
+      </h2>
+
+      <Karte>
+        <form onSubmit={(e) => void absenden(e)} className={stil.formular}>
+          <Feld
+            beschriftung="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoComplete="off"
+            required
+          />
+          <Knopf
+            type="submit"
+            auspraegung="primaer"
+            disabled={!vollstaendig || laeuft}
+            className={stil.absenden}
+          >
+            {laeuft ? "Wird angelegt …" : "Anlegen"}
+          </Knopf>
+        </form>
+      </Karte>
+    </section>
+  );
+}

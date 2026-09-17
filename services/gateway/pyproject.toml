@@ -47,6 +47,11 @@ markers = [
     "smoke: spricht mit einer laufenden Instanz",
 ]
 
+# Die Schwelle steht beim Projekt, nicht in der CI - so gilt sie auch
+# lokal und muss beim Anlegen eines Artefakts nirgends nachgetragen werden.
+[tool.coverage.report]
+fail_under = 90
+
 [tool.coverage.run]
 source = ["homepi_gateway"]
 branch = true

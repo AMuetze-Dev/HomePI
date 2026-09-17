@@ -1,0 +1,90 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ApiError } from "../../api/client";
+import * as api from "./api";
+import { {{Klasse}}Seite } from "./{{Klasse}}Seite";
+
+function eintrag(rest: Partial<api.Eintrag> = {}): api.Eintrag {
+  return { id: "1", name: "Erster", ...rest };
+}
+
+beforeEach(() => {
+  vi.spyOn(api, "legeEintragAn").mockResolvedValue(eintrag());
+  vi.spyOn(api, "entferneEintrag").mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("{{titel}}", () => {
+  it("zeigt zuerst einen Ladehinweis", () => {
+    vi.spyOn(api, "ladeEintraege").mockReturnValue(new Promise(() => {}));
+
+    render(<{{Klasse}}Seite />);
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
+  });
+
+  it("sagt im Erstzustand, was zu tun ist", async () => {
+    vi.spyOn(api, "ladeEintraege").mockResolvedValue([]);
+
+    render(<{{Klasse}}Seite />);
+
+    expect(await screen.findByText(/Noch nichts angelegt/)).toBeInTheDocument();
+  });
+
+  it("zeigt die Einträge", async () => {
+    vi.spyOn(api, "ladeEintraege").mockResolvedValue([eintrag()]);
+
+    render(<{{Klasse}}Seite />);
+
+    expect(await screen.findByText("Erster")).toBeInTheDocument();
+  });
+
+  it("legt an und leert danach das Formular", async () => {
+    vi.spyOn(api, "ladeEintraege").mockResolvedValue([]);
+    render(<{{Klasse}}Seite />);
+
+    await userEvent.type(await screen.findByLabelText("Name"), "Neuer");
+    await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
+
+    expect(api.legeEintragAn).toHaveBeenCalledWith({ name: "Neuer" });
+    expect(screen.getByLabelText("Name")).toHaveValue("");
+  });
+
+  it("behält die Eingabe, wenn das Anlegen fehlschlägt", async () => {
+    // Sonst tippt man nach einem doppelten Namen alles neu.
+    vi.spyOn(api, "ladeEintraege").mockResolvedValue([]);
+    vi.spyOn(api, "legeEintragAn").mockRejectedValue(
+      new ApiError("'Neuer' existiert bereits", 409),
+    );
+    render(<{{Klasse}}Seite />);
+
+    await userEvent.type(await screen.findByLabelText("Name"), "Neuer");
+    await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/existiert bereits/);
+    expect(screen.getByLabelText("Name")).toHaveValue("Neuer");
+  });
+
+  it("zeigt die Meldung des Backends, nicht nur den Statuscode", async () => {
+    vi.spyOn(api, "ladeEintraege").mockResolvedValue([eintrag()]);
+    vi.spyOn(api, "entferneEintrag").mockRejectedValue(new ApiError("Geht nicht", 500));
+    render(<{{Klasse}}Seite />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /entfernen/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Geht nicht");
+  });
+
+  it("meldet, wenn die Liste gar nicht geladen werden kann", async () => {
+    vi.spyOn(api, "ladeEintraege").mockRejectedValue(new ApiError("Gateway weg", 503));
+
+    render(<{{Klasse}}Seite />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Gateway weg");
+  });
+});

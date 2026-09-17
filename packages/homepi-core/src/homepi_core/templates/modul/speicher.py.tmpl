@@ -1,0 +1,48 @@
+"""Datenbankzugriff. Hier faellt I/O an, hier stehen keine Entscheidungen.
+
+Kein einziges if, das eine Fachregel abbildet - solche gehoeren in dienst.py.
+Erlaubt sind nur Pruefungen, die die Datenbank selbst beantwortet, etwa ob ein
+Datensatz existiert.
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from .dienst import EintragUnbekannt, NameVergeben
+from .modelle import Eintrag
+from .schemas import EintragAnlegen
+
+
+async def alle(sitzung: AsyncSession) -> list[Eintrag]:
+    ergebnis = await sitzung.execute(select(Eintrag).order_by(Eintrag.name))
+    return list(ergebnis.scalars())
+
+
+async def eines(sitzung: AsyncSession, eintrag_id: uuid.UUID) -> Eintrag:
+    eintrag = await sitzung.get(Eintrag, eintrag_id)
+    if eintrag is None:
+        raise EintragUnbekannt(f"Es gibt keinen Eintrag mit der Kennung {eintrag_id}")
+    return eintrag
+
+
+async def anlegen(sitzung: AsyncSession, daten: EintragAnlegen) -> Eintrag:
+    eintrag = Eintrag(**daten.model_dump())
+    sitzung.add(eintrag)
+    try:
+        await sitzung.flush()
+    except IntegrityError as fehler:
+        await sitzung.rollback()
+        # Die Datenbank ist die einzige Stelle, die das zuverlaessig weiss -
+        # eine Vorabpruefung waere ein Rennen zwischen zwei Anfragen.
+        raise NameVergeben(f"'{daten.name}' existiert bereits") from fehler
+    await sitzung.refresh(eintrag)
+    return eintrag
+
+
+async def loeschen(sitzung: AsyncSession, eintrag_id: uuid.UUID) -> None:
+    await sitzung.delete(await eines(sitzung, eintrag_id))
