@@ -70,6 +70,7 @@ def create_service(
     settings: ServiceSettings,
     *,
     module: Modulregister | None = None,
+    anmeldung: bool = False,
     on_startup: Callable[[ServiceContext], AsyncIterator[None]] | None = None,
     **fastapi_kwargs: object,
 ) -> FastAPI:
@@ -136,6 +137,18 @@ def create_service(
 
     install_error_handlers(app)
     _install_standard_routen(app, kontext)
+
+    if anmeldung:
+        if kontext.db is None:
+            raise RuntimeError(
+                "anmeldung=True braucht eine DATABASE_URL - Benutzer und "
+                "Sitzungen liegen in der Datenbank."
+            )
+        # Erst hier importieren: ein Service ohne Anmeldung soll weder
+        # argon2 noch die Auth-Tabellen laden.
+        from .auth import router as auth_router
+
+        app.include_router(auth_router, prefix="/auth")
 
     if module is not None:
         _mounte_module(app, module)

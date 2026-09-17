@@ -1,0 +1,71 @@
+"""Dependencies fuer Endpunkte, die eine Anmeldung voraussetzen.
+
+from homepi_core.auth import AktuellerBenutzer, erfordert
+
+@router.get("/")
+async def liste(benutzer: AktuellerBenutzer) -> list[X]: ...
+
+@router.delete("/{id}", dependencies=[erfordert("staffelpilot", Rolle.VERWALTER)])
+async def entfernen(...) -> None: ...
+"""
+
+from __future__ import annotations
+
+from typing import Annotated, cast
+
+from fastapi import Depends, Request, Response
+from fastapi.params import Depends as Abhaengigkeit
+
+from ..deps import DbSitzung, hole_einstellungen
+from . import cookies, speicher
+from .dienst import NichtAngemeldet, Rolle, ZugriffVerweigert, darf, pruefe_sitzung
+from .modelle import Benutzer
+
+
+async def hole_benutzer(request: Request, antwort: Response, sitzung: DbSitzung) -> Benutzer:
+    token = request.cookies.get(cookies.NAME)
+    if not token:
+        raise NichtAngemeldet("Für diese Seite ist eine Anmeldung nötig")
+
+    eintrag = await speicher.finde_sitzung(sitzung, token)
+    if eintrag is None:
+        # Cookie ist da, Sitzung nicht - meist abgemeldet oder aufgeraeumt.
+        cookies.loesche(antwort)
+        raise NichtAngemeldet("Die Sitzung ist nicht mehr gültig")
+
+    pruefung = pruefe_sitzung(eintrag.laeuft_ab)
+    if not pruefung.gueltig:
+        cookies.loesche(antwort)
+        raise NichtAngemeldet(pruefung.grund)
+
+    if pruefung.verlaengern:
+        await speicher.verlaengere(sitzung, eintrag)
+        cookies.setze(antwort, token, hole_einstellungen(request))
+
+    if not eintrag.benutzer.aktiv:
+        raise NichtAngemeldet("Dieses Konto ist deaktiviert")
+
+    return eintrag.benutzer
+
+
+AktuellerBenutzer = Annotated[Benutzer, Depends(hole_benutzer)]
+
+
+def erfordert(artefakt: str, rolle: Rolle) -> Abhaengigkeit:
+    """Prueft die Rolle fuer genau dieses Artefakt.
+
+    Es gibt keinen globalen Administrator: wer StaffelPilot verwaltet, hat
+    damit keinerlei Zugriff auf die Geraete im Haus.
+    """
+
+    async def pruefer(benutzer: AktuellerBenutzer) -> None:
+        if not darf(speicher.rechte_von(benutzer), artefakt, rolle):
+            raise ZugriffVerweigert(
+                f"Für '{artefakt}' fehlt die Rolle '{rolle.value}'",
+                artefakt=artefakt,
+                benoetigt=rolle.value,
+            )
+
+    # FastAPIs Depends ist als Any typisiert; der konkrete Rueckgabetyp ist
+    # fastapi.params.Depends.
+    return cast(Abhaengigkeit, Depends(pruefer))
