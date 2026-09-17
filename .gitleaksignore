@@ -1,0 +1,13 @@
+# Falsche Alarme von gitleaks, einzeln begründet.
+#
+# Jeder Eintrag ist ein Fingerabdruck aus Commit, Datei, Regel und Zeile - er
+# kann also nur genau diesen einen Fund stillstellen und keinen künftigen.
+# Wer hier etwas einträgt, schreibt dazu, warum es keines ist.
+
+# Der Rauchtest prüft, ob die Ersteinrichtung zu ist, und legt dafür ein
+# erfundenes Einrichtungstoken vor. Im Quelltext stand das als
+# {"token": "gibt-es-nicht-4711"} - ein Muster, bei dem ein Geheimnis-Scanner
+# anschlagen soll. Der Wert ist ausgedacht und wurde im Folgecommit durch eine
+# benannte Konstante ersetzt; aus der Historie lässt er sich nicht entfernen,
+# ohne einen bereits gepushten Commit umzuschreiben.
+e57da4db3a002ed18de73943af53e0beaf8454c5:packages/homepi-core/src/homepi_core/testing/smoke.py:generic-api-key:115
