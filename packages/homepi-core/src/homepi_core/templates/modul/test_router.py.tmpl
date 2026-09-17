@@ -4,7 +4,8 @@ Als Integration markiert, weil er fast nur aus Datenbankzugriff besteht: gegen
 eine nachgebaute Sitzung wuerde man vor allem den Nachbau testen.
 
     make dev
-    DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/test' uv run pytest -m ''
+    HOMEPI_TEST_DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/test' \
+        uv run pytest -m 'not smoke'
 """
 
 from __future__ import annotations

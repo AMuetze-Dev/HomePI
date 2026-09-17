@@ -262,6 +262,15 @@ Sichtbar ist es nur für Verwalter — wie jedes andere Artefakt auch.
 seine Daten sollen aber zuordenbar bleiben. Beides beendet laufende Sitzungen
 sofort — ohne das waere die Sperre bis zu vierzehn Tage wirkungslos.
 
+Zum Durchklicken der Oberfläche gibt es einen eigenen Befehl. Er legt ein
+Konto mit Rechten auf **jedem** geladenen Artefakt an und gibt sein festes
+Passwort aus — und bricht ab, solange `ENVIRONMENT` nicht ausdrücklich auf
+`entwicklung` steht:
+
+```bash
+homepi benutzer testkonto        # oder: make dev-testkonto
+```
+
 Das Passwort wird abgefragt, **nie als Argument übergeben** — als Argument
 stünde es in der Shell-Historie und in der Prozessliste. Für Skripte und die
 CI gibt es `--passwort-stdin`:

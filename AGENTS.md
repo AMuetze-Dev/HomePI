@@ -107,6 +107,7 @@ hat die falsche Datei geöffnet.
 
 ```bash
 make dev             # Umgebung: Frontend 5173, API 18000, Postgres 15432
+make dev-testkonto   # Konto zum Durchklicken, Rechte auf JEDEM Artefakt
 make test            # alles, was die CI auch prüft
 make e2e             # Oberflächentests gegen eine eigene, frische Umgebung
 make smoke           # gegen die laufende Umgebung
@@ -122,6 +123,9 @@ make tdd-api P=modules/<name>
 make tdd-web N=<name>      # vitest nur für dessen Oberfläche
 make test-modul N=<name>   # beide Hälften vollständig prüfen
 ```
+
+Wie ein Artefakt geprüft wird — fünf Ebenen, Testdatenbank, bekannte Fallen —
+steht in [docs/12-testen.md](docs/12-testen.md).
 
 Integrationstests fassen niemals `app` an — sie legen Tabellen an und löschen
 sie wieder. Jeder Lauf bekommt eine **eigene, frisch angelegte** Datenbank

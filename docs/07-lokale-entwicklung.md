@@ -88,6 +88,47 @@ Docker Desktop reicht keine inotify-Ereignisse vom Host durch.
 Ohne diese beiden Einstellungen merkt keines der Werkzeuge, dass du etwas
 geändert hast — und man sucht den Fehler an der völlig falschen Stelle.
 
+### Ein Konto zum Durchklicken
+
+Seit jedes Artefakt ein Recht verlangt, sieht ein frisches Konto **nichts** —
+die Übersicht ist leer, und die Adresse von Hand einzutippen hilft nicht. Wer
+die Oberfläche prüfen will, müsste also nach jedem Zurücksetzen erst ein Konto
+anlegen und dann für jedes Artefakt einzeln ein Recht vergeben.
+
+```bash
+make dev-testkonto                 # Konto "tester", Verwalter auf allem
+make dev-testkonto N=klick R=leser # anderer Name, andere Rolle
+```
+
+```
+==> Testkonto 'tester' anlegen
+    verwalter auf: geraete, staffelpilot, verwaltung
+    + 'tester' kann sich anmelden.
+==> Passwort
+    nur-zum-durchklicken-im-eigenen-netz
+```
+
+Die Rechte kommen aus derselben Entdeckung wie im Gateway — ein neu
+dazugekommenes Artefakt ist nach einem erneuten Aufruf dabei. Der Befehl ist
+wiederholbar: gibt es das Konto schon, werden Passwort, Sperre und Rechte neu
+gesetzt, statt zu scheitern.
+
+Das Passwort ist **fest und steht im Quelltext**. Das ist kein Versehen: man
+meldet sich damit zwanzigmal am Tag an, und ein erzeugtes müsste man zwanzigmal
+nachschlagen. Deshalb hängt am Befehl ein Riegel, und der ist zu, solange
+nicht ausdrücklich etwas anderes dasteht:
+
+```
+FEHLER: 'testkonto' legt ein Konto mit Rechten auf JEDEM Artefakt an und gibt
+sein Passwort aus.
+Das geht nur mit ENVIRONMENT=entwicklung (hier: nicht gesetzt).
+Sonst: homepi benutzer anlegen <name> --startpasswort
+```
+
+Gelesen wird `ENVIRONMENT` direkt, nicht über die Einstellungen — sonst würde
+ein unbeteiligter Konfigurationsfehler den Riegel mit einem Stacktrace
+überspringen, statt ihn zufallen zu lassen.
+
 ## Tests
 
 ```bash

@@ -8,6 +8,7 @@ Tür, die jemand eintritt.
     homepi benutzer anlegen aaron --artefakt staffelpilot --rolle verwalter
     homepi benutzer recht aaron staffelpilot leser
     homepi benutzer liste
+    homepi benutzer testkonto            # nur in der Entwicklung
 """
 
 from __future__ import annotations
@@ -25,6 +26,17 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from ..auth.modelle import Benutzer
+
+
+#: Vorgabename des Durchklick-Kontos.
+TESTKONTO = "tester"
+
+#: Sein Passwort. Absichtlich fest und absichtlich hier sichtbar: es gilt nur
+#: in einer Entwicklungsumgebung, die ohnehin app/app als Datenbankpasswort
+#: hat. Ein erzeugtes waere hier sogar schlechter - man will sich damit
+#: zwanzigmal am Tag anmelden, nicht es zwanzigmal nachschlagen.
+#: Enthaelt den Benutzernamen nicht; das lehnt die Passwortpruefung ab.
+TESTPASSWORT = "nur-zum-durchklicken-im-eigenen-netz"
 
 
 def argumente(parser: argparse.ArgumentParser) -> None:
@@ -75,6 +87,24 @@ def argumente(parser: argparse.ArgumentParser) -> None:
     p_pw = unter.add_parser("passwort", help="Passwort zurücksetzen")
     p_pw.add_argument("name")
     _passwort_stdin(p_pw)
+
+    p_test = unter.add_parser(
+        "testkonto",
+        help="Konto zum Durchklicken anlegen - nur in der Entwicklung",
+    )
+    p_test.add_argument("name", nargs="?", default=TESTKONTO)
+    p_test.add_argument(
+        "--rolle",
+        default="verwalter",
+        choices=["leser", "nutzer", "verwalter"],
+        help="Rolle auf JEDEM geladenen Artefakt (Vorgabe: verwalter)",
+    )
+    p_test.add_argument(
+        "--passwort-stdin",
+        action="store_true",
+        dest="passwort_stdin",
+        help="eigenes Passwort von der Standardeingabe statt des vorgegebenen",
+    )
 
 
 def _passwort_stdin(parser: argparse.ArgumentParser) -> None:
@@ -155,6 +185,7 @@ async def _ausfuehren(args: argparse.Namespace) -> int:
         "entsperren": _entsperren,
         "loeschen": _loeschen,
         "einrichtungstoken": _einrichtungstoken,
+        "testkonto": _testkonto,
     }
     try:
         async with datenbank.session() as sitzung:
@@ -319,6 +350,92 @@ async def _einrichtungstoken(sitzung: AsyncSession, args: argparse.Namespace) ->
     schritt("Einrichtungstoken")
     print(f"    {token}")
     hinweis("Gilt bis zum naechsten Start des Dienstes.")
+    return 0
+
+
+async def _testkonto(sitzung: AsyncSession, args: argparse.Namespace) -> int:
+    """Ein Konto zum Durchklicken, mit Rechten auf allem, was geladen ist.
+
+    Warum es das gibt: seit jedes Artefakt ein Recht verlangt, sieht ein
+    frisches Konto **nichts**. Wer die Oberfläche prüfen will, müsste also
+    erst ein Konto anlegen und dann für jedes Artefakt einzeln ein Recht
+    vergeben - jedes Mal neu, nach jedem Zurücksetzen der Datenbank.
+
+    Warum es ein eigener Befehl ist und kein Endpunkt: er legt ein Konto mit
+    Rechten auf allem an. So etwas darf nur, wer ohnehin an der Maschine
+    sitzt.
+
+    Warum das Passwort fest und sichtbar ist: man meldet sich damit zwanzigmal
+    am Tag an. Ein erzeugtes müsste man zwanzigmal nachschlagen, und ein
+    erzwungener Wechsel stünde bei jedem Durchlauf im Weg. Es gilt nur in der
+    Entwicklung - der Befehl bricht sonst ab.
+
+    Der Befehl ist wiederholbar: gibt es das Konto schon, werden Passwort und
+    Rechte neu gesetzt statt zu scheitern.
+    """
+    from ..auth import passwoerter, speicher
+    from ..auth.dienst import Rolle
+    from ..modules import entdecke_module
+    from ..settings import Umgebung
+
+    # Direkt aus der Umgebung statt ueber die Einstellungen: dieser Riegel
+    # soll halten, auch wenn an der Konfiguration sonst etwas fehlt. Ueber
+    # get_settings() wuerde eine unbeteiligte Pruefung ihn mit einem
+    # Stacktrace ueberspringen, statt ihn zufallen zu lassen.
+    #
+    # Und er faellt zu, wenn nichts dasteht: ein Konto mit Rechten auf allem
+    # soll nur entstehen, wo jemand ausdruecklich "entwicklung" gesagt hat.
+    erlaubt = {Umgebung.ENTWICKLUNG.value, Umgebung.TEST.value}
+    umgebung = os.environ.get("ENVIRONMENT", "").strip().lower()
+    if umgebung not in erlaubt:
+        raise CliFehler(
+            "'testkonto' legt ein Konto mit Rechten auf JEDEM Artefakt an und "
+            "gibt sein Passwort aus.\n"
+            f"Das geht nur mit ENVIRONMENT={Umgebung.ENTWICKLUNG.value} "
+            f"(hier: {umgebung or 'nicht gesetzt'}).\n"
+            "Sonst: homepi benutzer anlegen <name> --startpasswort"
+        )
+
+    rolle = Rolle(args.rolle)
+    passwort = _passwort_erfragen(args.name, True) if args.passwort_stdin else TESTPASSWORT
+
+    register = entdecke_module()
+    artefakte = sorted(register.ids)
+    if not artefakte:
+        raise CliFehler(
+            "Kein Artefakt geladen - ein Konto mit Rechten auf nichts hilft "
+            "beim Durchklicken nicht weiter."
+        )
+
+    benutzer = await speicher.finde_benutzer(sitzung, args.name)
+    if benutzer is None:
+        schritt(f"Testkonto '{args.name}' anlegen")
+        benutzer = await speicher.lege_benutzer_an(
+            sitzung, args.name, passwort, "Testkonto", wechsel_erzwingen=False
+        )
+    else:
+        # Wiederholbar: nach einem misslungenen Versuch will man denselben
+        # Befehl noch einmal absetzen und nicht erst aufraeumen.
+        schritt(f"Testkonto '{args.name}' auffrischen")
+        benutzer.aktiv = True
+        benutzer.passwort_wechseln = False
+        benutzer.passwort_hash = passwoerter.hashe_passwort(passwort)
+        await speicher.melde_ueberall_ab(sitzung, benutzer.id)
+
+    for artefakt in artefakte:
+        await speicher.setze_recht(sitzung, benutzer.id, artefakt, rolle)
+    hinweis(f"{rolle.value} auf: {', '.join(artefakte)}")
+
+    if register.defekte:
+        warnung(
+            "Ohne Recht bleiben die Artefakte, die sich nicht laden liessen: "
+            + ", ".join(sorted(d.id for d in register.defekte))
+        )
+
+    erfolg(f"'{benutzer.name}' kann sich anmelden.")
+    schritt("Passwort")
+    print(f"    {passwort}")
+    hinweis(f"Umgebung: {umgebung}. Kein Wechsel noetig, kein Ablauf.")
     return 0
 
 

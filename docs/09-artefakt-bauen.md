@@ -76,6 +76,9 @@ das Frontend kann sie unverändert anzeigen.
 
 ### Fachlogik testgetrieben
 
+Was wo geprüft wird und warum, steht vollständig in
+[12-testen.md](12-testen.md). Hier nur der Takt:
+
 ```bash
 cd modules/messwerte && uv run ptw . --now
 ```
@@ -89,11 +92,13 @@ falschen Stelle.
 Tabellen in `modelle.py`, Zugriff in `speicher.py`. Integrationstests:
 
 ```bash
-DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/test' uv run pytest -m ''
+HOMEPI_TEST_DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/test' \
+  uv run pytest -m 'not smoke'
 ```
 
-Die Datenbank heißt `test`, nicht `app`: die Tests legen Tabellen an und
-löschen sie wieder.
+Niemals `app`: die Tests legen Tabellen an und löschen sie wieder. Die
+angegebene Datenbank ist dabei nur die Vorlage — jeder Lauf bekommt eine
+eigene. Alles dazu in [12-testen.md](12-testen.md).
 
 ### Endpunkte
 
@@ -149,7 +154,7 @@ aktiv ist — sonst sucht man irgendwann, warum eine Kachel fehlt.
 ```bash
 cd modules/messwerte
 uv run ruff format --check . && uv run ruff check . && uv run mypy
-DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/test' uv run pytest -m ''
+HOMEPI_TEST_DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/test' uv run pytest -m 'not smoke'
 
 cd services/web
 npx prettier --check src && npx eslint . && npm run typecheck && npm run test:coverage
