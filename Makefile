@@ -241,6 +241,15 @@ e2e-token:
 e2e-runter:
 	$(E2E) down -v
 
+## dev-testkonto: Konto zum Durchklicken anlegen, mit Recht auf JEDEM Artefakt
+#
+# Seit jedes Artefakt ein Recht verlangt, sieht ein frisches Konto nichts.
+# Wer die Oberflaeche pruefen will, muesste sonst nach jedem Zuruecksetzen
+# erst ein Konto anlegen und dann jedes Recht einzeln vergeben.
+# Mit N=<name> ein anderes Konto, mit R=<rolle> eine andere Rolle.
+dev-testkonto:
+	$(DEV) exec -T -w /app/services/gateway gateway uv run homepi benutzer testkonto $(or $(N),tester) $(if $(R),--rolle $(R),)
+
 ## smoke: Rauchtests gegen die laufende lokale Umgebung
 # Die Tests, die GET /module auswerten, brauchen ein Konto - ohne Anmeldung ist
 # die Liste berechtigterweise leer. Setze HOMEPI_SMOKE_BENUTZER und
@@ -248,4 +257,4 @@ e2e-runter:
 smoke:
 	cd services/gateway && uv run pytest -m smoke -v
 
-.PHONY: artefakt backup cert check deploy-apps dev dev-logs dev-ps dev-reset dev-stop down e2e e2e-hoch e2e-runter e2e-token fmt help install lint-ci logs modul pg-tunnel ps psql pull render smoke stats tdd-api tdd-web test test-infra test-modul test-python test-web up up-apps up-core up-data up-dns up-home update verify
+.PHONY: artefakt backup cert check deploy-apps dev dev-logs dev-ps dev-reset dev-stop dev-testkonto down e2e e2e-hoch e2e-runter e2e-token fmt help install lint-ci logs modul pg-tunnel ps psql pull render smoke stats tdd-api tdd-web test test-infra test-modul test-python test-web up up-apps up-core up-data up-dns up-home update verify

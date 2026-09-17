@@ -107,6 +107,7 @@ hat die falsche Datei geöffnet.
 
 ```bash
 make dev             # Umgebung: Frontend 5173, API 18000, Postgres 15432
+make dev-testkonto   # Konto zum Durchklicken, Rechte auf JEDEM Artefakt
 make test            # alles, was die CI auch prüft
 make e2e             # Oberflächentests gegen eine eigene, frische Umgebung
 make smoke           # gegen die laufende Umgebung
