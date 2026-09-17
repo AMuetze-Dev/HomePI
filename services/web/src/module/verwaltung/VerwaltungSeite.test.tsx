@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/client";
 import { TESTBENUTZER, mitAnmeldung } from "../../testhilfen";
 import * as api from "./api";
-import type { Artefakt, Konto } from "./api";
+import type { Artefakt, Konto, KontoAngelegt } from "./api";
 import { VerwaltungSeite } from "./VerwaltungSeite";
 
 afterEach(() => {
@@ -21,8 +21,13 @@ function konto(rest: Partial<Konto> = {}): Konto {
     rechte: {},
     angelegt: null,
     verwalter: false,
+    passwort_wechseln: false,
     ...rest,
   };
+}
+
+function angelegt(rest: Partial<KontoAngelegt> = {}): KontoAngelegt {
+  return { ...konto(), startpasswort: null, ...rest };
 }
 
 const ICH = konto({
@@ -61,6 +66,17 @@ describe("Verwaltungsseite", () => {
     expect(within(liste).getAllByRole("listitem")).toHaveLength(2);
     expect(screen.getByText("pruefer")).toBeInTheDocument();
     expect(screen.getByText("gast")).toBeInTheDocument();
+  });
+
+  it("kennzeichnet ein noch nicht gewechseltes Startpasswort", async () => {
+    // Bis es ersetzt ist, kommt das Konto an kein Artefakt - das soll man
+    // sehen, ohne es ausprobieren zu muessen.
+    zeige([ICH, konto({ passwort_wechseln: true })]);
+
+    const liste = await screen.findByRole("list", { name: "Konten" });
+
+    expect(within(liste).getByText("Startpasswort")).toBeInTheDocument();
+    expect(within(liste).getByText(/an kein Artefakt/)).toBeInTheDocument();
   });
 
   it("weist Verwalter und Sperren aus", async () => {
@@ -185,7 +201,7 @@ describe("Verwaltungsseite", () => {
 
   describe("Anlegen", () => {
     it("legt ein Konto an", async () => {
-      const anlegen = vi.spyOn(api, "legeKontoAn").mockResolvedValue(konto());
+      const anlegen = vi.spyOn(api, "legeKontoAn").mockResolvedValue(angelegt());
       zeige();
       await screen.findByRole("list", { name: "Konten" });
 
@@ -222,7 +238,49 @@ describe("Verwaltungsseite", () => {
     it("sagt, dass ein neues Konto keine Rechte hat", async () => {
       zeige();
 
-      expect(await screen.findByText(/zunächst keine Rechte/)).toBeInTheDocument();
+      expect(await screen.findByText(/Rechte hat ein neues Konto/)).toBeInTheDocument();
+    });
+
+    it("braucht kein Passwort", async () => {
+      // Der Name genuegt - den Rest erzeugt der Dienst.
+      const anlegen = vi.spyOn(api, "legeKontoAn").mockResolvedValue(angelegt());
+      zeige();
+      await screen.findByRole("list", { name: "Konten" });
+
+      await userEvent.type(screen.getByLabelText("Benutzername"), "neuling");
+      await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
+
+      expect(anlegen).toHaveBeenCalledWith({ name: "neuling" });
+    });
+
+    it("zeigt das Startpasswort genau einmal", async () => {
+      vi.spyOn(api, "legeKontoAn").mockResolvedValue(
+        angelegt({ name: "neuling", startpasswort: "abcd-efgh-ijkl-mnop" }),
+      );
+      zeige();
+      await screen.findByRole("list", { name: "Konten" });
+
+      await userEvent.type(screen.getByLabelText("Benutzername"), "neuling");
+      await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
+
+      expect(await screen.findByText("abcd-efgh-ijkl-mnop")).toBeInTheDocument();
+      expect(screen.getByText(/nicht mehr abrufbar/)).toBeInTheDocument();
+    });
+
+    it("blendet es erst auf ausdrückliches Wegklicken aus", async () => {
+      // Wer es wegklickt, ohne es weiterzugeben, muss ein neues erzeugen.
+      vi.spyOn(api, "legeKontoAn").mockResolvedValue(
+        angelegt({ startpasswort: "abcd-efgh-ijkl-mnop" }),
+      );
+      zeige();
+      await screen.findByRole("list", { name: "Konten" });
+      await userEvent.type(screen.getByLabelText("Benutzername"), "neuling");
+      await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
+      await screen.findByText("abcd-efgh-ijkl-mnop");
+
+      await userEvent.click(screen.getByRole("button", { name: /ausblenden/ }));
+
+      expect(screen.queryByText("abcd-efgh-ijkl-mnop")).not.toBeInTheDocument();
     });
   });
 });

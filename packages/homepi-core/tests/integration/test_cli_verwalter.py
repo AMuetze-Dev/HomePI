@@ -228,3 +228,53 @@ class TestKontenVerwalten:
     ) -> None:
         assert main(["benutzer", "sperren", "gibtsnicht"]) == 1
         assert "Kein Konto" in capsys.readouterr().err
+
+
+class TestStartpasswortAufDerKommandozeile:
+    """Derselbe Gedanke wie in der Oberflaeche: was der Dienst erzeugt, muss
+    der Benutzer ersetzen."""
+
+    def test_wird_ausgegeben(self, datenbank: None, capsys: pytest.CaptureFixture[str]) -> None:
+        code = main(["benutzer", "anlegen", "neuling", "--startpasswort"])
+
+        ausgabe = capsys.readouterr().out
+        assert code == 0
+        assert "Startpasswort" in ausgabe
+        # Vier Gruppen zu vier Zeichen.
+        assert any(z.strip().count("-") == 3 for z in ausgabe.splitlines())
+
+    def test_das_konto_muss_wechseln(self, datenbank: None) -> None:
+        main(["benutzer", "anlegen", "neuling", "--startpasswort"])
+
+        async def nachsehen(sitzung):
+            person = await auth_speicher.finde_benutzer(sitzung, "neuling")
+            assert person is not None
+            return person.passwort_wechseln
+
+        assert _in_der_datenbank(nachsehen) is True
+
+    def test_ein_selbst_getipptes_nicht(
+        self, datenbank: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Wer es selbst tippt, hat es selbst gewaehlt."""
+        _anlege_befehl(monkeypatch, "benutzer", "anlegen", "neuling")
+
+        async def nachsehen(sitzung):
+            person = await auth_speicher.finde_benutzer(sitzung, "neuling")
+            assert person is not None
+            return person.passwort_wechseln
+
+        assert _in_der_datenbank(nachsehen) is False
+
+    def test_es_wird_nicht_abgefragt(
+        self, datenbank: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Sonst haenge das Skript an einer getpass-Abfrage, die niemand
+        beantwortet."""
+
+        def nicht_fragen(_: str) -> str:
+            raise AssertionError("getpass wurde aufgerufen")
+
+        monkeypatch.setattr(cli_benutzer.getpass, "getpass", nicht_fragen)
+
+        assert main(["benutzer", "anlegen", "neuling", "--startpasswort"]) == 0

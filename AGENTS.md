@@ -68,6 +68,10 @@ homepi benutzer anlegen <name> --artefakt verwaltung --rolle verwalter
 es darf, ist das, was man sonst Administrator nennt. Weitere Rechte vergibt er
 sich dort selbst.
 
+Für weitere Konten genügt dort ein Name: das Startpasswort erzeugt der Dienst
+und zeigt es genau einmal. Bis der Benutzer es ersetzt hat, weist das Backend
+ihn an jedem Artefakt ab.
+
 Rezept mit allen Schritten: [docs/09-artefakt-bauen.md](docs/09-artefakt-bauen.md).
 
 **Einen Agenten damit beauftragen:** [docs/10-auftrag-artefakt.md](docs/10-auftrag-artefakt.md)

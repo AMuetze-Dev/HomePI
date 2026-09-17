@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,8 +24,19 @@ async def finde_benutzer(sitzung: AsyncSession, name: str) -> Benutzer | None:
 
 
 async def lege_benutzer_an(
-    sitzung: AsyncSession, name: str, passwort: str, anzeigename: str | None = None
+    sitzung: AsyncSession,
+    name: str,
+    passwort: str,
+    anzeigename: str | None = None,
+    *,
+    wechsel_erzwingen: bool = False,
 ) -> Benutzer:
+    """Legt ein Konto an.
+
+    ``wechsel_erzwingen`` setzt das Konto auf "muss erst ein eigenes Passwort
+    waehlen". Wer ein Startpasswort vergibt, setzt es - ein Passwort, das
+    jemand anders kennt, soll nicht das bleibende sein.
+    """
     sauber = dienst.pruefe_benutzername(name)
     dienst.pruefe_passwort(passwort, sauber)
 
@@ -33,6 +44,7 @@ async def lege_benutzer_an(
         name=sauber,
         anzeigename=(anzeigename or name).strip(),
         passwort_hash=passwoerter.hashe_passwort(passwort),
+        passwort_wechseln=wechsel_erzwingen,
     )
     sitzung.add(benutzer)
     try:
@@ -205,3 +217,19 @@ async def einrichtungstoken_stimmt(sitzung: AsyncSession, token: str) -> bool:
 async def schliesse_einrichtung(sitzung: AsyncSession) -> None:
     """Nach dem ersten Verwalter ist das Token wertlos - und weg."""
     await sitzung.execute(delete(Einrichtung))
+
+
+async def melde_andere_ab(
+    sitzung: AsyncSession, benutzer_id: uuid.UUID, eigenes_token: str | None
+) -> None:
+    """Beendet alle Sitzungen dieses Kontos ausser der laufenden.
+
+    Nach einer Passwortaenderung: fremde Geraete fliegen raus, das eigene
+    bleibt. Wer gerade das Passwort geaendert hat, sitzt davor und hat sich
+    ausgewiesen - ihn mit hinauszuwerfen waere kein Gewinn an Sicherheit,
+    sondern nur ein Umweg ueber die Anmeldeseite.
+    """
+    bedingung = Sitzung.benutzer_id == benutzer_id
+    if eigenes_token:
+        bedingung = and_(bedingung, Sitzung.token_hash != passwoerter.hashe_token(eigenes_token))
+    await sitzung.execute(delete(Sitzung).where(bedingung))

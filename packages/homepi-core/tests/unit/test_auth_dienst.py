@@ -13,6 +13,8 @@ import pytest
 from homepi_core.auth.dienst import (
     MIN_LAENGE,
     SITZUNGSDAUER,
+    STARTGRUPPEN,
+    STARTGRUPPENLAENGE,
     VERWALTUNG,
     LetzterVerwalter,
     PasswortUngeeignet,
@@ -21,6 +23,7 @@ from homepi_core.auth.dienst import (
     darf_verwalten,
     laeuft_ab_am,
     neues_einrichtungstoken,
+    neues_startpasswort,
     neues_token,
     pruefe_benutzername,
     pruefe_letzter_verwalter,
@@ -184,3 +187,30 @@ class TestEinrichtungstoken:
 
     def test_wiederholt_sich_nicht(self) -> None:
         assert len({neues_einrichtungstoken() for _ in range(200)}) == 200
+
+
+class TestStartpasswort:
+    """Ein Passwort, das jemand anders setzt und der Benutzer gleich ersetzt."""
+
+    def test_erfuellt_die_eigenen_passwortregeln(self) -> None:
+        # Sonst liesse sich das Konto gar nicht erst anlegen.
+        for _ in range(20):
+            pruefe_passwort(neues_startpasswort(), "irgendwer")
+
+    def test_wiederholt_sich_nicht(self) -> None:
+        """Ein festes Standardpasswort waere nach dem ersten Aushang keines
+        mehr."""
+        assert len({neues_startpasswort() for _ in range(200)}) == 200
+
+    def test_laesst_sich_diktieren(self) -> None:
+        passwort = neues_startpasswort()
+
+        assert passwort.count("-") == STARTGRUPPEN - 1
+        assert all(len(g) == STARTGRUPPENLAENGE for g in passwort.split("-"))
+
+    def test_ohne_verwechselbare_zeichen(self) -> None:
+        """0/O und 1/l/I kosten beim Vorlesen und Abtippen mehr, als die paar
+        Bit Entropie wert sind."""
+        zeichen = {z for _ in range(200) for z in neues_startpasswort() if z != "-"}
+
+        assert not zeichen & set("0O1lI")

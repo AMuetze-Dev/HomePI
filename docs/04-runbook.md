@@ -73,6 +73,10 @@ Prüfen:
 $APPS exec -w /app/services/gateway gateway uv run homepi benutzer liste
 ```
 
+Weitere Konten legt der Verwalter in der Oberfläche unter *Verwaltung* an —
+dort genügt ein Name, das Startpasswort erzeugt der Dienst. Der Benutzer
+ersetzt es beim ersten Anmelden und kommt bis dahin an kein Artefakt.
+
 Weitere Rechte, Sperren, Löschen: [11-anmeldung.md](11-anmeldung.md).
 
 ## Home Assistant auf Postgres umstellen

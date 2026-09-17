@@ -22,6 +22,9 @@ class BenutzerAusgabe(BaseModel):
     #: Artefakt -> Rolle. Das Frontend blendet danach Bedienelemente aus -
     #: die eigentliche Pruefung passiert trotzdem im Backend.
     rechte: dict[str, Rolle] = {}
+    #: True, solange das Passwort von jemand anderem gesetzt wurde. Bis zum
+    #: Wechsel kommt dieses Konto an kein Artefakt.
+    passwort_wechseln: bool = False
 
 
 class PasswortAendern(BaseModel):

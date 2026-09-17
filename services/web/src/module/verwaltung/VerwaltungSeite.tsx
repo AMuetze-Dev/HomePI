@@ -15,6 +15,7 @@ import {
   type Konto,
   type Rolle,
 } from "./api";
+import { Startpasswort } from "./Startpasswort";
 import stil from "./VerwaltungSeite.module.css";
 
 type Daten = { konten: Konto[]; artefakte: Artefakt[] };
@@ -39,6 +40,9 @@ export function VerwaltungSeite() {
   // Getrennt vom Ladezustand: ein misslungener Klick darf die Liste nicht
   // gegen eine Fehlerseite austauschen.
   const [aktionsfehler, setAktionsfehler] = useState("");
+  // Ein Startpasswort ist genau einmal abrufbar. Es steht deshalb hier oben
+  // und nicht in der Zeile, die beim naechsten Laden verschwindet.
+  const [start, setStart] = useState<{ name: string; wert: string } | null>(null);
   const { benutzer } = useAnmeldung();
 
   const laden = useCallback(async (signal?: AbortSignal) => {
@@ -103,6 +107,10 @@ export function VerwaltungSeite() {
         </Hinweis>
       )}
 
+      {start && (
+        <Startpasswort name={start.name} wert={start.wert} onWeg={() => setStart(null)} />
+      )}
+
       <section aria-labelledby="konten">
         <h2 id="konten" className={stil.abschnittstitel}>
           Konten
@@ -119,6 +127,7 @@ export function VerwaltungSeite() {
                   artefakte={artefakte}
                   ichSelbst={konto.id === benutzer?.id}
                   aufAktion={mitFehlerbehandlung}
+                  aufStartpasswort={setStart}
                 />
               </li>
             ))}
@@ -126,7 +135,14 @@ export function VerwaltungSeite() {
         )}
       </section>
 
-      <Anlegen onAnlegen={(daten) => mitFehlerbehandlung(() => legeKontoAn(daten))} />
+      <Anlegen
+        onAnlegen={async (daten) =>
+          mitFehlerbehandlung(async () => {
+            const neu = await legeKontoAn(daten);
+            if (neu.startpasswort) setStart({ name: neu.name, wert: neu.startpasswort });
+          })
+        }
+      />
     </>
   );
 }
@@ -179,11 +195,13 @@ function Kontokarte({
   artefakte,
   ichSelbst,
   aufAktion,
+  aufStartpasswort,
 }: {
   konto: Konto;
   artefakte: Artefakt[];
   ichSelbst: boolean;
   aufAktion: (aktion: () => Promise<unknown>) => Promise<boolean>;
+  aufStartpasswort: (start: { name: string; wert: string }) => void;
 }) {
   const [passwort, setPasswort] = useState("");
   const [offen, setOffen] = useState(false);
@@ -199,6 +217,7 @@ function Kontokarte({
         <div className={stil.etiketten}>
           {ichSelbst && <Etikett>Du</Etikett>}
           {konto.verwalter && <Etikett ton="gut">Verwalter</Etikett>}
+          {konto.passwort_wechseln && <Etikett ton="warnung">Startpasswort</Etikett>}
           {!konto.aktiv && <Etikett ton="warnung">Gesperrt</Etikett>}
         </div>
       </div>
@@ -241,6 +260,13 @@ function Kontokarte({
         </p>
       )}
 
+      {konto.passwort_wechseln && !ichSelbst && (
+        <p className={stil.selbsthinweis}>
+          Benutzt noch das vergebene Startpasswort. Bis es ersetzt ist, kommt dieses Konto
+          an kein Artefakt.
+        </p>
+      )}
+
       {offen && (
         <>
           <Rechte
@@ -257,19 +283,26 @@ function Kontokarte({
               autoComplete="new-password"
               value={passwort}
               className={stil.passwortfeld}
-              hinweis="Beendet alle Sitzungen dieses Kontos."
+              hinweis="Leer lassen und ein Startpasswort erzeugen lassen. Beendet in jedem Fall alle Sitzungen dieses Kontos."
               onChange={(e) => setPasswort(e.target.value)}
             />
             <Knopf
               groesse="sm"
-              disabled={passwort === ""}
               onClick={() => {
-                void aufAktion(() => setzePasswort(konto.id, passwort)).then((ok) => {
+                void aufAktion(async () => {
+                  const antwort = await setzePasswort(
+                    konto.id,
+                    passwort === "" ? undefined : passwort,
+                  );
+                  if (antwort.startpasswort) {
+                    aufStartpasswort({ name: konto.name, wert: antwort.startpasswort });
+                  }
+                }).then((ok) => {
                   if (ok) setPasswort("");
                 });
               }}
             >
-              Setzen
+              {passwort === "" ? "Startpasswort erzeugen" : "Setzen"}
             </Knopf>
           </div>
         </>
@@ -346,7 +379,7 @@ function Anlegen({
 }: {
   onAnlegen: (daten: {
     name: string;
-    passwort: string;
+    passwort?: string;
     anzeigename?: string;
   }) => Promise<boolean>;
 }) {
@@ -355,7 +388,9 @@ function Anlegen({
   const [passwort, setPasswort] = useState("");
   const [laeuft, setLaeuft] = useState(false);
 
-  const vollstaendig = name.trim() !== "" && passwort !== "";
+  // Der Name genuegt. Ohne Passwort erzeugt der Dienst ein Startpasswort -
+  // ein Passwort, das ein Verwalter tippt, kennt jemand anders.
+  const vollstaendig = name.trim() !== "";
 
   async function absenden(ereignis: React.FormEvent) {
     ereignis.preventDefault();
@@ -364,7 +399,7 @@ function Anlegen({
     setLaeuft(true);
     const geklappt = await onAnlegen({
       name: name.trim(),
-      passwort,
+      ...(passwort ? { passwort } : {}),
       ...(anzeigename.trim() ? { anzeigename: anzeigename.trim() } : {}),
     });
     setLaeuft(false);
@@ -406,13 +441,15 @@ function Anlegen({
               type="password"
               autoComplete="new-password"
               value={passwort}
+              hinweis="Optional. Leer lassen für ein Startpasswort."
               onChange={(e) => setPasswort(e.target.value)}
             />
           </div>
 
           <p className={stil.leerhinweis}>
-            Ein neues Konto hat zunächst keine Rechte. Was es darf, vergibst du danach
-            einzeln.
+            Der Name genügt: ohne Passwort entsteht ein Startpasswort, das du weitergibst
+            und das der Benutzer beim ersten Anmelden ersetzt. Rechte hat ein neues Konto
+            zunächst keine — was es darf, vergibst du danach einzeln.
           </p>
 
           <Knopf type="submit" auspraegung="primaer" disabled={!vollstaendig || laeuft}>

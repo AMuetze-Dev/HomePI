@@ -35,6 +35,11 @@ def argumente(parser: argparse.ArgumentParser) -> None:
     p_neu.add_argument("--anzeigename", help="Name in der Oberfläche")
     p_neu.add_argument("--artefakt", help="gleich ein Recht vergeben")
     p_neu.add_argument("--rolle", default="nutzer", choices=["leser", "nutzer", "verwalter"])
+    p_neu.add_argument(
+        "--startpasswort",
+        action="store_true",
+        help="Passwort erzeugen lassen; der Benutzer ersetzt es beim ersten Anmelden",
+    )
     _passwort_stdin(p_neu)
 
     p_recht = unter.add_parser("recht", help="Rolle für ein Artefakt setzen")
@@ -159,18 +164,33 @@ async def _ausfuehren(args: argparse.Namespace) -> int:
 
 
 async def _anlegen(sitzung: AsyncSession, args: argparse.Namespace) -> int:
-    from ..auth import speicher
+    from ..auth import dienst, speicher
     from ..auth.dienst import Rolle
 
     schritt(f"Konto '{args.name}' anlegen")
-    passwort = _passwort_erfragen(args.name, args.passwort_stdin)
 
-    benutzer = await speicher.lege_benutzer_an(sitzung, args.name, passwort, args.anzeigename)
+    if args.startpasswort:
+        # Ein Passwort, das jemand anders kennt, soll nicht das bleibende sein.
+        passwort = dienst.neues_startpasswort()
+    else:
+        passwort = _passwort_erfragen(args.name, args.passwort_stdin)
+
+    benutzer = await speicher.lege_benutzer_an(
+        sitzung,
+        args.name,
+        passwort,
+        args.anzeigename,
+        wechsel_erzwingen=args.startpasswort,
+    )
     if args.artefakt:
         await speicher.setze_recht(sitzung, benutzer.id, args.artefakt, Rolle(args.rolle))
         hinweis(f"{args.artefakt}: {args.rolle}")
 
     erfolg(f"'{benutzer.name}' angelegt.")
+    if args.startpasswort:
+        schritt("Startpasswort - jetzt weitergeben, es ist danach nicht mehr abrufbar")
+        print(f"    {passwort}")
+        hinweis(f"'{benutzer.name}' muss es beim ersten Anmelden ersetzen.")
     if not args.artefakt:
         hinweis("Noch ohne Rechte. Vergeben mit:")
         hinweis(f"  homepi benutzer recht {benutzer.name} <artefakt> <rolle>")

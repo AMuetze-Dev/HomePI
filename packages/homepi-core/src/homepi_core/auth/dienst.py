@@ -92,6 +92,18 @@ class EinrichtungTokenFalsch(ServiceError):
     title = "Einrichtungstoken stimmt nicht"
 
 
+class PasswortWechselNoetig(ServiceError):
+    """Dieses Konto muss erst ein eigenes Passwort setzen.
+
+    403 und nicht 401: die Anmeldung hat geklappt, es fehlt nur ein Schritt.
+    Ein 401 wuerde die Oberflaeche zurueck auf die Anmeldeseite schicken - in
+    eine Schleife, denn das Anmelden funktioniert ja.
+    """
+
+    status = 403
+    title = "Passwortwechsel nötig"
+
+
 class LetzterVerwalter(ServiceError):
     """Der letzte Verwalter darf sich nicht selbst aussperren.
 
@@ -240,6 +252,36 @@ def pruefe_letzter_verwalter(
             f"{was} würde den letzten Verwalter entfernen. Lege zuerst einen "
             "zweiten an - sonst kann diese Installation niemand mehr verwalten."
         )
+
+
+# --- Startpasswoerter ------------------------------------------------------
+
+#: Ohne 0/O und 1/l/I: das Startpasswort wird vorgelesen oder abgetippt, und
+#: genau dort entstehen die Verwechslungen.
+STARTALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
+
+#: Vier Gruppen zu vier Zeichen: 16 Zeichen plus Bindestriche, damit es die
+#: Mindestlaenge sicher erreicht und sich trotzdem diktieren laesst.
+STARTGRUPPEN = 4
+STARTGRUPPENLAENGE = 4
+
+
+def neues_startpasswort() -> str:
+    """Ein Passwort, das jemand anders setzt und der Benutzer gleich ersetzt.
+
+    Bewusst zufaellig und nicht "start1234" fuer alle: ein festes Standard-
+    passwort ist nach dem ersten Aushang kein Passwort mehr. Bis zum ersten
+    Wechsel ist dieses hier die einzige Huerde vor dem Konto - es soll also
+    auch dann taugen, wenn der Wechsel zwei Wochen dauert.
+
+    Rund 78 Bit Entropie bei 16 Zeichen aus 31 - genug, und es laesst sich
+    am Telefon durchgeben.
+    """
+    gruppen = (
+        "".join(secrets.choice(STARTALPHABET) for _ in range(STARTGRUPPENLAENGE))
+        for _ in range(STARTGRUPPEN)
+    )
+    return "-".join(gruppen)
 
 
 # --- Einrichtung -----------------------------------------------------------

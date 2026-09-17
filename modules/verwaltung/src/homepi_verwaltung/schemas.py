@@ -19,6 +19,8 @@ class BenutzerAusgabe(BaseModel):
     name: str
     anzeigename: str
     aktiv: bool
+    #: True, solange das Passwort von jemand anderem gesetzt wurde.
+    passwort_wechseln: bool = False
     #: Artefakt -> Rolle.
     rechte: dict[str, Rolle] = {}
     angelegt: datetime | None = None
@@ -28,8 +30,15 @@ class BenutzerAusgabe(BaseModel):
 
 
 class NeuerBenutzer(BaseModel):
+    """Zum Anlegen genuegen Name und Anzeigename.
+
+    Ohne Passwort erzeugt der Dienst ein Startpasswort und gibt es genau
+    einmal zurueck. Der Benutzer muss es beim ersten Anmelden ersetzen -
+    ein Passwort, das jemand anders kennt, soll nicht das bleibende sein.
+    """
+
     name: str = Field(min_length=1, max_length=32)
-    passwort: str = Field(min_length=1, max_length=200)
+    passwort: str | None = Field(default=None, min_length=1, max_length=200)
     anzeigename: str | None = Field(default=None, max_length=100)
 
 
@@ -46,7 +55,25 @@ class BenutzerAenderung(BaseModel):
 
 
 class PasswortSetzen(BaseModel):
-    passwort: str = Field(min_length=1, max_length=200)
+    """Ohne Angabe entsteht ein neues Startpasswort."""
+
+    passwort: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class KontoAngelegt(BenutzerAusgabe):
+    """Die Antwort aufs Anlegen - einmalig mit dem Startpasswort.
+
+    Es steht nur hier, nie in der Datenbank und in keiner weiteren Antwort.
+    Wer das Konto anlegt, gibt es weiter; danach ist es nicht mehr abrufbar.
+    """
+
+    startpasswort: str | None = None
+
+
+class PasswortGesetzt(BaseModel):
+    """Auch hier einmalig: das Startpasswort, das der Verwalter weitergibt."""
+
+    startpasswort: str | None = None
 
 
 class RechtSetzen(BaseModel):

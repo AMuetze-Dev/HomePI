@@ -1,0 +1,66 @@
+/* Mobile first: untereinander, ab Tablet nebeneinander. */
+
+.karte {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  margin-bottom: var(--raum-6);
+  /* Abgesetzt: das hier ist kein Teil der Liste, sondern etwas, das man
+     einmal liest und dann nicht wiederbekommt. */
+  border-color: var(--farbe-rand-stark);
+  animation: eintreten var(--dauer-normal) var(--verlauf-eintritt);
+}
+
+.kopf {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--raum-4);
+}
+
+.titel {
+  font-size: var(--text-lg);
+}
+
+.zeile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+}
+
+.wert {
+  /* Gross und mit Zahlenabstand: das hier wird abgetippt oder vorgelesen. */
+  font-family: var(--schrift-mono);
+  font-size: var(--text-xl);
+  letter-spacing: 0.04em;
+  padding: var(--raum-3) var(--raum-4);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-sm);
+  background: var(--farbe-flaeche-gedaempft);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+@keyframes eintreten {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .karte {
+    animation: none;
+  }
+}
+
+@media (min-width: 40rem) {
+  .zeile {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .wert {
+    flex: 1;
+  }
+}

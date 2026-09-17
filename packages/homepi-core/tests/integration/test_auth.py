@@ -280,11 +280,7 @@ class TestSitzungen:
 
 
 class TestPasswortAendern:
-    async def test_aendert_und_meldet_ueberall_ab(
-        self, client: AsyncClient, benutzer, app_und_kontext
-    ) -> None:
-        """Wer das Passwort ändert, tut das häufig genau deshalb - eine
-        weiterlaufende fremde Sitzung wäre dann fatal."""
+    async def test_aendert_das_passwort(self, client: AsyncClient, benutzer) -> None:
         await _anmelden(client)
         neu = "ganz-anderes-langes-passwort"
 
@@ -293,13 +289,47 @@ class TestPasswortAendern:
         )
 
         assert antwort.status_code == 204
-        _, kontext = app_und_kontext
-        async with kontext.db.session() as sitzung:
-            assert (await sitzung.execute(select(Sitzung))).scalars().all() == []
-
         client.cookies.clear()
         assert (await _anmelden(client, passwort=neu)).status_code == 200
         assert (await _anmelden(client, passwort=PASSWORT)).status_code == 401
+
+    async def test_die_eigene_sitzung_bleibt(self, client: AsyncClient, benutzer) -> None:
+        """Wer gerade sein Passwort geändert hat, sitzt davor und hat sich
+        ausgewiesen. Ihn hinauszuwerfen hieße, ihn nach einem erzwungenen
+        Erstwechsel auf die Anmeldeseite zu schicken."""
+        await _anmelden(client)
+
+        await client.post(
+            "/auth/passwort",
+            json={"altes_passwort": PASSWORT, "neues_passwort": "ganz-anderes-langes-passwort"},
+        )
+
+        assert (await client.get("/auth/ich")).status_code == 200
+
+    async def test_alle_anderen_geraete_fliegen_raus(
+        self, client: AsyncClient, benutzer, app_und_kontext
+    ) -> None:
+        """Wer das Passwort ändert, tut das häufig genau deshalb - eine
+        weiterlaufende fremde Sitzung wäre dann fatal."""
+        app, kontext = app_und_kontext
+        await _anmelden(client)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as anderes_geraet:
+            await _anmelden(anderes_geraet)
+            assert (await anderes_geraet.get("/auth/ich")).status_code == 200
+
+            await client.post(
+                "/auth/passwort",
+                json={"altes_passwort": PASSWORT, "neues_passwort": "ganz-anderes-langes-passwort"},
+            )
+
+            assert (await anderes_geraet.get("/auth/ich")).status_code == 401
+
+        async with kontext.db.session() as sitzung:
+            uebrig = (await sitzung.execute(select(Sitzung))).scalars().all()
+            assert len(uebrig) == 1
 
     async def test_falsches_altes_passwort_aendert_nichts(
         self, client: AsyncClient, benutzer

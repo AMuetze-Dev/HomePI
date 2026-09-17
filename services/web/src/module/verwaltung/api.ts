@@ -15,6 +15,14 @@ export interface Konto {
   angelegt: string | null;
   /** Darf dieses Konto die Verwaltung? Blendet Knöpfe aus - geprüft wird im Backend. */
   verwalter: boolean;
+  /** True, solange das Passwort von jemand anderem gesetzt wurde. */
+  passwort_wechseln: boolean;
+}
+
+/** Die Antwort aufs Anlegen - einmalig mit dem Startpasswort. */
+export interface KontoAngelegt extends Konto {
+  /** Nur hier. Danach ist es nicht mehr abrufbar. */
+  startpasswort: string | null;
 }
 
 export interface Artefakt {
@@ -25,7 +33,8 @@ export interface Artefakt {
 
 export interface NeuesKonto {
   name: string;
-  passwort: string;
+  /** Ohne Angabe erzeugt der Dienst ein Startpasswort. */
+  passwort?: string;
   anzeigename?: string;
 }
 
@@ -74,8 +83,8 @@ export function ladeArtefakte(signal?: AbortSignal): Promise<Artefakt[]> {
   return anfrage<Artefakt[]>("/artefakte", {}, signal);
 }
 
-export function legeKontoAn(daten: NeuesKonto): Promise<Konto> {
-  return anfrage<Konto>("/benutzer", {
+export function legeKontoAn(daten: NeuesKonto): Promise<KontoAngelegt> {
+  return anfrage<KontoAngelegt>("/benutzer", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(daten),
@@ -98,11 +107,18 @@ export function setzeAnzeigename(id: string, anzeigename: string): Promise<Konto
   });
 }
 
-export function setzePasswort(id: string, passwort: string): Promise<void> {
-  return anfrage<void>(`/benutzer/${id}/passwort`, {
+/**
+ * Setzt ein Passwort zurück. Ohne Angabe erzeugt der Dienst ein Startpasswort
+ * und gibt es einmalig zurück - der Benutzer muss es dann ersetzen.
+ */
+export function setzePasswort(
+  id: string,
+  passwort?: string,
+): Promise<{ startpasswort: string | null }> {
+  return anfrage<{ startpasswort: string | null }>(`/benutzer/${id}/passwort`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ passwort }),
+    body: JSON.stringify(passwort === undefined ? {} : { passwort }),
   });
 }
 

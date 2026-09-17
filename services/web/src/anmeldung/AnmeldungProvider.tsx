@@ -59,6 +59,7 @@ export function AnmeldungProvider({ children }: { children: ReactNode }) {
 
   const wert: Anmeldung = {
     zustand: laedt ? "laedt" : benutzer ? "angemeldet" : "abgemeldet",
+    mussPasswortWechseln: benutzer?.passwort_wechseln ?? false,
     benutzer,
     anmelden,
     abmelden,

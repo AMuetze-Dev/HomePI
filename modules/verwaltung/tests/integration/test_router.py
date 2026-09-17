@@ -75,6 +75,7 @@ class TestLesen:
             "rechte",
             "angelegt",
             "verwalter",
+            "passwort_wechseln",
         }
 
     async def test_verwalter_wird_ausgewiesen(self, client: AsyncClient, gast) -> None:
@@ -221,10 +222,48 @@ class TestPasswort:
         antwort = await client.put(
             f"/verwaltung/benutzer/{gast.id}/passwort", json={"passwort": NEUES_PASSWORT}
         )
-        assert antwort.status_code == 204
+        assert antwort.status_code == 200
 
         neu = await anonym.post("/auth/anmelden", json={"name": "gast", "passwort": NEUES_PASSWORT})
         assert neu.status_code == 200
+
+    async def test_ohne_angabe_entsteht_ein_startpasswort(
+        self, client: AsyncClient, anonym: AsyncClient, gast
+    ) -> None:
+        antwort = await client.put(f"/verwaltung/benutzer/{gast.id}/passwort", json={})
+
+        start = antwort.json()["startpasswort"]
+        assert start
+        neu = await anonym.post("/auth/anmelden", json={"name": "gast", "passwort": start})
+        assert neu.status_code == 200
+        assert neu.json()["passwort_wechseln"] is True
+
+    async def test_ein_selbst_getipptes_kommt_nicht_zurueck(
+        self, client: AsyncClient, gast
+    ) -> None:
+        """Der Verwalter kennt es - zurueck kommt nur, was der Dienst erzeugt hat."""
+        antwort = await client.put(
+            f"/verwaltung/benutzer/{gast.id}/passwort", json={"passwort": NEUES_PASSWORT}
+        )
+
+        assert antwort.json()["startpasswort"] is None
+
+    async def test_am_fremden_konto_muss_gewechselt_werden(self, client: AsyncClient, gast) -> None:
+        """Ein Passwort, das ein Verwalter kennt, soll nicht das bleibende sein."""
+        await client.put(
+            f"/verwaltung/benutzer/{gast.id}/passwort", json={"passwort": NEUES_PASSWORT}
+        )
+
+        eintrag = (await client.get(f"/verwaltung/benutzer/{gast.id}")).json()
+        assert eintrag["passwort_wechseln"] is True
+
+    async def test_am_eigenen_konto_nicht(self, client: AsyncClient, chefin) -> None:
+        await client.put(
+            f"/verwaltung/benutzer/{chefin.id}/passwort", json={"passwort": NEUES_PASSWORT}
+        )
+
+        eintrag = (await client.get(f"/verwaltung/benutzer/{chefin.id}")).json()
+        assert eintrag["passwort_wechseln"] is False
 
     async def test_zu_kurzes_passwort_wird_abgelehnt(self, client: AsyncClient, gast) -> None:
         antwort = await client.put(

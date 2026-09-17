@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 from homepi_core.auth import AktuellerBenutzer, Benutzer, Rolle, darf_verwalten
 from homepi_core.auth import speicher as kern
+from homepi_core.auth.cookies import NAME as COOKIE
+from homepi_core.auth.dienst import neues_startpasswort
 from homepi_core.deps import DbSitzung, Kontext
 
 from . import dienst, speicher
@@ -24,7 +26,9 @@ from .schemas import (
     ArtefaktAusgabe,
     BenutzerAenderung,
     BenutzerAusgabe,
+    KontoAngelegt,
     NeuerBenutzer,
+    PasswortGesetzt,
     PasswortSetzen,
     RechtSetzen,
     Ueberblick,
@@ -45,6 +49,7 @@ def _ausgabe(benutzer: Benutzer) -> BenutzerAusgabe:
         rechte=dict(sorted(rechte.items())),
         angelegt=getattr(benutzer, "angelegt", None),
         verwalter=darf_verwalten(rechte),
+        passwort_wechseln=benutzer.passwort_wechseln,
     )
 
 
@@ -82,11 +87,21 @@ async def liste(sitzung: DbSitzung) -> list[BenutzerAusgabe]:
 
 
 @router.post("/benutzer", status_code=status.HTTP_201_CREATED, summary="Konto anlegen")
-async def anlegen(daten: NeuerBenutzer, sitzung: DbSitzung) -> BenutzerAusgabe:
-    """Ohne Rechte. Was das Konto darf, wird danach einzeln vergeben -
-    so steht die Entscheidung im Log und nicht in einer Voreinstellung."""
-    benutzer = await kern.lege_benutzer_an(sitzung, daten.name, daten.passwort, daten.anzeigename)
-    return _ausgabe(benutzer)
+async def anlegen(daten: NeuerBenutzer, sitzung: DbSitzung) -> KontoAngelegt:
+    """Name genügt. Ohne Passwort entsteht ein Startpasswort.
+
+    Es steht **einmalig** in dieser Antwort - nicht in der Datenbank und in
+    keiner weiteren Abfrage. Wer das Konto anlegt, gibt es weiter; der
+    Benutzer ersetzt es beim ersten Anmelden.
+
+    Ohne Rechte: was das Konto darf, wird danach einzeln vergeben - so steht
+    die Entscheidung im Log und nicht in einer Voreinstellung.
+    """
+    start = daten.passwort or neues_startpasswort()
+    benutzer = await kern.lege_benutzer_an(
+        sitzung, daten.name, start, daten.anzeigename, wechsel_erzwingen=True
+    )
+    return KontoAngelegt(**_ausgabe(benutzer).model_dump(), startpasswort=start)
 
 
 @router.get("/benutzer/{benutzer_id}", summary="Ein Konto")
@@ -138,19 +153,39 @@ async def loeschen(benutzer_id: uuid.UUID, sitzung: DbSitzung, ich: AktuellerBen
     await speicher.loesche(sitzung, ziel)
 
 
-@router.put(
-    "/benutzer/{benutzer_id}/passwort",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Passwort setzen",
-)
-async def passwort(benutzer_id: uuid.UUID, daten: PasswortSetzen, sitzung: DbSitzung) -> None:
-    """Auch am eigenen Konto erlaubt - ein neues Passwort sperrt niemanden aus.
+@router.put("/benutzer/{benutzer_id}/passwort", summary="Passwort zurücksetzen")
+async def passwort(
+    benutzer_id: uuid.UUID,
+    daten: PasswortSetzen,
+    request: Request,
+    sitzung: DbSitzung,
+    ich: AktuellerBenutzer,
+) -> PasswortGesetzt:
+    """Setzt ein neues Passwort. Ohne Angabe entsteht ein Startpasswort.
 
-    Alle Sitzungen des Kontos enden dabei, auch die eigene. Das ist gewollt:
-    wer ein Passwort zurücksetzt, tut das meist, weil etwas schiefging.
+    Am **fremden** Konto ist das Ergebnis immer ein Startpasswort: es muss
+    beim nächsten Anmelden ersetzt werden, denn ein Passwort, das ein
+    Verwalter kennt, soll nicht das bleibende sein. Am eigenen Konto nicht -
+    dort ist es schlicht das neue Passwort.
+
+    Alle Sitzungen des Kontos enden dabei. Wer ein Passwort zurücksetzt, tut
+    das meist, weil etwas schiefging.
     """
     ziel = await speicher.finde(sitzung, benutzer_id)
-    await speicher.setze_passwort(sitzung, ziel, daten.passwort)
+    fremd = ziel.id != ich.id
+    start = daten.passwort or neues_startpasswort()
+
+    await speicher.setze_passwort(
+        sitzung,
+        ziel,
+        start,
+        wechsel_erzwingen=fremd,
+        laufendes_token=request.cookies.get(COOKIE),
+    )
+
+    # Ein selbst getipptes Passwort gibt der Verwalter nicht zurueck - er
+    # kennt es. Zurueck kommt nur, was der Dienst erzeugt hat.
+    return PasswortGesetzt(startpasswort=start if daten.passwort is None else None)
 
 
 # --- Rechte ----------------------------------------------------------------

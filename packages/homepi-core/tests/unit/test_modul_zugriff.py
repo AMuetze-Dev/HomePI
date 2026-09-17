@@ -18,7 +18,12 @@ from fastapi import APIRouter, FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from homepi_core import Modul, ServiceSettings, Umgebung, Zugang, create_service, register_aus
-from homepi_core.auth.deps import hole_benutzer, hole_benutzer_optional
+from homepi_core.auth import AktuellerBenutzer
+from homepi_core.auth.deps import (
+    hole_benutzer,
+    hole_benutzer_optional,
+    hole_sitzungsbenutzer,
+)
 from homepi_core.auth.dienst import Rolle
 from homepi_core.auth.modelle import Benutzer, Recht
 
@@ -30,7 +35,7 @@ TOTE_DB = "postgresql+asyncpg://app:app@127.0.0.1:59999/nix"
 Anmelden = Callable[[Benutzer | None], None]
 
 
-def _benutzer(**rechte: Rolle) -> Benutzer:
+def _benutzer(*, wechsel: bool = False, **rechte: Rolle) -> Benutzer:
     kennung = uuid.uuid4()
     return Benutzer(
         id=kennung,
@@ -38,6 +43,7 @@ def _benutzer(**rechte: Rolle) -> Benutzer:
         anzeigename="Probe",
         passwort_hash="egal",
         aktiv=True,
+        passwort_wechseln=wechsel,
         rechte=[
             Recht(benutzer_id=kennung, artefakt=artefakt, rolle=rolle.value)
             for artefakt, rolle in rechte.items()
@@ -51,6 +57,11 @@ def _modul(kennung: str, zugang: Zugang, mindestrolle: Rolle = Rolle.LESER) -> M
     @router.get("/")
     async def wurzel() -> dict[str, str]:
         return {"modul": kennung}
+
+    @router.get("/geschuetzt")
+    async def geschuetzt(benutzer: AktuellerBenutzer) -> dict[str, str]:
+        """Ein Endpunkt, der seinen Benutzer selbst holt - ohne erfordert."""
+        return {"benutzer": benutzer.name}
 
     return Modul(
         id=kennung,
@@ -209,6 +220,49 @@ class TestGefiltertesManifest:
         als(None)
 
         assert (await client.get("/module")).status_code == 200
+
+
+# --- Ausstehender Passwortwechsel ------------------------------------------
+
+
+class TestPasswortwechsel:
+    """Solange das vergebene Startpasswort gilt, kommt das Konto an kein
+    Artefakt. Die Pruefung sitzt in hole_benutzer - also an der Stelle, an der
+    **jedes** Artefakt seinen Benutzer bekommt, auch ein selbstpruefendes."""
+
+    @pytest.fixture
+    def mit_wechsel(self, dienst: FastAPI) -> Benutzer:
+        benutzer = _benutzer(wechsel=True, geraete=Rolle.VERWALTER, verein=Rolle.VERWALTER)
+        dienst.dependency_overrides[hole_sitzungsbenutzer] = lambda: benutzer
+        return benutzer
+
+    async def test_ein_geschuetztes_artefakt_bleibt_zu(
+        self, client: AsyncClient, mit_wechsel: Benutzer
+    ) -> None:
+        antwort = await client.get("/geraete/")
+
+        assert antwort.status_code == 403
+        assert "Startpasswort" in antwort.json()["detail"]
+
+    async def test_auch_ein_selbstpruefendes(
+        self, client: AsyncClient, mit_wechsel: Benutzer
+    ) -> None:
+        """Es benutzt AktuellerBenutzer und nicht erfordert - eine Pruefung in
+        erfordert allein waere hier vorbeigelaufen."""
+        assert (await client.get("/verein/geschuetzt")).status_code == 403
+
+    async def test_das_oeffentliche_bleibt_offen(
+        self, client: AsyncClient, mit_wechsel: Benutzer
+    ) -> None:
+        assert (await client.get("/info/")).json() == {"modul": "info"}
+
+    async def test_das_manifest_zeigt_nur_oeffentliches(
+        self, client: AsyncClient, mit_wechsel: Benutzer
+    ) -> None:
+        antwort = await client.get("/module")
+
+        assert antwort.status_code == 200
+        assert _ids(antwort.json()) == {"info"}
 
 
 # --- Das OpenAPI-Schema ----------------------------------------------------

@@ -46,14 +46,28 @@ async def setze_aktiv(sitzung: AsyncSession, benutzer: Benutzer, aktiv: bool) ->
         await kern.melde_ueberall_ab(sitzung, benutzer.id)
 
 
-async def setze_passwort(sitzung: AsyncSession, benutzer: Benutzer, passwort: str) -> None:
-    """Setzt ein neues Passwort und beendet alle Sitzungen des Kontos.
+async def setze_passwort(
+    sitzung: AsyncSession,
+    benutzer: Benutzer,
+    passwort: str,
+    *,
+    wechsel_erzwingen: bool = False,
+    laufendes_token: str | None = None,
+) -> None:
+    """Setzt ein neues Passwort und beendet die Sitzungen des Kontos.
 
     Ein Verwalter setzt ein Passwort meist dann zurück, wenn etwas schiefging.
     Eine weiterlaufende fremde Sitzung wäre genau dann fatal.
+
+    ``laufendes_token`` ist das Cookie des Aufrufers. Am **fremden** Konto
+    gehört es niemandem in dieser Liste, also fliegen dort alle Sitzungen
+    raus. Am **eigenen** bleibt genau eine stehen: die, aus der der Aufruf
+    kam. Ein Verwalter, der sein eigenes Passwort setzt, soll dabei nicht auf
+    der Anmeldeseite landen.
     """
     from homepi_core.auth import dienst, passwoerter
 
     dienst.pruefe_passwort(passwort, benutzer.name)
     benutzer.passwort_hash = passwoerter.hashe_passwort(passwort)
-    await kern.melde_ueberall_ab(sitzung, benutzer.id)
+    benutzer.passwort_wechseln = wechsel_erzwingen
+    await kern.melde_andere_ab(sitzung, benutzer.id, laufendes_token)

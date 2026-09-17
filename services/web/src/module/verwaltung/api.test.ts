@@ -25,6 +25,7 @@ const KONTO = {
   rechte: {},
   angelegt: null,
   verwalter: false,
+  passwort_wechseln: false,
 };
 
 function antwort(koerper: unknown, status = 200): Response {
@@ -90,11 +91,23 @@ describe("Verwaltungs-API", () => {
     expect(aufruf(spy)[1].body).toBe(JSON.stringify({ anzeigename: "Gast im Haus" }));
   });
 
-  it("setzt ein Passwort und kommt mit 204 zurecht", async () => {
-    const spy = abfangen(new Response(null, { status: 204 }));
+  it("setzt ein Passwort", async () => {
+    const spy = abfangen(antwort({ startpasswort: null }));
 
-    await expect(setzePasswort(KONTO.id, "langes-passwort")).resolves.toBeUndefined();
-    expect(aufruf(spy)[0]).toContain("/passwort");
+    await setzePasswort(KONTO.id, "langes-passwort");
+
+    const [pfad, init] = aufruf(spy);
+    expect(pfad).toContain("/passwort");
+    expect(init.body).toBe(JSON.stringify({ passwort: "langes-passwort" }));
+  });
+
+  it("laesst ohne Angabe ein Startpasswort erzeugen", async () => {
+    const spy = abfangen(antwort({ startpasswort: "abcd-efgh-ijkl-mnop" }));
+
+    const ergebnis = await setzePasswort(KONTO.id);
+
+    expect(aufruf(spy)[1].body).toBe("{}");
+    expect(ergebnis.startpasswort).toBe("abcd-efgh-ijkl-mnop");
   });
 
   it("löscht ein Konto", async () => {

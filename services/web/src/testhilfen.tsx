@@ -19,6 +19,7 @@ export const TESTBENUTZER: Benutzer = {
   name: "pruefer",
   anzeigename: "Prüfer",
   rechte: { geraete: "verwalter", messwerte: "verwalter" },
+  passwort_wechseln: false,
 };
 
 /**

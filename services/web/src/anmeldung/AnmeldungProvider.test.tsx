@@ -15,6 +15,7 @@ const BENUTZER: api.Benutzer = {
   name: "leiter",
   anzeigename: "Staffelleiter",
   rechte: { staffelpilot: "nutzer" },
+  passwort_wechseln: false,
 };
 
 function Probe() {

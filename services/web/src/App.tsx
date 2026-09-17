@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 
 import { AnmeldungProvider } from "./anmeldung/AnmeldungProvider";
+import { Passwortwechseltor } from "./anmeldung/Passwortwechseltor";
 import { Einrichtungstor } from "./einrichtung/Einrichtungstor";
 import { Huelle } from "./huelle/Huelle";
 import { Anmeldeseite } from "./seiten/Anmeldeseite";
@@ -15,12 +16,16 @@ export function App() {
           diesen Fall seine eigene, schlichte Hülle mit. */}
       <Einrichtungstor>
         <Huelle>
-          <Routes>
-            <Route path="/" element={<Start />} />
-            <Route path="/anmelden" element={<Anmeldeseite />} />
-            <Route path="/modul/:id" element={<ModulSeite />} />
-            <Route path="*" element={<Start />} />
-          </Routes>
+          {/* Wer noch das vergebene Startpasswort hat, kommt an kein
+              Artefakt - also auch nicht an eine Ansicht davon. */}
+          <Passwortwechseltor>
+            <Routes>
+              <Route path="/" element={<Start />} />
+              <Route path="/anmelden" element={<Anmeldeseite />} />
+              <Route path="/modul/:id" element={<ModulSeite />} />
+              <Route path="*" element={<Start />} />
+            </Routes>
+          </Passwortwechseltor>
         </Huelle>
       </Einrichtungstor>
     </AnmeldungProvider>

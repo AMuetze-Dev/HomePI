@@ -12,6 +12,8 @@ import type { Benutzer, Rolle } from "../api/anmeldung";
  */
 export interface Anmeldung {
   zustand: "laedt" | "angemeldet" | "abgemeldet";
+  /** Angemeldet, aber noch mit dem vergebenen Startpasswort. */
+  mussPasswortWechseln: boolean;
   benutzer: Benutzer | null;
   anmelden: (name: string, passwort: string) => Promise<void>;
   abmelden: () => Promise<void>;

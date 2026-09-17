@@ -176,10 +176,55 @@ homepi benutzer entziehen aaron geraete
 homepi benutzer passwort aaron
 homepi benutzer liste
 
+homepi benutzer anlegen neuling --startpasswort   # Dienst erzeugt eines
 homepi benutzer sperren aaron       # stilllegen, Sitzungen fliegen sofort raus
 homepi benutzer entsperren aaron
 homepi benutzer loeschen aaron      # fragt nach; --ja fuer Skripte
 ```
+
+### Ein neues Konto braucht nur einen Namen
+
+```bash
+homepi benutzer anlegen neuling --startpasswort
+```
+
+Der Dienst erzeugt ein **Startpasswort** und gibt es genau einmal aus — in der
+Oberfläche als eigene Karte mit Kopierknopf, auf der Kommandozeile als Zeile
+unter dem Konto. Es steht nirgends sonst: nicht in der Datenbank, nicht in
+einer weiteren Antwort. Wer es wegklickt, ohne es weiterzugeben, erzeugt ein
+neues.
+
+```
+xkr7-mq2n-bt9v-wpsa
+```
+
+Vier Gruppen zu vier Zeichen aus einem Alphabet **ohne** `0/O` und `1/l/I` —
+es wird vorgelesen oder abgetippt, und genau dort entstehen die
+Verwechslungen. Bewusst zufällig und nicht `start1234` für alle: ein festes
+Standardpasswort ist nach dem ersten Aushang kein Passwort mehr.
+
+**Der Benutzer ersetzt es beim ersten Anmelden.** Bis dahin kommt sein Konto an
+**kein** Artefakt — auch nicht an eines, für das er längst ein Recht hat:
+
+| | |
+|---|---|
+| `POST /auth/anmelden` | geht, Antwort enthält `passwort_wechseln: true` |
+| `GET /auth/ich`, `/auth/abmelden`, `/auth/passwort` | gehen |
+| `GET /<artefakt>/…` | **403** |
+| `GET /module` | so viel wie für einen Besucher |
+
+Die Prüfung sitzt in `hole_benutzer` — also an der Stelle, über die **jedes**
+Artefakt seinen Benutzer bekommt, auch ein selbstprüfendes. Die Maske im
+Frontend führt dorthin; sie sichert nichts.
+
+Dasselbe gilt, wenn ein Verwalter ein Passwort zurücksetzt: am **fremden**
+Konto ist das Ergebnis immer ein Startpasswort. Am eigenen nicht — dort ist es
+schlicht das neue Passwort.
+
+Der Wechsel beendet alle **anderen** Sitzungen des Kontos. Die laufende bleibt:
+wer gerade sein Passwort geändert hat, sitzt davor und hat sich ausgewiesen.
+Ihn hinauszuwerfen hieße, ihn nach einem erzwungenen Erstwechsel auf die
+Anmeldeseite zu schicken.
 
 Dasselbe in der Oberfläche: Artefakt **Verwaltung**. Dort lassen sich Konten
 anlegen, sperren, löschen, Passwörter setzen und Rollen je Artefakt vergeben.
@@ -231,8 +276,8 @@ Ein unbekannter Benutzername und ein falsches Passwort sind von außen nicht zu
 unterscheiden — auch nicht an der Antwortzeit. Bei fehlendem Konto wird
 trotzdem einmal gehasht.
 
-Ein Passwortwechsel meldet **alle** Geräte ab. Wer sein Passwort ändert, tut
-das oft genau deshalb.
+Ein Passwortwechsel meldet alle **anderen** Geräte ab. Wer sein Passwort
+ändert, tut das oft genau deshalb. Die laufende Sitzung bleibt bestehen.
 
 ## Was das Gateway nach außen preisgibt
 

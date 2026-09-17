@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, Response, status
 
 from ..deps import DbSitzung, Einstellungen
 from . import cookies, speicher
-from .deps import AktuellerBenutzer
+from .deps import Sitzungsbenutzer
 from .dienst import AnmeldungFehlgeschlagen, pruefe_passwort
 from .modelle import Benutzer
 from .schemas import Anmeldung, BenutzerAusgabe, PasswortAendern
@@ -26,6 +26,7 @@ def _ausgabe(benutzer: Benutzer) -> BenutzerAusgabe:
         name=benutzer.name,
         anzeigename=benutzer.anzeigename,
         rechte=speicher.rechte_von(benutzer),
+        passwort_wechseln=benutzer.passwort_wechseln,
     )
 
 
@@ -49,7 +50,7 @@ async def abmelden(request: Request, antwort: Response, sitzung: DbSitzung) -> N
 
 
 @router.get("/ich", summary="Wer ist angemeldet")
-async def ich(benutzer: AktuellerBenutzer) -> BenutzerAusgabe:
+async def ich(benutzer: Sitzungsbenutzer) -> BenutzerAusgabe:
     return _ausgabe(benutzer)
 
 
@@ -60,10 +61,16 @@ async def ich(benutzer: AktuellerBenutzer) -> BenutzerAusgabe:
 )
 async def passwort_aendern(
     daten: PasswortAendern,
-    benutzer: AktuellerBenutzer,
-    antwort: Response,
+    benutzer: Sitzungsbenutzer,
+    request: Request,
     sitzung: DbSitzung,
 ) -> None:
+    """Das eigene Passwort.
+
+    Geht auch dann, wenn noch der Wechsel aussteht - es ist ja genau der
+    Schritt, der ihn beendet. Deshalb ``Sitzungsbenutzer`` und nicht
+    ``AktuellerBenutzer``.
+    """
     from . import passwoerter
 
     if not passwoerter.passwort_stimmt(benutzer.passwort_hash, daten.altes_passwort):
@@ -71,8 +78,11 @@ async def passwort_aendern(
 
     pruefe_passwort(daten.neues_passwort, benutzer.name)
     benutzer.passwort_hash = passwoerter.hashe_passwort(daten.neues_passwort)
+    benutzer.passwort_wechseln = False
 
-    # Alle Geraete abmelden. Wer das Passwort aendert, tut das haeufig genau
-    # deshalb - eine weiterlaufende fremde Sitzung waere dann fatal.
-    await speicher.melde_ueberall_ab(sitzung, benutzer.id)
-    cookies.loesche(antwort)
+    # Alle **anderen** Geraete abmelden. Wer sein Passwort aendert, tut das
+    # haeufig genau deshalb - eine weiterlaufende fremde Sitzung waere dann
+    # fatal. Die eigene bleibt: der Benutzer sitzt davor und hat sich gerade
+    # ausgewiesen. Ihn hier hinauszuwerfen hiesse, ihn nach einem erzwungenen
+    # Erstwechsel auf die Anmeldeseite zu schicken.
+    await speicher.melde_andere_ab(sitzung, benutzer.id, request.cookies.get(cookies.NAME))
