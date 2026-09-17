@@ -15,7 +15,7 @@ Nicht neu bauen, nicht umbauen:
 | | |
 |---|---|
 | Anmeldung | Entry Point `homepi.module` in `pyproject.toml` → Gateway findet das Modul beim Start |
-| Routing | Router hängt unter `/{{service}}`; Traefik leitet `api.<domain>/{{service}}` dorthin |
+| Routing | Router hängt unter `/{{service}}`; Traefik leitet `api.<domain>/{{service}}` dorthin. **`GET /{{service}}/` muss antworten** - daran erkennt der Rauchtest, dass das Modul wirklich eingehängt ist |
 | Kachel | Startseite liest `GET /module` und zeigt „{{titel}}" — ohne Frontend-Änderung |
 | Zugriff | `zugang=Zugang.GESCHUETZT` in `__init__.py`: nur mit Recht `{{service}}`. Die Prüfung hängt am ganzen Router |
 | Health | `/health` und `/info` kommen aus `homepi-core` |

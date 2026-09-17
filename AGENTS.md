@@ -55,12 +55,18 @@ make dev                          # Gateway und Oberfläche starten
 ```
 
 Die Kachel erscheint erst nach der Anmeldung — ein Artefakt ist per
-Voreinstellung verschlossen. Einmalig ein Konto anlegen:
+Voreinstellung verschlossen. Eine frische Umgebung zeigt die
+**Einrichtungsmaske**; das nötige Token steht im Log des Gateways. Auf der
+Kommandozeile geht dasselbe:
 
 ```bash
 export DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/app'
-homepi benutzer anlegen <name> --artefakt <artefakt> --rolle verwalter
+homepi benutzer anlegen <name> --artefakt verwaltung --rolle verwalter
 ```
+
+`verwaltung` ist das Artefakt, in dem Konten und Rechte verwaltet werden — wer
+es darf, ist das, was man sonst Administrator nennt. Weitere Rechte vergibt er
+sich dort selbst.
 
 Rezept mit allen Schritten: [docs/09-artefakt-bauen.md](docs/09-artefakt-bauen.md).
 

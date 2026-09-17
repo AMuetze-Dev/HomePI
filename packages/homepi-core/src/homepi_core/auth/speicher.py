@@ -7,12 +7,12 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import dienst, passwoerter
-from .modelle import Benutzer, Recht, Sitzung
+from .modelle import Benutzer, Einrichtung, Recht, Sitzung
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import CursorResult
@@ -142,3 +142,66 @@ async def raeume_abgelaufene_auf(sitzung: AsyncSession) -> int:
     # CursorResult.rowcount gibt es, der Rueckgabetyp von execute() ist nur
     # allgemeiner deklariert.
     return int(cast("CursorResult[Any]", ergebnis).rowcount or 0)
+
+
+# --- Verwalter -------------------------------------------------------------
+
+
+async def zaehle_verwalter(sitzung: AsyncSession) -> int:
+    """Wie viele Konten duerfen die Verwaltung?
+
+    Absichtlich **ohne** Ruecksicht auf ``aktiv``: zaehlte ein gesperrtes Konto
+    nicht mit, liesse sich die Einrichtung wieder oeffnen, indem man den
+    letzten Verwalter sperrt. Ein gesperrter Verwalter ist ein Fall fuer die
+    Kommandozeile, kein Grund, die Tuer erneut aufzumachen.
+    """
+    ergebnis = await sitzung.execute(
+        select(func.count())
+        .select_from(Recht)
+        .where(Recht.artefakt == dienst.VERWALTUNG, Recht.rolle == dienst.Rolle.VERWALTER.value)
+    )
+    return int(ergebnis.scalar_one())
+
+
+async def ist_verwalter(sitzung: AsyncSession, benutzer_id: uuid.UUID) -> bool:
+    ergebnis = await sitzung.execute(
+        select(Recht.id).where(
+            Recht.benutzer_id == benutzer_id,
+            Recht.artefakt == dienst.VERWALTUNG,
+            Recht.rolle == dienst.Rolle.VERWALTER.value,
+        )
+    )
+    return ergebnis.scalar_one_or_none() is not None
+
+
+# --- Einrichtung -----------------------------------------------------------
+
+
+async def einrichtung_noetig(sitzung: AsyncSession) -> bool:
+    return await zaehle_verwalter(sitzung) == 0
+
+
+async def setze_einrichtungstoken(sitzung: AsyncSession) -> str:
+    """Legt ein frisches Token an und gibt den Klartext zurueck.
+
+    Bei jedem Start ein neues: so steht im Log immer das gueltige, und ein
+    Token, das jemand vor drei Wochen mitgelesen hat, ist wertlos.
+    """
+    await sitzung.execute(delete(Einrichtung))
+    token = dienst.neues_einrichtungstoken()
+    sitzung.add(Einrichtung(token_hash=passwoerter.hashe_token(token), angelegt=datetime.now(UTC)))
+    await sitzung.flush()
+    return token
+
+
+async def einrichtungstoken_stimmt(sitzung: AsyncSession, token: str) -> bool:
+    ergebnis = await sitzung.execute(select(Einrichtung))
+    eintrag = ergebnis.scalars().first()
+    if eintrag is None:
+        return False
+    return passwoerter.token_stimmt(eintrag.token_hash, token)
+
+
+async def schliesse_einrichtung(sitzung: AsyncSession) -> None:
+    """Nach dem ersten Verwalter ist das Token wertlos - und weg."""
+    await sitzung.execute(delete(Einrichtung))

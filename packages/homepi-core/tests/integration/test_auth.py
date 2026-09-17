@@ -392,3 +392,48 @@ class TestBenutzer:
         async with kontext.db.session() as sitzung:
             geladen = await auth_speicher.finde_benutzer(sitzung, "aaron")
             assert auth_speicher.rechte_von(geladen) == {"probe": Rolle.LESER}
+
+
+class TestVerwalterSchutz:
+    """Ueber die Kommandozeile handelt niemand als jemand - der Selbstschutz
+    des Verwaltungs-Artefakts greift hier also nicht. Uebrig bleibt die
+    Zaehlung, und die muss halten."""
+
+    async def test_zaehlt_nur_verwalter_der_verwaltung(self, benutzer, app_und_kontext) -> None:
+        from homepi_core.auth import VERWALTUNG
+
+        _, kontext = app_und_kontext
+        async with kontext.db.session() as sitzung:
+            assert await auth_speicher.zaehle_verwalter(sitzung) == 0
+
+            await auth_speicher.setze_recht(sitzung, benutzer.id, "probe", Rolle.VERWALTER)
+            assert await auth_speicher.zaehle_verwalter(sitzung) == 0
+
+            await auth_speicher.setze_recht(sitzung, benutzer.id, VERWALTUNG, Rolle.VERWALTER)
+            assert await auth_speicher.zaehle_verwalter(sitzung) == 1
+
+    async def test_eine_niedrigere_rolle_zaehlt_nicht(self, benutzer, app_und_kontext) -> None:
+        from homepi_core.auth import VERWALTUNG
+
+        _, kontext = app_und_kontext
+        async with kontext.db.session() as sitzung:
+            await auth_speicher.setze_recht(sitzung, benutzer.id, VERWALTUNG, Rolle.NUTZER)
+
+            assert await auth_speicher.zaehle_verwalter(sitzung) == 0
+            assert not await auth_speicher.ist_verwalter(sitzung, benutzer.id)
+
+    async def test_ein_gesperrtes_konto_zaehlt_weiter(self, benutzer, app_und_kontext) -> None:
+        """Sonst liesse sich die Ersteinrichtung wieder oeffnen, indem man den
+        letzten Verwalter sperrt."""
+        from homepi_core.auth import VERWALTUNG
+
+        _, kontext = app_und_kontext
+        async with kontext.db.session() as sitzung:
+            await auth_speicher.setze_recht(sitzung, benutzer.id, VERWALTUNG, Rolle.VERWALTER)
+            geladen = await auth_speicher.finde_benutzer(sitzung, "aaron")
+            assert geladen is not None
+            geladen.aktiv = False
+
+        async with kontext.db.session() as sitzung:
+            assert await auth_speicher.zaehle_verwalter(sitzung) == 1
+            assert not await auth_speicher.einrichtung_noetig(sitzung)

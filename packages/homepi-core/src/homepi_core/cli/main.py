@@ -144,6 +144,18 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         fehler("Abgebrochen.")
         return 130
+    except Exception as problem:
+        # Fachliche Fehler teilt sich die CLI mit der API: "Benutzername
+        # vergeben" oder "letzter Verwalter" sind fuer den Benutzer gedacht und
+        # nicht fuer einen Stacktrace. Der Import steht hier drin und nicht
+        # oben, weil er FastAPI mitzieht - auf dem Fehlerweg ist das egal,
+        # beim "homepi deploy" waere es verschenkte Startzeit.
+        from homepi_core.errors import ServiceError
+
+        if isinstance(problem, ServiceError):
+            fehler(str(problem))
+            return 1
+        raise
 
 
 if __name__ == "__main__":  # pragma: no cover

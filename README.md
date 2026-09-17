@@ -44,7 +44,7 @@ Pi-hole anzufassen.
 | [docs/08-design.md](docs/08-design.md) | Designsystem: Tokens, Bausteine, Verhalten, Zugänglichkeit |
 | [docs/09-artefakt-bauen.md](docs/09-artefakt-bauen.md) | Vom leeren Verzeichnis bis zur Kachel auf dem Pi |
 | [docs/10-auftrag-artefakt.md](docs/10-auftrag-artefakt.md) | Fertiger Auftrag zum Übergeben an einen Agenten |
-| [docs/11-anmeldung.md](docs/11-anmeldung.md) | Konten, Rechte je Artefakt, wer welches Artefakt sieht |
+| [docs/11-anmeldung.md](docs/11-anmeldung.md) | Ersteinrichtung, Konten, Rechte je Artefakt, wer welches Artefakt sieht |
 
 ## Schnellstart auf dem Pi
 

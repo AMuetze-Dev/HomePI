@@ -276,6 +276,8 @@ HOMEPI_SMOKE_BENUTZER=entwickler HOMEPI_SMOKE_PASSWORT=… make smoke
 
 - [ ] Kein `TODO`, kein `pass`, keine leere Funktion mehr im Artefakt
 - [ ] Kein `@pytest.mark.skip`, kein `it.skip`, kein auskommentierter Test
+- [ ] `GET /<kennung>/` antwortet - daran erkennt der Rauchtest, dass das
+      Modul wirklich eingehängt ist und nicht nur im Manifest steht
 - [ ] Jeder Endpunkt hat mindestens einen Test für den Fehlerfall, nicht nur
       für den Erfolg
 - [ ] Die vier Zustände der Oberfläche sind belegt

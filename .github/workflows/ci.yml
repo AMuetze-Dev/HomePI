@@ -304,11 +304,16 @@ jobs:
         # berechtigterweise leer und die Rauchtests wuerden nichts mehr pruefen.
         # Das Passwort kommt ueber stdin, nicht als Argument - sonst stuende es
         # in der Prozessliste des Runners.
+        #
+        # Auch das Recht auf "verwaltung": damit gilt diese Instanz als
+        # eingerichtet, und der Rauchtest kann pruefen, ob die Ersteinrichtung
+        # danach wirklich zu ist. Ohne das wuerde er sich ueberspringen.
         run: |
+          GATEWAY="docker compose -f compose.dev.yml exec -T -w /app/services/gateway gateway"
           printf '%s' "$HOMEPI_SMOKE_PASSWORT" \
-            | docker compose -f compose.dev.yml exec -T -w /app/services/gateway gateway \
-                uv run homepi benutzer anlegen rauchtest --passwort-stdin \
+            | $GATEWAY uv run homepi benutzer anlegen rauchtest --passwort-stdin \
                 --artefakt geraete --rolle verwalter
+          $GATEWAY uv run homepi benutzer recht rauchtest verwaltung verwalter
 
       - name: Rauchtests gegen die laufende Instanz
         working-directory: services/gateway

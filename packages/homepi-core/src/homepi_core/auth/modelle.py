@@ -62,3 +62,19 @@ class Sitzung(Base):
     angelegt: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     benutzer: Mapped[Benutzer] = relationship(back_populates="sitzungen", lazy="selectin")
+
+
+class Einrichtung(Base):
+    """Das Token, mit dem sich der erste Verwalter anlegen laesst.
+
+    Hoechstens eine Zeile: sie entsteht beim Start, solange es keinen
+    Verwalter gibt, und verschwindet, sobald einer da ist. Wie bei den
+    Sitzungen steht hier nur der Hash - der Klartext steht einmal im Log und
+    sonst nirgends.
+    """
+
+    __tablename__ = "einrichtung"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    angelegt: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

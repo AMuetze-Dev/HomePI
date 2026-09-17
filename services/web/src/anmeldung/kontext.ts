@@ -15,6 +15,9 @@ export interface Anmeldung {
   benutzer: Benutzer | null;
   anmelden: (name: string, passwort: string) => Promise<void>;
   abmelden: () => Promise<void>;
+  /** Uebernimmt einen Benutzer, der anderswo entstanden ist - die
+   *  Ersteinrichtung meldet den ersten Verwalter gleich mit an. */
+  uebernimm: (benutzer: Benutzer) => void;
   /** Hat der Benutzer fuer dieses Artefakt mindestens diese Rolle? */
   darf: (artefakt: string, benoetigt?: Rolle) => boolean;
 }

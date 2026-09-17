@@ -29,16 +29,25 @@ make dev-reset    # stoppen und Datenbank wegwerfen
 
 ### Einmalig: ein Konto
 
-Artefakte sind per Voreinstellung verschlossen. Ohne Konto zeigt die Startseite
-das Anmeldeformular und sonst nichts — das ist richtig so, aber zum Entwickeln
-braucht es einmal ein Konto:
+Eine frische Umgebung hat keinen Verwalter. `http://localhost:5173` zeigt dann
+die **Einrichtungsmaske**. Sie verlangt das Einrichtungstoken, das beim Start
+im Log steht:
+
+```bash
+docker compose -f compose.dev.yml logs gateway | grep -A3 "keinen Verwalter"
+```
+
+Auf der Kommandozeile geht dasselbe:
 
 ```bash
 export DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/app'
 cd packages/homepi-core
-uv run homepi benutzer anlegen aaron --artefakt geraete --rolle verwalter
+uv run homepi benutzer anlegen aaron --artefakt verwaltung --rolle verwalter
 uv run homepi benutzer liste
 ```
+
+Weitere Rechte — etwa `geraete` — vergibst du danach in der Oberfläche unter
+*Verwaltung* oder mit `homepi benutzer recht aaron geraete verwalter`.
 
 `make dev-reset` wirft die Datenbank weg — danach ist auch das Konto weg.
 

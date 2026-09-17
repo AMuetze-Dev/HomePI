@@ -93,6 +93,37 @@ async def test_die_anmeldung_ist_erreichbar(smoke_client: httpx.AsyncClient) -> 
     assert antwort.status_code == 401, f"unerwarteter Code {antwort.status_code}"
 
 
+async def test_die_ersteinrichtung_ist_zu(smoke_client: httpx.AsyncClient) -> None:
+    """Der wichtigste Test dieser Datei nach einem Deploy.
+
+    Der Einrichtungs-Endpunkt legt ein Konto an, das alles verwalten darf, und
+    er ist naturgemäß ohne Anmeldung erreichbar. Steht er auf einer
+    eingerichteten Installation noch offen, kann sie jeder übernehmen, der sie
+    erreicht. Geprüft wird mit einem erfundenen Token: 409 heißt "die Tür ist
+    zu", 401 hieße "die Tür steht offen, nur der Schlüssel war falsch".
+    """
+    stand = await smoke_client.get("/auth/einrichtung")
+    if stand.status_code == 404:
+        pytest.skip("dieser Dienst hat keine Anmeldung")
+
+    if stand.json().get("noetig"):
+        pytest.skip("diese Installation ist noch nicht eingerichtet")
+
+    antwort = await smoke_client.post(
+        "/auth/einrichtung",
+        json={
+            "token": "gibt-es-nicht-4711",
+            "name": "eindringling",
+            "passwort": "auch-nicht-4711-lang",
+        },
+    )
+
+    assert antwort.status_code == 409, (
+        f"Die Ersteinrichtung antwortet mit {antwort.status_code}, obwohl diese "
+        "Installation bereits einen Verwalter hat"
+    )
+
+
 # --- Angemeldet ------------------------------------------------------------
 
 

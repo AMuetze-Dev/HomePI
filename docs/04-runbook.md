@@ -38,16 +38,34 @@ Mal ändert, gehört dort Alembic hin. Nachsehen, was da ist:
 $APPS exec -w /app/services/gateway gateway uv run homepi schema zeigen
 ```
 
-**2. Das erste Konto.** Es gibt keinen Registrierungs-Endpunkt: das erste
-Konto muss von jemandem kommen, der ohnehin Zugriff auf die Maschine hat.
+**2. Das erste Konto.** Zwei Wege, beide gleichwertig.
+
+*Über die Website.* Solange es keinen Verwalter gibt, zeigt sie die
+Einrichtungsmaske. Sie verlangt das Einrichtungstoken, das beim Start im Log
+steht:
+
+```bash
+$APPS logs gateway | grep -A3 "keinen Verwalter"
+```
+
+Lesen kann das nur, wer Zugriff auf die Maschine hat — genau das ist die
+Absicht. Ohne diese Bedingung würde derjenige die Installation übernehmen, der
+als Erster an die frische Adresse kommt.
+
+*Über die Kommandozeile.* Tut dasselbe; danach schließt sich die Maske von
+selbst.
 
 ```bash
 $APPS exec -w /app/services/gateway gateway \
-  uv run homepi benutzer anlegen aaron --artefakt geraete --rolle verwalter
+  uv run homepi benutzer anlegen aaron --artefakt verwaltung --rolle verwalter
 ```
 
 Das Passwort wird abgefragt — nie als Argument, sonst stünde es in der
 Shell-Historie und in der Prozessliste.
+
+Das Recht `verwaltung` ist das, was sonst „Administrator" heißt: damit lassen
+sich weitere Konten anlegen und Rechte vergeben — in der Oberfläche unter
+*Verwaltung*. Alles Weitere gibt sich der erste Verwalter dort selbst.
 
 Prüfen:
 
