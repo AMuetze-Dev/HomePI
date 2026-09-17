@@ -120,3 +120,11 @@
     transform: none;
   }
 }
+
+/* Solange unklar ist, ob hier eine Übersicht oder ein Anmeldeformular steht:
+   ein neutraler Platzhalter statt einer Überschrift, die gleich wieder weg ist. */
+.laden {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-8);
+}

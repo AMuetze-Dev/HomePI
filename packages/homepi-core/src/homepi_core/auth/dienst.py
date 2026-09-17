@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import secrets
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -165,7 +166,7 @@ def pruefe_benutzername(name: str) -> str:
 # --- Rechte ----------------------------------------------------------------
 
 
-def darf(rechte: dict[str, Rolle], artefakt: str, benoetigt: Rolle) -> bool:
+def darf(rechte: Mapping[str, Rolle], artefakt: str, benoetigt: Rolle) -> bool:
     """Hat der Benutzer für dieses Artefakt mindestens diese Rolle?
 
     Rechte sind ausdrücklich **je Artefakt**. Es gibt bewusst keinen globalen

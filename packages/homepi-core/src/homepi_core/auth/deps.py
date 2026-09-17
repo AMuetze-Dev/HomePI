@@ -51,6 +51,28 @@ async def hole_benutzer(request: Request, antwort: Response, sitzung: DbSitzung)
 AktuellerBenutzer = Annotated[Benutzer, Depends(hole_benutzer)]
 
 
+async def hole_benutzer_optional(
+    request: Request, antwort: Response, sitzung: DbSitzung
+) -> Benutzer | None:
+    """Wie ``hole_benutzer``, wirft aber nicht.
+
+    Fuer Endpunkte, die beiden antworten muessen - allen voran ``GET /module``:
+    ein nicht angemeldeter Besucher soll die oeffentlichen Artefakte sehen und
+    keinen 401 bekommen.
+    """
+    if not request.cookies.get(cookies.NAME):
+        # Der haeufigste Fall. Ohne diese Abkuerzung fragte jeder anonyme
+        # Aufruf die Datenbank nach einer Sitzung, die es nicht geben kann.
+        return None
+    try:
+        return await hole_benutzer(request, antwort, sitzung)
+    except NichtAngemeldet:
+        return None
+
+
+MoeglicherBenutzer = Annotated[Benutzer | None, Depends(hole_benutzer_optional)]
+
+
 def erfordert(artefakt: str, rolle: Rolle) -> Abhaengigkeit:
     """Prueft die Rolle fuer genau dieses Artefakt.
 

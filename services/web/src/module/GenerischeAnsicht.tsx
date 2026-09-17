@@ -37,8 +37,10 @@ export function GenerischeAnsicht({ modul }: { modul: ModulEintrag }) {
   if (endpunkte.length === 0) {
     return (
       <Leerzustand titel="Noch keine Oberfläche">
-        Dieses Artefakt bringt keine eigene Ansicht mit und meldet auch keine Endpunkte.
-        Eine eigene Oberfläche trägst du in <code>src/module/register.ts</code> ein.
+        Dieses Artefakt bringt keine eigene Ansicht mit, und über seine Schnittstelle ist
+        hier nichts zu erfahren — es meldet keine Endpunkte, oder das Schema ist
+        abgeschaltet, wie in Produktion üblich. Eine eigene Oberfläche trägst du in{" "}
+        <code>src/module/register.ts</code> ein.
       </Leerzustand>
     );
   }

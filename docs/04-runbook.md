@@ -11,6 +11,52 @@ make cert          # Ablaufdatum des Wildcard-Zertifikats
 make backup
 ```
 
+## Erstinbetriebnahme der Anwendung
+
+Zwei Schritte, die genau einmal nötig sind.
+
+**1. Schema anlegen.** In Produktion steht `DB_SCHEMA_ANLEGEN` auf `false` —
+ein Schema ändert man mit einer Migration, nicht beim Start. Beim allerersten
+Mal gibt es aber noch nichts zu migrieren:
+
+```bash
+APPS="docker compose -f stacks/apps/docker-compose.yml"
+
+$APPS exec -w /app/services/gateway gateway uv run homepi schema anlegen --trocken
+$APPS exec -w /app/services/gateway gateway uv run homepi schema anlegen
+```
+
+Erst der Trockenlauf, dann der Ernstfall — so steht vorher auf dem Schirm, was
+entsteht. Danach gibt es die Tabellen der Artefakte **und** die der Anmeldung
+(`benutzer`, `benutzer_rechte`, `sitzungen`).
+
+`homepi schema` ist ein Startwerkzeug, **kein Migrationssystem**: es legt
+Fehlendes an und ändert nichts Vorhandenes. Sobald sich ein Schema zum ersten
+Mal ändert, gehört dort Alembic hin. Nachsehen, was da ist:
+
+```bash
+$APPS exec -w /app/services/gateway gateway uv run homepi schema zeigen
+```
+
+**2. Das erste Konto.** Es gibt keinen Registrierungs-Endpunkt: das erste
+Konto muss von jemandem kommen, der ohnehin Zugriff auf die Maschine hat.
+
+```bash
+$APPS exec -w /app/services/gateway gateway \
+  uv run homepi benutzer anlegen aaron --artefakt geraete --rolle verwalter
+```
+
+Das Passwort wird abgefragt — nie als Argument, sonst stünde es in der
+Shell-Historie und in der Prozessliste.
+
+Prüfen:
+
+```bash
+$APPS exec -w /app/services/gateway gateway uv run homepi benutzer liste
+```
+
+Weitere Rechte, Sperren, Löschen: [11-anmeldung.md](11-anmeldung.md).
+
 ## Home Assistant auf Postgres umstellen
 
 Erst HA einmal normal einrichten, dann in `configuration.yaml`:

@@ -85,7 +85,10 @@ Nicht alles auf einmal. Jede Stufe verifizieren:
 4. **`make up-home`** — Home Assistant. Erst per `http://$PI_IP:8123` einrichten, dann
    `trusted_proxies` in `configuration.yaml` setzen, HA neu starten, dann über
    `https://ha.$DOMAIN` prüfen.
-5. **`make up-apps`** — deine eigene Software.
+5. **`make up-apps`** — deine eigene Software. Danach einmalig das Schema
+   anlegen und das erste Konto (siehe [04-runbook.md](04-runbook.md),
+   „Erstinbetriebnahme der Anwendung"). Ohne Konto zeigt die Startseite nur
+   das Anmeldeformular — die Artefakte sind per Voreinstellung verschlossen.
 
 ## Deine externen SSDs / USB-Platten
 

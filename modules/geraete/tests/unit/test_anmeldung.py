@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from homepi_core import Modul
+from homepi_core import Modul, Zugang
+from homepi_core.auth import Rolle
 
 
 def test_modul_ist_korrekt_beschrieben(modul: Modul) -> None:
@@ -10,6 +11,16 @@ def test_modul_ist_korrekt_beschrieben(modul: Modul) -> None:
     assert modul.titel == "Geräte"
     assert modul.praefix == "/geraete"
     assert modul.version
+
+
+def test_die_geraete_im_haus_sind_nicht_oeffentlich(modul: Modul) -> None:
+    """Wer kein Recht 'geraete' hat, soll das Artefakt nicht einmal im
+    Manifest sehen. Waere es oeffentlich, laege das Haus auf jeder Seite offen,
+    die dieses Gateway ausliefert."""
+    assert modul.zugang is Zugang.GESCHUETZT
+    assert not modul.sichtbar_fuer(None)
+    assert not modul.sichtbar_fuer({"staffelpilot": Rolle.VERWALTER})
+    assert modul.sichtbar_fuer({"geraete": Rolle.LESER})
 
 
 def test_manifest_hat_die_felder_der_kachel(modul: Modul) -> None:

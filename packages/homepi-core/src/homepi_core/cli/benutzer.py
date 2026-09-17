@@ -16,6 +16,7 @@ import argparse
 import asyncio
 import getpass
 import os
+import sys
 from typing import TYPE_CHECKING
 
 from .shell import CliFehler, erfolg, hinweis, schritt, warnung
@@ -34,6 +35,7 @@ def argumente(parser: argparse.ArgumentParser) -> None:
     p_neu.add_argument("--anzeigename", help="Name in der Oberfläche")
     p_neu.add_argument("--artefakt", help="gleich ein Recht vergeben")
     p_neu.add_argument("--rolle", default="nutzer", choices=["leser", "nutzer", "verwalter"])
+    _passwort_stdin(p_neu)
 
     p_recht = unter.add_parser("recht", help="Rolle für ein Artefakt setzen")
     p_recht.add_argument("name")
@@ -46,8 +48,40 @@ def argumente(parser: argparse.ArgumentParser) -> None:
 
     unter.add_parser("liste", help="Konten und Rechte anzeigen")
 
+    p_sperren = unter.add_parser("sperren", help="Konto stilllegen, ohne es zu löschen")
+    p_sperren.add_argument("name")
+
+    p_frei = unter.add_parser("entsperren", help="Gesperrtes Konto wieder freigeben")
+    p_frei.add_argument("name")
+
+    p_weg = unter.add_parser("loeschen", help="Konto samt Rechten und Sitzungen entfernen")
+    p_weg.add_argument("name")
+    p_weg.add_argument(
+        "--ja",
+        action="store_true",
+        help="ohne Rückfrage löschen (für Skripte)",
+    )
+
     p_pw = unter.add_parser("passwort", help="Passwort zurücksetzen")
     p_pw.add_argument("name")
+    _passwort_stdin(p_pw)
+
+
+def _passwort_stdin(parser: argparse.ArgumentParser) -> None:
+    """Fuer Skripte: das Passwort kommt von stdin statt aus einer Abfrage.
+
+    Weiterhin **kein** --passwort: ein Argument stuende in der Shell-Historie
+    und waere fuer jeden sichtbar, der 'ps' aufruft. Ueber stdin entscheidet
+    der Aufrufer, woher der Wert kommt - in der CI aus einem Secret.
+
+        printf '%s' "$PW" | homepi benutzer anlegen rauchtest --passwort-stdin
+    """
+    parser.add_argument(
+        "--passwort-stdin",
+        action="store_true",
+        dest="passwort_stdin",
+        help="Passwort von der Standardeingabe lesen statt abzufragen",
+    )
 
 
 def ausfuehren(args: argparse.Namespace) -> int:
@@ -64,10 +98,21 @@ def _datenbank_url() -> str:
     return url
 
 
-def _passwort_erfragen(benutzername: str) -> str:
+def _passwort_erfragen(benutzername: str, von_stdin: bool = False) -> str:
     """Zweimal eingeben lassen. Nie als Argument - das landet in der
     Shell-Historie und in der Prozessliste."""
     from ..auth.dienst import PasswortUngeeignet, pruefe_passwort
+
+    if von_stdin:
+        passwort = sys.stdin.readline().rstrip("\r\n")
+        if not passwort:
+            raise CliFehler("Kein Passwort auf der Standardeingabe")
+        try:
+            pruefe_passwort(passwort, benutzername)
+        except PasswortUngeeignet as problem:
+            # Kein zweiter Versuch: es gibt niemanden, der ihn tippen koennte.
+            raise CliFehler(str(problem)) from problem
+        return passwort
 
     for _ in range(3):
         erste = getpass.getpass("Passwort: ")
@@ -96,6 +141,9 @@ async def _ausfuehren(args: argparse.Namespace) -> int:
         "entziehen": _entziehen,
         "passwort": _passwort,
         "liste": _liste,
+        "sperren": _sperren,
+        "entsperren": _entsperren,
+        "loeschen": _loeschen,
     }
     try:
         async with datenbank.session() as sitzung:
@@ -109,7 +157,7 @@ async def _anlegen(sitzung: AsyncSession, args: argparse.Namespace) -> int:
     from ..auth.dienst import Rolle
 
     schritt(f"Konto '{args.name}' anlegen")
-    passwort = _passwort_erfragen(args.name)
+    passwort = _passwort_erfragen(args.name, args.passwort_stdin)
 
     benutzer = await speicher.lege_benutzer_an(sitzung, args.name, passwort, args.anzeigename)
     if args.artefakt:
@@ -147,12 +195,52 @@ async def _passwort(sitzung: AsyncSession, args: argparse.Namespace) -> int:
 
     benutzer = await _erwarte(sitzung, args.name)
     schritt(f"Neues Passwort für '{benutzer.name}'")
-    benutzer.passwort_hash = passwoerter.hashe_passwort(_passwort_erfragen(benutzer.name))
+    benutzer.passwort_hash = passwoerter.hashe_passwort(
+        _passwort_erfragen(benutzer.name, args.passwort_stdin)
+    )
 
     # Alle Geraete abmelden - wer ein Passwort zuruecksetzt, tut das meist,
     # weil es kompromittiert sein koennte.
     await speicher.melde_ueberall_ab(sitzung, benutzer.id)
     erfolg("Gesetzt. Alle bestehenden Sitzungen wurden beendet.")
+    return 0
+
+
+async def _sperren(sitzung: AsyncSession, args: argparse.Namespace) -> int:
+    """Stilllegen statt loeschen.
+
+    Der uebliche Fall: jemand ist ausgeschieden, seine Daten sollen aber
+    zuordenbar bleiben. Bestehende Sitzungen fliegen sofort raus - sonst waere
+    die Sperre bis zu vierzehn Tage wirkungslos.
+    """
+    from ..auth import speicher
+
+    benutzer = await _erwarte(sitzung, args.name)
+    benutzer.aktiv = False
+    await speicher.melde_ueberall_ab(sitzung, benutzer.id)
+    erfolg(f"'{benutzer.name}' ist gesperrt. Alle Sitzungen wurden beendet.")
+    return 0
+
+
+async def _entsperren(sitzung: AsyncSession, args: argparse.Namespace) -> int:
+    benutzer = await _erwarte(sitzung, args.name)
+    benutzer.aktiv = True
+    erfolg(f"'{benutzer.name}' kann sich wieder anmelden.")
+    return 0
+
+
+async def _loeschen(sitzung: AsyncSession, args: argparse.Namespace) -> int:
+    """Endgueltig. Rechte und Sitzungen gehen per Cascade mit."""
+    benutzer = await _erwarte(sitzung, args.name)
+
+    if not args.ja:
+        warnung(f"'{benutzer.name}' wird samt Rechten und Sitzungen entfernt.")
+        hinweis("Zum Bestaetigen den Benutzernamen eingeben, sonst Abbruch:")
+        if input("    > ").strip() != benutzer.name:
+            raise CliFehler("Abgebrochen - nichts geloescht.")
+
+    await sitzung.delete(benutzer)
+    erfolg(f"'{benutzer.name}' ist geloescht.")
     return 0
 
 

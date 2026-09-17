@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as client from "./api/client";
 import { App } from "./App";
+import { mitAnmeldung } from "./testhilfen";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -17,6 +18,7 @@ const geraete: client.ModulEintrag = {
   icon: "kachel",
   version: "1.0.0",
   status: "bereit",
+  zugang: "geschuetzt",
 };
 
 function zeige(pfad: string) {
@@ -28,11 +30,7 @@ function zeige(pfad: string) {
   vi.spyOn(client, "fetchModule").mockResolvedValue([geraete]);
   vi.spyOn(client, "fetchEndpunkte").mockResolvedValue([]);
 
-  render(
-    <MemoryRouter initialEntries={[pfad]}>
-      <App />
-    </MemoryRouter>,
-  );
+  render(<MemoryRouter initialEntries={[pfad]}>{mitAnmeldung(<App />)}</MemoryRouter>);
 }
 
 describe("App", () => {

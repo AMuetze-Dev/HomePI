@@ -58,3 +58,38 @@ async def smoke_client(ziel: Ziel) -> AsyncIterator[httpx.AsyncClient]:
                 "Anderes Ziel:   HOMEPI_ZIEL=pi pytest -m smoke"
             )
         yield client
+
+
+@pytest.fixture
+async def angemeldeter_smoke_client(
+    smoke_client: httpx.AsyncClient,
+) -> AsyncIterator[httpx.AsyncClient]:
+    """Wie ``smoke_client``, aber angemeldet.
+
+    Seit Artefakte je Benutzer sichtbar sind, sagt ein anonymes ``GET /module``
+    nichts mehr über den Zustand der Instanz: es ist berechtigterweise leer.
+    Ohne Konto überspringen sich die betroffenen Tests deshalb ausdrücklich,
+    statt auf einer leeren Liste stillschweigend grün zu werden.
+
+        HOMEPI_SMOKE_BENUTZER=rauchtest HOMEPI_SMOKE_PASSWORT=… pytest -m smoke
+    """
+    import os
+
+    name = os.environ.get("HOMEPI_SMOKE_BENUTZER", "").strip()
+    passwort = os.environ.get("HOMEPI_SMOKE_PASSWORT", "")
+    if not name or not passwort:
+        pytest.skip(
+            "HOMEPI_SMOKE_BENUTZER/HOMEPI_SMOKE_PASSWORT nicht gesetzt - "
+            "ohne Konto sind die Artefakte erwartungsgemäß unsichtbar"
+        )
+
+    antwort = await smoke_client.post("/auth/anmelden", json={"name": name, "passwort": passwort})
+    if antwort.status_code != 200:
+        pytest.fail(
+            f"Anmeldung als '{name}' scheiterte mit {antwort.status_code}. "
+            "Konto anlegen: homepi benutzer anlegen <name> --passwort-stdin"
+        )
+
+    yield smoke_client
+
+    await smoke_client.post("/auth/abmelden")

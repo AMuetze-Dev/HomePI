@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import benutzer, deploy, scaffold
+from . import benutzer, deploy, scaffold, schema
 from .project import projekt_ermitteln
 from .shell import CliFehler, erfolg, fehler, hinweis, lauf, schritt, warnung
 
@@ -18,6 +18,7 @@ Werkzeug für HomePI-Microservices.
   homepi info           erkanntes Projekt anzeigen
   homepi doctor         Voraussetzungen prüfen
   homepi benutzer       Konten und Rechte verwalten
+  homepi schema         Tabellen anlegen (Startwerkzeug, keine Migration)
 """
 
 
@@ -40,6 +41,10 @@ def _parser() -> argparse.ArgumentParser:
     p_benutzer = unterbefehle.add_parser("benutzer", help="Konten und Rechte verwalten")
     benutzer.argumente(p_benutzer)
     p_benutzer.set_defaults(fn=benutzer.ausfuehren)
+
+    p_schema = unterbefehle.add_parser("schema", help="Tabellen anlegen und nachsehen")
+    schema.argumente(p_schema)
+    p_schema.set_defaults(fn=schema.ausfuehren)
 
     p_info = unterbefehle.add_parser("info", help="erkanntes Projekt anzeigen")
     p_info.add_argument("-s", "--service", help="Servicename überschreiben")

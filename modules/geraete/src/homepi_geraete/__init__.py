@@ -1,6 +1,6 @@
 """HomePI-Artefakt: Geräte im Haus."""
 
-from homepi_core import Modul
+from homepi_core import Modul, Zugang
 
 from .router import router
 
@@ -16,6 +16,9 @@ modul = Modul(
     beschreibung="Was im Haus an- und ausgeht",
     icon="steckdose",
     version=__version__,
+    # Die Geraete im Haus sind niemandes Sache ausser der eigenen. Wer kein
+    # Recht "geraete" hat, sieht das Artefakt nicht einmal im Manifest.
+    zugang=Zugang.GESCHUETZT,
 )
 
 __all__ = ["__version__", "modul", "router"]

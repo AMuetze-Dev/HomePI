@@ -15,7 +15,7 @@ from fastapi import APIRouter
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
-from homepi_core import Base, Modul, ServiceSettings, create_service, register_aus
+from homepi_core import Base, Modul, ServiceSettings, Zugang, create_service, register_aus
 from homepi_core.auth import AktuellerBenutzer, Rolle, erfordert
 from homepi_core.auth import speicher as auth_speicher
 from homepi_core.auth.cookies import NAME as COOKIE
@@ -54,7 +54,9 @@ def _geschuetztes_modul() -> Modul:
     async def lesen() -> dict[str, bool]:
         return {"ok": True}
 
-    return Modul(id="probe", titel="Probe", router=router)
+    # Zugang.SELBST: das Modul prueft Endpunkt fuer Endpunkt, damit
+    # '/offen' auch ohne Anmeldung erreichbar bleibt.
+    return Modul(id="probe", titel="Probe", router=router, zugang=Zugang.SELBST)
 
 
 @pytest.fixture
@@ -344,6 +346,41 @@ class TestBenutzer:
             geladen.aktiv = False
 
         assert (await _anmelden(client)).status_code == 401
+
+    async def test_sperren_beendet_die_laufende_sitzung(
+        self, client: AsyncClient, benutzer, app_und_kontext
+    ) -> None:
+        """Ohne das Beenden waere die Sperre bis zum Ablauf der Sitzung
+        wirkungslos - bis zu vierzehn Tage."""
+        _, kontext = app_und_kontext
+        await _anmelden(client)
+        assert (await client.get("/auth/ich")).status_code == 200
+
+        async with kontext.db.session() as sitzung:
+            geladen = await auth_speicher.finde_benutzer(sitzung, "aaron")
+            geladen.aktiv = False
+            await auth_speicher.melde_ueberall_ab(sitzung, geladen.id)
+
+        assert (await client.get("/auth/ich")).status_code == 401
+
+    async def test_loeschen_nimmt_rechte_und_sitzungen_mit(
+        self, client: AsyncClient, benutzer, app_und_kontext
+    ) -> None:
+        """Cascade, nicht Handarbeit: eine verwaiste Sitzung waere ein
+        gueltiges Token ohne Konto dahinter."""
+        _, kontext = app_und_kontext
+        await _anmelden(client)
+
+        async with kontext.db.session() as sitzung:
+            geladen = await auth_speicher.finde_benutzer(sitzung, "aaron")
+            await sitzung.delete(geladen)
+
+        async with kontext.db.session() as sitzung:
+            assert await auth_speicher.finde_benutzer(sitzung, "aaron") is None
+            uebrig = await sitzung.execute(select(Sitzung))
+            assert uebrig.scalars().all() == []
+
+        assert (await client.get("/auth/ich")).status_code == 401
 
     async def test_recht_setzen_ist_idempotent(self, benutzer, app_und_kontext) -> None:
         _, kontext = app_und_kontext

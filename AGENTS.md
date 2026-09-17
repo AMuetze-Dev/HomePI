@@ -20,7 +20,7 @@ scripts/                Einrichtung, Backup, Diagnose
 docs/                   Begründungen. Lies sie, bevor du etwas umbaust.
 ```
 
-## Der Kern in vier Sätzen
+## Der Kern in fünf Sätzen
 
 1. Ein **Artefakt** ist ein Python-Paket mit einem `APIRouter`, das sich über
    einen Entry Point `homepi.module` anmeldet.
@@ -30,6 +30,9 @@ docs/                   Begründungen. Lies sie, bevor du etwas umbaust.
    Artefakt erscheint dort ohne Frontend-Änderung.
 4. Ohne eigene Oberfläche bekommt es die **generische Ansicht**, die seine
    Endpunkte aus dem OpenAPI-Schema liest.
+5. In dieser Liste steht nur, was der Aufrufer sehen darf. Ein Artefakt ist per
+   Voreinstellung **verschlossen**; Rechte gelten je Artefakt, einen globalen
+   Administrator gibt es nicht.
 
 Warum Modul und nicht Container: zehn FastAPI-Container wären 2 GB auf einem
 16-GB-Pi, zehn Module in einem Prozess sind rund 250 MB.
@@ -48,7 +51,15 @@ und trägt das Artefakt im Gateway und im Frontend-Register ein.
 
 ```bash
 cd services/gateway && uv sync    # Modul in die Umgebung holen
-make dev                          # Kachel erscheint
+make dev                          # Gateway und Oberfläche starten
+```
+
+Die Kachel erscheint erst nach der Anmeldung — ein Artefakt ist per
+Voreinstellung verschlossen. Einmalig ein Konto anlegen:
+
+```bash
+export DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/app'
+homepi benutzer anlegen <name> --artefakt <artefakt> --rolle verwalter
 ```
 
 Rezept mit allen Schritten: [docs/09-artefakt-bauen.md](docs/09-artefakt-bauen.md).
@@ -137,3 +148,4 @@ ist alles ohne horizontales Scrollen erreichbar.
 | Designsystem, Tokens, Zugänglichkeit | [docs/08-design.md](docs/08-design.md) |
 | Artefakt bauen, Schritt für Schritt | [docs/09-artefakt-bauen.md](docs/09-artefakt-bauen.md) |
 | Auftrag zum Übergeben an einen Agenten | [docs/10-auftrag-artefakt.md](docs/10-auftrag-artefakt.md) |
+| Konten, Rechte, Sichtbarkeit von Artefakten | [docs/11-anmeldung.md](docs/11-anmeldung.md) |

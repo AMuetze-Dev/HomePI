@@ -35,4 +35,12 @@ async def beim_start(kontext: ServiceContext) -> AsyncIterator[None]:
 
 
 settings = Settings()
-app = create_service(settings, module=entdecke_module(), on_startup=beim_start)
+app = create_service(
+    settings,
+    module=entdecke_module(),
+    # Artefakte sind per Voreinstellung verschlossen. Ohne Anmeldung gaebe
+    # es niemanden, der pruefen koennte, wer sie sehen darf - create_service
+    # laesst sich dann gar nicht erst starten.
+    anmeldung=True,
+    on_startup=beim_start,
+)
