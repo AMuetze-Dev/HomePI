@@ -1,0 +1,25 @@
+"""Tabellen dieses Artefakts.
+
+Erben von homepi_core.Base - alle Module teilen sich diese Metadata, deshalb
+legt das Gateway die Tabellen in einem Durchgang an.
+
+Braucht das Artefakt keine Datenbank: diese Datei loeschen, speicher.py
+loeschen, und in tests/conftest.py das database_url auf None setzen.
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from homepi_core import Base, ZeitstempelMixin
+from sqlalchemy import String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+
+class Eintrag(Base, ZeitstempelMixin):
+    # TODO: Tabellennamen und Spalten an die Fachlichkeit anpassen.
+    __tablename__ = "{{modul}}_eintraege"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)

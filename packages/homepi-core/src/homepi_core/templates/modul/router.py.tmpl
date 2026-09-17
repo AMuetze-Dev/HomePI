@@ -1,0 +1,46 @@
+"""HTTP-Schicht. Uebersetzt zwischen Anfrage und Fachlichkeit, sonst nichts.
+
+Regeln, die hier gelten:
+  - summary= bei jedem Endpunkt: die generische Ansicht im Frontend zeigt ihn
+  - feste Pfade VOR parametrisierten, sonst liest FastAPI das Wort als UUID
+  - Fehler ueber eigene ServiceError-Klassen, nie HTTPException
+  - Rueckgabetypen annotieren, sonst fehlt das OpenAPI-Schema
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from fastapi import APIRouter, status
+from homepi_core.deps import DbSitzung
+
+from . import speicher
+from .schemas import EintragAnlegen, EintragAusgabe
+
+router = APIRouter()
+
+
+@router.get("/", summary="Alle Einträge")
+async def liste(sitzung: DbSitzung) -> list[EintragAusgabe]:
+    return [EintragAusgabe.model_validate(e) for e in await speicher.alle(sitzung)]
+
+
+# TODO: Feste Pfade stehen hier - VOR /{eintrag_id}.
+#
+# @router.get("/zusammenfassung", summary="Überblick für die Kachel")
+# async def uebersicht(sitzung: DbSitzung) -> Zusammenfassung: ...
+
+
+@router.get("/{eintrag_id}", summary="Ein Eintrag")
+async def einzeln(eintrag_id: uuid.UUID, sitzung: DbSitzung) -> EintragAusgabe:
+    return EintragAusgabe.model_validate(await speicher.eines(sitzung, eintrag_id))
+
+
+@router.post("/", status_code=status.HTTP_201_CREATED, summary="Eintrag anlegen")
+async def anlegen(daten: EintragAnlegen, sitzung: DbSitzung) -> EintragAusgabe:
+    return EintragAusgabe.model_validate(await speicher.anlegen(sitzung, daten))
+
+
+@router.delete("/{eintrag_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eintrag entfernen")
+async def entfernen(eintrag_id: uuid.UUID, sitzung: DbSitzung) -> None:
+    await speicher.loeschen(sitzung, eintrag_id)

@@ -18,6 +18,7 @@ packages/      wiederverwendbare Bausteine
   homepi-core/   Grundgeruest jedes Microservice + homepi-CLI
 modules/       Artefakte, die im Gateway laufen
   geraete/       Geraete im Haus (FastAPI-Router + Fachlogik)
+               neue entstehen mit: homepi new <name>
 services/      lauffaehige Dienste
   gateway/       Python / FastAPI - laedt die Artefakte
   web/           TypeScript / React - die Huelle mit der Startseite
@@ -41,6 +42,7 @@ Pi-hole anzufassen.
 | [docs/06-artefakte.md](docs/06-artefakte.md) | Wie neue Artefakte dazukommen, ohne dass ein Container dazukommt |
 | [docs/07-lokale-entwicklung.md](docs/07-lokale-entwicklung.md) | Die Docker-Umgebung auf dem Windows-Rechner |
 | [docs/08-design.md](docs/08-design.md) | Designsystem: Tokens, Bausteine, Verhalten, Zugänglichkeit |
+| [docs/09-artefakt-bauen.md](docs/09-artefakt-bauen.md) | Vom leeren Verzeichnis bis zur Kachel auf dem Pi |
 
 ## Schnellstart auf dem Pi
 
@@ -86,6 +88,8 @@ pihole.$DOMAIN    Pi-hole            traefik.$DOMAIN   Traefik-Dashboard
 Die Artefakte bekommen keine eigenen Hostnamen: sie laufen als Module im
 Gateway und sind unter `api.$DOMAIN/<artefakt>` erreichbar. Warum das so ist,
 steht in [docs/06-artefakte.md](docs/06-artefakte.md).
+
+Für Agenten ist [AGENTS.md](AGENTS.md) der Einstieg.
 
 ## Entwicklung
 

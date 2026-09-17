@@ -154,6 +154,11 @@ install:
 # ---------------------------------------------------------------- Entwicklung (lokal)
 DEV := docker compose -f compose.dev.yml
 
+## artefakt: neues Artefakt anlegen, z.B. make artefakt N=messwerte
+artefakt:
+	@test -n "$(N)" || { echo "Aufruf: make artefakt N=<name> [T=\"Titel\"]"; exit 1; }
+	uv run --project packages/homepi-core homepi new $(N) $(if $(T),--titel "$(T)",)
+
 ## dev: lokale Umgebung starten (Frontend 5173, API 18000, DB 15432)
 dev:
 	$(DEV) up -d --build

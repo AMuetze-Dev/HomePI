@@ -1,17 +1,17 @@
 [project]
-name = "homepi-geraete"
+name = "homepi-{{service}}"
 version = "0.1.0"
-description = "HomePI-Artefakt: Geraete im Haus"
+description = "HomePI-Artefakt: {{titel}}"
 requires-python = ">=3.12"
 dependencies = ["homepi-core"]
 
-# Das ist die ganze Anmeldung. Das Gateway findet das Modul beim Start,
-# haengt den Router unter /geraete ein und nennt es in GET /module.
+# Die ganze Anmeldung. Das Gateway findet das Modul beim Start hierueber -
+# ein Tippfehler in dieser Zeile heisst: die Kachel fehlt.
 [project.entry-points."homepi.module"]
-geraete = "homepi_geraete:modul"
+{{service}} = "homepi_{{modul}}:modul"
 
 [tool.homepi]
-service = "geraete"
+service = "{{service}}"
 
 [tool.uv.sources]
 homepi-core = { path = "../../packages/homepi-core", editable = true }
@@ -21,7 +21,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/homepi_geraete"]
+packages = ["src/homepi_{{modul}}"]
 
 [dependency-groups]
 dev = [
@@ -44,13 +44,12 @@ markers = [
     "smoke: spricht mit einer laufenden Instanz",
 ]
 
-# Die Schwelle steht beim Projekt, nicht in der CI - so gilt sie auch
-# lokal und muss beim Anlegen eines Artefakts nirgends nachgetragen werden.
+# Die Schwelle steht beim Projekt, nicht in der CI - so gilt sie auch lokal.
 [tool.coverage.report]
 fail_under = 85
 
 [tool.coverage.run]
-source = ["homepi_geraete"]
+source = ["homepi_{{modul}}"]
 branch = true
 
 [tool.ruff]
@@ -68,7 +67,7 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 python_version = "3.12"
 strict = true
 mypy_path = "src"
-packages = ["homepi_geraete"]
+packages = ["homepi_{{modul}}"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"

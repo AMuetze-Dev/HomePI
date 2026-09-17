@@ -1,0 +1,43 @@
+"""Die Entscheidungen dieses Artefakts.
+
+REIN: keine Datenbank, kein await, keine Fixtures. Genau deshalb laufen die
+Tests dazu in Millisekunden - und nur deshalb benutzt man die rot-gruen-
+Schleife wirklich. Alles, was I/O macht, gehoert in speicher.py.
+
+Faustregel: Entscheidungen sind rein, Seiteneffekte sind dumm.
+"""
+
+from __future__ import annotations
+
+from homepi_core import ServiceError
+
+
+class EintragUnbekannt(ServiceError):
+    status = 404
+    title = "Eintrag unbekannt"
+
+
+class NameVergeben(ServiceError):
+    status = 409
+    title = "Name bereits vergeben"
+
+
+# TODO: Hier stehen die Regeln des Artefakts.
+#
+# Beispiel aus modules/geraete - eine Entscheidung als eigener Typ, damit der
+# Grund an ihr haengt und der Aufrufer ihn weiterreichen kann:
+#
+#     @dataclass(frozen=True, slots=True)
+#     class Schaltbar:
+#         erlaubt: bool
+#         grund: str = ""
+#
+#     def darf_geschaltet_werden(zustand: str) -> Schaltbar:
+#         if zustand == "wartung":
+#             return Schaltbar(False, "Geraet steht auf Wartung")
+#         return Schaltbar(True)
+
+
+def normalisiere(name: str) -> str:
+    """Platzhalter, damit von Anfang an etwas Reines getestet wird."""
+    return " ".join(name.split())

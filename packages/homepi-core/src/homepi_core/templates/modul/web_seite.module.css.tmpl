@@ -1,0 +1,65 @@
+/* Nur Tokens aus src/styles/tokens.css - kein fester Farbwert, keine feste
+   Pixelzahl. Siehe docs/08-design.md. */
+
+.liste {
+  list-style: none;
+  padding: 0;
+}
+
+.zeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+  padding: var(--raum-3) var(--raum-4);
+  border-bottom: 1px solid var(--farbe-rand);
+  transition: background-color var(--dauer-schnell) var(--verlauf);
+}
+
+.zeile:last-child {
+  border-bottom: none;
+}
+
+.zeile:hover {
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+.name {
+  font-weight: var(--gewicht-mittel);
+}
+
+.abschnittstitel {
+  margin-bottom: var(--raum-4);
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-halbfett);
+}
+
+/* Mobil zuerst: gestapelt. Zeilenlayout erst ab genug Breite - andersherum
+   muesste die Ausnahme das flex der Kinder wieder aufheben und braeuchte
+   dafuer dieselbe Spezifitaet. */
+.formular {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--raum-4);
+}
+
+.absenden {
+  width: 100%;
+}
+
+@media (width >= 34rem) {
+  .formular {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .formular > *:first-child {
+    flex: 1 1 12rem;
+  }
+
+  .absenden {
+    flex: none;
+    width: auto;
+  }
+}
