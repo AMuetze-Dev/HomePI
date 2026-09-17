@@ -271,7 +271,9 @@ jobs:
       # Wegwerfkonto in einer Datenbank, die am Ende des Jobs geloescht wird.
       # Kein Secret: es schuetzt nichts, was den Lauf ueberlebt.
       HOMEPI_SMOKE_BENUTZER: rauchtest
-      HOMEPI_SMOKE_PASSWORT: rauchtest-nur-fuer-die-ci-4711
+      # Enthaelt bewusst NICHT den Benutzernamen - das lehnt die
+      # Passwortpruefung ab, und zwar zu Recht.
+      HOMEPI_SMOKE_PASSWORT: wegwerf-konto-nur-fuer-die-ci-4711
     steps:
       - uses: actions/checkout@v4
 
@@ -356,15 +358,26 @@ jobs:
       # ins Leere, "exec: uvicorn: not found" - ist hier schon durchgerutscht.
       - name: Startet das Image ueberhaupt?
         if: matrix.name == 'gateway'
+        # Die DATABASE_URL zeigt absichtlich ins Leere: SQLAlchemy verbindet
+        # erst bei der ersten Abfrage, und hier geht es nur um die Frage, ob der
+        # Prozess hochkommt. Ganz ohne die Variable startet er gar nicht mehr -
+        # die Artefakte sind geschuetzt und brauchen eine Anmeldung.
+        # DB_SCHEMA_ANLEGEN muss dafuer aus sein, sonst greift schon der Start
+        # auf die Datenbank zu. Das Zusammenspiel mit echtem Postgres prueft
+        # der stack-Job.
         run: |
           docker run --rm -d --name probe -p 8000:8000 \
             -e SERVICE_NAME=gateway -e ENVIRONMENT=entwicklung \
+            -e DATABASE_URL=postgresql+asyncpg://app:app@127.0.0.1:59999/nix \
+            -e DB_SCHEMA_ANLEGEN=false \
             probe-gateway:ci
           for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:8000/info >/dev/null && break
             sleep 1
           done
-          curl -sf http://127.0.0.1:8000/info | grep -q '"geraete"'
+          # /info nennt keine Modulnamen mehr, nur ihre Anzahl. Null hiesse:
+          # kein Artefakt geladen.
+          curl -sf http://127.0.0.1:8000/info | grep -qE '"module":[1-9]'
           docker rm -f probe
 
   # -------------------------------------------------------------------------

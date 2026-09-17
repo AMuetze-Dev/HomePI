@@ -160,3 +160,21 @@ class TestPasswortVonStdin:
         args = _parser().parse_args(["benutzer", "anlegen", "aaron", "--passwort-stdin"])
 
         assert args.passwort_stdin is True
+
+
+class TestKontenVerwalten:
+    """Ohne diese Befehle liesse sich ein Konto nur anlegen, nie wieder
+    loswerden - bei einem System ohne Selbstregistrierung eine echte Luecke."""
+
+    def test_sperren_nimmt_einen_namen(self) -> None:
+        assert _parser().parse_args(["benutzer", "sperren", "aaron"]).name == "aaron"
+
+    def test_entsperren_nimmt_einen_namen(self) -> None:
+        assert _parser().parse_args(["benutzer", "entsperren", "aaron"]).name == "aaron"
+
+    def test_loeschen_fragt_standardmaessig_nach(self) -> None:
+        # Ein Tippfehler soll kein Konto kosten.
+        assert _parser().parse_args(["benutzer", "loeschen", "aaron"]).ja is False
+
+    def test_loeschen_laesst_sich_fuer_skripte_bestaetigen(self) -> None:
+        assert _parser().parse_args(["benutzer", "loeschen", "aaron", "--ja"]).ja is True

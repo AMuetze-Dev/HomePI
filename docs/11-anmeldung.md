@@ -98,7 +98,15 @@ homepi benutzer recht aaron geraete leser
 homepi benutzer entziehen aaron geraete
 homepi benutzer passwort aaron
 homepi benutzer liste
+
+homepi benutzer sperren aaron       # stilllegen, Sitzungen fliegen sofort raus
+homepi benutzer entsperren aaron
+homepi benutzer loeschen aaron      # fragt nach; --ja fuer Skripte
 ```
+
+`sperren` statt `loeschen` ist der uebliche Fall: jemand ist ausgeschieden,
+seine Daten sollen aber zuordenbar bleiben. Beides beendet laufende Sitzungen
+sofort — ohne das waere die Sperre bis zu vierzehn Tage wirkungslos.
 
 Das Passwort wird abgefragt, **nie als Argument übergeben** — als Argument
 stünde es in der Shell-Historie und in der Prozessliste. Für Skripte und die

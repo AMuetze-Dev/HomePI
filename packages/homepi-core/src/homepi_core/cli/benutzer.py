@@ -48,6 +48,20 @@ def argumente(parser: argparse.ArgumentParser) -> None:
 
     unter.add_parser("liste", help="Konten und Rechte anzeigen")
 
+    p_sperren = unter.add_parser("sperren", help="Konto stilllegen, ohne es zu löschen")
+    p_sperren.add_argument("name")
+
+    p_frei = unter.add_parser("entsperren", help="Gesperrtes Konto wieder freigeben")
+    p_frei.add_argument("name")
+
+    p_weg = unter.add_parser("loeschen", help="Konto samt Rechten und Sitzungen entfernen")
+    p_weg.add_argument("name")
+    p_weg.add_argument(
+        "--ja",
+        action="store_true",
+        help="ohne Rückfrage löschen (für Skripte)",
+    )
+
     p_pw = unter.add_parser("passwort", help="Passwort zurücksetzen")
     p_pw.add_argument("name")
     _passwort_stdin(p_pw)
@@ -127,6 +141,9 @@ async def _ausfuehren(args: argparse.Namespace) -> int:
         "entziehen": _entziehen,
         "passwort": _passwort,
         "liste": _liste,
+        "sperren": _sperren,
+        "entsperren": _entsperren,
+        "loeschen": _loeschen,
     }
     try:
         async with datenbank.session() as sitzung:
@@ -186,6 +203,44 @@ async def _passwort(sitzung: AsyncSession, args: argparse.Namespace) -> int:
     # weil es kompromittiert sein koennte.
     await speicher.melde_ueberall_ab(sitzung, benutzer.id)
     erfolg("Gesetzt. Alle bestehenden Sitzungen wurden beendet.")
+    return 0
+
+
+async def _sperren(sitzung: AsyncSession, args: argparse.Namespace) -> int:
+    """Stilllegen statt loeschen.
+
+    Der uebliche Fall: jemand ist ausgeschieden, seine Daten sollen aber
+    zuordenbar bleiben. Bestehende Sitzungen fliegen sofort raus - sonst waere
+    die Sperre bis zu vierzehn Tage wirkungslos.
+    """
+    from ..auth import speicher
+
+    benutzer = await _erwarte(sitzung, args.name)
+    benutzer.aktiv = False
+    await speicher.melde_ueberall_ab(sitzung, benutzer.id)
+    erfolg(f"'{benutzer.name}' ist gesperrt. Alle Sitzungen wurden beendet.")
+    return 0
+
+
+async def _entsperren(sitzung: AsyncSession, args: argparse.Namespace) -> int:
+    benutzer = await _erwarte(sitzung, args.name)
+    benutzer.aktiv = True
+    erfolg(f"'{benutzer.name}' kann sich wieder anmelden.")
+    return 0
+
+
+async def _loeschen(sitzung: AsyncSession, args: argparse.Namespace) -> int:
+    """Endgueltig. Rechte und Sitzungen gehen per Cascade mit."""
+    benutzer = await _erwarte(sitzung, args.name)
+
+    if not args.ja:
+        warnung(f"'{benutzer.name}' wird samt Rechten und Sitzungen entfernt.")
+        hinweis("Zum Bestaetigen den Benutzernamen eingeben, sonst Abbruch:")
+        if input("    > ").strip() != benutzer.name:
+            raise CliFehler("Abgebrochen - nichts geloescht.")
+
+    await sitzung.delete(benutzer)
+    erfolg(f"'{benutzer.name}' ist geloescht.")
     return 0
 
 
