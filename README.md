@@ -45,6 +45,7 @@ Pi-hole anzufassen.
 | [docs/09-artefakt-bauen.md](docs/09-artefakt-bauen.md) | Vom leeren Verzeichnis bis zur Kachel auf dem Pi |
 | [docs/10-auftrag-artefakt.md](docs/10-auftrag-artefakt.md) | Fertiger Auftrag zum Übergeben an einen Agenten |
 | [docs/11-anmeldung.md](docs/11-anmeldung.md) | Ersteinrichtung, Konten, Rechte je Artefakt, wer welches Artefakt sieht |
+| [docs/12-testen.md](docs/12-testen.md) | Wie ein Artefakt geprüft wird: fünf Ebenen, Testdatenbank, bekannte Fallen |
 
 ## Schnellstart auf dem Pi
 

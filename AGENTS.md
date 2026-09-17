@@ -124,6 +124,9 @@ make tdd-web N=<name>      # vitest nur für dessen Oberfläche
 make test-modul N=<name>   # beide Hälften vollständig prüfen
 ```
 
+Wie ein Artefakt geprüft wird — fünf Ebenen, Testdatenbank, bekannte Fallen —
+steht in [docs/12-testen.md](docs/12-testen.md).
+
 Integrationstests fassen niemals `app` an — sie legen Tabellen an und löschen
 sie wieder. Jeder Lauf bekommt eine **eigene, frisch angelegte** Datenbank
 (`<projekt>_test`), die am Ende weggeworfen wird; nach einem roten Lauf bleibt
