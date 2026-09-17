@@ -15,3 +15,8 @@
 # benannte Konstante; aus der Historie bekommt man ihn nur heraus, indem man
 # einen bereits gepushten Commit umschreibt.
 e57da4db3a002ed18de73943af53e0beaf8454c5:packages/homepi-core/src/homepi_core/testing/smoke.py:generic-api-key:115
+
+# Und der Fund, den der erste Versuch selbst erzeugt hat: die Begründung oben
+# zitierte die beanstandete Zeile. Behoben im Folgecommit, aber die Historie
+# behält sie.
+6fc0131b14c834bb44eb97bff496c48cbd957ab0:.gitleaksignore:generic-api-key:9
