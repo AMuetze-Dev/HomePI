@@ -75,7 +75,14 @@ zulässig. Pydantic-Validierung wird automatisch zu `422` mit Feldnamen.
 3. aufräumen, Tests bleiben unverändert
 
 ```bash
+make dev N={{service}}              # Gateway lädt nur dieses Artefakt
 cd modules/{{service}} && uv run ptw . --now
+```
+
+Für die Oberfläche in einem zweiten Fenster:
+
+```bash
+make tdd-web N={{service}}
 ```
 
 ### 3.3 Persistenz
@@ -126,6 +133,12 @@ npx prettier --check src && npx eslint . && npm run typecheck && npm run test:co
 
 # Zusammenspiel
 make dev && make smoke
+```
+
+Kürzer, solange du nur an diesem Artefakt arbeitest:
+
+```bash
+make test-modul N={{service}}
 ```
 
 | Kriterium | Schwelle |

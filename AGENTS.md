@@ -85,9 +85,17 @@ hat die falsche Datei geöffnet.
 make dev             # Umgebung: Frontend 5173, API 18000, Postgres 15432
 make test            # alles, was die CI auch prüft
 make smoke           # gegen die laufende Umgebung
-make tdd-web
-make tdd-api P=modules/<name>
 make fmt
+```
+
+An **einem** Artefakt arbeiten — alles andere bleibt aus dem Weg:
+
+```bash
+make modul N=<name>        # wo liegen Backend und Oberfläche?
+make dev N=<name>          # Gateway lädt nur dieses Artefakt
+make tdd-api P=modules/<name>
+make tdd-web N=<name>      # vitest nur für dessen Oberfläche
+make test-modul N=<name>   # beide Hälften vollständig prüfen
 ```
 
 Integrationstests laufen gegen die Datenbank `test`, nicht `app` — sie legen

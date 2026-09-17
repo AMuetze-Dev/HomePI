@@ -30,6 +30,7 @@ if TYPE_CHECKING:
         Modul,
         Modulregister,
         entdecke_module,
+        gewuenschte_module,
         register_aus,
     )
     from .service import ServiceContext, create_service
@@ -57,6 +58,7 @@ _HERKUNFT: dict[str, str] = {
     "configure_logging": "logging",
     "create_service": "service",
     "entdecke_module": "modules",
+    "gewuenschte_module": "modules",
     "evaluate": "health",
     "get_settings": "settings",
     "register_aus": "modules",
@@ -86,6 +88,7 @@ __all__ = [
     "entdecke_module",
     "evaluate",
     "get_settings",
+    "gewuenschte_module",
     "register_aus",
     "request_id_var",
 ]

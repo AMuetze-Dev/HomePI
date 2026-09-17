@@ -56,6 +56,9 @@ services:
       DB_SCHEMA_ANLEGEN: "true"
       # Leer: der Browser spricht nur mit dem Vite-Server, der proxyt.
       CORS_ORIGINS: ""
+      # Leer = alle Artefakte. Zum Arbeiten an einem einzelnen:
+      #   make dev N=geraete
+      HOMEPI_MODULE: ${HOMEPI_MODULE:-}
     volumes:
       # Quellcode live einhängen - der Reload beobachtet genau diese Pfade.
       - ./services/gateway/src:/app/services/gateway/src
