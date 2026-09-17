@@ -1,0 +1,44 @@
+.leiste {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+}
+
+.name {
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-sm);
+  /* Ein langer Anzeigename darf die Kopfzeile nicht sprengen. */
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.anmelden {
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-sm);
+  padding: var(--raum-1) var(--raum-2);
+  border-radius: var(--rundung-sm);
+  transition: color var(--dauer-schnell) var(--verlauf);
+}
+
+.anmelden:hover {
+  color: var(--farbe-text);
+}
+
+/* Haelt die Breite, solange noch unklar ist, wer angemeldet ist - sonst
+   springt die Kopfzeile, sobald die Antwort da ist. */
+.platz {
+  display: inline-block;
+  width: 5rem;
+}
+
+@media (max-width: 40rem) {
+  .name {
+    display: none;
+  }
+
+  .platz {
+    width: 0;
+  }
+}

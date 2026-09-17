@@ -15,7 +15,7 @@ from fastapi import APIRouter
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
-from homepi_core import Base, Modul, ServiceSettings, create_service, register_aus
+from homepi_core import Base, Modul, ServiceSettings, Zugang, create_service, register_aus
 from homepi_core.auth import AktuellerBenutzer, Rolle, erfordert
 from homepi_core.auth import speicher as auth_speicher
 from homepi_core.auth.cookies import NAME as COOKIE
@@ -54,7 +54,9 @@ def _geschuetztes_modul() -> Modul:
     async def lesen() -> dict[str, bool]:
         return {"ok": True}
 
-    return Modul(id="probe", titel="Probe", router=router)
+    # Zugang.SELBST: das Modul prueft Endpunkt fuer Endpunkt, damit
+    # '/offen' auch ohne Anmeldung erreichbar bleibt.
+    return Modul(id="probe", titel="Probe", router=router, zugang=Zugang.SELBST)
 
 
 @pytest.fixture

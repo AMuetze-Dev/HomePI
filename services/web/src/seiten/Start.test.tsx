@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as client from "../api/client";
+import { mitAnmeldung } from "../testhilfen";
 import { Start } from "./Start";
 
 afterEach(() => {
@@ -24,17 +25,16 @@ function modul(rest: Partial<client.ModulEintrag> = {}): client.ModulEintrag {
     icon: "kachel",
     version: "1.0.0",
     status: "bereit",
+    zugang: "geschuetzt",
     ...rest,
   };
 }
 
-function zeige(module: client.ModulEintrag[]) {
+function zeige(module: client.ModulEintrag[], angemeldet = true) {
   vi.spyOn(client, "fetchHealth").mockResolvedValue(gesund);
   vi.spyOn(client, "fetchModule").mockResolvedValue(module);
   render(
-    <MemoryRouter>
-      <Start />
-    </MemoryRouter>,
+    <MemoryRouter>{mitAnmeldung(<Start />, angemeldet ? undefined : null)}</MemoryRouter>,
   );
 }
 
@@ -60,6 +60,21 @@ describe("Startseite", () => {
     expect(await screen.findByText(/homepi new/)).toBeInTheDocument();
   });
 
+  it("bietet die Anmeldung an, statt 'kein Artefakt' zu behaupten", async () => {
+    // Abgemeldet ist die Liste berechtigterweise leer. Der Hinweis, man solle
+    // ein Artefakt anlegen, waere hier schlicht die falsche Auskunft.
+    zeige([], false);
+
+    expect(await screen.findByRole("heading", { name: "Anmelden" })).toBeInTheDocument();
+    expect(screen.queryByText(/homepi new/)).not.toBeInTheDocument();
+  });
+
+  it("zeigt oeffentliche Artefakte auch ohne Anmeldung", async () => {
+    zeige([modul({ id: "start", titel: "Start", zugang: "oeffentlich" })], false);
+
+    expect(await screen.findByRole("list", { name: "Artefakte" })).toBeInTheDocument();
+  });
+
   it("benennt ein defektes Artefakt, statt es wegzulassen", async () => {
     zeige([
       modul({
@@ -82,11 +97,7 @@ describe("Startseite", () => {
     vi.spyOn(client, "fetchHealth").mockReturnValue(new Promise(() => {}));
     vi.spyOn(client, "fetchModule").mockReturnValue(new Promise(() => {}));
 
-    render(
-      <MemoryRouter>
-        <Start />
-      </MemoryRouter>,
-    );
+    render(<MemoryRouter>{mitAnmeldung(<Start />)}</MemoryRouter>);
 
     expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
   });
@@ -95,11 +106,7 @@ describe("Startseite", () => {
     vi.spyOn(client, "fetchHealth").mockResolvedValue(gesund);
     vi.spyOn(client, "fetchModule").mockRejectedValue(new Error("Gateway weg"));
 
-    render(
-      <MemoryRouter>
-        <Start />
-      </MemoryRouter>,
-    );
+    render(<MemoryRouter>{mitAnmeldung(<Start />)}</MemoryRouter>);
 
     expect(await screen.findByText(/Gateway weg/)).toBeInTheDocument();
   });

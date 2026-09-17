@@ -88,14 +88,25 @@ make dev N=<kennung>
 `make dev N=…` lädt **nur dieses** Artefakt — schnellerer Start, und ein
 anderes kaputtes Artefakt steht nicht im Weg.
 
-Kontrolle:
+Einmalig ein Konto anlegen — Artefakte sind per Voreinstellung verschlossen,
+ohne Konto siehst du weder die Kachel noch die API:
 
 ```bash
-curl -s http://127.0.0.1:18000/module
+export DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/app'
+cd packages/homepi-core
+uv run homepi benutzer anlegen entwickler --artefakt <kennung> --rolle verwalter
+```
+
+Kontrolle (`-c` legt die Cookie-Datei an und benutzt sie):
+
+```bash
+curl -s -c kekse.txt -X POST http://127.0.0.1:18000/auth/anmelden   -H 'Content-Type: application/json'   -d '{"name":"entwickler","passwort":"<dein Passwort>"}'
+curl -s -b kekse.txt http://127.0.0.1:18000/module
 ```
 
 Dein Artefakt muss mit `"status": "bereit"` dastehen. Steht dort
-`"status": "fehler"`, nennt das Feld `beschreibung` den Grund.
+`"status": "fehler"`, nennt das Feld `beschreibung` den Grund. Ist die Liste
+leer, fehlt das Recht — nicht das Artefakt.
 
 Erzeugt wurde:
 
@@ -104,7 +115,7 @@ modules/<kennung>/
   AGENTS.md          Kurzfassung dieser Datei, im Artefakt
   pyproject.toml     Entry Point homepi.module  ← nicht umbenennen
   src/homepi_<kennung>/
-    __init__.py      modul = Modul(id=…, titel=…, router=…)
+    __init__.py      modul = Modul(id=…, titel=…, router=…, zugang=…)
     schemas.py       Vertrag nach außen
     modelle.py       Tabellen
     dienst.py        REINE Fachlogik
@@ -250,8 +261,16 @@ make dev && make smoke
 | Coverage Backend | `fail_under` aus `pyproject.toml` (Standard 85 %) |
 | Coverage Frontend | 85 % Zeilen, 80 % Zweige |
 | `mypy --strict` | keine Fehler |
-| `GET /module` | Artefakt mit `status: "bereit"` |
+| `GET /module` | Artefakt mit `status: "bereit"` (angemeldet) |
+| `GET /<kennung>/` ohne Cookie | 401 — nicht 200 |
 | Rauchtests | grün |
+
+`make smoke` braucht dafür ein Konto, sonst überspringen sich die Tests, die
+das Manifest auswerten:
+
+```bash
+HOMEPI_SMOKE_BENUTZER=entwickler HOMEPI_SMOKE_PASSWORT=… make smoke
+```
 
 ### Was kein Werkzeug prüft
 
@@ -263,6 +282,10 @@ make dev && make smoke
 - [ ] Bei 375 px Breite ist alles erreichbar, ohne horizontal zu scrollen
 - [ ] Die Fehlermeldungen sind für einen Menschen verständlich, nicht für einen
       Entwickler
+- [ ] Der `zugang` des Moduls ist bewusst gesetzt. `GESCHUETZT` ist die
+      Voreinstellung und in fast allen Fällen richtig. `OEFFENTLICH` nur, wenn
+      das Artefakt wirklich jeden etwas angeht — es ist dann auch für jeden
+      sichtbar
 
 ### Selbst nachsehen, nicht nur behaupten
 
@@ -340,3 +363,4 @@ kostet mehr Zeit, als es spart.
 | Lokale Umgebung, Fallstricke unter Windows | [07-lokale-entwicklung.md](07-lokale-entwicklung.md) |
 | Designsystem, Tokens, Zugänglichkeit | [08-design.md](08-design.md) |
 | Dasselbe ausführlicher | [09-artefakt-bauen.md](09-artefakt-bauen.md) |
+| Wer darf das Artefakt sehen? | [11-anmeldung.md](11-anmeldung.md) |

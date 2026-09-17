@@ -7,6 +7,8 @@ tests/integration/test_auth.py gegen echtes Postgres.
 
 from __future__ import annotations
 
+import io
+
 import pytest
 
 from homepi_core.cli import benutzer
@@ -119,3 +121,42 @@ class TestFehlerbehandlung:
 
         assert main(["benutzer", "liste"]) == 1
         assert "DATABASE_URL" in capsys.readouterr().err
+
+
+class TestPasswortVonStdin:
+    """Fuer Skripte: die CI kann kein getpass beantworten."""
+
+    def test_wird_von_der_standardeingabe_gelesen(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(benutzer.sys, "stdin", io.StringIO("korrekt-pferd-batterie\n"))
+
+        assert benutzer._passwort_erfragen("aaron", True) == "korrekt-pferd-batterie"
+
+    def test_zeilenende_wird_abgeschnitten(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Sonst haengt ein \r am Passwort, wenn das Skript aus Windows kommt.
+        monkeypatch.setattr(benutzer.sys, "stdin", io.StringIO("korrekt-pferd-batterie\r\n"))
+
+        assert benutzer._passwort_erfragen("aaron", True) == "korrekt-pferd-batterie"
+
+    def test_leere_eingabe_bricht_ab(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(benutzer.sys, "stdin", io.StringIO(""))
+
+        with pytest.raises(CliFehler, match="Standardeingabe"):
+            benutzer._passwort_erfragen("aaron", True)
+
+    def test_untaugliches_passwort_wird_nicht_nachgefragt(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Es gibt niemanden, der einen zweiten Versuch tippen koennte."""
+        monkeypatch.setattr(benutzer.sys, "stdin", io.StringIO("kurz\n"))
+
+        with pytest.raises(CliFehler, match="Zeichen"):
+            benutzer._passwort_erfragen("aaron", True)
+
+    def test_es_gibt_weiterhin_kein_passwort_argument(self) -> None:
+        with pytest.raises(SystemExit):
+            _parser().parse_args(["benutzer", "anlegen", "aaron", "--passwort", "geheim"])
+
+    def test_der_schalter_ist_vorgesehen(self) -> None:
+        args = _parser().parse_args(["benutzer", "anlegen", "aaron", "--passwort-stdin"])
+
+        assert args.passwort_stdin is True

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { fetchModule, type ModulEintrag } from "../api/client";
+import { Anmeldeformular } from "../anmeldung/Anmeldeformular";
+import { useAnmeldung } from "../anmeldung/kontext";
 import { GenerischeAnsicht } from "../module/GenerischeAnsicht";
 import { oberflaecheFuer } from "../module/register";
 import { Etikett, Hinweis, Leerzustand, Platzhalter, Seitenkopf } from "../ui";
@@ -18,8 +20,12 @@ const ZURUECK = { ziel: "/", text: "Übersicht" };
 export function ModulSeite() {
   const { id = "" } = useParams();
   const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
+  const { zustand: anmeldung, benutzer } = useAnmeldung();
+  const benutzerId = benutzer?.id ?? null;
 
   useEffect(() => {
+    if (anmeldung === "laedt") return undefined;
+
     const controller = new AbortController();
     setZustand({ phase: "laedt" });
 
@@ -35,7 +41,7 @@ export function ModulSeite() {
       });
 
     return () => controller.abort();
-  }, [id]);
+  }, [id, anmeldung, benutzerId]);
 
   if (zustand.phase === "laedt") {
     return (
@@ -59,6 +65,19 @@ export function ModulSeite() {
   }
 
   if (zustand.phase === "unbekannt") {
+    // Ein Artefakt, fuer das ein Recht fehlt, steht gar nicht erst im
+    // Manifest - von hier aus ist es von einem nicht vorhandenen nicht zu
+    // unterscheiden. Wer nicht angemeldet ist, bekommt deshalb nicht die
+    // Auskunft "gibt es nicht", sondern die Anmeldung.
+    if (anmeldung === "abgemeldet") {
+      return (
+        <Anmeldeformular
+          titel="Anmeldung nötig"
+          beschreibung="Dieser Bereich ist nicht öffentlich. Melde dich an, um zu sehen, ob er für dich freigeschaltet ist."
+        />
+      );
+    }
+
     return (
       <>
         <Seitenkopf titel="Unbekanntes Artefakt" zurueck={ZURUECK} />

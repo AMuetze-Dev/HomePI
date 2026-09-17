@@ -208,6 +208,9 @@ dev-ps:
 	$(DEV) ps
 
 ## smoke: Rauchtests gegen die laufende lokale Umgebung
+# Die Tests, die GET /module auswerten, brauchen ein Konto - ohne Anmeldung ist
+# die Liste berechtigterweise leer. Setze HOMEPI_SMOKE_BENUTZER und
+# HOMEPI_SMOKE_PASSWORT, sonst ueberspringen sie sich.
 smoke:
 	cd services/gateway && uv run pytest -m smoke -v
 

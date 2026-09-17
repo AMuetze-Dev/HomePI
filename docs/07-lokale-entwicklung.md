@@ -27,6 +27,25 @@ make dev-stop     # stoppen, Daten bleiben
 make dev-reset    # stoppen und Datenbank wegwerfen
 ```
 
+### Einmalig: ein Konto
+
+Artefakte sind per Voreinstellung verschlossen. Ohne Konto zeigt die Startseite
+das Anmeldeformular und sonst nichts — das ist richtig so, aber zum Entwickeln
+braucht es einmal ein Konto:
+
+```bash
+export DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/app'
+cd packages/homepi-core
+uv run homepi benutzer anlegen aaron --artefakt geraete --rolle verwalter
+uv run homepi benutzer liste
+```
+
+`make dev-reset` wirft die Datenbank weg — danach ist auch das Konto weg.
+
+Das Passwort wird abgefragt, nie als Argument übergeben; in einem Skript geht
+`--passwort-stdin`. Wer welches Artefakt sehen darf, steht in
+[11-anmeldung.md](11-anmeldung.md).
+
 ## Was lokal anders ist als auf dem Pi
 
 | | lokal | Pi |
@@ -78,6 +97,13 @@ Drei Arten, bewusst getrennt:
 | Unit | `tests/unit/` | bei jeder Änderung, Millisekunden |
 | Integration | `tests/integration/`, Marker `integration` | mit laufender Datenbank |
 | Rauchtest | `tests/smoke/`, Marker `smoke` | gegen eine laufende Instanz |
+
+Die Rauchtests werten `GET /module` aus. Ohne Konto ist die Liste
+berechtigterweise leer, und die betroffenen Tests überspringen sich:
+
+```bash
+HOMEPI_SMOKE_BENUTZER=aaron HOMEPI_SMOKE_PASSWORT=… make smoke
+```
 
 Unit-Tests laufen immer. Integration und Rauchtest sind standardmäßig
 abgewählt — sonst würde ein Testlauf ohne Datenbank scheitern und man gewöhnt

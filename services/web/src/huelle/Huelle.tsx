@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { Benutzerleiste } from "./Benutzerleiste";
 import stil from "./Huelle.module.css";
 import { Themenwechsel } from "./Themenwechsel";
 
@@ -31,6 +32,7 @@ export function Huelle({ children }: Props) {
           </Link>
 
           <div className={stil.werkzeuge}>
+            <Benutzerleiste />
             <Themenwechsel />
           </div>
         </div>

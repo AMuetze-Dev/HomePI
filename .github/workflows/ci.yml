@@ -267,6 +267,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.python == 'true' || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    env:
+      # Wegwerfkonto in einer Datenbank, die am Ende des Jobs geloescht wird.
+      # Kein Secret: es schuetzt nichts, was den Lauf ueberlebt.
+      HOMEPI_SMOKE_BENUTZER: rauchtest
+      HOMEPI_SMOKE_PASSWORT: rauchtest-nur-fuer-die-ci-4711
     steps:
       - uses: actions/checkout@v4
 
@@ -278,17 +283,32 @@ jobs:
       - name: Entwicklungsumgebung hochfahren
         run: docker compose -f compose.dev.yml up -d --build --wait --wait-timeout 300
 
+      - name: Konto fuer die Rauchtests anlegen
+        # Artefakte sind je Benutzer sichtbar. Ohne Konto waere das Manifest
+        # berechtigterweise leer und die Rauchtests wuerden nichts mehr pruefen.
+        # Das Passwort kommt ueber stdin, nicht als Argument - sonst stuende es
+        # in der Prozessliste des Runners.
+        run: |
+          printf '%s' "$HOMEPI_SMOKE_PASSWORT" \
+            | docker compose -f compose.dev.yml exec -T -w /app/services/gateway gateway \
+                uv run homepi benutzer anlegen rauchtest --passwort-stdin \
+                --artefakt geraete --rolle verwalter
+
       - name: Rauchtests gegen die laufende Instanz
         working-directory: services/gateway
         run: |
           uv sync --frozen --all-extras
-          HOMEPI_BASIS_URL=http://127.0.0.1:18000 uv run pytest -m smoke -v
+          uv run pytest -m smoke -v
+        env:
+          HOMEPI_BASIS_URL: http://127.0.0.1:18000
 
       - name: Frontend liefert aus und erreicht die API
         run: |
           curl -sf http://127.0.0.1:5173/ >/dev/null
-          # Der Vite-Proxy ist der Weg, den auch der Browser nimmt
-          curl -sf http://127.0.0.1:5173/api/module | grep -q '"geraete"'
+          # Der Vite-Proxy ist der Weg, den auch der Browser nimmt. Ohne
+          # Anmeldung ist die Liste leer - dass sie ueberhaupt ankommt, ist
+          # hier die Frage; was drinsteht, pruefen die Rauchtests.
+          curl -sf http://127.0.0.1:5173/api/module | grep -q '^\['
 
       - name: Logs bei Fehlschlag
         if: failure()

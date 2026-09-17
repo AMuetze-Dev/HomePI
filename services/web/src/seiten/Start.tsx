@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { fetchModule, type ModulEintrag } from "../api/client";
+import { Anmeldeformular } from "../anmeldung/Anmeldeformular";
+import { useAnmeldung } from "../anmeldung/kontext";
 import { SystemStatus } from "../components/SystemStatus";
 import { Etikett, Karte, Leerzustand, Platzhalter, Seitenkopf, Statuspunkt } from "../ui";
 import stil from "./Start.module.css";
@@ -13,8 +15,15 @@ type Zustand =
 
 export function Start() {
   const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
+  const { zustand: anmeldung, benutzer } = useAnmeldung();
+  // Nicht das ganze Objekt: es ist bei jedem Abruf neu, die Kennung nicht.
+  const benutzerId = benutzer?.id ?? null;
 
   useEffect(() => {
+    // Erst fragen, wenn feststeht, wer fragt. Sonst holt die Seite das
+    // Manifest zweimal - einmal anonym, einmal angemeldet.
+    if (anmeldung === "laedt") return undefined;
+
     const controller = new AbortController();
 
     fetchModule(controller.signal)
@@ -26,13 +35,23 @@ export function Start() {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [anmeldung, benutzerId]);
+
+  // Nichts zu sehen und niemand angemeldet: dann ist die Anmeldung das, was
+  // hier hingehört - und nicht der Hinweis, es sei kein Artefakt vorhanden.
+  if (
+    anmeldung === "abgemeldet" &&
+    zustand.phase === "fertig" &&
+    zustand.module.length === 0
+  ) {
+    return <Anmeldeformular />;
+  }
 
   return (
     <>
       <Seitenkopf
         titel="Übersicht"
-        beschreibung="Alle Dienste dieser Installation an einem Ort. Neue Artefakte erscheinen hier, sobald das Gateway sie geladen hat."
+        beschreibung="Alle Dienste dieser Installation an einem Ort. Es steht hier nur, wofür du berechtigt bist."
       />
 
       <Karte className={stil.statuskarte}>

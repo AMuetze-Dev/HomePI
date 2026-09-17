@@ -76,11 +76,41 @@ mit `status: "fehler"` im Manifest. Eine Kachel, die „Fehler" anzeigt, ist
 leichter zu bemerken als ein Artefakt, das nach einem Deploy kommentarlos
 verschwunden ist.
 
+## Ein Prozess, aber getrennte Websites
+
+Ein Artefakt soll sich anfühlen wie eine eigenständige Website. Ein
+Staffelleiter, der StaffelPilot benutzt, hat mit den Geräten im Haus nichts zu
+tun — er soll nicht einmal erfahren, dass es sie gibt.
+
+Dass alles in einem Prozess läuft, steht dem nicht entgegen, solange zwei
+Dinge gelten:
+
+1. **`GET /module` ist je Aufrufer gefiltert.** Wer kein Recht für ein Artefakt
+   hat, bekommt es nicht genannt — auch nicht als graue, gesperrte Kachel.
+2. **Die Zugriffsprüfung hängt am ganzen Router**, nicht an einzelnen
+   Endpunkten. Ein Artefakt bekommt im Lauf der Zeit Endpunkte dazu; hängt die
+   Prüfung an jedem einzelnen, ist der vergessene der, der das Loch reißt.
+
+Jedes Modul erklärt dafür seinen `Zugang` — `OEFFENTLICH`, `GESCHUETZT` oder
+`SELBST`. Die Voreinstellung ist `GESCHUETZT`: wer beim Bauen nicht über
+Zugriff nachdenkt, bekommt ein verschlossenes Artefakt und kein offenes.
+Mountet ein Service ein nicht-öffentliches Modul ohne Anmeldung, startet er
+gar nicht erst — lieber das als ein Artefakt, das offen steht, weil die
+Prüfung stillschweigend ausfiel.
+
+Ausführlich, samt Rollenmodell und CLI: [11-anmeldung.md](11-anmeldung.md).
+
+Was diese Ebene **nicht** leistet: ein Angemeldeter ohne Recht bekommt auf
+`/geraete/` ein 403 und weiß damit, dass es dieses Artefakt gibt. Die
+vollständige Trennung einer öffentlichen Website von den internen Artefakten
+leistet erst der Reverse Proxy.
+
 ## Das Frontend: eine Hülle, viele Kacheln
 
 Die Startseite liest `GET /module` und baut daraus ihre Kacheln. **Ein neues
 Artefakt erscheint dort, ohne dass am Frontend eine Zeile geändert wird** —
-es genügt, dass das Gateway es geladen hat.
+es genügt, dass das Gateway es geladen hat, und dass der Betrachter es sehen
+darf.
 
 Hinter der Kachel gibt es zwei Stufen:
 
@@ -162,8 +192,23 @@ Geprüft wird genau das, was ein Unit-Test grundsätzlich nicht sehen kann:
   Manifest steht, dessen Router aber fehlt, wäre sonst erst beim Klick auf die
   Kachel aufgefallen
 - kein Modul steht auf `status: "fehler"`
+- jedes als `geschuetzt` deklarierte Artefakt weist einen Aufruf **ohne**
+  Cookie ab. Die Liste kommt aus der angemeldeten Sitzung, der Aufruf von einem
+  frischen Client — wäre eines versehentlich offen, fiele es genau hier auf
+- die Anmeldung ist erreichbar; fehlt sie nach einem Deploy, käme niemand mehr
+  an seine Artefakte
 - die Anfrage-Kennung kommt zurück; ohne sie lässt sich ein Fehlerbericht des
   Benutzers nicht im Log wiederfinden
+
+Die Tests, die das Manifest auswerten, brauchen ein Konto — ohne Anmeldung ist
+es berechtigterweise leer:
+
+```bash
+HOMEPI_SMOKE_BENUTZER=rauchtest HOMEPI_SMOKE_PASSWORT=… pytest -m smoke
+```
+
+Ohne diese Variablen überspringen sie sich ausdrücklich, statt auf einer leeren
+Liste stillschweigend grün zu werden.
 
 Rauchtests sind wie Integrationstests standardmäßig abgewählt und laufen nur
 mit `-m smoke`. Im Deploy-Workflow gehören sie hinter den Neustart: erst

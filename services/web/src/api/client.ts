@@ -10,6 +10,7 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 export type HealthStatus = "ok" | "degraded" | "down";
 export type ModulStatus = "bereit" | "fehler";
+export type Zugang = "oeffentlich" | "geschuetzt" | "selbst";
 
 export interface Health {
   status: HealthStatus;
@@ -26,6 +27,9 @@ export interface ModulEintrag {
   icon: string;
   version: string;
   status: ModulStatus;
+  /** Wer das Artefakt sehen darf. Die Liste ist bereits gefiltert - dieses
+   *  Feld sagt nur, warum ein Eintrag darin steht. */
+  zugang: Zugang;
 }
 
 export class ApiError extends Error {
@@ -64,6 +68,9 @@ function istModulEintrag(wert: unknown): wert is ModulEintrag {
 async function hole(pfad: string, signal?: AbortSignal): Promise<Response> {
   return fetch(`${BASE_URL}${pfad}`, {
     signal: signal ?? null,
+    // Das Sitzungscookie ist httponly und muss mitgeschickt werden, sonst
+    // antwortet das Gateway so, als waere niemand angemeldet.
+    credentials: "include",
     headers: { Accept: "application/json" },
   });
 }
@@ -89,11 +96,14 @@ export async function fetchHealth(signal?: AbortSignal): Promise<Health> {
 }
 
 /**
- * Holt das Modulmanifest.
+ * Holt das Modulmanifest - gefiltert nach dem, was der Aufrufer sehen darf.
  *
- * Ein Dienst ohne Module antwortet mit 404. Das ist kein Fehler, sondern
- * heißt schlicht "hier läuft kein Gateway" - die Startseite zeigt dann eine
- * leere Liste statt einer Fehlermeldung.
+ * Ohne Anmeldung stehen darin nur die oeffentlichen Artefakte. Eine leere
+ * Liste ist also kein Fehler, sondern die richtige Antwort.
+ *
+ * Ein Dienst ohne Module antwortet mit 404. Das heisst schlicht "hier laeuft
+ * kein Gateway" - die Startseite zeigt dann eine leere Liste statt einer
+ * Fehlermeldung.
  */
 export async function fetchModule(signal?: AbortSignal): Promise<ModulEintrag[]> {
   const antwort = await hole("/module", signal);
