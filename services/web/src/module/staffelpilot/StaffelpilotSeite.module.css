@@ -1,0 +1,245 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
+.laden {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+/* ── Kennzahlen ──────────────────────────────────────────────────────── */
+
+.kennzahlen {
+  display: grid;
+  /* Vier nebeneinander, wo Platz ist; auf 375 px zwei. Kein Media Query --
+     die Spaltenzahl folgt dem Platz, nicht einer geratenen Geraetebreite. */
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--raum-3);
+  margin: 0 0 var(--raum-5);
+  padding: 0;
+  list-style: none;
+}
+
+.kennzahl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+  padding: var(--raum-3) var(--raum-4);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+}
+
+.zahl,
+.zahlWarnend {
+  font-size: var(--text-2xl);
+  font-weight: var(--gewicht-halbfett);
+  letter-spacing: var(--laufweite-enger);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--zeile-eng);
+}
+
+.zahl {
+  color: var(--farbe-text);
+}
+
+/* Nur wenn wirklich etwas offen ist - eine Null in Rot ist eine Warnung
+   ohne Anlass. */
+.zahlWarnend {
+  color: var(--signal-fehler);
+}
+
+.zahlName {
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+}
+
+/* ── Auswahl ─────────────────────────────────────────────────────────── */
+
+.wahl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+}
+
+.wahlName {
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+}
+
+.auswahl {
+  width: 100%;
+  padding: var(--raum-2) var(--raum-3);
+  font: inherit;
+  font-size: var(--text-md);
+  color: var(--farbe-text);
+  background: var(--farbe-flaeche);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-sm);
+}
+
+.auswahl:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 1px;
+}
+
+/* ── Liste der Spielberichte ─────────────────────────────────────────── */
+
+.liste {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  margin: var(--raum-4) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kopf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.kopf:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: var(--raum-1);
+  border-radius: var(--rundung-sm);
+}
+
+.paarung {
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-mittel);
+  letter-spacing: var(--laufweite-eng);
+  color: var(--farbe-text);
+}
+
+.zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-2);
+}
+
+.datum {
+  font-size: var(--text-sm);
+  color: var(--farbe-text-leise);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Aufgeklappter Bericht ───────────────────────────────────────────── */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  margin-top: var(--raum-4);
+  padding-top: var(--raum-4);
+  border-top: 1px solid var(--farbe-rand);
+}
+
+.sauber {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.befunde {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.befund {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+.befundKopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-2);
+}
+
+.befundTitel {
+  font-size: var(--text-md);
+  font-weight: var(--gewicht-mittel);
+  color: var(--farbe-text);
+}
+
+.befundText {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--zeile-normal);
+  color: var(--farbe-text-gedaempft);
+}
+
+.befundWer {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+}
+
+.erledigt {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--farbe-text-leise);
+}
+
+.knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+}
+
+.grundform {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+/* ── Entscheidungsleiste ─────────────────────────────────────────────── */
+
+.entscheidung {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+  padding-top: var(--raum-3);
+  border-top: 1px solid var(--farbe-rand);
+}
+
+.stand {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+/* ── Formular ────────────────────────────────────────────────────────── */
+
+.formular {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+}
+
+.formularTitel {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-halbfett);
+  letter-spacing: var(--laufweite-eng);
+  color: var(--farbe-text);
+}

@@ -1,5 +1,6 @@
 import { GeraeteSeite } from "./geraete/GeraeteSeite";
 import type { ModulOberflaeche } from "./typen";
+import { StaffelpilotSeite } from "./staffelpilot/StaffelpilotSeite";
 
 /**
  * Eigene Oberflächen der Artefakte.
@@ -14,6 +15,7 @@ import type { ModulOberflaeche } from "./typen";
  * dem Manifest des Gateways und erscheinen ohne Frontend-Änderung.
  */
 export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
+  { id: "staffelpilot", Komponente: StaffelpilotSeite },
   { id: "geraete", Komponente: GeraeteSeite },
 ];
 
