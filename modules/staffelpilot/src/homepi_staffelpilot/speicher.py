@@ -10,9 +10,23 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from .dienst import BefundUnbekannt, SpielUnbekannt, StaffelUnbekannt, StaffelVergeben
-from .modelle import Befund, Spielbericht, Staffel
-from .schemas import ImportAuftrag, StaffelAnlegen
+from . import dienst
+from .dienst import (
+    BefundUnbekannt,
+    SpielUnbekannt,
+    StaffelUnbekannt,
+    StaffelVergeben,
+    VorgangUnbekannt,
+    VorgangVergeben,
+)
+from .modelle import Befund, Einstellung, Mannschaft, Spielbericht, Staffel, Vorgang
+from .schemas import (
+    EinstellungenSetzen,
+    ImportAuftrag,
+    MannschaftEingang,
+    StaffelAnlegen,
+    VorgangAnlegen,
+)
 
 # ── Staffeln ──────────────────────────────────────────────────────────────
 
@@ -157,6 +171,7 @@ async def einspielen(sitzung: AsyncSession, auftrag: ImportAuftrag) -> tuple[int
                     text=b.text,
                     person=b.person,
                     mannschaft=b.mannschaft,
+                    weg=b.weg,
                     rang=rang,
                     entscheidung=alt.entscheidung if alt else "offen",
                     grund=alt.grund if alt else "",
@@ -188,3 +203,226 @@ async def haken_setzen(sitzung: AsyncSession, spiel_id: uuid.UUID, gesetzt: bool
     bericht.abgehakt_am = dt.datetime.now(dt.UTC) if gesetzt else None
     await sitzung.flush()
     return bericht
+
+
+# ── Einstellungen ─────────────────────────────────────────────────────────
+
+
+async def einstellungen(sitzung: AsyncSession) -> dienst.Einstellungen:
+    """Die geprueften Werte, nicht die rohen Zeilen.
+
+    Die Pruefung steht in `dienst.einstellungen_aus` und damit an einer
+    Stelle: sonst entscheidet jeder Aufrufer selbst, was eine leere
+    Zeichenkette bedeutet.
+    """
+    ergebnis = await sitzung.execute(select(Einstellung))
+    return dienst.einstellungen_aus({e.schluessel: e.wert for e in ergebnis.scalars()})
+
+
+async def einstellungen_setzen(
+    sitzung: AsyncSession, daten: EinstellungenSetzen
+) -> dienst.Einstellungen:
+    """Nur die mitgeschickten Felder. Ausgelassene bleiben stehen."""
+    vorhanden = {e.schluessel: e for e in (await sitzung.execute(select(Einstellung))).scalars()}
+    for schluessel, wert in daten.model_dump(exclude_none=True).items():
+        if schluessel in vorhanden:
+            vorhanden[schluessel].wert = str(wert)
+        else:
+            sitzung.add(Einstellung(schluessel=schluessel, wert=str(wert)))
+    await sitzung.flush()
+    return await einstellungen(sitzung)
+
+
+# ── Mannschaften ──────────────────────────────────────────────────────────
+
+
+async def mannschaften(sitzung: AsyncSession, staffel_id: uuid.UUID) -> list[Mannschaft]:
+    await staffel(sitzung, staffel_id)
+    ergebnis = await sitzung.execute(
+        select(Mannschaft)
+        .where(Mannschaft.staffel_id == staffel_id)
+        .order_by(Mannschaft.verein, Mannschaft.nummer, Mannschaft.name)
+    )
+    return list(ergebnis.scalars())
+
+
+async def mannschaften_setzen(
+    sitzung: AsyncSession, staffel_id: uuid.UUID, eingang: list[MannschaftEingang]
+) -> list[Mannschaft]:
+    """Die Meldung als Ganzes, nicht als Aenderung.
+
+    Was DFBnet nicht mehr meldet, ist zurueckgezogen. Bestaetigte Zuordnungen
+    ueberleben trotzdem: sie an eine Kennung zu binden, die mit der Meldung
+    verschwindet, hiesse, jede Handkorrektur beim naechsten Einspielen
+    wegzuwerfen -- und genau das ist der Fehler, vor dem die Zuordnung
+    schuetzen soll. Der Name traegt sie hinueber.
+    """
+    alt = {m.name: m for m in await mannschaften(sitzung, staffel_id)}
+    geraten = dienst.hoehere_raten([m.name for m in eingang])
+
+    await sitzung.execute(delete(Mannschaft).where(Mannschaft.staffel_id == staffel_id))
+    for m in eingang:
+        verein, nummer = dienst.verein_und_nummer(m.name)
+        vorher = alt.get(m.name)
+        # Reihenfolge der Quellen: was jetzt gesagt wurde, sonst was bestaetigt
+        # war, sonst der Vorschlag.
+        if m.hoehere or m.bestaetigt:
+            hoehere, bestaetigt = list(m.hoehere), True
+        elif vorher is not None and vorher.bestaetigt:
+            hoehere, bestaetigt = list(vorher.hoehere), True
+        else:
+            hoehere, bestaetigt = geraten.get(m.name, []), False
+        sitzung.add(
+            Mannschaft(
+                staffel_id=staffel_id,
+                name=m.name,
+                verein=m.verein or verein,
+                nummer=m.nummer or nummer,
+                ist_sg=m.ist_sg,
+                hoehere=hoehere,
+                bestaetigt=bestaetigt,
+            )
+        )
+    await sitzung.flush()
+    return await mannschaften(sitzung, staffel_id)
+
+
+# ── Vorgaenge ─────────────────────────────────────────────────────────────
+
+
+async def vorgaenge(sitzung: AsyncSession, zustand: str | None = None) -> list[Vorgang]:
+    frage = select(Vorgang).order_by(Vorgang.aktenzeichen.desc())
+    if zustand is not None:
+        frage = frage.where(Vorgang.zustand == zustand)
+    ergebnis = await sitzung.execute(frage)
+    return list(ergebnis.scalars())
+
+
+async def vorgang(sitzung: AsyncSession, vorgang_id: uuid.UUID) -> Vorgang:
+    gefunden = await sitzung.get(Vorgang, vorgang_id)
+    if gefunden is None:
+        raise VorgangUnbekannt(f"Es gibt keinen Vorgang mit der Kennung {vorgang_id}")
+    return gefunden
+
+
+async def vorgang_zu_befund(sitzung: AsyncSession, befund_id: uuid.UUID) -> Vorgang | None:
+    ergebnis = await sitzung.execute(select(Vorgang).where(Vorgang.befund_id == befund_id))
+    return ergebnis.scalar_one_or_none()
+
+
+async def anzahl_entwuerfe(sitzung: AsyncSession) -> int:
+    ergebnis = await sitzung.execute(
+        select(func.count()).select_from(Vorgang).where(Vorgang.zustand == "entwurf")
+    )
+    return int(ergebnis.scalar_one())
+
+
+async def _naechstes_aktenzeichen(sitzung: AsyncSession, saison: str) -> str:
+    """Fortlaufend je Saison.
+
+    Gezaehlt wird, was schon vergeben ist, und nicht ein Zaehler in einer
+    eigenen Zeile: ein geloeschter Vorgang darf keine Luecke lassen, die beim
+    naechsten Anlegen zur Kollision wird. Die Eindeutigkeit steht ohnehin in
+    der Datenbank -- zwei gleichzeitige Anlagen scheitern dort und nicht hier.
+    """
+    kern = saison.strip().replace("/", "-") or "ohne-saison"
+    ergebnis = await sitzung.execute(
+        select(func.count()).select_from(Vorgang).where(Vorgang.aktenzeichen.like(f"{kern}-%"))
+    )
+    return dienst.aktenzeichen(saison, int(ergebnis.scalar_one()) + 1)
+
+
+async def vorgang_anlegen(
+    sitzung: AsyncSession, befund_id: uuid.UUID, daten: VorgangAnlegen
+) -> Vorgang:
+    """Aus einem Befund einen Entwurf machen.
+
+    Der Text entsteht hier einmal und wird danach nicht wieder erzeugt: ein
+    spaeteres Neuerzeugen wuerde eine Formulierung ueberschreiben, die sich
+    jemand ueberlegt hat.
+
+    Dass es zu einem Befund nur einen Vorgang gibt, sichert die Datenbank und
+    nicht eine Abfrage davor: die waere ein Rennen zwischen zwei gleichzeitigen
+    Anlagen und zugleich eine zweite Stelle, an der dieselbe Regel steht.
+    """
+    gefunden = await befund(sitzung, befund_id)
+    art = dienst.art_aus_weg(gefunden.weg)
+    bericht = await spiel(sitzung, gefunden.spiel_id)
+    staffel_dazu = await staffel(sitzung, bericht.staffel_id)
+    werte = await einstellungen(sitzung)
+
+    anlass = dienst.Anlass(
+        staffel=staffel_dazu.name,
+        saison=staffel_dazu.saison,
+        heim=bericht.heim,
+        gast=bericht.gast,
+        spieldatum=bericht.datum,
+        dfbnet_id=bericht.dfbnet_id,
+        titel=gefunden.titel,
+        sachverhalt=gefunden.text,
+        verein=daten.verein or gefunden.mannschaft,
+        betroffener=daten.betroffener or gefunden.person,
+        grund=daten.grund or gefunden.titel,
+    )
+    schreiben = dienst.vorgang_entwurf(art, anlass, werte, dt.date.today())
+
+    neuer = Vorgang(
+        befund_id=befund_id,
+        art=art,
+        aktenzeichen=await _naechstes_aktenzeichen(sitzung, staffel_dazu.saison),
+        verein=anlass.verein,
+        betroffener=anlass.betroffener,
+        grund=anlass.grund,
+        empfaenger=daten.empfaenger or schreiben.empfaenger,
+        betreff=schreiben.betreff,
+        text=schreiben.text,
+    )
+    sitzung.add(neuer)
+    try:
+        await sitzung.flush()
+    except IntegrityError as fehler:
+        await sitzung.rollback()
+        raise VorgangVergeben(f"Zum Befund {befund_id} gibt es bereits einen Vorgang") from fehler
+    await sitzung.refresh(neuer)
+    return neuer
+
+
+async def vorgang_aendern(
+    sitzung: AsyncSession, vorgang_id: uuid.UUID, felder: dict[str, str]
+) -> Vorgang:
+    gefunden = await vorgang(sitzung, vorgang_id)
+    for name, wert in felder.items():
+        setattr(gefunden, name, wert)
+    await sitzung.flush()
+    return gefunden
+
+
+async def vorgang_zustand(sitzung: AsyncSession, vorgang_id: uuid.UUID, neu: str) -> Vorgang:
+    gefunden = await vorgang(sitzung, vorgang_id)
+    gefunden.zustand = dienst.zustand_weiter(gefunden.zustand, neu)
+    # Nur beim ersten Mal. Wer ein Schreiben zurueckholt und erneut abschickt,
+    # hat es trotzdem an dem Tag versandt, an dem es beim Verein ankam.
+    if neu == "versandt" and gefunden.versandt_am is None:
+        gefunden.versandt_am = dt.datetime.now(dt.UTC)
+    await sitzung.flush()
+    return gefunden
+
+
+async def vorgang_loeschen(sitzung: AsyncSession, vorgang_id: uuid.UUID) -> None:
+    await sitzung.delete(await vorgang(sitzung, vorgang_id))
+
+
+async def vorgaenge_zu_befunden(
+    sitzung: AsyncSession, befund_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, uuid.UUID]:
+    """Eine Abfrage fuer alle Befunde eines Berichts.
+
+    Je Befund einzeln zu fragen waere bei zwanzig Befunden zwanzig Abfragen
+    fuer eine Ansicht -- und genau das faellt erst auf dem Pi auf.
+    """
+    if not befund_ids:
+        return {}
+    ergebnis = await sitzung.execute(
+        select(Vorgang.befund_id, Vorgang.id).where(Vorgang.befund_id.in_(befund_ids))
+    )
+    return {befund_id: vorgang_id for befund_id, vorgang_id in ergebnis.all()}

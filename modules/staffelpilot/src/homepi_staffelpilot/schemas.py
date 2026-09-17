@@ -33,6 +33,19 @@ Entscheidung = Literal["offen", "kenntnis", "verworfen"]
 #: Altersklassen nach SpO SFV, soweit sie in einem Kreis vorkommen.
 Altersklasse = Literal["maenner", "frauen", "ue32", "ue35", "ue40", "ue50"]
 
+#: Wohin ein Befund fuehrt, wenn er stehen bleibt. Der Prueflauf sagt es beim
+#: Einspielen - dieses Artefakt kennt die Spielordnung nicht und soll sie auch
+#: nicht kennen. "kein" ist die Voreinstellung und der haeufigste Fall.
+Weg = Literal["kein", "mahnung", "sportgericht"]
+
+#: Die Art eines Vorgangs. Dieselben Woerter wie beim Weg, ohne "kein": ein
+#: Vorgang ohne Weg waere ein Schreiben ohne Anlass.
+VorgangArt = Literal["mahnung", "sportgericht"]
+
+#: Wo ein Vorgang steht. "versandt" heisst: ein Mensch hat ihn abgeschickt.
+#: Dieses Programm verschickt nichts.
+VorgangZustand = Literal["entwurf", "versandt", "erledigt"]
+
 
 def _getrimmt(wert: object) -> object:
     return wert.strip() if isinstance(wert, str) else wert
@@ -85,6 +98,9 @@ class BefundEingang(BaseModel):
     text: Annotated[str, Field(max_length=2000)] = ""
     person: KurzFeld = ""
     mannschaft: KurzFeld = ""
+    #: Wohin der Befund fuehrt. Der Prueflauf weiss es; hier wird es nur
+    #: mitgefuehrt, damit die Oberflaeche den passenden Knopf anbietet.
+    weg: Weg = "kein"
 
     @field_validator("regel", "titel", "text", "person", "mannschaft", mode="before")
     @classmethod
@@ -104,6 +120,11 @@ class BefundAusgabe(BaseModel):
     mannschaft: str
     entscheidung: Entscheidung
     grund: str
+    weg: Weg
+    #: Die Kennung des Vorgangs, falls schon einer angelegt wurde. So sieht
+    #: die Oberflaeche ohne zweiten Aufruf, ob der Knopf "Entwurf" noch
+    #: anzubieten ist.
+    vorgang_id: uuid.UUID | None = None
 
 
 class EntscheidungSetzen(BaseModel):
@@ -204,3 +225,170 @@ class Zusammenfassung(BaseModel):
     befunde_offen: int
     befunde_kritisch: int
     staffeln_aktiv: int
+    #: Entwuerfe, die noch niemand abgeschickt hat. Sie sind der Teil der
+    #: Arbeit, den man am leichtesten liegen laesst.
+    vorgaenge_entwurf: int = 0
+
+
+# ── Einstellungen ─────────────────────────────────────────────────────────
+
+
+class EinstellungenAusgabe(BaseModel):
+    """Was fuer die ganze Installation gilt.
+
+    Die Voreinstellungen stehen in `dienst.Einstellungen` und nicht hier:
+    sonst gaebe es zwei Stellen, an denen 30 Tage steht, und irgendwann zwei
+    verschiedene Zahlen.
+    """
+
+    staffelleiter: str
+    verband: str
+    absender: str
+    pruefzeitraum_tage: int
+    frist_tage: int
+
+
+class EinstellungenSetzen(BaseModel):
+    """Nur die Felder, die gesetzt werden sollen.
+
+    Ein ausgelassenes Feld bleibt, wie es war. Ein Dialog, der offen stand,
+    waehrend woanders etwas geschrieben wurde, schreibt sonst einen alten Wert
+    zurueck.
+    """
+
+    staffelleiter: KurzFeld | None = None
+    verband: KurzFeld | None = None
+    absender: Annotated[str, Field(max_length=200)] | None = None
+    pruefzeitraum_tage: Annotated[int, Field(ge=1, le=365)] | None = None
+    frist_tage: Annotated[int, Field(ge=1, le=90)] | None = None
+
+    @field_validator("staffelleiter", "verband", "absender", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
+
+
+# ── Mannschaften ──────────────────────────────────────────────────────────
+
+
+class MannschaftEingang(BaseModel):
+    """Eine Mannschaft, wie sie aus DFBnet kommt oder von Hand berichtigt wird."""
+
+    name: NameFeld
+    verein: KurzFeld = ""
+    nummer: Annotated[int, Field(ge=0, le=99)] = 0
+    ist_sg: bool = False
+    #: Leer heisst nicht "keine hoeheren", sondern "noch nicht gesagt": beim
+    #: Einspielen wird dann geraten. Wer ausdruecklich keine will, setzt
+    #: zusaetzlich `bestaetigt`.
+    hoehere: list[KurzFeld] = Field(default_factory=list)
+    bestaetigt: bool = False
+
+    @field_validator("name", "verein", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
+
+
+class MannschaftAusgabe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    verein: str
+    nummer: int
+    ist_sg: bool
+    hoehere: list[str]
+    bestaetigt: bool
+    #: Berechnet, nicht gespeichert: ob die geratene Zuordnung einen zweiten
+    #: Blick wert ist. Eine gespeicherte Spalte waere nach jeder Aenderung an
+    #: der Regel falsch.
+    unsicher: bool
+
+
+class MannschaftenSetzen(BaseModel):
+    """Die vollstaendige Liste einer Staffel.
+
+    Vollstaendig und nicht als Aenderung: DFBnet liefert die Meldung als
+    Ganzes, und eine Mannschaft, die darin fehlt, ist zurueckgezogen worden.
+    """
+
+    mannschaften: list[MannschaftEingang]
+
+
+# ── Vorgaenge ─────────────────────────────────────────────────────────────
+
+
+class VorgangAnlegen(BaseModel):
+    """Was der Staffelleiter beisteuert, bevor der Entwurf entsteht.
+
+    Alles ist freiwillig: fehlt der Verein, wird die Mannschaft des Befundes
+    genommen, fehlt der Grund, der Titel. Ein Entwurf, der an einem leeren
+    Feld scheitert, waere ein Entwurf, den niemand anfaengt.
+    """
+
+    verein: KurzFeld = ""
+    betroffener: KurzFeld = ""
+    grund: Annotated[str, Field(max_length=500)] = ""
+    empfaenger: Annotated[str, Field(max_length=200)] = ""
+
+    @field_validator("verein", "betroffener", "grund", "empfaenger", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
+
+
+class VorgangAendern(BaseModel):
+    """Der Text gehoert dem Staffelleiter.
+
+    Die Vorlage liefert einen Anfang, kein Ergebnis. Wer den Text hier
+    ueberschreibt, behaelt ihn: ein spaeteres Neuerzeugen gibt es bewusst
+    nicht, es wuerde stillschweigend eine Formulierung loeschen, die jemand
+    sich ueberlegt hat.
+    """
+
+    empfaenger: Annotated[str, Field(max_length=200)] | None = None
+    betreff: Annotated[str, Field(max_length=200)] | None = None
+    text: str | None = None
+
+    @field_validator("empfaenger", "betreff", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
+
+
+class ZustandSetzen(BaseModel):
+    zustand: VorgangZustand
+
+
+class VorgangAusgabe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    befund_id: uuid.UUID
+    art: VorgangArt
+    aktenzeichen: str
+    verein: str
+    betroffener: str
+    grund: str
+    empfaenger: str
+    betreff: str
+    text: str
+    zustand: VorgangZustand
+    versandt_am: dt.datetime | None
+
+
+class VorgangZeile(BaseModel):
+    """Die Liste. Ohne den Text - der ist lang und wird erst beim Oeffnen
+    gebraucht."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    befund_id: uuid.UUID
+    art: VorgangArt
+    aktenzeichen: str
+    verein: str
+    betroffener: str
+    betreff: str
+    zustand: VorgangZustand
