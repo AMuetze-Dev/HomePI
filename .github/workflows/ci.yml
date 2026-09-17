@@ -317,11 +317,31 @@ jobs:
           test -n "$token" || { echo "::error::kein Einrichtungstoken im Log"; exit 1; }
           echo "EINRICHTUNGSTOKEN=$token" >> "$GITHUB_ENV"
 
-      - name: Oberflaechentests vorbereiten
+      - name: Abhaengigkeiten des Frontends
         working-directory: services/web
+        run: npm ci
+
+      # Getrennt vom npm-Schritt: beim Fehlschlag soll auf einen Blick klar
+      # sein, ob die Pakete oder der Browser das Problem waren.
+      - name: Browser zwischenspeichern
+        id: browser-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('services/web/package-lock.json') }}
+
+      - name: Browser holen
+        working-directory: services/web
+        # Drei Versuche: der Download kommt von einem CDN und die
+        # Systempakete von apt - beides faellt gelegentlich aus, und mit dem
+        # Inhalt der Tests hat das nichts zu tun.
         run: |
-          npm ci
-          npx playwright install --with-deps chromium
+          for versuch in 1 2 3; do
+            npx playwright install --with-deps chromium && exit 0
+            echo "::warning::Browserinstallation fehlgeschlagen (Versuch $versuch)"
+            sleep 15
+          done
+          exit 1
 
       - name: Oberflaechentests
         working-directory: services/web
