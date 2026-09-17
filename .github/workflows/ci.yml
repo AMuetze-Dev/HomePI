@@ -61,16 +61,27 @@ jobs:
         id: projekte
         run: |
           python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json, pathlib
+          import json
+          from pathlib import Path
+
+          orte = [
+              *sorted(Path().glob("packages/*/pyproject.toml")),
+              *sorted(Path().glob("modules/*/pyproject.toml")),
+              Path("services/gateway/pyproject.toml"),
+          ]
 
           projekte = []
-          for pyproject in sorted(pathlib.Path().glob("packages/*/pyproject.toml"))                          + sorted(pathlib.Path().glob("modules/*/pyproject.toml"))                          + [pathlib.Path("services/gateway/pyproject.toml")]:
-              verzeichnis = pyproject.parent
-              pakete = [p.name for p in (verzeichnis / "src").glob("homepi_*") if p.is_dir()]
+          for pyproject in orte:
+              ordner = pyproject.parent
+              pakete = [p.name for p in (ordner / "src").glob("homepi_*") if p.is_dir()]
               if not pakete:
                   continue
               projekte.append(
-                  {"name": verzeichnis.name, "pfad": str(verzeichnis).replace("\\", "/"), "paket": pakete[0]}
+                  {
+                      "name": ordner.name,
+                      "pfad": ordner.as_posix(),
+                      "paket": pakete[0],
+                  }
               )
 
           print("matrix=" + json.dumps(projekte))
@@ -111,6 +122,13 @@ jobs:
             exit 1
           fi
           echo "Alle Skripte haben das Ausfuehrbar-Bit."
+
+      - name: Workflows pruefen
+        # Faengt Tippfehler in den Workflows, bevor sie einen Lauf kosten.
+        # Achtung: bei einer Matrix aus fromJSON kennt actionlint die
+        # Schluessel nicht - ein falscher matrix.<name> bleibt unentdeckt.
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
 
       - name: Compose-Dateien validieren
         run: |
@@ -188,10 +206,12 @@ jobs:
       - name: Tests inklusive Integration
         # -m 'not smoke' hebt den Standardfilter auf: Postgres ist hier da,
         # eine laufende Instanz nicht.
+        #
+        # Ohne --cov-fail-under: die Schwelle steht als fail_under in der
+        # pyproject.toml des Projekts und gilt damit auch lokal.
         run: |
           uv run pytest -m 'not smoke' \
-            --cov=${{ matrix.paket }} --cov-report=term-missing --cov-report=xml \
-            --cov-fail-under=${{ matrix.mindest_coverage }} \
+            --cov=${{ matrix.projekt.paket }} --cov-report=term-missing --cov-report=xml \
             --junitxml=junit.xml
 
       - uses: actions/upload-artifact@v4
@@ -224,7 +244,7 @@ jobs:
       - run: npm ci
 
       - name: Format
-        run: npx prettier --check src *.ts *.js
+        run: npx prettier --check src "./*.ts" "./*.js"
 
       - name: Lint
         run: npx eslint .

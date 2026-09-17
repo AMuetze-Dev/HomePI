@@ -1,0 +1,5 @@
+# Eigene Labels des selbst gehosteten Runners auf dem Pi. Ohne diesen Eintrag
+# meldet actionlint sie als unbekannt.
+self-hosted-runner:
+  labels:
+    - homepi
