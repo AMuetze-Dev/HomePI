@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-import os
-
 import pytest
 from sqlalchemy import text
 
 from homepi_core.db import Database
+from homepi_core.testing.datenbank import datenbank_fuer_tests
 
 pytestmark = pytest.mark.integration
 
-URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://app:app@127.0.0.1:15432/test")
+#: Nur eine Datenbank, die erkennbar zum Testen da ist - diese Tests
+#: rufen drop_all auf.
+URL = datenbank_fuer_tests()
 
 
 @pytest.fixture

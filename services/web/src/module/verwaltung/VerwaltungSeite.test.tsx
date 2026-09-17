@@ -190,6 +190,25 @@ describe("Verwaltungsseite", () => {
       expect(entziehen).toHaveBeenCalledWith(konto().id, "geraete");
     });
 
+    it("zeigt das gesetzte Recht danach auch an", async () => {
+      // Der Fall aus dem Oberflaechentest: das Backend hatte das Recht, die
+      // Ansicht zeigte weiter "kein Recht".
+      const mitRecht = konto({ rechte: { geraete: "nutzer" } });
+      vi.spyOn(api, "setzeRecht").mockResolvedValue(mitRecht);
+      const laden = vi.spyOn(api, "ladeKonten").mockResolvedValue([ICH, konto()]);
+      vi.spyOn(api, "ladeArtefakte").mockResolvedValue(ARTEFAKTE);
+      render(mitAnmeldung(<VerwaltungSeite />));
+      await userEvent.click(
+        await screen.findByRole("button", { name: /Rechte von gast/ }),
+      );
+
+      // Ab jetzt antwortet das Backend mit dem gesetzten Recht.
+      laden.mockResolvedValue([ICH, mitRecht]);
+      await userEvent.selectOptions(screen.getByLabelText("Geräte"), "nutzer");
+
+      await waitFor(() => expect(screen.getByLabelText("Geräte")).toHaveValue("nutzer"));
+    });
+
     it("sperrt die eigene Verwaltung im Auswahlfeld", async () => {
       // Das Backend lehnt es ohnehin ab - hier steht es gar nicht erst als
       // anklickbare Falle da.

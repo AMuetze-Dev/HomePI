@@ -6,7 +6,6 @@ und gegen eine nachgebaute Sitzung würde man vor allem den Nachbau testen.
 
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 
@@ -20,10 +19,13 @@ from homepi_core.auth import AktuellerBenutzer, Rolle, erfordert
 from homepi_core.auth import speicher as auth_speicher
 from homepi_core.auth.cookies import NAME as COOKIE
 from homepi_core.auth.modelle import Sitzung
+from homepi_core.testing.datenbank import datenbank_fuer_tests
 
 pytestmark = pytest.mark.integration
 
-URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://app:app@127.0.0.1:15432/test")
+#: Nur eine Datenbank, die erkennbar zum Testen da ist - diese Tests
+#: rufen drop_all auf.
+URL = datenbank_fuer_tests()
 PASSWORT = "korrekt-pferd-batterie-heftklammer"
 
 

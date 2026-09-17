@@ -296,8 +296,48 @@ jobs:
           enable-cache: true
           cache-dependency-glob: services/gateway/uv.lock
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/web/package-lock.json
+
       - name: Entwicklungsumgebung hochfahren
         run: docker compose -f compose.dev.yml up -d --build --wait --wait-timeout 300
+
+      # Erst die Oberflaechentests: sie brauchen eine Installation ohne
+      # Verwalter, weil sie bei der Ersteinrichtung anfangen. Danach legt der
+      # Schritt darunter das Rauchtest-Konto an.
+      - name: Einrichtungstoken aus dem Log holen
+        # Es steht dort, sobald das Gateway ohne Verwalter startet - und nur
+        # wer das Log lesen kann, kommt an die Ersteinrichtung.
+        run: |
+          docker compose -f compose.dev.yml logs gateway > gateway.log
+          token=$(sed -n 's/.*Einrichtungstoken:[[:space:]]*//p' gateway.log | tail -1 | tr -d '\r')
+          test -n "$token" || { echo "::error::kein Einrichtungstoken im Log"; exit 1; }
+          echo "EINRICHTUNGSTOKEN=$token" >> "$GITHUB_ENV"
+
+      - name: Oberflaechentests vorbereiten
+        working-directory: services/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Oberflaechentests
+        working-directory: services/web
+        run: npm run test:e2e
+        env:
+          E2E_URL: http://127.0.0.1:5173
+          E2E_EINRICHTUNGSTOKEN: ${{ env.EINRICHTUNGSTOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: oberflaechentests
+          path: |
+            services/web/playwright-report/
+            services/web/test-results/
+          retention-days: 7
 
       - name: Konto fuer die Rauchtests anlegen
         # Artefakte sind je Benutzer sichtbar. Ohne Konto waere das Manifest

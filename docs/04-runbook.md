@@ -32,7 +32,24 @@ entsteht. Danach gibt es die Tabellen der Artefakte **und** die der Anmeldung
 
 `homepi schema` ist ein Startwerkzeug, **kein Migrationssystem**: es legt
 Fehlendes an und ändert nichts Vorhandenes. Sobald sich ein Schema zum ersten
-Mal ändert, gehört dort Alembic hin. Nachsehen, was da ist:
+Mal ändert, gehört dort Alembic hin.
+
+**Es vergleicht Tabellen und Spalten.** Kommt in einer vorhandenen Tabelle
+eine Spalte dazu, kann `create_all` sie nicht nachtragen — der Befehl meldet
+das und endet mit Fehler statt mit „alles gut":
+
+```
+! benutzer: Spalte(n) passwort_wechseln fehlen
+  create_all legt nur fehlende Tabellen an und aendert keine vorhandene.
+  Hier gehoert eine Migration hin - von Hand oder mit Alembic.
+```
+
+Dieselbe Prüfung hängt als `schema` im `/health`: eine fehlende Spalte setzt
+die Instanz auf `degraded`, und die Rauchtests werden nach dem Deploy rot.
+Ohne das sieht eine halb migrierte Datenbank aus, als wären die Daten weg —
+jede Abfrage auf die betroffene Tabelle scheitert.
+
+Nachsehen, was da ist:
 
 ```bash
 $APPS exec -w /app/services/gateway gateway uv run homepi schema zeigen

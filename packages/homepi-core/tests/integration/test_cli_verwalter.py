@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import io
-import os
 from collections.abc import Iterator
 
 import pytest
@@ -21,10 +20,13 @@ from homepi_core.auth import speicher as auth_speicher
 from homepi_core.cli import benutzer as cli_benutzer
 from homepi_core.cli.main import main
 from homepi_core.modelle import Base
+from homepi_core.testing.datenbank import datenbank_fuer_tests
 
 pytestmark = pytest.mark.integration
 
-URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://app:app@127.0.0.1:15432/test")
+#: Nur eine Datenbank, die erkennbar zum Testen da ist - diese Tests
+#: rufen drop_all auf.
+URL = datenbank_fuer_tests()
 PASSWORT = "korrekt-pferd-batterie-heftklammer"
 
 

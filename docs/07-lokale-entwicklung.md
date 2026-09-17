@@ -99,13 +99,54 @@ make tdd-web        # vitest im Watch-Modus
 make tdd-api P=modules/geraete
 ```
 
-Drei Arten, bewusst getrennt:
+### Die Testdatenbank ist nicht die Arbeitsdatenbank
+
+Integrationstests rufen `drop_all` auf. Zeigt `DATABASE_URL` gerade auf die
+Arbeitsdatenbank — und auf einem Entwicklungsrechner tut sie das die meiste
+Zeit —, dann löscht ein Testlauf die Konten, an denen man eben noch gearbeitet
+hat. Genau das ist einmal passiert.
+
+Deshalb entscheidet nicht mehr die Umgebung allein:
+
+```python
+from homepi_core.testing.datenbank import datenbank_fuer_tests
+
+DATENBANK = datenbank_fuer_tests()
+```
+
+Sie nimmt `HOMEPI_TEST_DATABASE_URL`, sonst `DATABASE_URL`, sonst die
+Voreinstellung — und **bricht ab**, wenn dabei etwas anderes als eine
+Datenbank namens `test` oder `<name>_test` herauskommt:
+
+```
+'app' sieht nicht nach einer Testdatenbank aus.
+Integrationstests rufen drop_all auf - gegen die Arbeitsdatenbank wäre das
+der Verlust aller Konten.
+```
+
+Die Oberflächentests gehen noch einen Schritt weiter: sie bekommen mit
+`make e2e` eine **eigene Umgebung** mit eigener Datenbank, eigenen Ports und
+eigenem Projektnamen. Sie legen Konten an, ändern Rechte und werfen am Ende
+alles weg.
+
+```bash
+make e2e          # Umgebung hoch, Tests, Umgebung samt Datenbank weg
+```
+
+Vier Arten, bewusst getrennt:
 
 | | wo | wann |
 |---|---|---|
 | Unit | `tests/unit/` | bei jeder Änderung, Millisekunden |
 | Integration | `tests/integration/`, Marker `integration` | mit laufender Datenbank |
 | Rauchtest | `tests/smoke/`, Marker `smoke` | gegen eine laufende Instanz |
+| Oberfläche | `services/web/e2e/` | gegen eine eigene, frische Umgebung |
+
+Die Oberflächentests melden sich an wie ein Mensch: Ersteinrichtung mit Token,
+Konto anlegen, Startpasswort weitergeben, erstes Anmelden, erzwungener
+Wechsel. Was sie sehen, sehen die Komponententests nicht — die prüfen jede
+Ansicht für sich, mit ersetztem Backend. Der Weg dazwischen ist das, was
+kaputtgeht.
 
 Die Rauchtests werten `GET /module` aus. Ohne Konto ist die Liste
 berechtigterweise leer, und die betroffenen Tests überspringen sich:

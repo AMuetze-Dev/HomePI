@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncIterator
 
 import pytest
 from homepi_core import Base, Modul, ServiceSettings, create_service, register_aus
 from homepi_core.auth import VERWALTUNG, Rolle
 from homepi_core.auth import speicher as auth_speicher
+from homepi_core.testing.datenbank import datenbank_fuer_tests
 from httpx import ASGITransport, AsyncClient
 
 from homepi_verwaltung import modul as artefakt
 
-DATENBANK = os.environ.get("DATABASE_URL", "postgresql+asyncpg://app:app@127.0.0.1:15432/test")
+#: Nur eine Datenbank, die erkennbar zum Testen da ist - diese Tests
+#: rufen drop_all auf.
+DATENBANK = datenbank_fuer_tests()
 
 #: Nur fuer Tests. Die Konten legt die Fixture unten an.
 PASSWORT = "korrekt-pferd-batterie-heftklammer"

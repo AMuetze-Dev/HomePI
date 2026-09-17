@@ -35,7 +35,11 @@ from .db import Database
 from .errors import install_error_handlers
 from .health import HealthRegistry
 from .logging import configure_logging
-from .middleware import AccessLogMiddleware, RequestIdMiddleware
+from .middleware import (
+    AccessLogMiddleware,
+    KeinZwischenspeicherMiddleware,
+    RequestIdMiddleware,
+)
 from .modules import Modul, Modulregister, Zugang
 from .settings import ServiceSettings
 
@@ -94,6 +98,13 @@ def create_service(
     if settings.database_url:
         kontext.db = Database(settings.database_url)
         kontext.health.register("database", kontext.db.ping, essential=True)
+        # Nicht essenziell, aber sichtbar: eine fehlende Spalte laesst jede
+        # Abfrage auf diese Tabelle scheitern. Ohne diesen Check faellt das
+        # erst auf, wenn jemand die betroffene Seite aufruft - und sieht dann
+        # aus, als waeren die Daten weg.
+        from .schema import probe as schema_probe
+
+        kontext.health.register("schema", schema_probe(kontext.db), essential=False)
 
     if anmeldung and kontext.db is None:
         # Frueh und deutlich: Benutzer und Sitzungen liegen in der Datenbank,
@@ -152,6 +163,9 @@ def create_service(
     # gesetzt sein. Starlette führt zuletzt hinzugefügte Middleware zuerst aus.
     app.add_middleware(AccessLogMiddleware)
     app.add_middleware(RequestIdMiddleware)
+    # Zuletzt hinzugefuegt heisst zuerst ausgefuehrt - der Header sitzt damit
+    # auf jeder Antwort, auch auf denen der Fehlerbehandlung.
+    app.add_middleware(KeinZwischenspeicherMiddleware)
 
     if settings.cors_origin_list:
         app.add_middleware(

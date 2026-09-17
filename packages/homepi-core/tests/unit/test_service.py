@@ -69,3 +69,34 @@ async def test_context_meldet_fehlende_datenbank_verstaendlich() -> None:
 
     with pytest.raises(RuntimeError, match="DATABASE_URL"):
         app.state.homepi.require_db()
+
+
+class TestKeinZwischenspeicher:
+    """Ein Fehler, den erst ein Oberflaechentest gefunden hat: ein Recht stand
+    in der Datenbank, die Oberflaeche zeigte weiter den alten Wert. Der Browser
+    hatte die unveraenderte Adresse aus seinem Zwischenspeicher bedient."""
+
+    async def test_jede_antwort_traegt_no_store(self, client: AsyncClient) -> None:
+        assert (await client.get("/info")).headers["cache-control"] == "no-store"
+
+    async def test_auch_die_fehlerantwort(self, client: AsyncClient) -> None:
+        """Sonst merkt sich der Browser ein 404, das laengst keines mehr ist."""
+        assert (await client.get("/gibtsnicht")).headers["cache-control"] == "no-store"
+
+    async def test_ein_eigener_wert_bleibt_stehen(self) -> None:
+        """setdefault statt setzen: ein Endpunkt, der es besser weiss, soll es
+        sagen duerfen."""
+        from starlette.responses import Response
+
+        app = create_service(ServiceSettings(service_name="probe"))
+
+        @app.get("/eigen")
+        async def eigen() -> Response:
+            return Response(
+                "{}",
+                media_type="application/json",
+                headers={"Cache-Control": "max-age=60"},
+            )
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            assert (await c.get("/eigen")).headers["cache-control"] == "max-age=60"

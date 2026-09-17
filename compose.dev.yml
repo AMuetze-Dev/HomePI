@@ -9,12 +9,17 @@
 # Die Ports 3000, 5432 und 8000 sind auf diesem Rechner bereits belegt -
 # deshalb 15432 und 18000. Traefik, TLS und Pi-hole fehlen hier bewusst: die
 # gehören zum Pi und würden lokal nur Zertifikatswarnungen erzeugen.
-name: homepi-dev
+#
+# Dieselbe Datei startet auch eine ZWEITE, unabhängige Umgebung - dafür sind
+# Projektname, Containernamen und Ports über Variablen einstellbar. "make e2e"
+# benutzt das: die Oberflächentests legen Konten an und löschen sie wieder,
+# und das darf niemals die Datenbank treffen, in der man gerade arbeitet.
+name: ${DEV_PROJEKT:-homepi-dev}
 
 services:
   postgres:
     image: postgres:17-bookworm
-    container_name: homepi-dev-postgres
+    container_name: ${DEV_PROJEKT:-homepi-dev}-postgres
     restart: unless-stopped
     ports:
       - "${DEV_DB_PORT:-15432}:5432"
@@ -37,7 +42,7 @@ services:
     build:
       context: .
       dockerfile: services/gateway/Dockerfile.dev
-    container_name: homepi-dev-gateway
+    container_name: ${DEV_PROJEKT:-homepi-dev}-gateway
     restart: unless-stopped
     depends_on:
       postgres:
@@ -79,7 +84,7 @@ services:
     build:
       context: .
       dockerfile: services/web/Dockerfile.dev
-    container_name: homepi-dev-web
+    container_name: ${DEV_PROJEKT:-homepi-dev}-web
     restart: unless-stopped
     depends_on:
       - gateway

@@ -14,8 +14,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+from typing import TYPE_CHECKING
 
 from .shell import CliFehler, erfolg, hinweis, schritt, warnung
+
+if TYPE_CHECKING:
+    from ..schema import Schemastand
 
 
 def argumente(parser: argparse.ArgumentParser) -> None:
@@ -70,44 +74,71 @@ def _bekannte_tabellen() -> list[str]:
     return sorted(Base.metadata.tables)
 
 
-async def _ausfuehren(args: argparse.Namespace) -> int:
-    from sqlalchemy import inspect
+def _fehlende_spalten_melden(stand: Schemastand) -> None:
+    """Der Fall, der frueher lautlos durchging.
 
+    create_all legt fehlende Tabellen an und ruehrt vorhandene nicht an. Eine
+    neue Spalte fehlt danach - und jede Abfrage auf diese Tabelle scheitert.
+    """
+    for tabelle, spalten in sorted(stand.fehlende_spalten.items()):
+        warnung(f"{tabelle}: Spalte(n) {', '.join(spalten)} fehlen")
+    hinweis("create_all legt nur fehlende Tabellen an und aendert keine vorhandene.")
+    hinweis("Hier gehoert eine Migration hin - von Hand oder mit Alembic.")
+
+
+async def _ausfuehren(args: argparse.Namespace) -> int:
     from ..db import Database
     from ..modelle import Base
+    from ..schema import erwartet, stand
 
     schritt("Schema")
     bekannt = _bekannte_tabellen()
 
     datenbank = Database(_datenbank_url())
     try:
-        async with datenbank.connection() as verbindung:
-            vorhanden = set(await verbindung.run_sync(lambda s: inspect(s).get_table_names()))
-
-        fehlend = [name for name in bekannt if name not in vorhanden]
+        ergebnis = await stand(datenbank)
+        fehlende_tabellen = set(ergebnis.fehlende_tabellen)
 
         if args.unterbefehl == "zeigen":
             for name in bekannt:
-                zeichen = "+" if name in vorhanden else "-"
+                if name in fehlende_tabellen:
+                    zeichen = "-"
+                elif name in ergebnis.fehlende_spalten:
+                    zeichen = "!"
+                else:
+                    zeichen = "+"
                 print(f"    {zeichen} {name}")
-            hinweis(f"{len(bekannt) - len(fehlend)} von {len(bekannt)} Tabellen vorhanden.")
+            vorhanden = len(bekannt) - len(fehlende_tabellen)
+            hinweis(f"{vorhanden} von {len(bekannt)} Tabellen vorhanden.")
+            if ergebnis.fehlende_spalten:
+                _fehlende_spalten_melden(ergebnis)
+                return 1
             return 0
 
-        if not fehlend:
-            erfolg(f"Nichts zu tun - alle {len(bekannt)} Tabellen sind da.")
+        if ergebnis.vollstaendig:
+            erfolg(f"Nichts zu tun - alle {len(erwartet())} Tabellen sind vollstaendig.")
             return 0
 
-        for name in fehlend:
+        for name in ergebnis.fehlende_tabellen:
             hinweis(f"fehlt: {name}")
 
         if args.trocken:
+            if ergebnis.fehlende_spalten:
+                _fehlende_spalten_melden(ergebnis)
             warnung("Trockenlauf - nichts geaendert.")
-            return 0
+            return 1 if ergebnis.fehlende_spalten else 0
 
-        async with datenbank.engine.begin() as verbindung:
-            await verbindung.run_sync(Base.metadata.create_all)
+        if ergebnis.fehlende_tabellen:
+            async with datenbank.engine.begin() as verbindung:
+                await verbindung.run_sync(Base.metadata.create_all)
+            erfolg(f"{len(ergebnis.fehlende_tabellen)} Tabelle(n) angelegt.")
 
-        erfolg(f"{len(fehlend)} Tabelle(n) angelegt.")
+        if ergebnis.fehlende_spalten:
+            # Bewusst ein Fehlschlag: sonst faehrt ein Deploy mit "alles gut"
+            # weiter und die Anwendung ist trotzdem kaputt.
+            _fehlende_spalten_melden(ergebnis)
+            return 1
+
         hinweis("Aendert sich ein Schema spaeter, gehoert dort eine Migration hin.")
         return 0
     finally:

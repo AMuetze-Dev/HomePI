@@ -28,6 +28,19 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 @pytest.fixture(scope="session")
+def testdatenbank() -> str:
+    """Die URL, gegen die Integrationstests laufen duerfen.
+
+    Sie bricht ab, wenn die Umgebung auf eine Arbeitsdatenbank zeigt -
+    Integrationstests rufen drop_all auf, und das waere dort der Verlust aller
+    Konten.
+    """
+    from .datenbank import datenbank_fuer_tests
+
+    return datenbank_fuer_tests()
+
+
+@pytest.fixture(scope="session")
 def ziel() -> Ziel:
     from .ziel import ziel_aus_umgebung
 

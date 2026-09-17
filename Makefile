@@ -113,6 +113,8 @@ cert:
 WEB    := services/web
 # Die Integrationstests laufen gegen die Datenbank der Dev-Umgebung -
 # aber gegen "test", nicht gegen "app": sie legen Tabellen an und loeschen sie wieder.
+# Ueber HOMEPI_TEST_DATABASE_URL, nicht ueber DATABASE_URL: so kann daneben
+# die Arbeitsdatenbank gesetzt sein, ohne dass ein Testlauf sie trifft.
 TESTDB := postgresql+asyncpg://app:app@127.0.0.1:15432/test
 
 ## test: alles pruefen, was die CI auch prueft
@@ -128,11 +130,11 @@ test-infra: render verify lint-ci
 
 ## test-python: Format, Lint, Typen und Tests aller drei Python-Projekte
 test-python:
-	@for p in packages/homepi-core modules/geraete services/gateway; do 		echo "=== $$p"; 		( cd $$p 		  && uv run ruff format --check . 		  && uv run ruff check . 		  && uv run mypy 		  && DATABASE_URL=$(TESTDB) uv run pytest -m 'not smoke' --cov --cov-report=term ) 		|| exit 1; 	done
+	@for p in packages/homepi-core modules/geraete modules/verwaltung services/gateway; do 		echo "=== $$p"; 		( cd $$p 		  && uv run ruff format --check . 		  && uv run ruff check . 		  && uv run mypy 		  && HOMEPI_TEST_DATABASE_URL=$(TESTDB) uv run pytest -m 'not smoke' --cov --cov-report=term ) 		|| exit 1; 	done
 
 ## test-web: Format, Lint, Typen und Tests des Frontends
 test-web:
-	cd $(WEB) && npx prettier --check src *.ts *.js
+	cd $(WEB) && npx prettier --check src e2e *.ts *.js
 	cd $(WEB) && npx eslint .
 	cd $(WEB) && npm run typecheck
 	cd $(WEB) && npm run test:coverage
@@ -160,18 +162,18 @@ test-modul:
 	cd modules/$(N) && uv run ruff format --check .
 	cd modules/$(N) && uv run ruff check .
 	cd modules/$(N) && uv run mypy
-	cd modules/$(N) && DATABASE_URL=$(TESTDB) uv run pytest -m 'not smoke' --cov
+	cd modules/$(N) && HOMEPI_TEST_DATABASE_URL=$(TESTDB) uv run pytest -m 'not smoke' --cov
 	@test -d $(WEB)/src/module/$(N) || { echo "(keine eigene Oberflaeche)"; exit 0; }
 	cd $(WEB) && npx vitest run src/module/$(N)
 
 ## fmt: Quellcode formatieren und automatisch behebbare Funde beheben
 fmt:
-	@for p in packages/homepi-core modules/geraete services/gateway; do 		( cd $$p && uv run ruff format . && uv run ruff check --fix . ); 	done
+	@for p in packages/homepi-core modules/geraete modules/verwaltung services/gateway; do 		( cd $$p && uv run ruff format . && uv run ruff check --fix . ); 	done
 	cd $(WEB) && npm run format && npm run lint:fix
 
 ## install: Entwicklungsabhaengigkeiten aller Projekte einrichten
 install:
-	@for p in packages/homepi-core modules/geraete services/gateway; do 		echo "=== $$p"; ( cd $$p && uv sync --all-extras ) || exit 1; 	done
+	@for p in packages/homepi-core modules/geraete modules/verwaltung services/gateway; do 		echo "=== $$p"; ( cd $$p && uv sync --all-extras ) || exit 1; 	done
 	cd $(WEB) && npm ci
 
 # ---------------------------------------------------------------- Entwicklung (lokal)
@@ -207,6 +209,34 @@ dev-logs:
 dev-ps:
 	$(DEV) ps
 
+## e2e: Oberflaechentests gegen eine EIGENE, frische Umgebung
+#
+# Eigene Datenbank, eigene Ports, eigener Projektname: die Tests legen Konten
+# an und loeschen sie wieder, und das darf niemals die Umgebung treffen, in
+# der gerade jemand arbeitet. Am Ende wird sie samt Volume weggeworfen, damit
+# der naechste Lauf wieder bei der Ersteinrichtung beginnt.
+E2E_WEB_PORT ?= 5273
+E2E_API_PORT ?= 18100
+E2E_DB_PORT ?= 15532
+E2E := DEV_PROJEKT=homepi-e2e DEV_WEB_PORT=$(E2E_WEB_PORT) DEV_API_PORT=$(E2E_API_PORT) DEV_DB_PORT=$(E2E_DB_PORT) docker compose -f compose.dev.yml
+
+e2e: e2e-hoch
+	@cd services/web && E2E_URL=http://127.0.0.1:$(E2E_WEB_PORT) 	  E2E_EINRICHTUNGSTOKEN="$$(cd ../.. && $(MAKE) --no-print-directory e2e-token)" 	  npm run test:e2e; 	  ergebnis=$$?; 	  cd ../.. && $(MAKE) --no-print-directory e2e-runter; 	  exit $$ergebnis
+
+## e2e-hoch: die Testumgebung starten, mit frischer Datenbank
+e2e-hoch:
+	-@$(E2E) down -v >/dev/null 2>&1
+	$(E2E) up -d --build --wait --wait-timeout 300
+
+## e2e-token: Einrichtungstoken der Testumgebung ausgeben
+e2e-token:
+	@$(E2E) logs gateway 2>/dev/null | grep "Einrichtungstoken:" | tail -1 | sed 's/.*Einrichtungstoken:[[:space:]]*//' | tr -d '
+'
+
+## e2e-runter: die Testumgebung samt Datenbank wegwerfen
+e2e-runter:
+	$(E2E) down -v
+
 ## smoke: Rauchtests gegen die laufende lokale Umgebung
 # Die Tests, die GET /module auswerten, brauchen ein Konto - ohne Anmeldung ist
 # die Liste berechtigterweise leer. Setze HOMEPI_SMOKE_BENUTZER und
@@ -214,4 +244,4 @@ dev-ps:
 smoke:
 	cd services/gateway && uv run pytest -m smoke -v
 
-.PHONY: artefakt backup cert check deploy-apps dev dev-logs dev-ps dev-reset dev-stop down fmt help install lint-ci logs modul pg-tunnel ps psql pull render smoke stats tdd-api tdd-web test test-infra test-modul test-python test-web up up-apps up-core up-data up-dns up-home update verify
+.PHONY: artefakt backup cert check deploy-apps dev dev-logs dev-ps dev-reset dev-stop down e2e e2e-hoch e2e-runter e2e-token fmt help install lint-ci logs modul pg-tunnel ps psql pull render smoke stats tdd-api tdd-web test test-infra test-modul test-python test-web up up-apps up-core up-data up-dns up-home update verify
