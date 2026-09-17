@@ -177,8 +177,10 @@ Ein Aufruf von `/geraete/` beantwortet sich für einen Angemeldeten ohne Recht
 mit **403**, nicht mit 404. Damit weiß er, dass es ein Artefakt `geraete` gibt.
 Das ist die ehrliche HTTP-Semantik und macht Fehlersuche möglich; die
 vollständige Trennung einer öffentlichen Website von den internen Artefakten
-leistet erst der Reverse Proxy, der öffentlich nur `/api/<artefakt>` durchlässt
-(Stufe 4, siehe [03-architecture](03-architecture.md)).
+leistet erst der Reverse Proxy, der auf einem öffentlichen Host nur
+`/api/<artefakt>` und `/auth/…` durchlässt. Das ist noch nicht gebaut; die
+Netz-Topologie, in die es sich einfügt, steht in
+[03-architecture.md](03-architecture.md).
 
 ## Im Frontend
 
