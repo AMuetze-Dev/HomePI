@@ -9,8 +9,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
   gap: var(--raum-3);
-  list-style: none;
-  padding: 0;
 }
 
 .eintrag {

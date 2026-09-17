@@ -54,6 +54,21 @@ p {
   text-wrap: pretty;
 }
 
+/* Listen tragen hier Struktur, keine Aufzaehlung: Kachelraster, Kennzahlen,
+ * Kontokarten. Sie sind <ul>, damit Screenreader "Liste, 5 Einträge" ansagen -
+ * Punkte und Einzug waeren dazu nur Dekoration, die das Raster bricht.
+ *
+ * Bis hierher stand die Zeile zweimal in Modul-CSS, und beim dritten Mal
+ * fehlte sie: die Konten in der Verwaltung hatten Punkte.
+ *
+ * Eine echte Aufzaehlung im Fliesstext holt sie sich zurueck, mit
+ * "list-style: disc" und einem Einzug an der Stelle, wo sie steht. */
+ul,
+ol {
+  list-style: none;
+  padding-left: 0;
+}
+
 /* Bilder und Medien sprengen sonst jedes Raster. */
 img,
 svg,
