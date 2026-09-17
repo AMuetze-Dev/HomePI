@@ -21,6 +21,30 @@ damit keinerlei Zugriff auf die Geräte im Haus. Ein Konto ohne Eintrag für ein
 Artefakt sieht dieses Artefakt nicht — nicht als gesperrte Kachel, sondern gar
 nicht.
 
+### Wer „Administrator" ist
+
+An genau einer Stelle definiert, und absichtlich nichts Besonderes:
+**`verwalter` für das Artefakt `verwaltung`**. Geprüft mit derselben Funktion
+wie jedes andere Recht.
+
+Das Artefakt `verwaltung` ist die Oberfläche, in der Konten angelegt, gesperrt,
+gelöscht und Rechte vergeben werden. Wer es darf, kann sich selbst jedes andere
+Recht geben — das ist kein Loch, sondern die Definition von Administrator. Der
+Unterschied zu einem globalen Administrator bleibt trotzdem: die Macht hängt an
+einem Artefakt wie jede andere auch, sie steht in derselben Tabelle, und sie
+lässt sich einzeln entziehen.
+
+Zwei Regeln binden auch ihn:
+
+| | |
+|---|---|
+| Niemand nimmt sich **selbst** die Verwaltung | Er könnte es nicht zurücknehmen und säße vor einer Oberfläche, die ihn nicht mehr hineinlässt |
+| Der **letzte** Verwalter bleibt | Sonst kann diese Installation niemand mehr verwalten |
+
+Über die Oberfläche greift immer die erste: der letzte Verwalter ist
+zwangsläufig der Aufrufer selbst. Die Zählung ist die Sicherung für den Weg
+über die Kommandozeile, wo niemand als jemand handelt.
+
 Drei Rollen, aufsteigend. Absichtlich nicht mehr: jede weitere Stufe macht die
 Frage „darf der das?" schwerer zu beantworten, nicht leichter.
 
@@ -84,11 +108,64 @@ setzen, wirft `create_service` beim Start. Lieber gar nicht starten als offen
 stehen — ohne Anmeldung gäbe es niemanden, der die Rechte prüfen könnte, und
 die Prüfung fiele stillschweigend aus.
 
+## Ersteinrichtung: das erste Konto
+
+Eine frische Installation hat keinen Verwalter. Wer die Adresse aufruft,
+bekommt die **Einrichtungsmaske** statt der Anmeldung.
+
+Damit nicht derjenige die Installation übernimmt, der als Erster an die frische
+Adresse kommt, verlangt sie ein **Einrichtungstoken**. Das schreibt das Gateway
+beim Start ins Log:
+
+```
+Diese Installation hat noch keinen Verwalter.
+  Einrichtung öffnen:  <adresse>/einrichtung
+  Einrichtungstoken:   <43 Zeichen, bei jedem Start neu>
+  Das Token gilt bis zum nächsten Start und wird danach ersetzt.
+```
+
+```bash
+docker compose -f compose.dev.yml logs gateway | grep -A3 "keinen Verwalter"
+```
+
+Lesen kann das Log nur, wer Zugriff auf die Maschine hat — damit gilt dieselbe
+Bedingung wie für die Kommandozeile, nur bequemer.
+
+### Was das Backend prüft
+
+Bei **jedem** Aufruf, beide Bedingungen:
+
+1. Es gibt noch keinen Verwalter.
+2. Das vorgelegte Token stimmt.
+
+| Fall | Antwort |
+|---|---|
+| noch kein Verwalter, Token stimmt | 200, Konto angelegt und angemeldet |
+| noch kein Verwalter, Token falsch | 401 — die Einrichtung bleibt offen |
+| Verwalter vorhanden | 409, auch mit gültigem Token |
+| letzter Verwalter gesperrt | 409 — eine Sperre öffnet die Tür nicht wieder |
+
+**Dass die Oberfläche die Maske nicht anzeigt, ist keine Sicherung.** Wer
+`/einrichtung` von Hand eintippt oder direkt gegen die API spricht, landet
+genauso hier — und hier wird geprüft. Ein eigener Testfall hält das fest.
+
+Das Token liegt wie ein Sitzungstoken nur als SHA-256 in der Datenbank; der
+Klartext steht einmal im Log und sonst nirgends. Bei jedem Start entsteht ein
+neues, damit ein vorgestern mitgelesenes wertlos ist. Ist das Log schon
+weggerollt:
+
+```bash
+homepi benutzer einrichtungstoken
+```
+
+Das verweigert sich, sobald es einen Verwalter gibt — sonst wäre es ein
+Zweitschlüssel, der nie ungültig wird.
+
 ## Konten anlegen
 
-**Es gibt keinen Registrierungs-Endpunkt.** Das erste Konto muss von jemandem
-kommen, der ohnehin Zugriff auf die Maschine hat; ein offenes Anmeldeformular
-wäre auf einem selbst gehosteten Dienst die erste Tür, die jemand eintritt.
+**Es gibt keinen Registrierungs-Endpunkt.** Wer ein Konto braucht, bekommt es
+von einem Verwalter — in der Oberfläche unter *Verwaltung* oder auf der
+Kommandozeile.
 
 ```bash
 export DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/app'
@@ -99,10 +176,59 @@ homepi benutzer entziehen aaron geraete
 homepi benutzer passwort aaron
 homepi benutzer liste
 
+homepi benutzer anlegen neuling --startpasswort   # Dienst erzeugt eines
 homepi benutzer sperren aaron       # stilllegen, Sitzungen fliegen sofort raus
 homepi benutzer entsperren aaron
 homepi benutzer loeschen aaron      # fragt nach; --ja fuer Skripte
 ```
+
+### Ein neues Konto braucht nur einen Namen
+
+```bash
+homepi benutzer anlegen neuling --startpasswort
+```
+
+Der Dienst erzeugt ein **Startpasswort** und gibt es genau einmal aus — in der
+Oberfläche als eigene Karte mit Kopierknopf, auf der Kommandozeile als Zeile
+unter dem Konto. Es steht nirgends sonst: nicht in der Datenbank, nicht in
+einer weiteren Antwort. Wer es wegklickt, ohne es weiterzugeben, erzeugt ein
+neues.
+
+```
+xkr7-mq2n-bt9v-wpsa
+```
+
+Vier Gruppen zu vier Zeichen aus einem Alphabet **ohne** `0/O` und `1/l/I` —
+es wird vorgelesen oder abgetippt, und genau dort entstehen die
+Verwechslungen. Bewusst zufällig und nicht `start1234` für alle: ein festes
+Standardpasswort ist nach dem ersten Aushang kein Passwort mehr.
+
+**Der Benutzer ersetzt es beim ersten Anmelden.** Bis dahin kommt sein Konto an
+**kein** Artefakt — auch nicht an eines, für das er längst ein Recht hat:
+
+| | |
+|---|---|
+| `POST /auth/anmelden` | geht, Antwort enthält `passwort_wechseln: true` |
+| `GET /auth/ich`, `/auth/abmelden`, `/auth/passwort` | gehen |
+| `GET /<artefakt>/…` | **403** |
+| `GET /module` | so viel wie für einen Besucher |
+
+Die Prüfung sitzt in `hole_benutzer` — also an der Stelle, über die **jedes**
+Artefakt seinen Benutzer bekommt, auch ein selbstprüfendes. Die Maske im
+Frontend führt dorthin; sie sichert nichts.
+
+Dasselbe gilt, wenn ein Verwalter ein Passwort zurücksetzt: am **fremden**
+Konto ist das Ergebnis immer ein Startpasswort. Am eigenen nicht — dort ist es
+schlicht das neue Passwort.
+
+Der Wechsel beendet alle **anderen** Sitzungen des Kontos. Die laufende bleibt:
+wer gerade sein Passwort geändert hat, sitzt davor und hat sich ausgewiesen.
+Ihn hinauszuwerfen hieße, ihn nach einem erzwungenen Erstwechsel auf die
+Anmeldeseite zu schicken.
+
+Dasselbe in der Oberfläche: Artefakt **Verwaltung**. Dort lassen sich Konten
+anlegen, sperren, löschen, Passwörter setzen und Rollen je Artefakt vergeben.
+Sichtbar ist es nur für Verwalter — wie jedes andere Artefakt auch.
 
 `sperren` statt `loeschen` ist der uebliche Fall: jemand ist ausgeschieden,
 seine Daten sollen aber zuordenbar bleiben. Beides beendet laufende Sitzungen
@@ -150,8 +276,8 @@ Ein unbekannter Benutzername und ein falsches Passwort sind von außen nicht zu
 unterscheiden — auch nicht an der Antwortzeit. Bei fehlendem Konto wird
 trotzdem einmal gehasht.
 
-Ein Passwortwechsel meldet **alle** Geräte ab. Wer sein Passwort ändert, tut
-das oft genau deshalb.
+Ein Passwortwechsel meldet alle **anderen** Geräte ab. Wer sein Passwort
+ändert, tut das oft genau deshalb. Die laufende Sitzung bleibt bestehen.
 
 ## Was das Gateway nach außen preisgibt
 
@@ -161,6 +287,8 @@ das oft genau deshalb.
 | `GET /info` | Version, Umgebung, **Anzahl** der Module — keine Namen |
 | `GET /module` | nur die öffentlichen Artefakte, nie ein 401 |
 | `GET /openapi.json` | in Produktion abgeschaltet |
+| `GET /auth/einrichtung` | ein Ja oder Nein, sonst nichts |
+| `POST /auth/einrichtung` | 409, sobald es einen Verwalter gibt |
 | `GET /<artefakt>/…` | 401 ohne Anmeldung, 403 ohne Recht |
 
 `/module` antwortet bewusst auch anonym mit 200. Ein Besucher der öffentlichen

@@ -77,3 +77,21 @@ async def test_unbekannter_pfad_liefert_problem_json(client: AsyncClient) -> Non
 
     assert antwort.status_code == 404
     assert "problem+json" in antwort.headers["content-type"]
+
+
+async def test_die_verwaltung_ist_geladen(angemeldet: AsyncClient) -> None:
+    """Ohne dieses Artefakt kann niemand Konten anlegen oder Rechte vergeben -
+    es gehoert zum Gateway wie die Anmeldung selbst."""
+    nach_id = {e["id"]: e for e in (await angemeldet.get("/module")).json()}
+
+    assert "verwaltung" in nach_id
+    assert nach_id["verwaltung"]["status"] == "bereit"
+
+
+async def test_die_ersteinrichtung_ist_erreichbar(client: AsyncClient) -> None:
+    """Ohne Konto kaeme sonst niemand hinein - und ohne Anmeldung, denn es gibt
+    ja noch niemanden, der sich anmelden koennte."""
+    antwort = await client.get("/auth/einrichtung")
+
+    # Ohne Datenbank scheitert die Abfrage - aber die Route ist da.
+    assert antwort.status_code != 404

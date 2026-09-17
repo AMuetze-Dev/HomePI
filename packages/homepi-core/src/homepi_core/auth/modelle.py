@@ -21,6 +21,14 @@ class Benutzer(Base, ZeitstempelMixin):
     passwort_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    #: True, solange das Passwort von jemand anderem gesetzt wurde.
+    #:
+    #: Solange es steht, kommt dieses Konto an kein Artefakt - nur an die
+    #: Anmeldung und an den Passwortwechsel. Geprueft wird das in deps.py,
+    #: also an derselben Stelle, an der jedes Artefakt seinen Benutzer
+    #: bekommt; eine Maske im Frontend waere keine Sicherung.
+    passwort_wechseln: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
     rechte: Mapped[list[Recht]] = relationship(
         back_populates="benutzer", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -62,3 +70,19 @@ class Sitzung(Base):
     angelegt: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     benutzer: Mapped[Benutzer] = relationship(back_populates="sitzungen", lazy="selectin")
+
+
+class Einrichtung(Base):
+    """Das Token, mit dem sich der erste Verwalter anlegen laesst.
+
+    Hoechstens eine Zeile: sie entsteht beim Start, solange es keinen
+    Verwalter gibt, und verschwindet, sobald einer da ist. Wie bei den
+    Sitzungen steht hier nur der Hash - der Klartext steht einmal im Log und
+    sonst nirgends.
+    """
+
+    __tablename__ = "einrichtung"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    angelegt: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

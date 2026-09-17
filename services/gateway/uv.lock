@@ -524,7 +524,7 @@ test = [
 requires-dist = [
     { name = "argon2-cffi", specifier = ">=25.1.0" },
     { name = "asyncpg", specifier = ">=0.30" },
-    { name = "fastapi", specifier = ">=0.115" },
+    { name = "fastapi", specifier = ">=0.116.1" },
     { name = "httpx", marker = "extra == 'test'", specifier = ">=0.28" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3" },
@@ -554,6 +554,7 @@ source = { editable = "." }
 dependencies = [
     { name = "homepi-core" },
     { name = "homepi-geraete" },
+    { name = "homepi-verwaltung" },
 ]
 
 [package.dev-dependencies]
@@ -572,6 +573,7 @@ dev = [
 requires-dist = [
     { name = "homepi-core", editable = "../../packages/homepi-core" },
     { name = "homepi-geraete", editable = "../../modules/geraete" },
+    { name = "homepi-verwaltung", editable = "../../modules/verwaltung" },
 ]
 
 [package.metadata.requires-dev]
@@ -590,6 +592,28 @@ dev = [
 name = "homepi-geraete"
 version = "0.1.0"
 source = { editable = "../../modules/geraete" }
+dependencies = [
+    { name = "homepi-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "homepi-core", editable = "../../packages/homepi-core" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "mypy", specifier = ">=1.14" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.25" },
+    { name = "pytest-cov", specifier = ">=6.0" },
+    { name = "pytest-watcher", specifier = ">=0.4" },
+    { name = "ruff", specifier = ">=0.9" },
+]
+
+[[package]]
+name = "homepi-verwaltung"
+version = "0.1.0"
+source = { editable = "../../modules/verwaltung" }
 dependencies = [
     { name = "homepi-core" },
 ]

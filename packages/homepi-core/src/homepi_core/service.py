@@ -35,7 +35,11 @@ from .db import Database
 from .errors import install_error_handlers
 from .health import HealthRegistry
 from .logging import configure_logging
-from .middleware import AccessLogMiddleware, RequestIdMiddleware
+from .middleware import (
+    AccessLogMiddleware,
+    KeinZwischenspeicherMiddleware,
+    RequestIdMiddleware,
+)
 from .modules import Modul, Modulregister, Zugang
 from .settings import ServiceSettings
 
@@ -94,6 +98,13 @@ def create_service(
     if settings.database_url:
         kontext.db = Database(settings.database_url)
         kontext.health.register("database", kontext.db.ping, essential=True)
+        # Nicht essenziell, aber sichtbar: eine fehlende Spalte laesst jede
+        # Abfrage auf diese Tabelle scheitern. Ohne diesen Check faellt das
+        # erst auf, wenn jemand die betroffene Seite aufruft - und sieht dann
+        # aus, als waeren die Daten weg.
+        from .schema import probe as schema_probe
+
+        kontext.health.register("schema", schema_probe(kontext.db), essential=False)
 
     if anmeldung and kontext.db is None:
         # Frueh und deutlich: Benutzer und Sitzungen liegen in der Datenbank,
@@ -119,8 +130,13 @@ def create_service(
         )
         if on_startup is not None:
             async with _als_kontext(on_startup, kontext):
+                # Nach on_startup: dort legt das Gateway die Tabellen an, und
+                # ohne sie liesse sich nicht nachsehen, ob es einen Verwalter
+                # gibt.
+                await _einrichtung_vorbereiten(kontext, anmeldung=anmeldung)
                 yield
         else:
+            await _einrichtung_vorbereiten(kontext, anmeldung=anmeldung)
             yield
         log.info("%s fährt herunter", settings.service_name)
         if kontext.db is not None:
@@ -147,6 +163,9 @@ def create_service(
     # gesetzt sein. Starlette führt zuletzt hinzugefügte Middleware zuerst aus.
     app.add_middleware(AccessLogMiddleware)
     app.add_middleware(RequestIdMiddleware)
+    # Zuletzt hinzugefuegt heisst zuerst ausgefuehrt - der Header sitzt damit
+    # auf jeder Antwort, auch auf denen der Fehlerbehandlung.
+    app.add_middleware(KeinZwischenspeicherMiddleware)
 
     if settings.cors_origin_list:
         app.add_middleware(
@@ -164,8 +183,12 @@ def create_service(
         # Erst hier importieren: ein Service ohne Anmeldung soll weder
         # argon2 noch die Auth-Tabellen laden.
         from .auth import anmelde_router
+        from .auth.einrichtung import router as einrichtungs_router
 
         app.include_router(anmelde_router, prefix="/auth")
+        # Prueft bei jedem Aufruf selbst, ob die Einrichtung noch offen ist -
+        # deshalb darf er dauerhaft haengen bleiben.
+        app.include_router(einrichtungs_router, prefix="/auth")
 
     if module is not None:
         _mounte_module(app, module, anmeldung=anmeldung)
@@ -212,6 +235,41 @@ def _zugriffspruefung(modul: Modul) -> list[Any]:
     from .auth import erfordert
 
     return [erfordert(modul.id, modul.mindestrolle)]
+
+
+async def _einrichtung_vorbereiten(kontext: ServiceContext, *, anmeldung: bool) -> None:
+    """Solange es keinen Verwalter gibt: ein frisches Einrichtungstoken ins Log.
+
+    Nur so kommt jemand an die Ersteinrichtung - und nur, wer das Log lesen
+    kann, also Zugriff auf die Maschine hat. Bei jedem Start ein neues Token:
+    damit ist im Log immer das gueltige zu finden, und ein mitgelesenes von
+    vorgestern ist wertlos.
+
+    Scheitert das - etwa weil die Datenbank noch nicht da ist -, wird es
+    gemeldet und der Dienst startet trotzdem. Ein Gateway, das wegen der
+    Ersteinrichtung nicht hochkommt, waere die schlechtere Antwort.
+    """
+    if not anmeldung or kontext.db is None:
+        return
+
+    from .auth import speicher
+
+    try:
+        async with kontext.db.session() as sitzung:
+            if not await speicher.einrichtung_noetig(sitzung):
+                return
+            token = await speicher.setze_einrichtungstoken(sitzung)
+    except Exception:
+        log.exception("Einrichtungstoken liess sich nicht anlegen")
+        return
+
+    log.warning(
+        "Diese Installation hat noch keinen Verwalter.\n"
+        "  Einrichtung öffnen:  <adresse>/einrichtung\n"
+        "  Einrichtungstoken:   %s\n"
+        "  Das Token gilt bis zum nächsten Start und wird danach ersetzt.",
+        token,
+    )
 
 
 @asynccontextmanager

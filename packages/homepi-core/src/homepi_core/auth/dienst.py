@@ -18,6 +18,16 @@ from enum import StrEnum
 
 from homepi_core import ServiceError
 
+#: Das Artefakt, ueber das Konten verwaltet werden.
+#:
+#: Wer dafuer VERWALTER ist, kann Benutzer anlegen, sperren, loeschen und
+#: Rechte vergeben - das, was man sonst "Administrator" nennt. Der Unterschied
+#: zu einem globalen Administrator bleibt bestehen und ist der Punkt: die Macht
+#: haengt an einem Artefakt wie jede andere auch. Wer die Verwaltung darf, darf
+#: damit **nicht** die Geraete im Haus - er kann sich das Recht allerdings
+#: selbst geben. Genau das steht dann auch im Log.
+VERWALTUNG = "verwaltung"
+
 
 class Rolle(StrEnum):
     """Rechte je Artefakt. Absichtlich nur drei - jede weitere Stufe macht die
@@ -63,6 +73,47 @@ class PasswortUngeeignet(ServiceError):
 class BenutzerVergeben(ServiceError):
     status = 409
     title = "Benutzername bereits vergeben"
+
+
+class EinrichtungNichtNoetig(ServiceError):
+    """Es gibt bereits einen Verwalter - die Einrichtung ist vorbei.
+
+    409 und nicht 404: die Frage 'ist hier schon jemand?' beantwortet
+    ``GET /auth/einrichtung`` ohnehin oeffentlich, verheimlicht wird also
+    nichts. Ein klarer Status ist hier mehr wert als ein verschleierter.
+    """
+
+    status = 409
+    title = "Einrichtung ist bereits abgeschlossen"
+
+
+class EinrichtungTokenFalsch(ServiceError):
+    status = 401
+    title = "Einrichtungstoken stimmt nicht"
+
+
+class PasswortWechselNoetig(ServiceError):
+    """Dieses Konto muss erst ein eigenes Passwort setzen.
+
+    403 und nicht 401: die Anmeldung hat geklappt, es fehlt nur ein Schritt.
+    Ein 401 wuerde die Oberflaeche zurueck auf die Anmeldeseite schicken - in
+    eine Schleife, denn das Anmelden funktioniert ja.
+    """
+
+    status = 403
+    title = "Passwortwechsel nötig"
+
+
+class LetzterVerwalter(ServiceError):
+    """Der letzte Verwalter darf sich nicht selbst aussperren.
+
+    Ohne diese Regel waere der Dienst nach einem Fehlgriff nur noch ueber die
+    Kommandozeile zu retten - und auf einem Pi, an dem gerade niemand sitzt,
+    heisst das: gar nicht.
+    """
+
+    status = 409
+    title = "Letzter Verwalter"
 
 
 # --- Sitzungen -------------------------------------------------------------
@@ -175,3 +226,77 @@ def darf(rechte: Mapping[str, Rolle], artefakt: str, benoetigt: Rolle) -> bool:
     """
     vorhanden = rechte.get(artefakt)
     return vorhanden is not None and vorhanden.deckt(benoetigt)
+
+
+def darf_verwalten(rechte: Mapping[str, Rolle]) -> bool:
+    """Darf dieser Benutzer Konten verwalten?
+
+    Das ist die einzige Stelle, an der 'Administrator' definiert wird - und sie
+    ist absichtlich nichts Besonderes: VERWALTER fuer das Artefakt
+    ``verwaltung``, geprueft mit derselben Funktion wie jedes andere Recht.
+    """
+    return darf(rechte, VERWALTUNG, Rolle.VERWALTER)
+
+
+def pruefe_letzter_verwalter(
+    anzahl_verwalter: int, betrifft_verwalter: bool, was: str = "Diese Änderung"
+) -> None:
+    """Wirft, wenn dem Dienst dabei der letzte Verwalter abhanden kaeme.
+
+    ``anzahl_verwalter`` ist die Zahl **vor** der Aenderung. Der Aufrufer sagt
+    mit ``betrifft_verwalter``, ob das Ziel ueberhaupt einer ist - sonst ist
+    die Frage gegenstandslos.
+    """
+    if betrifft_verwalter and anzahl_verwalter <= 1:
+        raise LetzterVerwalter(
+            f"{was} würde den letzten Verwalter entfernen. Lege zuerst einen "
+            "zweiten an - sonst kann diese Installation niemand mehr verwalten."
+        )
+
+
+# --- Startpasswoerter ------------------------------------------------------
+
+#: Ohne 0/O und 1/l/I: das Startpasswort wird vorgelesen oder abgetippt, und
+#: genau dort entstehen die Verwechslungen.
+STARTALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
+
+#: Vier Gruppen zu vier Zeichen: 16 Zeichen plus Bindestriche, damit es die
+#: Mindestlaenge sicher erreicht und sich trotzdem diktieren laesst.
+STARTGRUPPEN = 4
+STARTGRUPPENLAENGE = 4
+
+
+def neues_startpasswort() -> str:
+    """Ein Passwort, das jemand anders setzt und der Benutzer gleich ersetzt.
+
+    Bewusst zufaellig und nicht "start1234" fuer alle: ein festes Standard-
+    passwort ist nach dem ersten Aushang kein Passwort mehr. Bis zum ersten
+    Wechsel ist dieses hier die einzige Huerde vor dem Konto - es soll also
+    auch dann taugen, wenn der Wechsel zwei Wochen dauert.
+
+    Rund 78 Bit Entropie bei 16 Zeichen aus 31 - genug, und es laesst sich
+    am Telefon durchgeben.
+    """
+    gruppen = (
+        "".join(secrets.choice(STARTALPHABET) for _ in range(STARTGRUPPENLAENGE))
+        for _ in range(STARTGRUPPEN)
+    )
+    return "-".join(gruppen)
+
+
+# --- Einrichtung -----------------------------------------------------------
+
+#: Wie das Sitzungstoken: 256 Bit aus secrets, in der Datenbank nur der Hash.
+EINRICHTUNG_TOKEN_BYTES = 32
+
+
+def neues_einrichtungstoken() -> str:
+    """Das Token, mit dem sich der erste Verwalter anlegen laesst.
+
+    Warum ueberhaupt eines: 'es gibt noch keinen Verwalter' allein genuegt
+    nicht. Wer als Erster an die frisch ausgerollte Adresse kommt, wuerde sonst
+    die Installation uebernehmen. Das Token steht im Log des Dienstes - lesen
+    kann es also nur, wer ohnehin Zugriff auf die Maschine hat. Damit gilt
+    dieselbe Bedingung wie vorher fuer die Kommandozeile, nur bequemer.
+    """
+    return secrets.token_urlsafe(EINRICHTUNG_TOKEN_BYTES)

@@ -49,6 +49,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/setupTests.ts"],
     css: false,
+    // Die Oberflaechentests gehoeren Playwright: sie brauchen einen echten
+    // Browser und eine laufende Instanz. Vitest wuerde sie sonst einsammeln
+    // und an "test is not defined" scheitern.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],

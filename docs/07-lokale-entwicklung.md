@@ -29,16 +29,25 @@ make dev-reset    # stoppen und Datenbank wegwerfen
 
 ### Einmalig: ein Konto
 
-Artefakte sind per Voreinstellung verschlossen. Ohne Konto zeigt die Startseite
-das Anmeldeformular und sonst nichts — das ist richtig so, aber zum Entwickeln
-braucht es einmal ein Konto:
+Eine frische Umgebung hat keinen Verwalter. `http://localhost:5173` zeigt dann
+die **Einrichtungsmaske**. Sie verlangt das Einrichtungstoken, das beim Start
+im Log steht:
+
+```bash
+docker compose -f compose.dev.yml logs gateway | grep -A3 "keinen Verwalter"
+```
+
+Auf der Kommandozeile geht dasselbe:
 
 ```bash
 export DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/app'
 cd packages/homepi-core
-uv run homepi benutzer anlegen aaron --artefakt geraete --rolle verwalter
+uv run homepi benutzer anlegen aaron --artefakt verwaltung --rolle verwalter
 uv run homepi benutzer liste
 ```
+
+Weitere Rechte — etwa `geraete` — vergibst du danach in der Oberfläche unter
+*Verwaltung* oder mit `homepi benutzer recht aaron geraete verwalter`.
 
 `make dev-reset` wirft die Datenbank weg — danach ist auch das Konto weg.
 
@@ -90,13 +99,97 @@ make tdd-web        # vitest im Watch-Modus
 make tdd-api P=modules/geraete
 ```
 
-Drei Arten, bewusst getrennt:
+### Die Testdatenbank ist nicht die Arbeitsdatenbank
+
+Integrationstests rufen `drop_all` auf. Zeigt `DATABASE_URL` gerade auf die
+Arbeitsdatenbank — und auf einem Entwicklungsrechner tut sie das die meiste
+Zeit —, dann löscht ein Testlauf die Konten, an denen man eben noch gearbeitet
+hat. Genau das ist einmal passiert.
+
+Deshalb entscheidet nicht mehr die Umgebung allein:
+
+```python
+from homepi_core.testing.datenbank import datenbank_fuer_tests
+
+DATENBANK = datenbank_fuer_tests()
+```
+
+Sie nimmt `HOMEPI_TEST_DATABASE_URL`, sonst `DATABASE_URL`, sonst die
+Voreinstellung — und **bricht ab**, wenn dabei etwas anderes als eine
+Datenbank namens `test` oder `<name>_test` herauskommt:
+
+```
+'app' sieht nicht nach einer Testdatenbank aus.
+Integrationstests rufen drop_all auf - gegen die Arbeitsdatenbank wäre das
+der Verlust aller Konten.
+```
+
+### Jeder Lauf bekommt eine frische Datenbank
+
+Die geprüfte Datenbank ist nur die **Vorlage**. Beim Start legt das
+pytest-Plugin daneben eine eigene an und stellt die Umgebung darauf um; am
+Ende wird sie weggeworfen und die vorherige wieder eingestellt. Im Kopf des
+Laufs steht, welche es ist:
+
+```
+Testdatenbank: homepi_core_test (neu angelegt, wird am Ende weggeworfen)
+```
+
+Der Name kommt vom Projekt (`homepi-core` → `homepi_core_test`), ist also
+wiederfindbar. Zwei Folgen, beide beabsichtigt:
+
+- **Kein Lauf sieht, was der vorige hinterlassen hat.** Ein Test, der nur
+  wegen eines Restes grün ist, ist schlimmer als ein roter.
+- **Nach einem roten Lauf bleibt sie stehen**, damit man hineinsehen kann.
+  Der nächste Lauf legt sie ohnehin neu an — es häuft sich nichts an.
+
+```bash
+psql "postgresql://app:app@127.0.0.1:15432/homepi_core_test"
+
+# Bei der Vorlage bleiben, statt je Lauf eine eigene anzulegen:
+HOMEPI_TEST_DATENBANK_JE_LAUF=0 uv run pytest -m integration
+```
+
+Lässt sich keine anlegen — etwa weil gerade keine Postgres läuft —, sagt der
+Lauf das als Warnung und benutzt die vorgegebene. Unit-Tests brauchen ohnehin
+keine, und `pytest -m smoke` fasst gar keine an: dort gehört die Datenbank der
+laufenden Instanz.
+
+### Die Oberflächentests bekommen eine ganze Umgebung
+
+Sie gehen noch einen Schritt weiter: mit `make e2e` eine **eigene Umgebung**
+mit eigener Datenbank, eigenen Ports und eigenem Projektnamen. Sie legen
+Konten an, ändern Rechte und werfen am Ende alles weg.
+
+```bash
+make e2e          # Umgebung hoch, Tests, Umgebung samt Datenbank weg
+```
+
+Bevor der erste Test etwas anfasst, fragt er nach: hat diese Installation
+schon einen Verwalter? Wenn ja, bricht der Lauf ab, statt in fremden Konten
+zu wüten:
+
+```
+http://127.0.0.1:5173 hat bereits einen Verwalter — hier arbeitet also jemand.
+Diese Tests legen Konten an und vergeben Rechte; sie laufen nur gegen eine
+frische Installation mit eigener Datenbank:
+  make e2e
+```
+
+Vier Arten, bewusst getrennt:
 
 | | wo | wann |
 |---|---|---|
 | Unit | `tests/unit/` | bei jeder Änderung, Millisekunden |
 | Integration | `tests/integration/`, Marker `integration` | mit laufender Datenbank |
 | Rauchtest | `tests/smoke/`, Marker `smoke` | gegen eine laufende Instanz |
+| Oberfläche | `services/web/e2e/` | gegen eine eigene, frische Umgebung |
+
+Die Oberflächentests melden sich an wie ein Mensch: Ersteinrichtung mit Token,
+Konto anlegen, Startpasswort weitergeben, erstes Anmelden, erzwungener
+Wechsel. Was sie sehen, sehen die Komponententests nicht — die prüfen jede
+Ansicht für sich, mit ersetztem Backend. Der Weg dazwischen ist das, was
+kaputtgeht.
 
 Die Rauchtests werten `GET /module` aus. Ohne Konto ist die Liste
 berechtigterweise leer, und die betroffenen Tests überspringen sich:
@@ -109,9 +202,9 @@ Unit-Tests laufen immer. Integration und Rauchtest sind standardmäßig
 abgewählt — sonst würde ein Testlauf ohne Datenbank scheitern und man gewöhnt
 sich an rote Läufe.
 
-**Die Integrationstests benutzen die Datenbank `test`, nicht `app`.** Sie legen
-Tabellen an und löschen sie wieder; liefen sie auf `app`, wären die Daten der
-laufenden Entwicklungsumgebung nach jedem Testlauf weg.
+**Die Integrationstests benutzen niemals `app`.** Sie legen Tabellen an und
+löschen sie wieder; liefen sie auf der Arbeitsdatenbank, wären deren Daten
+nach jedem Testlauf weg.
 
 Die Rauchtests sind dieselben, die später gegen den Pi laufen. Was sich
 unterscheidet, ist die Basis-URL aus `homepi.toml`:

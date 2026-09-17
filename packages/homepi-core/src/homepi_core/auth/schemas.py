@@ -22,8 +22,29 @@ class BenutzerAusgabe(BaseModel):
     #: Artefakt -> Rolle. Das Frontend blendet danach Bedienelemente aus -
     #: die eigentliche Pruefung passiert trotzdem im Backend.
     rechte: dict[str, Rolle] = {}
+    #: True, solange das Passwort von jemand anderem gesetzt wurde. Bis zum
+    #: Wechsel kommt dieses Konto an kein Artefakt.
+    passwort_wechseln: bool = False
 
 
 class PasswortAendern(BaseModel):
     altes_passwort: str = Field(min_length=1, max_length=200)
     neues_passwort: str = Field(min_length=1, max_length=200)
+
+
+class Einrichtungsstand(BaseModel):
+    #: True, solange es keinen Verwalter gibt. Mehr verraet die Antwort nicht.
+    noetig: bool
+
+
+class Einrichtung(BaseModel):
+    """Der erste Verwalter.
+
+    Das Token ist kein Passwort und wird deshalb auch nicht wie eines geprueft
+    - es ist der Nachweis, dass der Aufrufer an das Log der Maschine kommt.
+    """
+
+    token: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=32)
+    passwort: str = Field(min_length=1, max_length=200)
+    anzeigename: str | None = Field(default=None, max_length=100)

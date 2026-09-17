@@ -44,6 +44,11 @@ export function AnmeldungProvider({ children }: { children: ReactNode }) {
     setBenutzer(null);
   }, []);
 
+  // Die Ersteinrichtung legt den ersten Verwalter an und meldet ihn in
+  // einem Zug an. Ohne diesen Weg muesste die Oberflaeche danach neu
+  // laden, nur um zu erfahren, was sie schon weiss.
+  const uebernimm = useCallback((neuer: Benutzer) => setBenutzer(neuer), []);
+
   const darf = useCallback(
     (artefakt: string, benoetigt: Rolle = "leser") => {
       const vorhanden = benutzer?.rechte[artefakt];
@@ -54,9 +59,11 @@ export function AnmeldungProvider({ children }: { children: ReactNode }) {
 
   const wert: Anmeldung = {
     zustand: laedt ? "laedt" : benutzer ? "angemeldet" : "abgemeldet",
+    mussPasswortWechseln: benutzer?.passwort_wechseln ?? false,
     benutzer,
     anmelden,
     abmelden,
+    uebernimm,
     darf,
   };
 

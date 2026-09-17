@@ -194,7 +194,12 @@ jobs:
           --health-retries 10
 
     env:
-      DATABASE_URL: postgresql+asyncpg://app:app@127.0.0.1:5432/test
+      # HOMEPI_TEST_DATABASE_URL, nicht DATABASE_URL: die Tests sollen nur
+      # ueber die Variable an eine Datenbank kommen, die ausdruecklich zum
+      # Testen da ist. Sie ist die Vorlage, nicht das Ziel - das pytest-Plugin
+      # legt daneben je Lauf eine eigene an ("<projekt>_test") und wirft sie
+      # am Ende wieder weg.
+      HOMEPI_TEST_DATABASE_URL: postgresql+asyncpg://app:app@127.0.0.1:5432/test
 
     steps:
       - uses: actions/checkout@v4
@@ -296,21 +301,94 @@ jobs:
           enable-cache: true
           cache-dependency-glob: services/gateway/uv.lock
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/web/package-lock.json
+
+      # VOR dem Hochfahren der Umgebung, und das ist kein Zufall:
+      # compose haengt ein anonymes Volume auf /app/node_modules. Docker
+      # legt den Einhaengepunkt dafuer auf dem Host an - als root. Ein
+      # spaeteres 'npm ci' liefe dann als 'runner' gegen ein Verzeichnis,
+      # das ihm nicht gehoert, und scheiterte an der Berechtigung.
+      - name: Abhaengigkeiten des Frontends
+        working-directory: services/web
+        run: npm ci
+
+      # Getrennt vom npm-Schritt: beim Fehlschlag soll auf einen Blick klar
+      # sein, ob die Pakete oder der Browser das Problem waren.
+      - name: Browser zwischenspeichern
+        id: browser-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('services/web/package-lock.json') }}
+
+      - name: Browser holen
+        working-directory: services/web
+        # Drei Versuche: der Download kommt von einem CDN und die
+        # Systempakete von apt - beides faellt gelegentlich aus, und mit dem
+        # Inhalt der Tests hat das nichts zu tun.
+        run: |
+          for versuch in 1 2 3; do
+            npx playwright install --with-deps chromium && exit 0
+            echo "::warning::Browserinstallation fehlgeschlagen (Versuch $versuch)"
+            sleep 15
+          done
+          exit 1
+
       - name: Entwicklungsumgebung hochfahren
         run: docker compose -f compose.dev.yml up -d --build --wait --wait-timeout 300
+
+      # Erst die Oberflaechentests: sie brauchen eine Installation ohne
+      # Verwalter, weil sie bei der Ersteinrichtung anfangen. Danach legt der
+      # Schritt darunter das Rauchtest-Konto an.
+      - name: Einrichtungstoken aus dem Log holen
+        # Es steht dort, sobald das Gateway ohne Verwalter startet - und nur
+        # wer das Log lesen kann, kommt an die Ersteinrichtung.
+        run: |
+          docker compose -f compose.dev.yml logs gateway > gateway.log
+          token=$(sed -n 's/.*Einrichtungstoken:[[:space:]]*//p' gateway.log | tail -1 | tr -d '\r')
+          test -n "$token" || { echo "::error::kein Einrichtungstoken im Log"; exit 1; }
+          echo "EINRICHTUNGSTOKEN=$token" >> "$GITHUB_ENV"
+
+      - name: Oberflaechentests
+        working-directory: services/web
+        run: npm run test:e2e
+        env:
+          E2E_URL: http://127.0.0.1:5173
+          E2E_EINRICHTUNGSTOKEN: ${{ env.EINRICHTUNGSTOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: oberflaechentests
+          path: |
+            services/web/playwright-report/
+            services/web/test-results/
+          retention-days: 7
 
       - name: Konto fuer die Rauchtests anlegen
         # Artefakte sind je Benutzer sichtbar. Ohne Konto waere das Manifest
         # berechtigterweise leer und die Rauchtests wuerden nichts mehr pruefen.
         # Das Passwort kommt ueber stdin, nicht als Argument - sonst stuende es
         # in der Prozessliste des Runners.
+        #
+        # Auch das Recht auf "verwaltung": damit gilt diese Instanz als
+        # eingerichtet, und der Rauchtest kann pruefen, ob die Ersteinrichtung
+        # danach wirklich zu ist. Ohne das wuerde er sich ueberspringen.
         run: |
+          GATEWAY="docker compose -f compose.dev.yml exec -T -w /app/services/gateway gateway"
           printf '%s' "$HOMEPI_SMOKE_PASSWORT" \
-            | docker compose -f compose.dev.yml exec -T -w /app/services/gateway gateway \
-                uv run homepi benutzer anlegen rauchtest --passwort-stdin \
+            | $GATEWAY uv run homepi benutzer anlegen rauchtest --passwort-stdin \
                 --artefakt geraete --rolle verwalter
+          $GATEWAY uv run homepi benutzer recht rauchtest verwaltung verwalter
 
       - name: Rauchtests gegen die laufende Instanz
+        # "-m smoke" waehlt ausschliesslich Tests gegen eine laufende Instanz.
+        # Das Plugin legt dafuer bewusst keine eigene Datenbank an: diese hier
+        # gehoert der Umgebung, die oben hochgefahren wurde.
         working-directory: services/gateway
         run: |
           uv sync --frozen --all-extras

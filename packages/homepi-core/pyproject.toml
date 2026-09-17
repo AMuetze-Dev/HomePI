@@ -10,7 +10,9 @@ readme = "README.md"
 # und kein Click herein.
 dependencies = [
     "pydantic-settings>=2.6",
-    "fastapi>=0.115",
+    # Ab 0.116: Depends(..., scope="function"). Ohne das committet die
+    # Datenbanksitzung erst nach der Antwort - siehe deps.py.
+    "fastapi>=0.116.1",
     "uvicorn[standard]>=0.34",
     "sqlalchemy[asyncio]>=2.0",
     "asyncpg>=0.30",
@@ -114,4 +116,11 @@ disallow_untyped_defs = false
 [[tool.mypy.overrides]]
 # redis ist ein optionales Extra; ohne Installation gibt es keine Stubs.
 module = "redis.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# asyncpg liefert keine Typen mit. Normalerweise spricht nur SQLAlchemy damit;
+# die Testdatenbank legt es direkt an, weil CREATE DATABASE nicht in eine
+# Transaktion passt.
+module = "asyncpg.*"
 ignore_missing_imports = true

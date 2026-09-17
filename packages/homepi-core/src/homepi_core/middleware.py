@@ -71,3 +71,23 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             },
         )
         return antwort
+
+
+class KeinZwischenspeicherMiddleware(BaseHTTPMiddleware):
+    """``Cache-Control: no-store`` auf jede Antwort.
+
+    Dieser Dienst liefert ausschliesslich Daten, die sich aendern - Konten,
+    Rechte, Geraete. Ohne diesen Header entscheidet der Browser selbst, ob er
+    eine Antwort wiederverwendet, und tut das bei einer unveraenderten Adresse
+    gelegentlich auch. Das Ergebnis ist eine Oberflaeche, die eine Aenderung
+    nicht zeigt, obwohl sie gespeichert ist - ein Fehler, den man an der
+    falschen Stelle sucht.
+
+    Ausgeliefert werden hier keine statischen Dateien; das uebernimmt das
+    Frontend. Ein pauschales no-store kostet hier also nichts.
+    """
+
+    async def dispatch(self, request: Request, call_next: Weiter) -> Response:
+        antwort = await call_next(request)
+        antwort.headers.setdefault("Cache-Control", "no-store")
+        return antwort

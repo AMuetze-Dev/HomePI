@@ -18,11 +18,26 @@ from fastapi.params import Depends as Abhaengigkeit
 
 from ..deps import DbSitzung, hole_einstellungen
 from . import cookies, speicher
-from .dienst import NichtAngemeldet, Rolle, ZugriffVerweigert, darf, pruefe_sitzung
+from .dienst import (
+    NichtAngemeldet,
+    PasswortWechselNoetig,
+    Rolle,
+    ZugriffVerweigert,
+    darf,
+    pruefe_sitzung,
+)
 from .modelle import Benutzer
 
 
-async def hole_benutzer(request: Request, antwort: Response, sitzung: DbSitzung) -> Benutzer:
+async def hole_sitzungsbenutzer(
+    request: Request, antwort: Response, sitzung: DbSitzung
+) -> Benutzer:
+    """Wer ist angemeldet - ohne die Frage, ob er schon loslegen darf.
+
+    Nur fuer die Endpunkte unter ``/auth``: 'wer bin ich', 'abmelden' und der
+    Passwortwechsel selbst muessen auch dann gehen, wenn genau dieser Wechsel
+    noch aussteht. Alles andere nimmt ``hole_benutzer``.
+    """
     token = request.cookies.get(cookies.NAME)
     if not token:
         raise NichtAngemeldet("Für diese Seite ist eine Anmeldung nötig")
@@ -48,6 +63,24 @@ async def hole_benutzer(request: Request, antwort: Response, sitzung: DbSitzung)
     return eintrag.benutzer
 
 
+Sitzungsbenutzer = Annotated[Benutzer, Depends(hole_sitzungsbenutzer)]
+
+
+async def hole_benutzer(benutzer: Sitzungsbenutzer) -> Benutzer:
+    """Wer ist angemeldet und darf loslegen?
+
+    Die Pruefung auf einen ausstehenden Passwortwechsel sitzt hier und nicht in
+    einzelnen Endpunkten: hierueber kommt **jedes** Artefakt an seinen
+    Benutzer, auch eines, das seine Rechte selbst prueft. Eine Maske im
+    Frontend waere keine Sicherung, sondern nur eine Bitte.
+    """
+    if benutzer.passwort_wechseln:
+        raise PasswortWechselNoetig(
+            "Dieses Konto benutzt noch das vergebene Startpasswort. Wähle erst ein eigenes."
+        )
+    return benutzer
+
+
 AktuellerBenutzer = Annotated[Benutzer, Depends(hole_benutzer)]
 
 
@@ -65,8 +98,10 @@ async def hole_benutzer_optional(
         # Aufruf die Datenbank nach einer Sitzung, die es nicht geben kann.
         return None
     try:
-        return await hole_benutzer(request, antwort, sitzung)
-    except NichtAngemeldet:
+        return await hole_benutzer(await hole_sitzungsbenutzer(request, antwort, sitzung))
+    except (NichtAngemeldet, PasswortWechselNoetig):
+        # Bis zum Passwortwechsel sieht dieses Konto so viel wie ein Besucher:
+        # die oeffentlichen Artefakte. An die anderen kaeme es ohnehin nicht.
         return None
 
 

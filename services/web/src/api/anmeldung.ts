@@ -19,6 +19,13 @@ export interface Benutzer {
   anzeigename: string;
   /** Artefakt → Rolle. Nur zum Ausblenden von Bedienelementen - geprüft wird im Backend. */
   rechte: Record<string, Rolle>;
+  /**
+   * True, solange das Passwort von jemand anderem gesetzt wurde.
+   *
+   * Bis zum Wechsel weist das Backend dieses Konto an jedem Artefakt ab. Die
+   * Maske im Frontend ist die Führung dorthin, nicht die Sicherung.
+   */
+  passwort_wechseln: boolean;
 }
 
 /** Fehlerformat des Backends (RFC 9457). */
@@ -61,6 +68,20 @@ export function anmelden(name: string, passwort: string): Promise<Benutzer> {
 
 export function abmelden(): Promise<void> {
   return anfrage<void>("/abmelden", { method: "POST" });
+}
+
+/**
+ * Das eigene Passwort ändern.
+ *
+ * Die laufende Sitzung bleibt bestehen, alle anderen Geräte fliegen raus. Wer
+ * sein Passwort ändert, tut das häufig genau deshalb.
+ */
+export function aenderePasswort(altes: string, neues: string): Promise<void> {
+  return anfrage<void>("/passwort", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ altes_passwort: altes, neues_passwort: neues }),
+  });
 }
 
 /**

@@ -20,14 +20,16 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .deps import AktuellerBenutzer, MoeglicherBenutzer, erfordert, hole_benutzer
     from .dienst import (
+        VERWALTUNG,
         AnmeldungFehlgeschlagen,
         NichtAngemeldet,
         PasswortUngeeignet,
         Rolle,
         ZugriffVerweigert,
         darf,
+        darf_verwalten,
     )
-    from .modelle import Benutzer, Recht, Sitzung
+    from .modelle import Benutzer, Einrichtung, Recht, Sitzung
     from .router import router as anmelde_router
 
 #: Name -> (Untermodul, Name dort). Der Anmelde-Router heißt hier bewusst
@@ -38,6 +40,7 @@ _HERKUNFT: dict[str, tuple[str, str]] = {
     "AktuellerBenutzer": ("deps", "AktuellerBenutzer"),
     "AnmeldungFehlgeschlagen": ("dienst", "AnmeldungFehlgeschlagen"),
     "Benutzer": ("modelle", "Benutzer"),
+    "Einrichtung": ("modelle", "Einrichtung"),
     "MoeglicherBenutzer": ("deps", "MoeglicherBenutzer"),
     "NichtAngemeldet": ("dienst", "NichtAngemeldet"),
     "PasswortUngeeignet": ("dienst", "PasswortUngeeignet"),
@@ -45,8 +48,10 @@ _HERKUNFT: dict[str, tuple[str, str]] = {
     "Rolle": ("dienst", "Rolle"),
     "Sitzung": ("modelle", "Sitzung"),
     "ZugriffVerweigert": ("dienst", "ZugriffVerweigert"),
+    "VERWALTUNG": ("dienst", "VERWALTUNG"),
     "anmelde_router": ("router", "router"),
     "darf": ("dienst", "darf"),
+    "darf_verwalten": ("dienst", "darf_verwalten"),
     "erfordert": ("deps", "erfordert"),
     "hole_benutzer": ("deps", "hole_benutzer"),
 }
@@ -54,9 +59,11 @@ _HERKUNFT: dict[str, tuple[str, str]] = {
 #: Ausgeschrieben statt ``sorted(_HERKUNFT)``: nur so sieht ein Linter, dass
 #: die Importe oben Exporte sind - und ein Tippfehler faellt hier auf.
 __all__ = [
+    "VERWALTUNG",
     "AktuellerBenutzer",
     "AnmeldungFehlgeschlagen",
     "Benutzer",
+    "Einrichtung",
     "MoeglicherBenutzer",
     "NichtAngemeldet",
     "PasswortUngeeignet",
@@ -66,6 +73,7 @@ __all__ = [
     "ZugriffVerweigert",
     "anmelde_router",
     "darf",
+    "darf_verwalten",
     "erfordert",
     "hole_benutzer",
 ]

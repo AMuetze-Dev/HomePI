@@ -211,7 +211,9 @@ Vier Regeln, alle schon einmal teuer gewesen:
    `/zusammenfassung` als UUID und antwortet `422`.
 3. Rückgabetypen annotieren, sonst fehlt das OpenAPI-Schema.
 4. Datenbank über `DbSitzung` aus `homepi_core.deps` — eine Transaktion je
-   Anfrage, Commit am Ende, Rollback bei Fehler.
+   Anfrage, Commit am Ende, Rollback bei Fehler. **Nie selbst committen** und
+   die Sitzung nicht selbst aufbauen: `DbSitzung` ist mit `scope="function"`
+   verdrahtet, damit der Commit vor der Antwort liegt und nicht dahinter.
 
 ### 4.5 Oberfläche — `api.ts`, `<Kennung>Seite.tsx`
 
@@ -276,6 +278,8 @@ HOMEPI_SMOKE_BENUTZER=entwickler HOMEPI_SMOKE_PASSWORT=… make smoke
 
 - [ ] Kein `TODO`, kein `pass`, keine leere Funktion mehr im Artefakt
 - [ ] Kein `@pytest.mark.skip`, kein `it.skip`, kein auskommentierter Test
+- [ ] `GET /<kennung>/` antwortet - daran erkennt der Rauchtest, dass das
+      Modul wirklich eingehängt ist und nicht nur im Manifest steht
 - [ ] Jeder Endpunkt hat mindestens einen Test für den Fehlerfall, nicht nur
       für den Erfolg
 - [ ] Die vier Zustände der Oberfläche sind belegt

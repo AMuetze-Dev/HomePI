@@ -32,28 +32,67 @@ entsteht. Danach gibt es die Tabellen der Artefakte **und** die der Anmeldung
 
 `homepi schema` ist ein Startwerkzeug, **kein Migrationssystem**: es legt
 Fehlendes an und ändert nichts Vorhandenes. Sobald sich ein Schema zum ersten
-Mal ändert, gehört dort Alembic hin. Nachsehen, was da ist:
+Mal ändert, gehört dort Alembic hin.
+
+**Es vergleicht Tabellen und Spalten.** Kommt in einer vorhandenen Tabelle
+eine Spalte dazu, kann `create_all` sie nicht nachtragen — der Befehl meldet
+das und endet mit Fehler statt mit „alles gut":
+
+```
+! benutzer: Spalte(n) passwort_wechseln fehlen
+  create_all legt nur fehlende Tabellen an und aendert keine vorhandene.
+  Hier gehoert eine Migration hin - von Hand oder mit Alembic.
+```
+
+Dieselbe Prüfung hängt als `schema` im `/health`: eine fehlende Spalte setzt
+die Instanz auf `degraded`, und die Rauchtests werden nach dem Deploy rot.
+Ohne das sieht eine halb migrierte Datenbank aus, als wären die Daten weg —
+jede Abfrage auf die betroffene Tabelle scheitert.
+
+Nachsehen, was da ist:
 
 ```bash
 $APPS exec -w /app/services/gateway gateway uv run homepi schema zeigen
 ```
 
-**2. Das erste Konto.** Es gibt keinen Registrierungs-Endpunkt: das erste
-Konto muss von jemandem kommen, der ohnehin Zugriff auf die Maschine hat.
+**2. Das erste Konto.** Zwei Wege, beide gleichwertig.
+
+*Über die Website.* Solange es keinen Verwalter gibt, zeigt sie die
+Einrichtungsmaske. Sie verlangt das Einrichtungstoken, das beim Start im Log
+steht:
+
+```bash
+$APPS logs gateway | grep -A3 "keinen Verwalter"
+```
+
+Lesen kann das nur, wer Zugriff auf die Maschine hat — genau das ist die
+Absicht. Ohne diese Bedingung würde derjenige die Installation übernehmen, der
+als Erster an die frische Adresse kommt.
+
+*Über die Kommandozeile.* Tut dasselbe; danach schließt sich die Maske von
+selbst.
 
 ```bash
 $APPS exec -w /app/services/gateway gateway \
-  uv run homepi benutzer anlegen aaron --artefakt geraete --rolle verwalter
+  uv run homepi benutzer anlegen aaron --artefakt verwaltung --rolle verwalter
 ```
 
 Das Passwort wird abgefragt — nie als Argument, sonst stünde es in der
 Shell-Historie und in der Prozessliste.
+
+Das Recht `verwaltung` ist das, was sonst „Administrator" heißt: damit lassen
+sich weitere Konten anlegen und Rechte vergeben — in der Oberfläche unter
+*Verwaltung*. Alles Weitere gibt sich der erste Verwalter dort selbst.
 
 Prüfen:
 
 ```bash
 $APPS exec -w /app/services/gateway gateway uv run homepi benutzer liste
 ```
+
+Weitere Konten legt der Verwalter in der Oberfläche unter *Verwaltung* an —
+dort genügt ein Name, das Startpasswort erzeugt der Dienst. Der Benutzer
+ersetzt es beim ersten Anmelden und kommt bis dahin an kein Artefakt.
 
 Weitere Rechte, Sperren, Löschen: [11-anmeldung.md](11-anmeldung.md).
 

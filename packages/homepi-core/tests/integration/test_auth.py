@@ -6,7 +6,6 @@ und gegen eine nachgebaute Sitzung würde man vor allem den Nachbau testen.
 
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 
@@ -20,10 +19,13 @@ from homepi_core.auth import AktuellerBenutzer, Rolle, erfordert
 from homepi_core.auth import speicher as auth_speicher
 from homepi_core.auth.cookies import NAME as COOKIE
 from homepi_core.auth.modelle import Sitzung
+from homepi_core.testing.datenbank import datenbank_fuer_tests
 
 pytestmark = pytest.mark.integration
 
-URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://app:app@127.0.0.1:15432/test")
+#: Nur eine Datenbank, die erkennbar zum Testen da ist - diese Tests
+#: rufen drop_all auf.
+URL = datenbank_fuer_tests()
 PASSWORT = "korrekt-pferd-batterie-heftklammer"
 
 
@@ -280,11 +282,7 @@ class TestSitzungen:
 
 
 class TestPasswortAendern:
-    async def test_aendert_und_meldet_ueberall_ab(
-        self, client: AsyncClient, benutzer, app_und_kontext
-    ) -> None:
-        """Wer das Passwort ändert, tut das häufig genau deshalb - eine
-        weiterlaufende fremde Sitzung wäre dann fatal."""
+    async def test_aendert_das_passwort(self, client: AsyncClient, benutzer) -> None:
         await _anmelden(client)
         neu = "ganz-anderes-langes-passwort"
 
@@ -293,13 +291,47 @@ class TestPasswortAendern:
         )
 
         assert antwort.status_code == 204
-        _, kontext = app_und_kontext
-        async with kontext.db.session() as sitzung:
-            assert (await sitzung.execute(select(Sitzung))).scalars().all() == []
-
         client.cookies.clear()
         assert (await _anmelden(client, passwort=neu)).status_code == 200
         assert (await _anmelden(client, passwort=PASSWORT)).status_code == 401
+
+    async def test_die_eigene_sitzung_bleibt(self, client: AsyncClient, benutzer) -> None:
+        """Wer gerade sein Passwort geändert hat, sitzt davor und hat sich
+        ausgewiesen. Ihn hinauszuwerfen hieße, ihn nach einem erzwungenen
+        Erstwechsel auf die Anmeldeseite zu schicken."""
+        await _anmelden(client)
+
+        await client.post(
+            "/auth/passwort",
+            json={"altes_passwort": PASSWORT, "neues_passwort": "ganz-anderes-langes-passwort"},
+        )
+
+        assert (await client.get("/auth/ich")).status_code == 200
+
+    async def test_alle_anderen_geraete_fliegen_raus(
+        self, client: AsyncClient, benutzer, app_und_kontext
+    ) -> None:
+        """Wer das Passwort ändert, tut das häufig genau deshalb - eine
+        weiterlaufende fremde Sitzung wäre dann fatal."""
+        app, kontext = app_und_kontext
+        await _anmelden(client)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as anderes_geraet:
+            await _anmelden(anderes_geraet)
+            assert (await anderes_geraet.get("/auth/ich")).status_code == 200
+
+            await client.post(
+                "/auth/passwort",
+                json={"altes_passwort": PASSWORT, "neues_passwort": "ganz-anderes-langes-passwort"},
+            )
+
+            assert (await anderes_geraet.get("/auth/ich")).status_code == 401
+
+        async with kontext.db.session() as sitzung:
+            uebrig = (await sitzung.execute(select(Sitzung))).scalars().all()
+            assert len(uebrig) == 1
 
     async def test_falsches_altes_passwort_aendert_nichts(
         self, client: AsyncClient, benutzer
@@ -392,3 +424,48 @@ class TestBenutzer:
         async with kontext.db.session() as sitzung:
             geladen = await auth_speicher.finde_benutzer(sitzung, "aaron")
             assert auth_speicher.rechte_von(geladen) == {"probe": Rolle.LESER}
+
+
+class TestVerwalterSchutz:
+    """Ueber die Kommandozeile handelt niemand als jemand - der Selbstschutz
+    des Verwaltungs-Artefakts greift hier also nicht. Uebrig bleibt die
+    Zaehlung, und die muss halten."""
+
+    async def test_zaehlt_nur_verwalter_der_verwaltung(self, benutzer, app_und_kontext) -> None:
+        from homepi_core.auth import VERWALTUNG
+
+        _, kontext = app_und_kontext
+        async with kontext.db.session() as sitzung:
+            assert await auth_speicher.zaehle_verwalter(sitzung) == 0
+
+            await auth_speicher.setze_recht(sitzung, benutzer.id, "probe", Rolle.VERWALTER)
+            assert await auth_speicher.zaehle_verwalter(sitzung) == 0
+
+            await auth_speicher.setze_recht(sitzung, benutzer.id, VERWALTUNG, Rolle.VERWALTER)
+            assert await auth_speicher.zaehle_verwalter(sitzung) == 1
+
+    async def test_eine_niedrigere_rolle_zaehlt_nicht(self, benutzer, app_und_kontext) -> None:
+        from homepi_core.auth import VERWALTUNG
+
+        _, kontext = app_und_kontext
+        async with kontext.db.session() as sitzung:
+            await auth_speicher.setze_recht(sitzung, benutzer.id, VERWALTUNG, Rolle.NUTZER)
+
+            assert await auth_speicher.zaehle_verwalter(sitzung) == 0
+            assert not await auth_speicher.ist_verwalter(sitzung, benutzer.id)
+
+    async def test_ein_gesperrtes_konto_zaehlt_weiter(self, benutzer, app_und_kontext) -> None:
+        """Sonst liesse sich die Ersteinrichtung wieder oeffnen, indem man den
+        letzten Verwalter sperrt."""
+        from homepi_core.auth import VERWALTUNG
+
+        _, kontext = app_und_kontext
+        async with kontext.db.session() as sitzung:
+            await auth_speicher.setze_recht(sitzung, benutzer.id, VERWALTUNG, Rolle.VERWALTER)
+            geladen = await auth_speicher.finde_benutzer(sitzung, "aaron")
+            assert geladen is not None
+            geladen.aktiv = False
+
+        async with kontext.db.session() as sitzung:
+            assert await auth_speicher.zaehle_verwalter(sitzung) == 1
+            assert not await auth_speicher.einrichtung_noetig(sitzung)
