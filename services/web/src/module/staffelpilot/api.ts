@@ -68,7 +68,11 @@ interface Problem {
   detail?: string;
 }
 
-async function anfrage<T>(pfad: string, init: RequestInit = {}, signal?: AbortSignal): Promise<T> {
+async function anfrage<T>(
+  pfad: string,
+  init: RequestInit = {},
+  signal?: AbortSignal,
+): Promise<T> {
   const antwort = await fetch(`${BASE_URL}/staffelpilot${pfad}`, {
     ...init,
     signal: signal ?? null,
@@ -111,7 +115,10 @@ export function legeStaffelAn(daten: NeueStaffel): Promise<Staffel> {
   return anfrage<Staffel>("/staffeln", mitKoerper("POST", daten));
 }
 
-export function ladeWarteschlange(staffelId?: string, signal?: AbortSignal): Promise<SpielZeile[]> {
+export function ladeWarteschlange(
+  staffelId?: string,
+  signal?: AbortSignal,
+): Promise<SpielZeile[]> {
   const frage = staffelId ? `?staffel_id=${encodeURIComponent(staffelId)}` : "";
   return anfrage<SpielZeile[]>(`/${frage}`, {}, signal);
 }
@@ -129,7 +136,10 @@ export function entscheide(
   art: "kenntnis" | "verworfen",
   grund = "",
 ): Promise<Befund> {
-  return anfrage<Befund>(`/befunde/${befundId}/entscheidung`, mitKoerper("POST", { art, grund }));
+  return anfrage<Befund>(
+    `/befunde/${befundId}/entscheidung`,
+    mitKoerper("POST", { art, grund }),
+  );
 }
 
 export function hakeAb(spielId: string): Promise<Spiel> {

@@ -108,7 +108,11 @@ describe("StaffelPilot-API", () => {
   it("legt eine Staffel per POST an", async () => {
     const aufruf = antworteMit(staffel, 201);
 
-    await legeStaffelAn({ name: "Neu", altersklasse: "ue35", spielklasse: "1.Kreisklasse" });
+    await legeStaffelAn({
+      name: "Neu",
+      altersklasse: "ue35",
+      spielklasse: "1.Kreisklasse",
+    });
 
     expect(aufruf).toHaveBeenCalledWith(
       expect.stringContaining("/staffelpilot/staffeln"),
@@ -153,7 +157,13 @@ describe("StaffelPilot-API", () => {
 
 describe("Fehler", () => {
   it("nimmt den Text aus problem+json", async () => {
-    antworteMit({ title: "Es sind noch Befunde offen", detail: "1 Befund braucht noch eine Entscheidung" }, 409);
+    antworteMit(
+      {
+        title: "Es sind noch Befunde offen",
+        detail: "1 Befund braucht noch eine Entscheidung",
+      },
+      409,
+    );
 
     await expect(hakeAb("m1")).rejects.toThrow("1 Befund braucht noch eine Entscheidung");
   });
