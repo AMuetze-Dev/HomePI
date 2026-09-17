@@ -120,7 +120,7 @@ beim Start ins Log:
 ```
 Diese Installation hat noch keinen Verwalter.
   Einrichtung öffnen:  <adresse>/einrichtung
-  Einrichtungstoken:   D2oEXAHV31fDHs8aycq-…
+  Einrichtungstoken:   <43 Zeichen, bei jedem Start neu>
   Das Token gilt bis zum nächsten Start und wird danach ersetzt.
 ```
 
