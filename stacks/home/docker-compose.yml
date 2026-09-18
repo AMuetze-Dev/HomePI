@@ -36,26 +36,35 @@ services:
     networks:
       - edge
 
-  # Zigbee erst aktivieren, wenn der Coordinator-Stick da ist.
-  # zigbee2mqtt:
-  #   image: koenkk/zigbee2mqtt:latest
-  #   container_name: zigbee2mqtt
-  #   restart: unless-stopped
-  #   depends_on: [mosquitto]
-  #   environment:
-  #     TZ: ${TZ}
-  #   volumes:
-  #     - ${DATA_ROOT}/zigbee2mqtt:/app/data
-  #     - /run/udev:/run/udev:ro
-  #   devices:
-  #     - /dev/serial/by-id/usb-XXXX:/dev/ttyACM0
-  #   networks: [edge]
-  #   labels:
-  #     traefik.enable: "true"
-  #     traefik.http.routers.z2m.rule: "Host(`zigbee.${DOMAIN}`)"
-  #     traefik.http.routers.z2m.entrypoints: "websecure"
-  #     traefik.http.routers.z2m.middlewares: "lan-only@file"
-  #     traefik.http.services.z2m.loadbalancer.server.port: "8080"
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt:latest
+    container_name: zigbee2mqtt
+    restart: unless-stopped
+    depends_on: [mosquitto]
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ${DATA_ROOT}/zigbee2mqtt:/app/data
+      - /run/udev:/run/udev:ro
+    # Immer der by-id-Pfad, nie /dev/ttyUSB0: die Nummer wandert, sobald ein
+    # zweites serielles Geraet dazukommt oder die Reihenfolge beim Booten
+    # anders ausfaellt. Der Pfad steht in der .env, weil er je Stick anders
+    # heisst -  nachsehen mit:  ls /dev/serial/by-id/
+    devices:
+      - ${ZIGBEE_ADAPTER}:/dev/ttyUSB0
+    # Die Oberflaeche zum Anlernen. Nicht 8080: das ist im Betrieb der
+    # Notausgang von Pi-hole, und zwei Dienste auf einem Port sind ein
+    # Fehler, der erst Monate spaeter auffaellt.
+    ports:
+      - "${Z2M_PORT:-8099}:8080"
+    networks:
+      - edge
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.z2m.rule: "Host(`zigbee.${DOMAIN}`)"
+      traefik.http.routers.z2m.entrypoints: "websecure"
+      traefik.http.routers.z2m.middlewares: "lan-only@file"
+      traefik.http.services.z2m.loadbalancer.server.port: "8080"
 
 networks:
   edge:
