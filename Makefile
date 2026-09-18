@@ -234,8 +234,7 @@ e2e-hoch:
 
 ## e2e-token: Einrichtungstoken der Testumgebung ausgeben
 e2e-token:
-	@$(E2E) logs gateway 2>/dev/null | grep "Einrichtungstoken:" | tail -1 | sed 's/.*Einrichtungstoken:[[:space:]]*//' | tr -d '
-'
+	@$(E2E) logs gateway 2>/dev/null | grep "Einrichtungstoken:" | tail -1 | sed 's/.*Einrichtungstoken:[[:space:]]*//' | tr -d '\r\n'
 
 ## e2e-runter: die Testumgebung samt Datenbank wegwerfen
 e2e-runter:
