@@ -10,7 +10,8 @@ Locale/Timezone.
 ## Ablauf
 
 ```bash
-git clone <dein-repo> ~/homelab && cd ~/homelab
+# Zurzeit laeuft auf dem Pi "develop" - siehe 05-workflow.md.
+git clone -b develop <dein-repo> ~/homelab && cd ~/homelab
 sudo ./scripts/10-os-bootstrap.sh      # Pakete, Härtung, Journald, Swap, fstrim
 ./scripts/20-install-docker.sh         # Docker Engine + Compose Plugin
 # ab-/anmelden, damit die docker-Gruppe greift

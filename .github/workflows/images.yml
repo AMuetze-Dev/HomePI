@@ -2,9 +2,17 @@ name: Images
 
 # Baut die arm64-Images fuer den Pi und legt sie in der GitHub Container
 # Registry ab. Auf dem Pi danach nur noch:  make deploy-apps
+#
+# Auch auf "develop", nicht nur auf "main": solange nichts veroeffentlicht
+# wird, ist develop der Zweig, der auf dem Pi laeuft. Das Bild heisst dann
+# ":develop" - der Tag benennt, woher er kommt.
+#
+# ":latest" bleibt "main" vorbehalten. Das ist Absicht: sobald es wieder
+# Releases gibt, soll der Tag nicht stillschweigend etwas anderes bedeuten
+# als vorher.
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
