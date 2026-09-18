@@ -28,8 +28,8 @@ jobs:
       python: ${{ steps.filter.outputs.python }}
       projekte: ${{ steps.projekte.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -93,7 +93,7 @@ jobs:
     if: needs.changes.outputs.infra == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Shell-Skripte pruefen
         run: |
@@ -202,9 +202,9 @@ jobs:
       HOMEPI_TEST_DATABASE_URL: postgresql+asyncpg://app:app@127.0.0.1:5432/test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: ${{ matrix.projekt.pfad }}/uv.lock
@@ -233,7 +233,7 @@ jobs:
             --cov=${{ matrix.projekt.paket }} --cov-report=term-missing --cov-report=xml \
             --junitxml=junit.xml
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: testbericht-${{ matrix.projekt.name }}
@@ -252,9 +252,9 @@ jobs:
         working-directory: services/web
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -294,14 +294,14 @@ jobs:
       # Passwortpruefung ab, und zwar zu Recht.
       HOMEPI_SMOKE_PASSWORT: wegwerf-konto-nur-fuer-die-ci-4711
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: services/gateway/uv.lock
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -320,7 +320,7 @@ jobs:
       # sein, ob die Pakete oder der Browser das Problem waren.
       - name: Browser zwischenspeichern
         id: browser-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('services/web/package-lock.json') }}
@@ -360,7 +360,7 @@ jobs:
           E2E_URL: http://127.0.0.1:5173
           E2E_EINRICHTUNGSTOKEN: ${{ env.EINRICHTUNGSTOKEN }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: oberflaechentests
@@ -432,7 +432,7 @@ jobs:
             context: services/web
             file: services/web/Dockerfile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
@@ -476,7 +476,7 @@ jobs:
   secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Nach Geheimnissen in der Historie suchen
