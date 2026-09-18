@@ -54,6 +54,7 @@ ufw allow from "${LAN_CIDR}" to any port 443   proto tcp comment 'Traefik HTTPS'
 ufw allow from "${LAN_CIDR}" to any port 8080  proto tcp comment 'Pi-hole Notausgang'
 ufw allow from "${LAN_CIDR}" to any port 8123  proto tcp comment 'Home Assistant'
 ufw allow from "${LAN_CIDR}" to any port 1883  proto tcp comment 'MQTT'
+ufw allow from "${LAN_CIDR}" to any port 8099  proto tcp comment 'Zigbee2MQTT'
 ufw --force enable
 # Hinweis: UFW und Dockers eigene iptables-Regeln greifen unabhaengig voneinander.
 # Published Ports umgehen UFW. Deshalb sind hier alle Ports ausser 53/80/443
