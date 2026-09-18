@@ -3,23 +3,30 @@
 ## Branch-Modell
 
 ```
-main        ──●────────────────────●──────────▶   das, was auf dem Pi läuft
+main        ──○────────────────────○──────────▶   ruht, bis veröffentlicht wird
                ╲                  ╱
-develop     ────●───────●────────●────────────▶   Integrationszweig
+develop     ────●───────●────────●────────────▶   Integration UND was auf dem Pi läuft
                  ╲     ╱ ╲      ╱
 feature/*         ●───●   ●────●                  eine Aufgabe, ein Branch
 ```
 
 | Branch | Rolle | Wer merged hinein |
 |---|---|---|
-| `main` | Release. Was hier liegt, ist auf dem Pi ausgerollt. Ein Push löst den Image-Build aus. | nur `develop`, per PR |
-| `develop` | Integration. Standardziel für Feature-Branches. | `feature/*`, per PR |
+| `develop` | Integration. Standardziel für Feature-Branches. **Baut zurzeit auch die Images für den Pi.** | `feature/*`, per PR |
+| `main` | Release. Ruht, solange nichts veröffentlicht wird. | nur `develop`, per PR |
 | `feature/<thema>` | eine Aufgabe | — |
 | `fix/<thema>` | Fehlerbehebung | — |
 | `chore/<thema>` | Abhängigkeiten, CI, Aufräumarbeiten | — |
 
-Der Remote hat `develop` bereits als Default-Branch. `main` ist bewusst der
-*ruhigere* Zweig: dort landet nur, was funktioniert hat.
+**Solange nichts veröffentlicht wird, ist `develop` der Zweig, der auf dem Pi
+läuft.** Ein Push dorthin baut die arm64-Images und legt sie als
+`ghcr.io/…/homepi-gateway:develop` in der GHCR ab; `.env` auf dem Pi zeigt auf
+ebendiesen Tag.
+
+`:latest` bleibt dabei `main` vorbehalten. Das ist Absicht: sobald es wieder
+Releases gibt, soll der Tag nicht stillschweigend etwas anderes bedeuten als
+vorher. Wer umstellt, ändert zwei Zeilen in der `.env` und startet
+`make deploy-apps`.
 
 ### Eine Aufgabe von Anfang bis Ende
 
@@ -41,7 +48,15 @@ Nach dem Merge:
 git checkout develop && git pull && git branch -d feature/geraeteliste
 ```
 
-### Release auf den Pi
+### Auf den Pi bringen
+
+Zurzeit genügt der Merge nach `develop` — der Push baut die Images:
+
+```bash
+cd ~/homelab && git pull && make deploy-apps
+```
+
+Sobald veröffentlicht werden soll, kommt der Release-Zweig dazu:
 
 ```bash
 git checkout main && git pull
@@ -50,11 +65,8 @@ git tag -a v0.2.0 -m "Geräteliste"
 git push origin main --tags
 ```
 
-Der Push auf `main` baut die arm64-Images und legt sie in der GHCR ab. Auf dem Pi:
-
-```bash
-cd ~/homelab && git pull && make deploy-apps
-```
+Dann tragen `GATEWAY_IMAGE` und `WEB_IMAGE` in der `.env` auf dem Pi wieder
+`:latest`.
 
 ## Die TDD-Schleife
 
@@ -141,7 +153,7 @@ zählt dort als Erfolg. Ohne diese Zusammenfassung würde ein Pfadfilter, der `a
 Jede Stufe gibt eine präzisere Fehlermeldung als die nächste. Ein Tippfehler soll als
 Tippfehler gemeldet werden, nicht als fehlgeschlagener Test.
 
-### `images.yml` — bei Push auf `main`
+### `images.yml` — bei Push auf `develop` oder `main`
 
 Baut `ghcr.io/amuetze-dev/homepi-api` und `homepi-web` für `linux/arm64`.
 

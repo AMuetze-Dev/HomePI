@@ -138,7 +138,10 @@ Verwalter hat. Beides steht in [docs/07-lokale-entwicklung.md](docs/07-lokale-en
 
 ## Branches
 
-`feature/*` → `develop` → `main`. Auf `main` baut die Pipeline arm64-Images,
+`feature/*` → `develop` → `main`. **Zurzeit ist `develop` der Zweig, der auf
+dem Pi läuft** — ein Push dorthin baut die arm64-Images als `:develop`;
+`main` ruht, bis veröffentlicht wird. Danach wieder: auf `main` baut die
+Pipeline arm64-Images,
 `homepi deploy -s <name>` rollt aus. Nie direkt auf `main` committen.
 
 ---

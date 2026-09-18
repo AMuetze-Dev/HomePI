@@ -11,6 +11,10 @@ name: Deploy
 #   3. Auf dem Pi einmalig:  echo $TOKEN | docker login ghcr.io -u USER --password-stdin
 #
 # Bis dahin ist der Weg von Hand:  ssh pi && cd ~/homelab && make deploy-apps
+#
+# Der Zweig ist waehlbar und steht auf "develop": solange nichts
+# veroeffentlicht wird, laeuft auf dem Pi derselbe Zweig, an dem gearbeitet
+# wird.
 
 on:
   workflow_dispatch:
@@ -20,6 +24,11 @@ on:
         type: choice
         options: [apps, core, dns, data, home, alle]
         default: apps
+      zweig:
+        description: "Welcher Zweig auf dem Pi"
+        type: choice
+        options: [develop, main]
+        default: develop
 
 concurrency:
   group: deploy
@@ -38,11 +47,16 @@ jobs:
 
     steps:
       - name: Stand des Repos auf dem Pi aktualisieren
+        # Der Zweig kommt aus einer Auswahlliste, nicht aus freiem Text -
+        # sonst stuende hier eine Zeichenkette aus dem Formular direkt in
+        # einer Shell.
+        env:
+          ZWEIG: ${{ github.event.inputs.zweig }}
         run: |
           cd "$HOME/homelab"
           git fetch --prune origin
-          git checkout main
-          git reset --hard origin/main
+          git checkout "$ZWEIG"
+          git reset --hard "origin/$ZWEIG"
 
       - name: Sichern, bevor etwas ersetzt wird
         run: |
