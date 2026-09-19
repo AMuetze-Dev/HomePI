@@ -38,6 +38,16 @@ class RegelUnbekannt(ServiceError):
     title = "Regel unbekannt"
 
 
+class AuftragUnbekannt(ServiceError):
+    status = 404
+    title = "Auftrag unbekannt"
+
+
+class SchonUnterwegs(ServiceError):
+    status = 409
+    title = "Es läuft schon einer"
+
+
 class StaffelVergeben(ServiceError):
     status = 409
     title = "Staffel bereits angelegt"
@@ -51,6 +61,11 @@ class NochOffeneBefunde(ServiceError):
 class GrundFehlt(ServiceError):
     status = 422
     title = "Begruendung fehlt"
+
+
+class SchonHinaus(ServiceError):
+    status = 409
+    title = "Dazu ist schon ein Schreiben hinausgegangen"
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +136,21 @@ def entscheidung_pruefen(art: str, grund: str) -> str:
     if art == "verworfen" and not bereinigt:
         raise GrundFehlt("Zum Verwerfen eines Befundes gehört eine Begründung")
     return bereinigt
+
+
+def darf_zurueckgenommen_werden(vorgang_zustand: str | None) -> None:
+    """Eine Entscheidung zurueckzunehmen geht - solange nichts hinaus ist.
+
+    Ein Entwurf laesst sich verwerfen, und danach ist der Befund wieder offen.
+    Ein **versandtes** Schreiben nicht: der Verein hat es, und ein Befund, der
+    hier wieder "offen" heisst, waere eine Akte, die dem widerspricht, was
+    draussen steht. Erst den Vorgang zuruueckholen, dann den Befund.
+    """
+    if vorgang_zustand in ("versandt", "erledigt"):
+        raise SchonHinaus(
+            "Zu diesem Befund ist ein Schreiben versandt. Erst den Vorgang "
+            "zurueck in den Entwurf stellen oder verwerfen."
+        )
 
 
 # ── Reihenfolge ───────────────────────────────────────────────────────────
@@ -443,3 +473,68 @@ def vorgang_entwurf(
             f"{unterschrift}"
         )
     return Schreiben(empfaenger=einstellungen.absender, betreff=betreff, text=text)
+
+
+# ── Auftraege ─────────────────────────────────────────────────────────────
+
+# Welche Arten es gibt, steht als `AuftragArt` in schemas.py und wird von
+# Pydantic geprueft, bevor irgendetwas hier ankommt. Eine zweite Liste an
+# dieser Stelle waere dieselbe Tatsache doppelt -- und irgendwann verschieden.
+
+#: Solange einer davon offen ist, wird kein zweiter angenommen.
+OFFENE_ZUSTAENDE = ("angefordert", "laeuft")
+
+#: Der Weg eines Auftrags. Nur vorwaerts: ein beendeter Lauf laesst sich nicht
+#: fortsetzen, er wird neu angefordert.
+_AUFTRAGSWEGE: dict[str, tuple[str, ...]] = {
+    # "fertig" gleich von hier aus: ein Prueflauf, fuer den es nichts zu
+    # pruefen gibt, ist fertig, ohne je einen Schritt gemeldet zu haben.
+    "angefordert": ("laeuft", "fertig", "abgebrochen", "gescheitert"),
+    "laeuft": ("fertig", "abgebrochen", "gescheitert"),
+    "fertig": (),
+    "abgebrochen": (),
+    "gescheitert": (),
+}
+
+
+def darf_angefordert_werden(offene: int) -> None:
+    """Einer nach dem anderen.
+
+    Es gibt genau eine DFBnet-Sitzung. Zwei Laeufe gleichzeitig hiessen zwei
+    Browser an derselben Anmeldung, und der zweite wirft den ersten hinaus -
+    mitten in einem halb gelesenen Spielbericht.
+    """
+    if offene:
+        raise SchonUnterwegs("Es ist bereits ein Auftrag unterwegs. Erst abwarten oder abbrechen.")
+
+
+def auftrag_weiter(alt: str, neu: str) -> str:
+    if neu not in _AUFTRAGSWEGE.get(alt, ()):
+        moeglich = ", ".join(_AUFTRAGSWEGE.get(alt, ())) or "nichts"
+        raise ZustandUnmoeglich(f"Von {alt!r} aus geht nur: {moeglich}")
+    return neu
+
+
+def ist_beendet(zustand: str) -> bool:
+    return not _AUFTRAGSWEGE.get(zustand, ())
+
+
+def darf_fortschreiben(zustand: str) -> None:
+    """Ein beendeter Auftrag nimmt nichts mehr an.
+
+    Eine spaete Meldung eines Dienstes, der sich schon abgemeldet hat, wuerde
+    sonst den Endstand ueberschreiben -- und im Protokoll staende nach
+    "fertig" noch, was er angeblich gerade tut.
+    """
+    if ist_beendet(zustand):
+        raise ZustandUnmoeglich(f"Der Auftrag ist {zustand}; er nimmt nichts mehr an")
+
+
+def fortschritt_pruefen(wert: int) -> int:
+    """Zwischen 0 und 100.
+
+    Abgeschnitten statt abgelehnt: ein Dienst, der sich verrechnet, soll
+    deswegen nicht mitten im Lauf stehenbleiben -- die Zahl ist eine Anzeige,
+    kein Ergebnis.
+    """
+    return max(0, min(100, wert))

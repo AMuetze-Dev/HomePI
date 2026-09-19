@@ -200,3 +200,43 @@ class Regel(Base, ZeitstempelMixin):
     schwere: Mapped[str] = mapped_column(String(20), nullable=False, default="hinweis")
     weg: Mapped[str] = mapped_column(String(20), nullable=False, default="kein")
     aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class Auftrag(Base, ZeitstempelMixin):
+    """Ein langlaufender Browservorgang - als Datensatz, nicht als Thread.
+
+    Der Prueflauf faehrt minutenlang einen echten Browser. Er laeuft deshalb
+    in einem eigenen Dienst (docs/06-artefakte.md), und was hier steht, ist
+    der Auftrag dafuer: wer ihn angefordert hat, wie weit er ist, was
+    herausgekommen ist.
+
+    Ein Datensatz und kein laufender Prozess - das ist der ganze Punkt: das
+    Gateway darf neu starten, ohne dass der Staffelleiter vor einer Anzeige
+    steht, die nie wieder weiterzaehlt.
+    """
+
+    __tablename__ = "staffelpilot_auftraege"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    art: Mapped[str] = mapped_column(String(20), nullable=False)
+    #: Leer heisst: alle aktiven Staffeln.
+    staffel_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("staffelpilot_staffeln.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    zustand: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="angefordert", index=True
+    )
+    #: Was er gerade tut, in einem Satz. Ein Wartekreisel sagt nichts.
+    schritt: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    fortschritt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    gepruefte: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    befunde: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: Woran er gescheitert ist. Leer, solange nichts schiefging.
+    meldung: Mapped[str] = mapped_column(String(1000), nullable=False, default="")
+    #: Was er mitgeschrieben hat: [{"zeit": ..., "text": ...}].
+    protokoll: Mapped[list[dict[str, str]]] = mapped_column(JSONB, nullable=False, default=list)
+    gestartet_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    beendet_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)

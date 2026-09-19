@@ -22,6 +22,8 @@ from .dienst import (
     NochOffeneBefunde,
     SpielSicht,
     darf_abgehakt_werden,
+    darf_angefordert_werden,
+    darf_zurueckgenommen_werden,
     entscheidung_pruefen,
     ist_faellig,
     mannschaft_unsicher,
@@ -30,10 +32,16 @@ from .dienst import (
 )
 from .modelle import Befund, Mannschaft, Regel, Vorgang
 from .schemas import (
+    Abschluss,
+    AuftragAnfordern,
+    AuftragAusgabe,
+    AuftragZeile,
     BefundAusgabe,
+    BefundZeile,
     EinstellungenAusgabe,
     EinstellungenSetzen,
     EntscheidungSetzen,
+    Fortschritt,
     ImportAuftrag,
     ImportErgebnis,
     MannschaftAusgabe,
@@ -162,13 +170,16 @@ async def staffel_anlegen(daten: StaffelAnlegen, sitzung: DbSitzung) -> StaffelA
     return StaffelAusgabe.model_validate(await speicher.staffel_anlegen(sitzung, daten))
 
 
-@router.patch("/staffeln/{staffel_id}", summary="Staffel aktiv oder inaktiv setzen")
-async def staffel_umschalten(
+@router.patch("/staffeln/{staffel_id}", summary="Staffel ändern")
+async def staffel_aendern(
     staffel_id: uuid.UUID, daten: StaffelAendern, sitzung: DbSitzung
 ) -> StaffelAusgabe:
-    gefunden = await speicher.staffel(sitzung, staffel_id)
-    gefunden.aktiv = daten.aktiv
-    return StaffelAusgabe.model_validate(gefunden)
+    """Nur die mitgeschickten Felder. Ausgelassene bleiben stehen.
+
+    Ein Dialog, der offen stand, während woanders geschrieben wurde, schreibt
+    sonst einen alten Wert zurück.
+    """
+    return StaffelAusgabe.model_validate(await speicher.staffel_aendern(sitzung, staffel_id, daten))
 
 
 @router.delete(
@@ -256,6 +267,57 @@ async def entscheiden(
     gefunden = await speicher.entscheidung_setzen(sitzung, befund_id, daten.art, grund)
     vorhanden = await speicher.vorgang_zu_befund(sitzung, befund_id)
     return _befund(gefunden, vorhanden.id if vorhanden else None)
+
+
+@router.delete("/befunde/{befund_id}/entscheidung", summary="Entscheidung zurücknehmen")
+async def entscheidung_zuruecknehmen(befund_id: uuid.UUID, sitzung: DbSitzung) -> BefundAusgabe:
+    """Der Befund ist wieder offen — und das Spiel damit nicht mehr abgehakt.
+
+    Wer sich vertippt hat, soll das geradeziehen können, ohne den Bericht neu
+    einzuspielen. Nur wenn zu dem Befund schon ein Schreiben **hinaus** ist,
+    geht es nicht: der Verein hat es, und ein Befund, der hier wieder „offen"
+    heißt, wäre eine Akte, die dem widerspricht.
+    """
+    vorhanden = await speicher.vorgang_zu_befund(sitzung, befund_id)
+    darf_zurueckgenommen_werden(vorhanden.zustand if vorhanden else None)
+    gefunden = await speicher.entscheidung_zuruecknehmen(sitzung, befund_id)
+    return _befund(gefunden, vorhanden.id if vorhanden else None)
+
+
+@router.get("/befunde", summary="Alle Befunde, flach")
+async def alle_befunde(
+    sitzung: DbSitzung,
+    staffel_id: Annotated[uuid.UUID | None, Query(description="Nur diese Staffel")] = None,
+    nur_offen: Annotated[bool, Query(description="Nur unentschiedene")] = False,
+) -> list[BefundZeile]:
+    """Die andere Frage: was ist in dieser Saison alles aufgelaufen.
+
+    Die Warteschlange geht Spiel für Spiel; hier steht jeder Befund einzeln,
+    mit dem Spiel an der Zeile — sonst wäre eine Zeile nicht zuzuordnen.
+    """
+    paare = await speicher.alle_befunde(sitzung, staffel_id, nur_offen)
+    zu_vorgang = await speicher.vorgaenge_zu_befunden(sitzung, [b.id for b, _ in paare])
+    return [
+        BefundZeile(
+            id=b.id,
+            spiel_id=s.id,
+            staffel_id=s.staffel_id,
+            dfbnet_id=s.dfbnet_id,
+            datum=s.datum,
+            heim=s.heim,
+            gast=s.gast,
+            regel=b.regel,
+            schwere=b.schwere,  # type: ignore[arg-type]
+            titel=b.titel,
+            person=b.person,
+            mannschaft=b.mannschaft,
+            entscheidung=b.entscheidung,  # type: ignore[arg-type]
+            grund=b.grund,
+            weg=b.weg,  # type: ignore[arg-type]
+            vorgang_id=zu_vorgang.get(b.id),
+        )
+        for b, s in paare
+    ]
 
 
 # ── Einstellungen ─────────────────────────────────────────────────────────
@@ -394,3 +456,74 @@ async def regel_umschalten(
     dort und nicht hier.
     """
     return _regel(await speicher.regel_umschalten(sitzung, regel_id, daten.aktiv))
+
+
+# ── Aufträge: Prüflauf und Initialisierung ────────────────────────────────
+#
+# Der Prüflauf fährt minutenlang einen echten Browser und läuft deshalb in
+# einem eigenen Dienst (docs/06-artefakte.md). Was hier steht, ist der Auftrag
+# dafür — ein Datensatz, kein laufender Prozess. Das Gateway darf neu starten,
+# ohne dass jemand vor einer Anzeige sitzt, die nie wieder weiterzählt.
+#
+# **Hier passiert nichts von selbst.** Solange kein Prüfdienst läuft, bleibt
+# ein Auftrag auf „angefordert" stehen. Kein Klick in dieser Oberfläche meldet
+# sich irgendwo an oder trägt irgendwo etwas ein.
+
+
+@router.get("/auftraege", summary="Prüfläufe und Initialisierungen")
+async def auftraege(sitzung: DbSitzung) -> list[AuftragZeile]:
+    return [AuftragZeile.model_validate(a) for a in await speicher.auftraege(sitzung)]
+
+
+@router.get("/auftraege/offen", summary="Der Auftrag, der gerade läuft")
+async def auftrag_offen(sitzung: DbSitzung) -> AuftragAusgabe | None:
+    """`null`, wenn keiner unterwegs ist.
+
+    Die Oberfläche fragt das im Sekundentakt ab; ein 404 wäre dort ein Fehler
+    und kein Ergebnis, und die Konsole liefe damit voll.
+    """
+    offen = await speicher.offener_auftrag(sitzung)
+    return AuftragAusgabe.model_validate(offen) if offen else None
+
+
+@router.post("/auftraege", status_code=status.HTTP_201_CREATED, summary="Auftrag anfordern")
+async def auftrag_anfordern(daten: AuftragAnfordern, sitzung: DbSitzung) -> AuftragAusgabe:
+    """Einer nach dem anderen.
+
+    Es gibt genau eine DFBnet-Sitzung. Zwei Läufe gleichzeitig hießen zwei
+    Browser an derselben Anmeldung, und der zweite wirft den ersten hinaus —
+    mitten in einem halb gelesenen Spielbericht.
+    """
+    darf_angefordert_werden(1 if await speicher.offener_auftrag(sitzung) else 0)
+    return AuftragAusgabe.model_validate(
+        await speicher.auftrag_anfordern(sitzung, daten.art, daten.staffel_id)
+    )
+
+
+@router.get("/auftraege/{auftrag_id}", summary="Ein Auftrag mit seinem Protokoll")
+async def auftrag(auftrag_id: uuid.UUID, sitzung: DbSitzung) -> AuftragAusgabe:
+    return AuftragAusgabe.model_validate(await speicher.auftrag(sitzung, auftrag_id))
+
+
+@router.post("/auftraege/{auftrag_id}/fortschritt", summary="Fortschritt melden")
+async def auftrag_fortschritt(
+    auftrag_id: uuid.UUID, daten: Fortschritt, sitzung: DbSitzung
+) -> AuftragAusgabe:
+    """Vom Prüfdienst aufgerufen, nicht von der Oberfläche.
+
+    Die erste Meldung setzt den Auftrag auf „läuft": dass er sich meldet,
+    **ist** der Beleg dafür, dass er angefangen hat.
+    """
+    return AuftragAusgabe.model_validate(
+        await speicher.auftrag_fortschreiben(sitzung, auftrag_id, daten)
+    )
+
+
+@router.post("/auftraege/{auftrag_id}/abschluss", summary="Auftrag beenden")
+async def auftrag_abschliessen(
+    auftrag_id: uuid.UUID, daten: Abschluss, sitzung: DbSitzung
+) -> AuftragAusgabe:
+    """Vom Prüfdienst — oder von der Oberfläche mit `abgebrochen`."""
+    return AuftragAusgabe.model_validate(
+        await speicher.auftrag_abschliessen(sitzung, auftrag_id, daten)
+    )

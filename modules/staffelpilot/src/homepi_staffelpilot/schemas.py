@@ -68,11 +68,23 @@ class StaffelAnlegen(BaseModel):
 
 
 class StaffelAendern(BaseModel):
-    """Nur der Schalter. Name und Spielklasse stehen in DFBnet und werden dort
-    geaendert; sie hier zusaetzlich bearbeitbar zu machen liesse beides
-    auseinanderlaufen."""
+    """Alles, was sich an einer Staffel aendern laesst.
 
-    aktiv: bool
+    Ausgelassene Felder bleiben stehen. Name und Spielklasse stehen auch in
+    DFBnet - wer sie hier aendert, sollte wissen, dass der naechste Abgleich
+    ueber den Namen sucht.
+    """
+
+    name: NameFeld | None = None
+    altersklasse: Altersklasse | None = None
+    spielklasse: NameFeld | None = None
+    saison: Annotated[str, Field(max_length=10)] | None = None
+    aktiv: bool | None = None
+
+    @field_validator("name", "spielklasse", "saison", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
 
 
 class StaffelAusgabe(BaseModel):
@@ -440,3 +452,124 @@ class RegelAusgabe(BaseModel):
 
 class RegelUmschalten(BaseModel):
     aktiv: bool
+
+
+# ── Alle Befunde auf einmal ───────────────────────────────────────────────
+
+
+class BefundZeile(BaseModel):
+    """Ein Befund mit dem Spiel, zu dem er gehoert.
+
+    Die Warteschlange fragt Spiel fuer Spiel; diese Liste beantwortet die
+    andere Frage: "was ist in dieser Saison alles aufgelaufen". Dafuer muss
+    das Spiel mit an der Zeile stehen, sonst ist eine Zeile nicht zuzuordnen.
+    """
+
+    id: uuid.UUID
+    spiel_id: uuid.UUID
+    staffel_id: uuid.UUID
+    dfbnet_id: str
+    datum: dt.date
+    heim: str
+    gast: str
+    regel: str
+    schwere: Schwere
+    titel: str
+    person: str
+    mannschaft: str
+    entscheidung: Entscheidung
+    grund: str
+    weg: Weg
+    vorgang_id: uuid.UUID | None = None
+
+
+# ── Aufträge ──────────────────────────────────────────────────────────────
+
+#: Was ein Auftrag tut. `pruflauf` prüft Spielberichte, `initialisierung`
+#: holt die Saisondaten einer Staffel aus DFBnet.
+AuftragArt = Literal["pruflauf", "initialisierung"]
+
+#: Wo er steht. Nur vorwärts — ein beendeter Lauf wird neu angefordert, nicht
+#: fortgesetzt.
+AuftragZustand = Literal["angefordert", "laeuft", "fertig", "abgebrochen", "gescheitert"]
+
+
+class AuftragAnfordern(BaseModel):
+    """Ohne `staffel_id` gilt der Auftrag für alle aktiven Staffeln."""
+
+    art: AuftragArt = "pruflauf"
+    staffel_id: uuid.UUID | None = None
+
+
+class Protokollzeile(BaseModel):
+    zeit: str
+    text: str
+
+
+class AuftragAusgabe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    art: AuftragArt
+    staffel_id: uuid.UUID | None
+    zustand: AuftragZustand
+    schritt: str
+    fortschritt: int
+    gepruefte: int
+    befunde: int
+    meldung: str
+    protokoll: list[Protokollzeile]
+    gestartet_am: dt.datetime | None
+    beendet_am: dt.datetime | None
+    angelegt: dt.datetime
+
+
+class AuftragZeile(BaseModel):
+    """Die Liste. Ohne Protokoll — das ist lang und erst beim Öffnen nötig."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    art: AuftragArt
+    staffel_id: uuid.UUID | None
+    zustand: AuftragZustand
+    schritt: str
+    fortschritt: int
+    gepruefte: int
+    befunde: int
+    meldung: str
+    gestartet_am: dt.datetime | None
+    beendet_am: dt.datetime | None
+    angelegt: dt.datetime
+
+
+class Fortschritt(BaseModel):
+    """Was der Prüfdienst meldet, während er läuft.
+
+    Alles freiwillig: ein Dienst, der nur den Schritt weiterschreibt, soll
+    nicht auch noch Zahlen mitschicken müssen, die sich nicht geändert haben.
+    """
+
+    schritt: KurzFeld | None = None
+    fortschritt: int | None = None
+    gepruefte: Annotated[int, Field(ge=0)] | None = None
+    befunde: Annotated[int, Field(ge=0)] | None = None
+    #: Eine Zeile fürs Protokoll. Angehängt, nie ersetzt.
+    zeile: Annotated[str, Field(max_length=500)] | None = None
+
+    @field_validator("schritt", "zeile", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
+
+
+class Abschluss(BaseModel):
+    """Wie ein Auftrag endet. `gescheitert` braucht eine Meldung."""
+
+    zustand: Literal["fertig", "gescheitert", "abgebrochen"]
+    meldung: Annotated[str, Field(max_length=1000)] = ""
+
+    @field_validator("meldung", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
