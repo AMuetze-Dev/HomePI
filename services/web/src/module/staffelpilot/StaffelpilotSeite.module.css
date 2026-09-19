@@ -362,3 +362,44 @@
   color: var(--farbe-text);
   cursor: pointer;
 }
+
+/* ── Prüflauf ────────────────────────────────────────────────────────── */
+
+.balken {
+  width: 100%;
+  height: 0.5rem;
+  margin-top: var(--raum-3);
+  overflow: hidden;
+  border-radius: var(--rundung-voll);
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+.balkenFuellung {
+  height: 100%;
+  background: var(--farbe-aktion);
+  transition: width var(--dauer-normal) var(--verlauf);
+}
+
+/* Monospace und klein: es sind Zeitstempel und Meldungen, keine Prosa. */
+.protokoll {
+  max-height: 14rem;
+  margin: var(--raum-3) 0 0;
+  padding: var(--raum-2) var(--raum-3);
+  overflow-y: auto;
+  list-style: none;
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche-gedaempft);
+  font-family: var(--schrift-mono);
+  font-size: var(--text-xs);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-gedaempft);
+}
+
+/* Der Text links, der Knopf rechts - und auf dem Telefon untereinander. */
+.entschieden {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-2);
+}

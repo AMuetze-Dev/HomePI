@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -13,12 +13,20 @@ function werte(rest: Partial<api.Einstellungen> = {}): api.Einstellungen {
     absender: "staffelleitung@example.org",
     pruefzeitraum_tage: 30,
     frist_tage: 14,
+    uebertragung_pausiert: true,
     ...rest,
   };
 }
 
 function mitWerten(rest: Partial<api.Einstellungen> = {}) {
   vi.spyOn(api, "ladeEinstellungen").mockResolvedValue(werte(rest));
+  // Die Zugangskarte sitzt auf derselben Fläche. Ohne Antwort meldet sie
+  // ihrerseits einen Fehler - und dann stehen zwei Meldungen da.
+  vi.spyOn(api, "ladeZugang").mockResolvedValue({
+    gespeichert: false,
+    benutzer: "",
+    schluessel_vorhanden: true,
+  });
 }
 
 afterEach(() => {
@@ -80,7 +88,10 @@ describe("Einstellungen", () => {
     await screen.findByLabelText(/Staffelleiter/);
     await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/zwischen 1 und 90/);
+    const formular = screen.getByRole("button", { name: "Speichern" }).closest("form")!;
+    expect(await within(formular).findByRole("alert")).toHaveTextContent(
+      /zwischen 1 und 90/,
+    );
   });
 
   it("behält die Eingabe, wenn das Speichern scheitert", async () => {
@@ -95,11 +106,17 @@ describe("Einstellungen", () => {
     await userEvent.type(feld, "Neuer Verband");
     await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await screen.findByRole("alert");
+    const formular = screen.getByRole("button", { name: "Speichern" }).closest("form")!;
+    await within(formular).findByRole("alert");
     expect(screen.getByDisplayValue("Neuer Verband")).toBeInTheDocument();
   });
 
   it("zeigt einen Fehler beim Laden statt eines leeren Formulars", async () => {
+    vi.spyOn(api, "ladeZugang").mockResolvedValue({
+      gespeichert: false,
+      benutzer: "",
+      schluessel_vorhanden: true,
+    });
     vi.spyOn(api, "ladeEinstellungen").mockRejectedValue(
       new ApiError("kein Zugriff", 403),
     );

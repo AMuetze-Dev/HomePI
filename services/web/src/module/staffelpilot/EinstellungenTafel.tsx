@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Feld, Hinweis, Karte, Knopf, Platzhalter } from "../../ui";
 import { type Einstellungen, ladeEinstellungen, speichereEinstellungen } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
+import { ZugangKarte } from "./ZugangKarte";
 
 function meldung(fehler: unknown): string {
   return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
@@ -69,58 +70,62 @@ export function EinstellungenTafel() {
   }
 
   return (
-    <Karte>
-      <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
-        <h2 className={stil.formularTitel}>Einstellungen</h2>
+    <>
+      <Karte>
+        <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
+          <h2 className={stil.formularTitel}>Einstellungen</h2>
 
-        <Feld
-          beschriftung="Staffelleiter"
-          hinweis="Steht unter jedem Schreiben."
-          value={werte.staffelleiter}
-          onChange={(e) => aendern("staffelleiter", e.target.value)}
-        />
-        <Feld
-          beschriftung="Verband"
-          hinweis="Zeile unter der Unterschrift. Darf leer bleiben."
-          value={werte.verband}
-          onChange={(e) => aendern("verband", e.target.value)}
-        />
-        <Feld
-          beschriftung="Absenderadresse"
-          hinweis="Vorschlag für den Empfänger eines neuen Entwurfs."
-          value={werte.absender}
-          onChange={(e) => aendern("absender", e.target.value)}
-        />
-        <Feld
-          beschriftung="Prüfzeitraum (Tage)"
-          hinweis="Wie weit zurück ein Spiel noch geprüft wird."
-          type="number"
-          min={1}
-          max={365}
-          value={String(werte.pruefzeitraum_tage)}
-          onChange={(e) => aendern("pruefzeitraum_tage", Number(e.target.value))}
-        />
-        <Feld
-          beschriftung="Frist (Tage)"
-          hinweis="Wie lange ein Verein Zeit bekommt zu antworten."
-          type="number"
-          min={1}
-          max={90}
-          value={String(werte.frist_tage)}
-          onChange={(e) => aendern("frist_tage", Number(e.target.value))}
-        />
+          <Feld
+            beschriftung="Staffelleiter"
+            hinweis="Steht unter jedem Schreiben."
+            value={werte.staffelleiter}
+            onChange={(e) => aendern("staffelleiter", e.target.value)}
+          />
+          <Feld
+            beschriftung="Verband"
+            hinweis="Zeile unter der Unterschrift. Darf leer bleiben."
+            value={werte.verband}
+            onChange={(e) => aendern("verband", e.target.value)}
+          />
+          <Feld
+            beschriftung="Absenderadresse"
+            hinweis="Vorschlag für den Empfänger eines neuen Entwurfs."
+            value={werte.absender}
+            onChange={(e) => aendern("absender", e.target.value)}
+          />
+          <Feld
+            beschriftung="Prüfzeitraum (Tage)"
+            hinweis="Wie weit zurück ein Spiel noch geprüft wird."
+            type="number"
+            min={1}
+            max={365}
+            value={String(werte.pruefzeitraum_tage)}
+            onChange={(e) => aendern("pruefzeitraum_tage", Number(e.target.value))}
+          />
+          <Feld
+            beschriftung="Frist (Tage)"
+            hinweis="Wie lange ein Verein Zeit bekommt zu antworten."
+            type="number"
+            min={1}
+            max={90}
+            value={String(werte.frist_tage)}
+            onChange={(e) => aendern("frist_tage", Number(e.target.value))}
+          />
 
-        {fehler && (
-          <Hinweis ton="fehler" dringend>
-            {fehler}
-          </Hinweis>
-        )}
-        {gespeichert && !fehler && <Hinweis ton="neutral">Gespeichert.</Hinweis>}
+          {fehler && (
+            <Hinweis ton="fehler" dringend>
+              {fehler}
+            </Hinweis>
+          )}
+          {gespeichert && !fehler && <Hinweis ton="neutral">Gespeichert.</Hinweis>}
 
-        <Knopf type="submit" disabled={laeuft}>
-          {laeuft ? "Speichert …" : "Speichern"}
-        </Knopf>
-      </form>
-    </Karte>
+          <Knopf type="submit" disabled={laeuft}>
+            {laeuft ? "Speichert …" : "Speichern"}
+          </Knopf>
+        </form>
+      </Karte>
+
+      <ZugangKarte />
+    </>
   );
 }

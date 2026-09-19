@@ -2,23 +2,38 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../api/client";
 import {
+  aendereStaffel,
   aendereVorgang,
+  brichAuftragAb,
+  fordereAuftragAn,
   entscheide,
   hakeAb,
   ladeSpiel,
   ladeStaffeln,
   ladeWarteschlange,
   ladeZusammenfassung,
+  ladeAlleBefunde,
+  ladeAuftrag,
+  ladeAuftraege,
   ladeEinstellungen,
   ladeMannschaften,
+  ladeOffenenAuftrag,
+  ladeUebertragung,
+  ladeZugang,
   ladeVorgaenge,
   legeStaffelAn,
   legeVorgangAn,
+  loescheStaffel,
+  loescheZugang,
   loeseHaken,
+  nimmEntscheidungZurueck,
+  setzeUebertragungPause,
   setzeVorgangZustand,
   speichereEinstellungen,
   speichereMannschaften,
+  speichereZugang,
   verwerfeVorgang,
+  wiederholeUebertragung,
   type Staffel,
 } from "./api";
 
@@ -322,5 +337,163 @@ describe("Einstellungen, Mannschaften und Vorgänge", () => {
     await ladeEinstellungen();
 
     expect(holen.mock.calls[0]?.[1]).toMatchObject({ credentials: "include" });
+  });
+});
+
+describe("Staffeln, Befunde und Aufträge", () => {
+  it("ändert nur die mitgeschickten Felder einer Staffel", async () => {
+    const holen = antworteMit(staffel);
+
+    await aendereStaffel("s1", { aktiv: false });
+
+    expect(holen.mock.calls[0]?.[0]).toContain("/staffeln/s1");
+    expect(holen.mock.calls[0]?.[1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({ aktiv: false }),
+    });
+  });
+
+  it("löscht eine Staffel und erwartet keinen Körper", async () => {
+    antworteMit(null, 204);
+
+    await expect(loescheStaffel("s1")).resolves.toBeUndefined();
+  });
+
+  it("nimmt eine Entscheidung mit DELETE zurück", async () => {
+    // Kein eigener Pfad: es ist dieselbe Ressource, nur weg.
+    const holen = antworteMit({});
+
+    await nimmEntscheidungZurueck("b1");
+
+    expect(holen.mock.calls[0]?.[0]).toContain("/befunde/b1/entscheidung");
+    expect(holen.mock.calls[0]?.[1]).toMatchObject({ method: "DELETE" });
+  });
+
+  it("holt alle Befunde ohne Frage, wenn nichts gefiltert wird", async () => {
+    const holen = antworteMit([]);
+
+    await ladeAlleBefunde();
+
+    expect(String(holen.mock.calls[0]?.[0])).toMatch(/\/befunde$/);
+  });
+
+  it("hängt beide Filter an", async () => {
+    const holen = antworteMit([]);
+
+    await ladeAlleBefunde({ staffelId: "s1", nurOffen: true });
+
+    expect(holen.mock.calls[0]?.[0]).toContain("staffel_id=s1");
+    expect(holen.mock.calls[0]?.[0]).toContain("nur_offen=true");
+  });
+
+  it("liest die Auftragsliste", async () => {
+    const holen = antworteMit([]);
+
+    await ladeAuftraege();
+
+    expect(String(holen.mock.calls[0]?.[0])).toMatch(/\/auftraege$/);
+  });
+
+  it("liest den offenen Auftrag und verträgt null", async () => {
+    // Die Oberflaeche fragt das im Takt ab; null ist ein Ergebnis, kein
+    // Fehler.
+    antworteMit(null);
+
+    await expect(ladeOffenenAuftrag()).resolves.toBeNull();
+  });
+
+  it("liest einen einzelnen Auftrag", async () => {
+    const holen = antworteMit({});
+
+    await ladeAuftrag("a1");
+
+    expect(holen.mock.calls[0]?.[0]).toContain("/auftraege/a1");
+  });
+
+  it("fordert einen Prüflauf an, ohne Staffel", async () => {
+    const holen = antworteMit({});
+
+    await fordereAuftragAn();
+
+    expect(holen.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ art: "pruflauf", staffel_id: null }),
+    });
+  });
+
+  it("fordert eine Initialisierung für eine Staffel an", async () => {
+    const holen = antworteMit({});
+
+    await fordereAuftragAn("initialisierung", "s1");
+
+    expect(String(holen.mock.calls[0]?.[1]?.body)).toContain("initialisierung");
+    expect(String(holen.mock.calls[0]?.[1]?.body)).toContain("s1");
+  });
+
+  it("bricht ab, indem es den Abschluss meldet", async () => {
+    const holen = antworteMit({});
+
+    await brichAuftragAb("a1");
+
+    expect(holen.mock.calls[0]?.[0]).toContain("/auftraege/a1/abschluss");
+    expect(String(holen.mock.calls[0]?.[1]?.body)).toContain("abgebrochen");
+  });
+});
+
+describe("Übertragung und Zugang", () => {
+  it("liest den Stand der Übertragung", async () => {
+    const holen = antworteMit({});
+
+    await ladeUebertragung();
+
+    expect(String(holen.mock.calls[0]?.[0])).toMatch(/\/uebertragungen$/);
+  });
+
+  it("setzt die Pause", async () => {
+    const holen = antworteMit({});
+
+    await setzeUebertragungPause(false);
+
+    expect(holen.mock.calls[0]?.[0]).toContain("/uebertragungen/pause");
+    expect(String(holen.mock.calls[0]?.[1]?.body)).toContain("false");
+  });
+
+  it("wiederholt ohne Kennung alle gescheiterten", async () => {
+    const holen = antworteMit({});
+
+    await wiederholeUebertragung();
+
+    expect(String(holen.mock.calls[0]?.[0])).toMatch(/wiederholen$/);
+  });
+
+  it("wiederholt mit Kennung nur eine", async () => {
+    const holen = antworteMit({});
+
+    await wiederholeUebertragung("u1");
+
+    expect(holen.mock.calls[0]?.[0]).toContain("uebertragung_id=u1");
+  });
+
+  it("liest den Stand des Zugangs", async () => {
+    const holen = antworteMit({});
+
+    await ladeZugang();
+
+    expect(String(holen.mock.calls[0]?.[0])).toMatch(/\/zugang$/);
+  });
+
+  it("hinterlegt den Zugang mit PUT und erwartet keinen Körper zurück", async () => {
+    const holen = antworteMit(null, 204);
+
+    await expect(speichereZugang("sl42", "geheim")).resolves.toBeUndefined();
+    expect(holen.mock.calls[0]?.[1]).toMatchObject({ method: "PUT" });
+  });
+
+  it("entfernt den Zugang", async () => {
+    const holen = antworteMit(null, 204);
+
+    await loescheZugang();
+
+    expect(holen.mock.calls[0]?.[1]).toMatchObject({ method: "DELETE" });
   });
 });

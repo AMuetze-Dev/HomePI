@@ -103,10 +103,27 @@ beforeEach(() => {
     absender: "",
     pruefzeitraum_tage: 30,
     frist_tage: 14,
+    uebertragung_pausiert: true,
   });
   vi.spyOn(api, "ladeVorgaenge").mockResolvedValue([]);
   vi.spyOn(api, "ladeMannschaften").mockResolvedValue([]);
   vi.spyOn(api, "ladeRegeln").mockResolvedValue([]);
+  vi.spyOn(api, "ladeAlleBefunde").mockResolvedValue([]);
+  vi.spyOn(api, "ladeOffenenAuftrag").mockResolvedValue(null);
+  vi.spyOn(api, "ladeAuftraege").mockResolvedValue([]);
+  vi.spyOn(api, "ladeUebertragung").mockResolvedValue({
+    pausiert: true,
+    offen: 0,
+    laeuft: 0,
+    fertig: 0,
+    fehler: 0,
+    fehlerhafte: [],
+  });
+  vi.spyOn(api, "ladeZugang").mockResolvedValue({
+    gespeichert: false,
+    benutzer: "",
+    schluessel_vorhanden: true,
+  });
 });
 
 afterEach(() => {
@@ -569,5 +586,97 @@ describe("Nur fällige", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Regeln" }));
 
     expect(await screen.findByText("Kein Regelkatalog")).toBeInTheDocument();
+  });
+});
+
+describe("Eine Entscheidung zurücknehmen", () => {
+  it("bietet es am entschiedenen Befund an", async () => {
+    mitDaten();
+    vi.spyOn(api, "ladeSpiel").mockResolvedValue(
+      spiel({ befunde: [befund({ entscheidung: "kenntnis" })] }),
+    );
+    render(<StaffelpilotSeite />);
+    await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
+
+    expect(
+      await screen.findByRole("button", { name: "Zurücknehmen" }),
+    ).toBeInTheDocument();
+  });
+
+  it("bietet es am offenen Befund nicht an", async () => {
+    mitDaten();
+    render(<StaffelpilotSeite />);
+    await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
+
+    await screen.findByText("Feldverweis auf Dauer");
+    expect(
+      screen.queryByRole("button", { name: "Zurücknehmen" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("nimmt zurück", async () => {
+    mitDaten();
+    vi.spyOn(api, "ladeSpiel").mockResolvedValue(
+      spiel({ befunde: [befund({ entscheidung: "verworfen", grund: "kein Verstoß" })] }),
+    );
+    const zurueck = vi.spyOn(api, "nimmEntscheidungZurueck").mockResolvedValue(befund());
+    render(<StaffelpilotSeite />);
+    await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Zurücknehmen" }));
+
+    await waitFor(() => expect(zurueck).toHaveBeenCalledWith("b1"));
+  });
+
+  it("zeigt die Meldung, wenn schon ein Schreiben hinaus ist", async () => {
+    // Der Verein hat es. Ein Befund, der hier wieder "offen" heisst, waere
+    // eine Akte, die dem widerspricht.
+    mitDaten();
+    vi.spyOn(api, "ladeSpiel").mockResolvedValue(
+      spiel({ befunde: [befund({ entscheidung: "kenntnis", vorgang_id: "v1" })] }),
+    );
+    vi.spyOn(api, "nimmEntscheidungZurueck").mockRejectedValue(
+      new ApiError("Zu diesem Befund ist ein Schreiben versandt.", 409),
+    );
+    render(<StaffelpilotSeite />);
+    await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Zurücknehmen" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Schreiben versandt/);
+  });
+});
+
+describe("Die neuen Reiter", () => {
+  it("führen zu den Befunden", async () => {
+    mitDaten();
+    render(<StaffelpilotSeite />);
+    await screen.findByText("SG Gittersee – SV Fortschritt");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Befunde" }));
+
+    expect(await screen.findByText("Keine Befunde")).toBeInTheDocument();
+  });
+
+  it("führen zum Prüflauf", async () => {
+    mitDaten();
+    render(<StaffelpilotSeite />);
+    await screen.findByText("SG Gittersee – SV Fortschritt");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Prüflauf" }));
+
+    expect(
+      await screen.findByRole("button", { name: "Prüflauf anfordern" }),
+    ).toBeInTheDocument();
+  });
+
+  it("zeigen den DFBnet-Zugang bei den Einstellungen", async () => {
+    mitDaten();
+    render(<StaffelpilotSeite />);
+    await screen.findByText("SG Gittersee – SV Fortschritt");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Einstellungen" }));
+
+    expect(await screen.findByText("DFBnet-Zugang")).toBeInTheDocument();
   });
 });

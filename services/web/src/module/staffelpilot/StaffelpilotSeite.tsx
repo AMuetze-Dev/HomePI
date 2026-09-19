@@ -7,6 +7,7 @@ import {
   ladeSpiel,
   ladeStaffeln,
   legeVorgangAn,
+  nimmEntscheidungZurueck,
   ladeWarteschlange,
   ladeZusammenfassung,
   legeStaffelAn,
@@ -20,7 +21,9 @@ import {
 } from "./api";
 import { alsDatum } from "./datum";
 import { EinstellungenTafel } from "./EinstellungenTafel";
+import { BefundeTafel } from "./BefundeTafel";
 import { MannschaftenTafel } from "./MannschaftenTafel";
+import { PrueflaufTafel } from "./PrueflaufTafel";
 import { RegelnTafel } from "./RegelnTafel";
 import { VorgaengeTafel } from "./VorgaengeTafel";
 import stil from "./StaffelpilotSeite.module.css";
@@ -36,7 +39,9 @@ type Daten = { staffeln: Staffel[]; spiele: SpielZeile[]; uebersicht: Zusammenfa
  */
 const REITER = [
   ["spiele", "Spielberichte"],
+  ["befunde", "Befunde"],
   ["vorgaenge", "Vorgänge"],
+  ["prueflauf", "Prüflauf"],
   ["mannschaften", "Mannschaften"],
   ["regeln", "Regeln"],
   ["einstellungen", "Einstellungen"],
@@ -190,6 +195,24 @@ export function StaffelpilotSeite() {
     );
   }
 
+  if (reiter === "befunde") {
+    return (
+      <>
+        {leiste}
+        <BefundeTafel staffeln={staffeln} />
+      </>
+    );
+  }
+
+  if (reiter === "prueflauf") {
+    return (
+      <>
+        {leiste}
+        <PrueflaufTafel staffeln={staffeln} />
+      </>
+    );
+  }
+
   if (reiter === "regeln") {
     return (
       <>
@@ -276,6 +299,9 @@ export function StaffelpilotSeite() {
                     onEntwurf={(befundId) =>
                       nachAktion(zeile.id, () => legeVorgangAn(befundId))
                     }
+                    onZuruecknehmen={(befundId) =>
+                      nachAktion(zeile.id, () => nimmEntscheidungZurueck(befundId))
+                    }
                   />
                 </li>
               ))}
@@ -349,6 +375,7 @@ function SpielKarte({
   onEntscheiden,
   onAbhaken,
   onEntwurf,
+  onZuruecknehmen,
 }: {
   zeile: SpielZeile;
   offen: Spiel | null;
@@ -360,6 +387,7 @@ function SpielKarte({
   ) => Promise<boolean>;
   onAbhaken: () => void;
   onEntwurf: (befundId: string) => Promise<boolean>;
+  onZuruecknehmen: (befundId: string) => Promise<boolean>;
 }) {
   return (
     <Karte>
@@ -402,6 +430,7 @@ function SpielKarte({
                     befund={b}
                     onEntscheiden={onEntscheiden}
                     onEntwurf={onEntwurf}
+                    onZuruecknehmen={onZuruecknehmen}
                   />
                 </li>
               ))}
@@ -437,6 +466,7 @@ function BefundZeile({
   befund,
   onEntscheiden,
   onEntwurf,
+  onZuruecknehmen,
 }: {
   befund: Befund;
   onEntscheiden: (
@@ -445,6 +475,7 @@ function BefundZeile({
     grund: string,
   ) => Promise<boolean>;
   onEntwurf: (befundId: string) => Promise<boolean>;
+  onZuruecknehmen: (befundId: string) => Promise<boolean>;
 }) {
   const [grund, setGrund] = useState("");
   const [fragtNachGrund, setFragtNachGrund] = useState(false);
@@ -515,10 +546,21 @@ function BefundZeile({
             </div>
           )
         ) : (
-          <p className={stil.erledigt}>
-            {befund.entscheidung === "kenntnis" ? "Zur Kenntnis genommen" : "Verworfen"}
-            {befund.grund && `: ${befund.grund}`}
-          </p>
+          <div className={stil.entschieden}>
+            <p className={stil.erledigt}>
+              {befund.entscheidung === "kenntnis" ? "Zur Kenntnis genommen" : "Verworfen"}
+              {befund.grund && `: ${befund.grund}`}
+            </p>
+            {/* Wer sich vertippt hat, soll das geradeziehen können, ohne den
+                Bericht neu einzuspielen. Der Haken fällt dabei mit. */}
+            <Knopf
+              groesse="sm"
+              auspraegung="leise"
+              onClick={() => void onZuruecknehmen(befund.id)}
+            >
+              Zurücknehmen
+            </Knopf>
+          </div>
         )}
 
         {befund.weg !== "kein" &&
