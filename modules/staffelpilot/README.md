@@ -173,6 +173,21 @@ HOMEPI_TEST_DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/test' \
 Wie genau geprueft wird, steht in
 [docs/12-testen.md](../../docs/12-testen.md).
 
+### Die Karten einer Saison
+
+`staffelpilot_karten` haelt fest, wer wann eine Karte bekommen hat -- Spieltag,
+Wettbewerb, Person, Passnummer, Art, Minute. Sie sind **kein Befund**, sondern
+Gedaechtnis: Paragraf 58 SpO rechnet ueber die Saison, die fuenfte Verwarnung
+sperrt, und nach jeder Sperre faengt der Zaehler von vorn an. Nichts davon
+steht im einzelnen Spielbericht.
+
+Ein erneuter Import ersetzt die Karten desselben Spiels. Wuerden sie sich
+anhaeufen, zaehlte Paragraf 58 nach dem dritten Prueflauf die dreifache Zahl.
+
+**Gezaehlt wird hier nicht.** `GET /karten?pass_nr=...` gibt heraus, was das
+Artefakt weiss; die Schwellen stehen in den Regeldateien des Staffelleiters
+(`30_karten.py`), und der Zaehler selbst im Pruefdienst (`auskunft.py`).
+
 ### Wenn das Schema sich geaendert hat
 
 `homepi schema` legt Fehlendes an und aendert nichts Vorhandenes - es ist kein

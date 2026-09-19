@@ -71,6 +71,28 @@ Die Beispieldaten sagen, dass sie welche sind: jede Spielkennung fängt mit
 `DEMO-` an, und in jedem Befundtext steht „(Beispieldaten)". Wer das in der
 Oberfläche sieht, weiß, dass niemand bei DFBnet war.
 
+## Der erste echte Lauf
+
+Am 19.09.2026 lief der Dienst zum ersten Mal gegen das echte DFBnet: eine
+Staffel, dreißig Tage, 24 Spielberichte, **nur lesend**
+(`PRUEFDIENST_DARF_SCHREIBEN=0`). Er hat vier Fehler gefunden, die kein Test
+finden konnte — und alle vier waren still:
+
+| Was passierte | Warum es niemand gemerkt hätte |
+|---|---|
+| Der Bericht wurde über seine Adresse angesprungen | DFBnet lädt dann eine Seite, die aussieht wie der Bericht, aber leer bleibt. Die Schnittstelle antwortet 401 |
+| Die Aufstellung wurde mit der falschen Kennung geholt | Verlinkt wird `report/<id>`, geöffnet `report-details/<andere id>`. 404, und der Kader bleibt leer |
+| Der Verlaufsreiter fehlte | Dort stehen die Bestätigungen. 48 erfundene „Bestätigung fehlt" auf 24 Spielen |
+| Gelesen wurde, bevor die Seite ihre Daten hatte | Ohne Paarung liegt der Gastkader auf der Heimseite — 52 von 87 Karten fanden ihren Spieler nicht |
+
+Dazu einer, der laut war: 78 von 108 Befunden hießen „Verwarnungszähler nicht
+verfügbar". Die Regel hatte recht — die Karten der Saison lagen nirgends.
+Seitdem liegen sie im Artefakt.
+
+Danach: **24 Spiele, 36 Befunde**, und die verteilen sich auf Ordnungsdienst,
+Feldverweise, fehlende Bestätigungen und Spielerfotos. Das ist die Arbeit, die
+ein Staffelleiter wirklich hat.
+
 ## Zusehen
 
 Im Container gibt es keinen Bildschirm. Wer dem Prüflauf bei der Arbeit
@@ -104,13 +126,14 @@ passieren, weil ein Container gestartet wurde.
 | | |
 |---|---|
 | Anfordern, anmelden, Fortschritt, Abschluss, Fehlerbehandlung | **geprüft** — gegen ein nachgebautes Gateway und den Demo-Leser |
-| Anmelden bei DFBnet, Trefferliste lesen | gebaut, **nicht gegen das echte DFBnet geprüft** |
+| Meldung einer Staffel holen (Initialisierung) | gebaut, **nicht gegen das echte DFBnet geprüft** |
 | Spielbericht aus HTML lesen | **geprüft** — gegen echtes, aufgezeichnetes DFBnet-HTML (`tests/aufnahmen/`): Kopfdaten, Karten, Tore, Wechsel, Bestätigungen, Vorkommnisse |
-| Die Berichtsseite im Browser aufmachen | gebaut, **nicht gegen das echte DFBnet geprüft** — Info- und Verlaufsreiter, Adresse in `dienst.bericht_adresse` |
+| Anmelden, Staffel wählen, Trefferliste, Bericht lesen, Aufstellung holen | **gegen das echte DFBnet gelaufen** (19.09.2026, 24 Spielberichte einer Staffel, nur lesend) |
 | Aufstellung aus der Schnittstelle | die **Übersetzung** ist geprüft (`aufstellung.py`, 99 %); der Abruf ist gebaut (zwei Aufrufe mit der Sitzung des Browsers), **nicht gegen das echte DFBnet geprüft**. Der DOM-Rückfall der alten Anwendung ist nicht portiert — misslingt der Abruf, bleibt die Aufstellung *unbekannt* und keine Regel macht daraus einen Verstoß |
 | Regeln, die **nur den Bericht** brauchen | **übernommen und geprüft** (`regeln.py`, 100 %): Vorkommnisse, Kommentare an Bestätigungen, Ordnungsdienst, fehlende Bestätigungen, Fristen nach § 59 (17), Dokumente, Spielrecht aus der Aufstellung |
 | Der **Regelkatalog** des Staffelleiters (30 Regeln) | **übernommen, geprüft und im Lauf** (`regelwerk/`, 250 übernommene Tests): Altersklassen, Stammspieler, Karten, Spieldurchführung, Spielabbruch, Spielerfoto, Spielrecht, Wechsel und Spielführer, Spielbericht |
-| Was die Regeln noch nicht wissen können | die Saisongeschichte (Verwarnungszähler, Einsätze in höheren Mannschaften) und die Zahl der Spieltage einer Staffel. `Auskunft` antwortet dann durchgehend `None` — *weiß ich nicht* —, und die Regeln, die darauf bauen, sagen das selbst, statt eine 0 zu behaupten |
+| Verwarnungszähler nach § 58 | **gebaut und am echten Lauf geprüft**: die Karten liegen im Artefakt, `GatewayAuskunft` rechnet daraus „seit der letzten Sperre". Ohne Passnummer oder ohne Antwort kommt `None` — *weiß ich nicht* —, und die Regel sagt das selbst, statt eine 0 zu behaupten |
+| Einsätze in höheren Mannschaften (Stammspieler, § 68) | **fehlt**. `Auskunft` schweigt dazu, und die Regeln sagen es |
 | Ein Bericht, der nicht kam | wird eine **Warnung am Spiel**, keine leere Liste. Eine leere Liste sieht in der Warteschlange aus wie „geprüft und sauber" |
 | Meldung einer Staffel holen (Initialisierung) | gebaut: Spielplanbearbeitung, „Eigene Staffeln", Staffel öffnen, Reiter „Mannschaften", Tabelle lesen (`meldung.py`, 100 %). **Nicht gegen das echte DFBnet geprüft, und von dieser Seite gibt es keine Aufnahme** — die Tests beschreiben den Aufbau, den die alte Anwendung vorfand. Misslingt es, kommt eine leere Liste, und die überschreibt im Artefakt nichts |
 | Eintragen in DFBnet (Prüferfreigabe, Fallanlage) | **fehlt**. Mit `PRUEFDIENST_LESER=dfbnet` bleibt Vorgemerktes stehen, statt still auf „fertig" zu springen |
@@ -135,6 +158,8 @@ src/homepi_pruefdienst/
   meldung.py      die Mannschaften einer Staffel aus der Tabelle (uebernommen)
   katalog.py      die Bruecke zu den Regeldateien (uebernommen)
   regelwerk/      das anpassbare Regelwerk (uebernommen, mit Vorlagen)
+  auswahl.py      Namen gegen die Auswahlfelder von DFBnet (uebernommen)
+  auskunft.py     der Verwarnungszaehler nach Paragraf 58
   aufstellung.py  Aufstellung aus der DFBnet-Schnittstelle (uebernommen)
   gateway.py      HTTP zum Artefakt
   leser.py        das Protokoll, und ein Leser ohne DFBnet
