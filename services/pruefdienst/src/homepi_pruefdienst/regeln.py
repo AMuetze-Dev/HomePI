@@ -108,7 +108,9 @@ def als_befund(verstoss: Violation, mannschaft: str = "") -> dict[str, object]:
     return {
         "regel": verstoss.rule,
         "schwere": _SCHWERE[verstoss.severity],
-        "titel": titel_zu(verstoss.rule),
+        # Eine Regel aus dem Katalog des Staffelleiters bringt ihren
+        # Anzeigenamen selbst mit; `_TITEL` kennt nur die eingebauten.
+        "titel": str(einzelheiten.get("regelname") or titel_zu(verstoss.rule)),
         "text": verstoss.message[:2000],
         "person": str(einzelheiten.get("player") or einzelheiten.get("person") or "")[:120],
         "mannschaft": (mannschaft or str(einzelheiten.get("team") or ""))[:120],

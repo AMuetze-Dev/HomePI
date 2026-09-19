@@ -109,7 +109,8 @@ passieren, weil ein Container gestartet wurde.
 | Die Berichtsseite im Browser aufmachen | gebaut, **nicht gegen das echte DFBnet geprüft** — Info- und Verlaufsreiter, Adresse in `dienst.bericht_adresse` |
 | Aufstellung aus der Schnittstelle | die **Übersetzung** ist geprüft (`aufstellung.py`, 99 %); der Abruf ist gebaut (zwei Aufrufe mit der Sitzung des Browsers), **nicht gegen das echte DFBnet geprüft**. Der DOM-Rückfall der alten Anwendung ist nicht portiert — misslingt der Abruf, bleibt die Aufstellung *unbekannt* und keine Regel macht daraus einen Verstoß |
 | Regeln, die **nur den Bericht** brauchen | **übernommen und geprüft** (`regeln.py`, 100 %): Vorkommnisse, Kommentare an Bestätigungen, Ordnungsdienst, fehlende Bestätigungen, Fristen nach § 59 (17), Dokumente, Spielrecht aus der Aufstellung |
-| Regeln, die **mehr** brauchen | **fehlen**: gelbe Karten und Stammspieler brauchen die Saisongeschichte, der Regelkatalog des Staffelleiters (`config/regeln/*.py`) ist ein eigenes Stück |
+| Der **Regelkatalog** des Staffelleiters (30 Regeln) | **übernommen und geprüft** (`regelwerk/`, 250 übernommene Tests): Altersklassen, Stammspieler, Karten, Spieldurchführung, Spielabbruch, Spielerfoto, Spielrecht, Wechsel und Spielführer, Spielbericht. **Noch nicht in den Lauf gehängt** — siehe unten |
+| Was die Regeln noch nicht wissen können | die Saisongeschichte (Verwarnungszähler, Einsätze in höheren Mannschaften) und die Zahl der Spieltage einer Staffel. `Auskunft` antwortet dann durchgehend `None` — *weiß ich nicht* —, und die Regeln, die darauf bauen, sagen das selbst, statt eine 0 zu behaupten |
 | Ein Bericht, der nicht kam | wird eine **Warnung am Spiel**, keine leere Liste. Eine leere Liste sieht in der Warteschlange aus wie „geprüft und sauber" |
 | Meldung einer Staffel holen (Initialisierung) | gebaut: Spielplanbearbeitung, „Eigene Staffeln", Staffel öffnen, Reiter „Mannschaften", Tabelle lesen (`meldung.py`, 100 %). **Nicht gegen das echte DFBnet geprüft, und von dieser Seite gibt es keine Aufnahme** — die Tests beschreiben den Aufbau, den die alte Anwendung vorfand. Misslingt es, kommt eine leere Liste, und die überschreibt im Artefakt nichts |
 | Eintragen in DFBnet (Prüferfreigabe, Fallanlage) | **fehlt**. Mit `PRUEFDIENST_LESER=dfbnet` bleibt Vorgemerktes stehen, statt still auf „fertig" zu springen |
@@ -132,6 +133,8 @@ src/homepi_pruefdienst/
   bericht.py      Spielbericht aus HTML (uebernommen, woertlich)
   regeln.py       die Regeln, die nur den Bericht brauchen (uebernommen)
   meldung.py      die Mannschaften einer Staffel aus der Tabelle (uebernommen)
+  katalog.py      die Bruecke zu den Regeldateien (uebernommen)
+  regelwerk/      das anpassbare Regelwerk (uebernommen, mit Vorlagen)
   aufstellung.py  Aufstellung aus der DFBnet-Schnittstelle (uebernommen)
   gateway.py      HTTP zum Artefakt
   leser.py        das Protokoll, und ein Leser ohne DFBnet
@@ -180,6 +183,51 @@ beiden echten Fehlalarme hingen:
   verschwiegen: Schweigen sähe genauso aus wie „fristgerecht".
 
 Dasselbe Prinzip wie beim Spielerfoto in `aufstellung.py`.
+
+## Die Regeln, die dem Staffelleiter gehören
+
+Dreißig Prüfungen der Spielordnung stehen **nicht im Programm**, sondern in
+Python-Dateien in einem Ordner, der ein neues Abbild überlebt:
+
+```
+PRUEFDIENST_REGELN=/data/regeln     # Vorgabe
+```
+
+Beim ersten Lauf werden die mitgelieferten Vorlagen dorthin kopiert — und
+danach **nie wieder überschrieben**. Was jemand angepasst hat, bleibt, auch
+wenn eine neue Fassung der Vorlage mitkommt. Eine Aktualisierung, die eine von
+Hand geschärfte Regel zurücksetzt, ist schlimmer als eine veraltete Vorlage,
+weil sie nichts sagt.
+
+Eine Regeldatei beginnt nicht mit sechs `from …`-Zeilen: `regel`, `melde`,
+`ANZAHL` und die Datumshilfen stellt der Lader. Ein Linter versteht das nicht
+— eine Konfigurationsdatei ist aber auch kein Modul.
+
+**Ein Fehler legt genau eine Regel still, und zwar laut.** Eine kaputte Datei
+liefert je Spiel den Befund „Regel X ist fehlerhaft" (kritisch, damit das
+Spiel sich nicht abhaken lässt), alle anderen laufen weiter. Wird gar keine
+Regel geladen — kein Schreibrecht auf dem Band, nichts ausgerollt —, steht das
+genauso an jedem Spiel.
+
+**Der Ü32-Wert.** `10_altersklassen.py` erlaubt drei Spieler unter dem
+Altersband. Das ist der Wert aus dem laufenden Betrieb im Kreis Dresden,
+mündlich bestätigt am 06.09.2026; eine schriftliche Fundstelle gibt es nicht.
+Genau deshalb steht er in einer Datei, die sich ändern lässt.
+
+### Was noch fehlt
+
+Der Katalog ist übernommen und geprüft, hängt aber **noch nicht im Prüflauf**.
+Drei Angaben fehlen dafür:
+
+* die **Spieltage** einer Staffel (für die U23-Ausnahme an den letzten vier) —
+  das Artefakt führt sie nicht,
+* die **höheren Mannschaften** je Mannschaft — das Artefakt führt sie, der
+  Dienst holt sie noch nicht,
+* die **Saisongeschichte** für Verwarnungszähler und Einsätze.
+
+Ohne sie liefe `spieltage_unbekannt` in jedem Spiel — dreißig Warnungen, die
+nichts über das Spiel sagen und die echten Befunde zudecken. Deshalb erst die
+Angaben, dann der Schalter.
 
 ## Entwickeln
 

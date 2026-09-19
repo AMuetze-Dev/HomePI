@@ -11,6 +11,10 @@ dependencies = [
     # Golden-Tests haengen an dem, was dort steht.
     "beautifulsoup4>=4.12",
     "lxml>=5.3",
+    # Fuer den Schalter, der einzelne Regeln stilllegt. Eine abgeschaltete
+    # Regel steht in einer YAML-Datei neben den Regeln -- nicht in der
+    # Regeldatei selbst, die gehoert dem Staffelleiter.
+    "pyyaml>=6.0",
 ]
 
 [tool.homepi]
@@ -56,23 +60,36 @@ branch = true
 # pruefen und nicht DFBnet. Die Zahl steht hier, damit sie kein Versteck wird.
 #
 # Die Schwelle von 90 % gilt damit fuer das, was wir selbst geschrieben haben.
-omit = ["*/dfbnet.py", "*/__main__.py", "*/bericht.py"]
+omit = ["*/dfbnet.py", "*/__main__.py", "*/bericht.py", "*/regelwerk/vorlagen/*"]
 
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
 target-version = "py312"
+# Die Regeldateien des Staffelleiters. Sie werden nicht importiert, sondern
+# mit einem gestellten Namensraum ausgefuehrt: `regel`, `melde`, `ANZAHL` und
+# die Datumshilfen sind dort einfach da. Fuer ruff sind das lauter undefinierte
+# Namen -- und formatieren darf er sie schon gar nicht: sie gehoeren dem
+# Staffelleiter, der sie von Hand aendert.
+extend-exclude = ["src/homepi_pruefdienst/regelwerk/vorlagen"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["E501"]
+# Die uebernommenen Regeltests. Dieselbe Begruendung wie beim Regelwerk
+# selbst: sie sind woertlich uebernommen, und die deutsche Typografie in den
+# Paragrafenzitaten ist dort Absicht.
+"tests/unit/regelwerk/**" = ["E501", "RUF002", "RUF005", "RUF015"]
 # Woertlich uebernommen aus der bestehenden Anwendung und dort ueber eine
 # Saison an echten Seiten gewachsen. Ihn nach unserem Geschmack umzuformen
 # hiesse, jede Zeile anzufassen, die sich bewaehrt hat -- und der Vergleich
 # mit dem Original waere danach keiner mehr.
 "src/homepi_pruefdienst/bericht.py" = ["E741", "RUF001"]
+# Dasselbe fuer das uebernommene Regelwerk: die deutschen Anfuehrungszeichen
+# und Gedankenstriche in den Paragrafenzitaten sind dort Absicht.
+"src/homepi_pruefdienst/regelwerk/*.py" = ["RUF001", "RUF002", "RUF003", "SIM103"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -89,4 +106,13 @@ disallow_untyped_defs = false
 # gehalten -- das ist die Pruefung, auf die es bei ihm ankommt.
 [[tool.mypy.overrides]]
 module = "homepi_pruefdienst.bericht"
+ignore_errors = true
+
+# Und dasselbe fuer das Regelwerk. Es ist woertlich uebernommen und wird von
+# den ebenfalls uebernommenen Tests gehalten (tests/unit/regelwerk/). Es
+# durchzutypisieren hiesse, 1700 Zeilen anzufassen, die sich ueber eine Saison
+# bewaehrt haben -- das ist eine eigene Arbeit und keine Nebenwirkung des
+# Umzugs.
+[[tool.mypy.overrides]]
+module = "homepi_pruefdienst.regelwerk.*"
 ignore_errors = true
