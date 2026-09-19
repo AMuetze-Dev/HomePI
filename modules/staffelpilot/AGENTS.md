@@ -8,20 +8,32 @@ Lies zuerst [`../../docs/06-artefakte.md`](../../docs/06-artefakte.md) — dort
 steht, warum ein Artefakt ein Modul im Gateway ist und kein eigener Container —
 und [`../../docs/12-testen.md`](../../docs/12-testen.md) für die Prüfebenen.
 
-## Stand (17.09.2026)
+## Stand (19.09.2026)
 
-Gebaut: Staffeln, Warteschlange mit Fälligkeit, Spielberichte und Befunde,
-Abhaken, Einstellungen, Mannschaften mit geratenem Aufbau, Regelkatalog,
-Vorgänge (Mahnung und Sportgerichtsantrag als Entwurf). 146 Tests, 100 %
-Zeilen und Zweige; Oberfläche mit fünf Reitern, 265 Frontend-Tests.
+Alle Funktionen der alten Software sind uebernommen, bis auf zwei
+ausdrueckliche Ausnahmen (unten). Gebaut: Staffeln anlegen und bearbeiten,
+Warteschlange mit Faelligkeit, Spielberichte und Befunde, Entscheidungen
+setzen **und zuruecknehmen**, Abhaken, flache Befundliste, Einstellungen,
+Mannschaften mit geratenem Aufbau, Regelkatalog, Vorgaenge (Mahnung und
+Sportgerichtsantrag als Entwurf), Auftraege fuer Prueflauf und
+Initialisierung, Uebertragungswarteschlange nach DFBnet, DFBnet-Zugang
+verschluesselt. 230 Artefakt-Tests mit 100 % Zeilen und Zweigen; Oberflaeche
+mit sieben Reitern, 325 Frontend-Tests.
 
 Offen, in der Reihenfolge, in der es sich lohnt:
 
 | | |
 |---|---|
-| **DFBnet-Prüfdienst** | eigener Container mit Playwright. Er füllt `POST /import`, `PUT /regeln` und `PUT /staffeln/{id}/mannschaften`. Das ist das größte fehlende Stück — ohne ihn kommen keine Daten herein |
+| **DFBnet-Pruefdienst** | eigener Container mit Playwright. Er nimmt den offenen Auftrag, meldet Fortschritt, spielt ein und arbeitet die Uebertragungen ab. Alle Nahtstellen stehen (siehe README); das ist das letzte grosse Stueck -- ohne ihn kommen keine echten Daten herein |
 | **Mahnung als PDF** | der Vordruck des Verbandes. Text und Felder stehen, das Formular fehlt. Vorlage: `D:/DevLibrary/StaffelPilot/src/core/mahnung.py` |
-| **Ergebnisse eines Prüflaufs** | Fortschritt und Protokoll, solange der Dienst läuft |
+| **Migrationen** | `homepi schema` legt nur an. Eine neue Spalte in einer bestehenden Tabelle haelt das Gateway auf `unhealthy` an |
+
+Zwei Dinge der alten Software sind **absichtlich** nicht uebernommen:
+
+| | |
+|---|---|
+| `sportrichter_mail` in der Uebertragungswarteschlange | ein Programm, das Post an einen Sportrichter verschickt, ist etwas anderes als eines, das einen Entwurf hinlegt |
+| `datenbank_zuruecksetzen` | in HomePI ist das `make dev-reset` beziehungsweise Sache der Verwaltung, nicht eines Knopfes im Artefakt |
 
 **Zwei Zusagen sind nicht verhandelbar** und gehören in jede Änderung:
 
