@@ -27,7 +27,9 @@ class Leser(Protocol):
 
     def bericht(self, kennung: str) -> MatchReport | None: ...
 
-    def mannschaften(self, staffel: str) -> list[dict[str, object]]: ...
+    def mannschaften(
+        self, staffel: str, saison: str = "", verband: str = ""
+    ) -> list[dict[str, object]]: ...
 
     def schliessen(self) -> None: ...
 
@@ -74,7 +76,9 @@ class DemoLeser:
         """
         return self._berichte.get(kennung)
 
-    def mannschaften(self, staffel: str) -> list[dict[str, object]]:
+    def mannschaften(
+        self, staffel: str, saison: str = "", verband: str = ""
+    ) -> list[dict[str, object]]:
         return self._mannschaften.get(staffel, [])
 
     def schliessen(self) -> None:
@@ -159,7 +163,9 @@ class BeispielLeser(DemoLeser):
             )
         return gefunden
 
-    def mannschaften(self, staffel: str) -> list[dict[str, object]]:
+    def mannschaften(
+        self, staffel: str, saison: str = "", verband: str = ""
+    ) -> list[dict[str, object]]:
         return [{"name": name, "ist_sg": ist_sg} for name, ist_sg in _VEREINE]
 
     @staticmethod

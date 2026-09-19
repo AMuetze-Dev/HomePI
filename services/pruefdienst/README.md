@@ -111,7 +111,7 @@ passieren, weil ein Container gestartet wurde.
 | Regeln, die **nur den Bericht** brauchen | **übernommen und geprüft** (`regeln.py`, 100 %): Vorkommnisse, Kommentare an Bestätigungen, Ordnungsdienst, fehlende Bestätigungen, Fristen nach § 59 (17), Dokumente, Spielrecht aus der Aufstellung |
 | Regeln, die **mehr** brauchen | **fehlen**: gelbe Karten und Stammspieler brauchen die Saisongeschichte, der Regelkatalog des Staffelleiters (`config/regeln/*.py`) ist ein eigenes Stück |
 | Ein Bericht, der nicht kam | wird eine **Warnung am Spiel**, keine leere Liste. Eine leere Liste sieht in der Warteschlange aus wie „geprüft und sauber" |
-| Meldung einer Staffel holen (Initialisierung) | **fehlt** — im DFBnet-Leser. Er gibt eine leere Liste zurück, und die überschreibt im Artefakt nichts; der Auftrag meldet dann, dass nichts kam, statt einen Erfolg |
+| Meldung einer Staffel holen (Initialisierung) | gebaut: Spielplanbearbeitung, „Eigene Staffeln", Staffel öffnen, Reiter „Mannschaften", Tabelle lesen (`meldung.py`, 100 %). **Nicht gegen das echte DFBnet geprüft, und von dieser Seite gibt es keine Aufnahme** — die Tests beschreiben den Aufbau, den die alte Anwendung vorfand. Misslingt es, kommt eine leere Liste, und die überschreibt im Artefakt nichts |
 | Eintragen in DFBnet (Prüferfreigabe, Fallanlage) | **fehlt**. Mit `PRUEFDIENST_LESER=dfbnet` bleibt Vorgemerktes stehen, statt still auf „fertig" zu springen |
 | Eintragen **simuliert** | mit den Beispieldaten wird jede Übertragung als erledigt gemeldet — mit dem Vermerk „Simuliert — es war kein Browser bei DFBnet" an der Zeile. Nur so lässt sich der Weg bis zum Freigeben einmal durchklicken |
 
@@ -131,6 +131,7 @@ src/homepi_pruefdienst/
   dienst.py       REINE Entscheidungen - Zeile zerlegen, Fortschritt, Wartezeit
   bericht.py      Spielbericht aus HTML (uebernommen, woertlich)
   regeln.py       die Regeln, die nur den Bericht brauchen (uebernommen)
+  meldung.py      die Mannschaften einer Staffel aus der Tabelle (uebernommen)
   aufstellung.py  Aufstellung aus der DFBnet-Schnittstelle (uebernommen)
   gateway.py      HTTP zum Artefakt
   leser.py        das Protokoll, und ein Leser ohne DFBnet

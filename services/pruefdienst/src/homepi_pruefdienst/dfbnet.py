@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import re
 import time
 from collections.abc import Callable
 from typing import Any
 
-from . import aufstellung, dienst
+from . import aufstellung, dienst, meldung
 from .bericht import MatchReport, MatchReportExtractor
 from .dienst import Spielzeile
 
@@ -285,19 +286,119 @@ class DfbnetLeser:
                 gefunden.append(eintrag)
         return gefunden
 
-    def mannschaften(self, staffel: str) -> list[dict[str, object]]:
-        """Die Meldung einer Staffel.
+    def mannschaften(
+        self, staffel: str, saison: str = "", verband: str = ""
+    ) -> list[dict[str, object]]:
+        """Die Meldung einer Staffel: Meisterschaft, Staffel, Reiter, Tabelle.
 
-        Noch nicht portiert: sie steckt in der alten Anwendung in
-        `staffel_initialisierung.py` und haengt an mehreren Auswahlfeldern, die
-        sich nur gegen das echte DFBnet erproben lassen. Eine leere Liste ist
-        hier die ehrliche Antwort -- sie ueberschreibt im Artefakt nichts.
+        Der Weg stammt aus `navigator.py` der alten Anwendung. Nicht
+        uebernommen ist der Filter **Gebiet**: dort stand er auf einem Kreis
+        aus der Konfiguration, und fuer jeden anderen suchte die
+        Initialisierung am falschen Ort. Mit "Eigene Staffeln" ist die Liste
+        ohnehin auf die eigenen beschraenkt.
+
+        Die **Mannschaftsart** bleibt auf "Keine Auswahl": so trifft der
+        Staffelname unabhaengig von der Altersklasse.
+
+        Eine leere Liste ueberschreibt im Artefakt nichts -- und der Auftrag
+        meldet dann, dass nichts kam, statt einen Erfolg.
         """
-        logger.warning(
-            "Das Holen der Meldung zu %r ist noch nicht portiert; es kommt nichts.",
-            staffel,
+        seite = self._seite
+        if seite is None:
+            raise RuntimeError("Erst anmelden, dann lesen")
+
+        try:
+            self._zur_spielplanbearbeitung(seite)
+            self._suchmaske_fuellen(seite, saison, verband)
+            seite.locator("button:has-text('SUCHEN')").first.click(timeout=ZEIT_MS)
+            _warten_auf(seite, ["table tbody tr"])
+
+            if not self._staffel_oeffnen(seite, staffel):
+                logger.warning("Staffel %r steht nicht in der Meisterschaftsliste", staffel)
+                return []
+
+            reiter = seite.get_by_role("tab", name=re.compile("Mannschaften", re.IGNORECASE)).first
+            reiter.click(timeout=ZEIT_MS)
+            _warten_auf(seite, ["table"])
+            return meldung.mannschaften_lesen(self._mannschaftstabelle(seite))
+        except Exception:
+            logger.exception("Die Meldung zu %r liess sich nicht holen", staffel)
+            return []
+
+    def _zur_spielplanbearbeitung(self, seite: Any) -> None:
+        """Meisterschaft -> Spielplanbearbeitung.
+
+        Diese Maske und nicht die Spielplanansicht: nur sie hat "Eigene
+        Staffeln" und den Reiter "Mannschaften".
+        """
+        seite.get_by_role("link", name="Meisterschaft").first.click(timeout=ZEIT_MS)
+        seite.wait_for_load_state("domcontentloaded")
+        seite.get_by_role("link", name="Spielplanbearbeitung").first.click(timeout=ZEIT_MS)
+        seite.wait_for_load_state("domcontentloaded")
+        seite.locator("button:has-text('SUCHEN')").first.wait_for(state="visible")
+
+    def _suchmaske_fuellen(self, seite: Any, saison: str, verband: str) -> None:
+        try:
+            seite.get_by_role("button", name="Eingaben leeren").first.click(timeout=3000)
+            seite.wait_for_timeout(800)
+        except Exception:
+            logger.warning("Die Suchmaske liess sich nicht leeren")
+
+        if saison:
+            self._auswahl(seite, "Saison", saison)
+        # Auf dieser Seite heisst das Feld "Verband", woanders "Landesverband".
+        # Beides versuchen, sonst bleibt der Filter leer.
+        if verband and not self._auswahl(seite, "Verband", verband):
+            self._auswahl(seite, "Landesverband", verband)
+
+        for sucher in ("Eigene Staffeln", "label:has-text('Eigene Staffeln')"):
+            try:
+                if sucher.startswith("label:"):
+                    seite.locator(sucher).first.click(timeout=3000)
+                else:
+                    seite.get_by_label(sucher).first.click(timeout=3000)
+                return
+            except Exception:
+                continue
+        logger.warning("Der Haken 'Eigene Staffeln' liess sich nicht setzen")
+
+    def _auswahl(self, seite: Any, feld: str, wert: str) -> bool:
+        try:
+            seite.get_by_label(feld).first.select_option(label=wert, timeout=3000)
+            return True
+        except Exception:
+            logger.info("Das Feld %r liess sich nicht auf %r setzen", feld, wert)
+            return False
+
+    def _staffel_oeffnen(self, seite: Any, staffel: str) -> bool:
+        """Die Zeile mit diesem Namen aufmachen.
+
+        Verglichen wird ohne Gross- und Kleinschreibung und als Teilstueck:
+        DFBnet schreibt den Staffelnamen in der Liste nicht immer genauso wie
+        im Spielplan.
+        """
+        for zeile in seite.locator("table tbody tr").all():
+            text = (zeile.text_content() or "").strip()
+            if staffel.lower() not in text.lower():
+                continue
+            knopf = zeile.locator("button[title='Staffel bearbeiten']").first
+            if knopf.count() == 0:
+                continue
+            knopf.click(timeout=ZEIT_MS)
+            seite.wait_for_load_state("domcontentloaded")
+            return True
+        return False
+
+    def _mannschaftstabelle(self, seite: Any) -> str:
+        """Die Tabelle mit der Spalte "Mannschaft", sonst die erste."""
+        tabelle = (
+            seite.locator("table")
+            .filter(has=seite.locator("th").filter(has_text="Mannschaft"))
+            .first
         )
-        return []
+        if tabelle.count() == 0:
+            tabelle = seite.locator("table").first
+        return str(tabelle.evaluate("el => el.outerHTML"))
 
     def schliessen(self) -> None:
         for teil, name in ((self._browser, "browser"), (self._playwright, "playwright")):

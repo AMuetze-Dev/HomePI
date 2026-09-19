@@ -180,6 +180,11 @@ class Prueflauf:
 
         self._anmelden(kennung)
 
+        # Der Verband steht in den Einstellungen: DFBnet sucht danach, und ein
+        # fest verdrahtetes "Saechsischer Fussball-Verband" faende fuer jeden
+        # anderen Kreisverband nichts und meldete nur, die Staffel sei nicht da.
+        verband = str(self._gateway.einstellungen().get("verband") or "")
+
         gesamt = 0
         for i, staffel in enumerate(staffeln):
             name = str(staffel["name"])
@@ -188,7 +193,9 @@ class Prueflauf:
                 schritt=f"Hole die Meldung zu {name}",
                 fortschritt=dienst.fortschritt(i, len(staffeln)),
             )
-            mannschaften = self._leser.mannschaften(name)
+            mannschaften = self._leser.mannschaften(
+                name, saison=str(staffel.get("saison") or ""), verband=verband
+            )
             if mannschaften:
                 self._gateway.mannschaften_setzen(str(staffel["id"]), mannschaften)
                 gesamt += len(mannschaften)
