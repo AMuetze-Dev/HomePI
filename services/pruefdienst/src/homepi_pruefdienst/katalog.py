@@ -23,7 +23,7 @@ from typing import Any
 
 from . import regelwerk
 from .bericht import MatchReport
-from .regeln import Severity, Violation
+from .regeln import Severity, Violation, als_befund
 from .regelwerk import Ladung, ausfuehren, laden, schalter, uebersetzen
 
 logger = logging.getLogger(__name__)
@@ -195,3 +195,44 @@ def pruefen(
                 )
             )
     return verstoesse
+
+
+def befunde_aus(
+    report: MatchReport,
+    staffel: Staffelangabe | None = None,
+    ordner: Path | None = None,
+    auskunft: regelwerk.Auskunft | None = None,
+) -> list[dict[str, object]]:
+    """Die Regeln des Katalogs, fertig für das Artefakt."""
+    return [als_befund(v) for v in pruefen(report, staffel, ordner, auskunft)]
+
+
+def _ganzzahl(wert: object) -> int:
+    """Eine Zahl, oder 0 fuer alles andere -- also *nicht bekannt*.
+
+    Das Artefakt liefert einen `int`; wer sich darauf verlaesst, bekommt beim
+    ersten `null` einen Abbruch mitten im Lauf.
+    """
+    if isinstance(wert, bool) or not isinstance(wert, int | float | str):
+        return 0
+    try:
+        return int(wert)
+    except ValueError:
+        return 0
+
+
+def staffelangabe(staffel: dict[str, object]) -> Staffelangabe:
+    """Aus der Staffel des Artefakts das, was die Regeln lesen.
+
+    `hoehere_mannschaften` bleibt leer: das Artefakt führt sie je Mannschaft
+    und nicht je Staffel. Der Übersetzer erschließt sie dann aus den Namen --
+    "SV Loschwitz" steht über "SV Loschwitz 2". Das ist die Rückfallebene der
+    alten Anwendung und nicht das Ende der Arbeit; die gepflegte Liste kennt
+    Spielgemeinschaften, die aus einem Namen nicht abzulesen sind.
+    """
+    return Staffelangabe(
+        name=str(staffel.get("name") or ""),
+        altersklasse=str(staffel.get("altersklasse") or ""),
+        saison=str(staffel.get("saison") or ""),
+        spieltage=_ganzzahl(staffel.get("spieltage")),
+    )

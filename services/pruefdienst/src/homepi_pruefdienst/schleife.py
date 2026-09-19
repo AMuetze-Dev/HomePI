@@ -12,7 +12,7 @@ import datetime as dt
 import logging
 from typing import Any
 
-from . import dienst, regeln
+from . import dienst, katalog, regeln
 from .gateway import Gateway, GatewayFehler
 from .leser import BeispielLeser, Leser
 
@@ -83,11 +83,17 @@ class Prueflauf:
             return [s for s in alle if str(s["id"]) == str(staffel_id)]
         return [s for s in alle if s.get("aktiv")]
 
-    def _befunde_zu(self, zeile: dienst.Spielzeile) -> list[dict[str, object]]:
+    def _befunde_zu(
+        self, zeile: dienst.Spielzeile, staffel: dict[str, Any]
+    ) -> list[dict[str, object]]:
         """Den Bericht holen und die Regeln darüber laufen lassen.
 
-        Kommt keiner, gibt es **eine Warnung und keine leere Liste**: ein
-        Spiel ohne Befunde sieht in der Warteschlange aus wie eines, das
+        Zwei Quellen, und beide laufen: die eingebauten Regeln (Fristen,
+        Bestätigungen, Ordnungsdienst — Verfahren, das niemand anpassen soll)
+        und der Katalog des Staffelleiters (die Spielordnung).
+
+        Kommt kein Bericht, gibt es **eine Warnung und keine leere Liste**:
+        ein Spiel ohne Befunde sieht in der Warteschlange aus wie eines, das
         geprüft und sauber war.
         """
         if isinstance(self._leser, BeispielLeser):
@@ -95,7 +101,9 @@ class Prueflauf:
         bericht = self._leser.bericht(zeile.dfbnet_id)
         if bericht is None:
             return regeln.nicht_gelesen("der Prüfdienst hat ihn nicht bekommen")
-        return regeln.befunde_aus(bericht)
+        return regeln.befunde_aus(bericht) + katalog.befunde_aus(
+            bericht, katalog.staffelangabe(staffel)
+        )
 
     def _anmelden(self, kennung: str) -> None:
         self._gateway.fortschritt(
@@ -131,7 +139,7 @@ class Prueflauf:
 
             ausbeute = dienst.Ausbeute()
             for zeile in self._leser.spiele(name, von, bis):
-                ausbeute.aufnehmen(zeile, self._befunde_zu(zeile))
+                ausbeute.aufnehmen(zeile, self._befunde_zu(zeile, staffel))
 
             if ausbeute.uebersprungen:
                 self._gateway.fortschritt(

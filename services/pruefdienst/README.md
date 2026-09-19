@@ -109,7 +109,7 @@ passieren, weil ein Container gestartet wurde.
 | Die Berichtsseite im Browser aufmachen | gebaut, **nicht gegen das echte DFBnet geprüft** — Info- und Verlaufsreiter, Adresse in `dienst.bericht_adresse` |
 | Aufstellung aus der Schnittstelle | die **Übersetzung** ist geprüft (`aufstellung.py`, 99 %); der Abruf ist gebaut (zwei Aufrufe mit der Sitzung des Browsers), **nicht gegen das echte DFBnet geprüft**. Der DOM-Rückfall der alten Anwendung ist nicht portiert — misslingt der Abruf, bleibt die Aufstellung *unbekannt* und keine Regel macht daraus einen Verstoß |
 | Regeln, die **nur den Bericht** brauchen | **übernommen und geprüft** (`regeln.py`, 100 %): Vorkommnisse, Kommentare an Bestätigungen, Ordnungsdienst, fehlende Bestätigungen, Fristen nach § 59 (17), Dokumente, Spielrecht aus der Aufstellung |
-| Der **Regelkatalog** des Staffelleiters (30 Regeln) | **übernommen und geprüft** (`regelwerk/`, 250 übernommene Tests): Altersklassen, Stammspieler, Karten, Spieldurchführung, Spielabbruch, Spielerfoto, Spielrecht, Wechsel und Spielführer, Spielbericht. **Noch nicht in den Lauf gehängt** — siehe unten |
+| Der **Regelkatalog** des Staffelleiters (30 Regeln) | **übernommen, geprüft und im Lauf** (`regelwerk/`, 250 übernommene Tests): Altersklassen, Stammspieler, Karten, Spieldurchführung, Spielabbruch, Spielerfoto, Spielrecht, Wechsel und Spielführer, Spielbericht |
 | Was die Regeln noch nicht wissen können | die Saisongeschichte (Verwarnungszähler, Einsätze in höheren Mannschaften) und die Zahl der Spieltage einer Staffel. `Auskunft` antwortet dann durchgehend `None` — *weiß ich nicht* —, und die Regeln, die darauf bauen, sagen das selbst, statt eine 0 zu behaupten |
 | Ein Bericht, der nicht kam | wird eine **Warnung am Spiel**, keine leere Liste. Eine leere Liste sieht in der Warteschlange aus wie „geprüft und sauber" |
 | Meldung einer Staffel holen (Initialisierung) | gebaut: Spielplanbearbeitung, „Eigene Staffeln", Staffel öffnen, Reiter „Mannschaften", Tabelle lesen (`meldung.py`, 100 %). **Nicht gegen das echte DFBnet geprüft, und von dieser Seite gibt es keine Aufnahme** — die Tests beschreiben den Aufbau, den die alte Anwendung vorfand. Misslingt es, kommt eine leere Liste, und die überschreibt im Artefakt nichts |
@@ -214,20 +214,25 @@ Altersband. Das ist der Wert aus dem laufenden Betrieb im Kreis Dresden,
 mündlich bestätigt am 06.09.2026; eine schriftliche Fundstelle gibt es nicht.
 Genau deshalb steht er in einer Datei, die sich ändern lässt.
 
-### Was noch fehlt
+### Was die Regeln noch nicht wissen
 
-Der Katalog ist übernommen und geprüft, hängt aber **noch nicht im Prüflauf**.
-Drei Angaben fehlen dafür:
+Der Katalog läuft im Prüflauf mit — neben den eingebauten Regeln, nicht statt
+ihrer. Zwei Angaben fehlen ihm noch:
 
-* die **Spieltage** einer Staffel (für die U23-Ausnahme an den letzten vier) —
-  das Artefakt führt sie nicht,
-* die **höheren Mannschaften** je Mannschaft — das Artefakt führt sie, der
-  Dienst holt sie noch nicht,
-* die **Saisongeschichte** für Verwarnungszähler und Einsätze.
+* die **höheren Mannschaften** je Mannschaft. Das Artefakt führt sie, der
+  Dienst holt sie noch nicht; der Übersetzer erschließt sie so lange aus den
+  Namen („SV Loschwitz" steht über „SV Loschwitz 2"). Das ist die
+  Rückfallebene der alten Anwendung — die gepflegte Liste kennt
+  Spielgemeinschaften, die aus einem Namen nicht abzulesen sind.
+* die **Saisongeschichte** für Verwarnungszähler und Einsätze in höheren
+  Mannschaften. `Auskunft` antwortet dann `None`, also *weiß ich nicht*, und
+  die Regeln sagen das selbst.
 
-Ohne sie liefe `spieltage_unbekannt` in jedem Spiel — dreißig Warnungen, die
-nichts über das Spiel sagen und die echten Befunde zudecken. Deshalb erst die
-Angaben, dann der Schalter.
+Die **Spieltage** stehen seit dem 19.09.2026 an der Staffel und lassen sich
+unter *Staffeln verwalten* eintragen. Leer heißt *nicht bekannt*: dann bleibt
+die U23-Ausnahme an den letzten vier Spieltagen stehen, und
+`spieltage_unbekannt` sagt, dass hier etwas ungeprüft blieb. Aus DFBnet holt
+der Dienst die Zahl noch nicht.
 
 ## Entwickeln
 

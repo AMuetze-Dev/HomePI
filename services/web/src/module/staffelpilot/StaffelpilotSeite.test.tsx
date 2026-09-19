@@ -436,6 +436,7 @@ describe("Staffeln", () => {
       altersklasse: "maenner",
       spielklasse: "1.Kreisklasse",
       saison: "",
+      spieltage: 0,
     });
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue(""),

@@ -30,6 +30,11 @@ class Staffel(Base, ZeitstempelMixin):
     # nicht eindeutig: dieselbe Klasse gibt es fuer Herren und fuer Ue35.
     spielklasse: Mapped[str] = mapped_column(String(120), nullable=False)
     saison: Mapped[str] = mapped_column(String(10), nullable=False, default="")
+    # Wie viele Spieltage die Saison hat. 0 heisst *nicht bekannt* und nicht
+    # "keine": an den letzten vier Spieltagen faellt die U23-Ausnahme nach
+    # Paragraf 68 (2) c) weg, und ohne diese Zahl laesst sie sich nicht
+    # aufheben. Die Regel sagt das dann selbst, statt still weiterzurechnen.
+    spieltage: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     spiele: Mapped[list[Spielbericht]] = relationship(

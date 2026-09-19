@@ -12,6 +12,7 @@ function staffel(rest: Partial<api.Staffel> = {}): api.Staffel {
     altersklasse: "maenner",
     spielklasse: "3.Kreisliga (C)",
     saison: "26/27",
+    spieltage: 0,
     aktiv: true,
     ...rest,
   };
@@ -75,10 +76,46 @@ describe("Staffeln verwalten", () => {
         name: "Ü35",
         spielklasse: "1.Kreisklasse",
         saison: "",
+        // Ein leeres Feld heißt *nicht bekannt*, und genau dafür steht die 0.
+        spieltage: 0,
         altersklasse: "maenner",
       }),
     );
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("");
+  });
+
+  it("nimmt die Spieltage entgegen", async () => {
+    const { anlegen } = tafel([]);
+
+    await userEvent.type(screen.getByRole("textbox", { name: "Name" }), "Ü35");
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Spielklasse" }),
+      "1.Kreisklasse",
+    );
+    await userEvent.type(screen.getByRole("textbox", { name: "Spieltage" }), "26");
+    await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
+
+    await waitFor(() =>
+      expect(anlegen).toHaveBeenCalledWith(expect.objectContaining({ spieltage: 26 })),
+    );
+  });
+
+  it("macht aus einer unsinnigen Eingabe kein geratenes Ergebnis", async () => {
+    // 0 heißt *nicht bekannt*. Aus "zwanzig" eine 20 zu raten wäre schlimmer,
+    // als nichts zu wissen: die U23-Ausnahme fiele an den falschen Spieltagen.
+    const { anlegen } = tafel([]);
+
+    await userEvent.type(screen.getByRole("textbox", { name: "Name" }), "Ü35");
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Spielklasse" }),
+      "1.Kreisklasse",
+    );
+    await userEvent.type(screen.getByRole("textbox", { name: "Spieltage" }), "zwanzig");
+    await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
+
+    await waitFor(() =>
+      expect(anlegen).toHaveBeenCalledWith(expect.objectContaining({ spieltage: 0 })),
+    );
   });
 
   it("behält die Eingabe, wenn das Anlegen scheitert", async () => {

@@ -41,6 +41,34 @@ class TestStaffeln:
         namen = [s["name"] for s in (await client.get("/staffelpilot/staffeln")).json()]
         assert namen == ["Stadtliga C"]
 
+    async def test_ohne_angabe_sind_die_spieltage_unbekannt(self, client: AsyncClient) -> None:
+        """0 heisst *nicht bekannt* und nicht "keine": ohne die Saisonlaenge
+        laesst sich die U23-Ausnahme an den letzten vier Spieltagen nicht
+        aufheben, und die Regel sagt das dann selbst."""
+        await staffel_anlegen(client)
+
+        assert (await client.get("/staffelpilot/staffeln")).json()[0]["spieltage"] == 0
+
+    async def test_die_spieltage_lassen_sich_setzen_und_aendern(
+        self, client: AsyncClient
+    ) -> None:
+        staffel_id = await staffel_anlegen(client, spieltage=26)
+        assert (await client.get("/staffelpilot/staffeln")).json()[0]["spieltage"] == 26
+
+        antwort = await client.patch(
+            f"/staffelpilot/staffeln/{staffel_id}", json={"spieltage": 30}
+        )
+
+        assert antwort.status_code == 200
+        assert antwort.json()["spieltage"] == 30
+
+    async def test_hundert_spieltage_gibt_es_nicht(self, client: AsyncClient) -> None:
+        antwort = await client.post(
+            "/staffelpilot/staffeln", json={**STAFFEL, "spieltage": 100}
+        )
+
+        assert antwort.status_code == 422
+
     async def test_derselbe_name_zweimal_wird_abgelehnt(self, client: AsyncClient) -> None:
         await staffel_anlegen(client)
         antwort = await client.post("/staffelpilot/staffeln", json=STAFFEL)

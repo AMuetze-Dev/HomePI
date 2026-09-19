@@ -188,6 +188,18 @@ Das ist richtig so: lieber gar nicht starten als halb. In der Entwicklung
 entweder `make dev-reset` (wirft die Datenbank weg) oder die Spalte von Hand
 nachziehen.
 
+**Seit 19.09.2026: `staffelpilot_staffeln.spieltage`.** Wer eine Datenbank von
+vorher weiterbenutzt, zieht sie so nach:
+
+```sql
+ALTER TABLE staffelpilot_staffeln
+  ADD COLUMN spieltage INTEGER NOT NULL DEFAULT 0;
+```
+
+0 heisst dabei *nicht bekannt* und nicht "keine": ohne die Saisonlaenge laesst
+sich die U23-Ausnahme nach Paragraf 68 (2) c) an den letzten vier Spieltagen
+nicht aufheben, und die Regel sagt das dann selbst.
+
 ### Der Schlüssel für die Zugangsdaten
 
 `compose.dev.yml` setzt `STAFFELPILOT_SCHLUESSEL` fest -- zum Entwickeln, und

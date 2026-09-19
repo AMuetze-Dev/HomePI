@@ -158,3 +158,59 @@ class TestAuskunft:
 
         assert stumm.verwarnungen("P1", "Meisterschaft") is None
         assert stumm.letzte_sperre("P1", "Meisterschaft") is None
+
+
+class TestFuerDasArtefakt:
+    def test_befunde_aus_liefert_fertige_zeilen(self, tmp_path: Path) -> None:
+        befunde = katalog.befunde_aus(bericht(), ordner=tmp_path / "regeln")
+
+        assert befunde
+        assert all(
+            set(b) == {"regel", "schwere", "titel", "text", "person", "mannschaft"} for b in befunde
+        )
+
+    def test_der_titel_ist_der_name_der_regel_und_nicht_der_verein(self, tmp_path: Path) -> None:
+        """In einer Liste von zwanzig Befunden liest man, *was* los ist."""
+        befunde = katalog.befunde_aus(bericht(), ordner=tmp_path / "regeln")
+        treffer = [b for b in befunde if b["regel"] == "spielfuehrer_fehlt"]
+
+        assert treffer and treffer[0]["titel"] == "Spielführer nicht benannt"
+
+    def test_die_mannschaft_steht_auch_in_der_meldung(self, tmp_path: Path) -> None:
+        """In der Liste steht der Text allein, und "Müller ist 19" ohne Verein
+        zwingt zum Öffnen des Spiels."""
+        befunde = katalog.befunde_aus(bericht(), ordner=tmp_path / "regeln")
+        treffer = [b for b in befunde if b["regel"] == "spielfuehrer_fehlt"][0]
+
+        assert str(treffer["text"]).startswith(str(treffer["mannschaft"]))
+
+
+class TestStaffelangabe:
+    def test_die_felder_kommen_aus_dem_artefakt(self) -> None:
+        angabe = katalog.staffelangabe(
+            {
+                "id": "s1",
+                "name": "Stadtliga C",
+                "altersklasse": "maenner",
+                "saison": "26/27",
+                "spieltage": 26,
+                "aktiv": True,
+            }
+        )
+
+        assert angabe.name == "Stadtliga C"
+        assert angabe.altersklasse == "maenner"
+        assert angabe.saison == "26/27"
+        assert angabe.spieltage == 26
+
+    @pytest.mark.parametrize("wert", [None, "", "zwanzig", [], True])
+    def test_unbrauchbare_spieltage_heissen_unbekannt(self, wert: object) -> None:
+        """0 ist hier *nicht bekannt*. Ein Abbruch mitten im Lauf waere die
+        schlechtere Antwort, eine geratene Zahl die schlechteste."""
+        assert katalog.staffelangabe({"spieltage": wert}).spieltage == 0
+
+    def test_eine_zahl_als_text_wird_gelesen(self) -> None:
+        assert katalog.staffelangabe({"spieltage": "26"}).spieltage == 26
+
+    def test_eine_leere_staffel_faellt_nicht_um(self) -> None:
+        assert katalog.staffelangabe({}).spieltage == 0

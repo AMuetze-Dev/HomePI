@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from homepi_pruefdienst import regeln
-from homepi_pruefdienst.bericht import MatchMeta, MatchReport
+from homepi_pruefdienst.bericht import MatchMeta, MatchReport, Player, TeamSquad
 from homepi_pruefdienst.dienst import Spielzeile
 from homepi_pruefdienst.gateway import GatewayFehler
 from homepi_pruefdienst.leser import BeispielLeser, DemoLeser
@@ -500,6 +500,36 @@ class TestBefundeImLauf:
         befunde = spiele[0]["befunde"]
         assert [b["regel"] for b in befunde] == ["bericht_ungelesen"]
         assert befunde[0]["schwere"] == "warnung"
+
+    def test_der_katalog_laeuft_mit(self, tmp_path: Any, monkeypatch: Any) -> None:
+        """Zwei Quellen, und beide laufen: die eingebauten Regeln und der
+        Katalog des Staffelleiters."""
+        monkeypatch.setenv("PRUEFDIENST_REGELN", str(tmp_path / "regeln"))
+        from homepi_pruefdienst import katalog
+
+        katalog.zuruecksetzen()
+        bericht = MatchReport(
+            meta=MatchMeta(
+                match_id="M-1",
+                home_team="SG Gittersee",
+                away_team="SV Fortschritt",
+                match_date=(HEUTE - dt.timedelta(days=1)).strftime("%d.%m.%Y"),
+            ),
+            home_squad=TeamSquad(
+                team_name="SG Gittersee",
+                starting_eleven=[Player(name=f"S{i}", pass_number=f"P{i}") for i in range(11)],
+            ),
+        )
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+        leser = DemoLeser({"Stadtliga C": [zeile("M-1")]}, berichte_je_spiel={"M-1": bericht})
+
+        lauf(gateway, leser).runde()
+
+        _, spiele = gateway.importe[0]
+        gefunden = {b["regel"] for b in spiele[0]["befunde"]}
+        # Aus regeln.py und aus 80_wechsel_und_spielfuehrer.py.
+        assert "confirmation_missing" in gefunden
+        assert "spielfuehrer_fehlt" in gefunden
 
     def test_ein_bericht_wird_durch_die_regeln_geschickt(self) -> None:
         bericht = MatchReport(

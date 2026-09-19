@@ -71,8 +71,14 @@ services:
       # Mit PRUEFDIENST_LESER=dfbnet weigert sich der Dienst weiterhin --
       # das Eintragen ist nicht portiert.
       PRUEFDIENST_DARF_SCHREIBEN: ${PRUEFDIENST_DARF_SCHREIBEN:-1}
+      # Die dreissig Regeln der Spielordnung. Sie liegen auf einem Band und
+      # nicht im Abbild: was jemand anpasst, soll das naechste `up --build`
+      # ueberleben. Beim ersten Lauf werden die Vorlagen dorthin kopiert und
+      # danach nie wieder ueberschrieben.
+      PRUEFDIENST_REGELN: /data/regeln
     volumes:
       - ./services/pruefdienst/src:/app/services/pruefdienst/src
+      - dev-regeln:/data/regeln
 
   gateway:
     build:
@@ -146,3 +152,6 @@ services:
 
 volumes:
   dev-postgres:
+  # Die angepassten Regeln des Staffelleiters. Ein eigenes Band, damit
+  # `make dev-reset` die Datenbank wegwerfen kann, ohne sie mitzunehmen.
+  dev-regeln:

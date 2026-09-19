@@ -59,6 +59,8 @@ class StaffelAnlegen(BaseModel):
     altersklasse: Altersklasse
     spielklasse: NameFeld
     saison: Annotated[str, Field(max_length=10)] = ""
+    #: 0 heisst *nicht bekannt*. Siehe `modelle.Staffel.spieltage`.
+    spieltage: Annotated[int, Field(ge=0, le=99)] = 0
     aktiv: bool = True
 
     @field_validator("name", "spielklasse", "saison", mode="before")
@@ -79,6 +81,7 @@ class StaffelAendern(BaseModel):
     altersklasse: Altersklasse | None = None
     spielklasse: NameFeld | None = None
     saison: Annotated[str, Field(max_length=10)] | None = None
+    spieltage: Annotated[int, Field(ge=0, le=99)] | None = None
     aktiv: bool | None = None
 
     @field_validator("name", "spielklasse", "saison", mode="before")
@@ -95,6 +98,7 @@ class StaffelAusgabe(BaseModel):
     altersklasse: Altersklasse
     spielklasse: str
     saison: str
+    spieltage: int
     aktiv: bool
 
 

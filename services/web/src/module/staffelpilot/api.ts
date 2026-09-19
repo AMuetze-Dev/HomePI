@@ -16,6 +16,8 @@ export interface Staffel {
   altersklasse: Altersklasse;
   spielklasse: string;
   saison: string;
+  /** 0 heißt *nicht bekannt* — nicht "keine". */
+  spieltage: number;
   aktiv: boolean;
 }
 
@@ -218,6 +220,7 @@ export interface NeueStaffel {
   altersklasse: Altersklasse;
   spielklasse: string;
   saison?: string;
+  spieltage?: number;
 }
 
 /** Fehlerformat des Backends (RFC 9457). */

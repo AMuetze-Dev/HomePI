@@ -62,6 +62,17 @@ export function StaffelnTafel({
   );
 }
 
+/**
+ * Eine Zahl aus dem Eingabefeld — 0 für alles, was keine ist.
+ *
+ * 0 heißt im Artefakt *nicht bekannt*, und genau das ist ein leeres Feld
+ * auch. Aus „zwanzig" eine 20 zu raten wäre schlimmer als nichts zu wissen.
+ */
+function zahl(text: string): number {
+  const wert = Number.parseInt(text, 10);
+  return Number.isFinite(wert) && wert >= 0 && wert <= 99 ? wert : 0;
+}
+
 function StaffelKarte({
   staffel,
   onAendern,
@@ -75,6 +86,7 @@ function StaffelKarte({
   const [name, setName] = useState(staffel.name);
   const [spielklasse, setSpielklasse] = useState(staffel.spielklasse);
   const [saison, setSaison] = useState(staffel.saison);
+  const [spieltage, setSpieltage] = useState(String(staffel.spieltage || ""));
   const [fragtNach, setFragtNach] = useState(false);
 
   return (
@@ -102,7 +114,7 @@ function StaffelKarte({
             className={stil.formular}
             onSubmit={(e) => {
               e.preventDefault();
-              void onAendern({ name, spielklasse, saison });
+              void onAendern({ name, spielklasse, saison, spieltage: zahl(spieltage) });
             }}
           >
             <Feld
@@ -120,6 +132,13 @@ function StaffelKarte({
               beschriftung="Saison"
               value={saison}
               onChange={(e) => setSaison(e.target.value)}
+            />
+            <Feld
+              beschriftung="Spieltage"
+              hinweis="Wie viele die Saison hat. Leer heißt: nicht bekannt — dann bleibt die U23-Ausnahme an den letzten vier Spieltagen stehen."
+              inputMode="numeric"
+              value={spieltage}
+              onChange={(e) => setSpieltage(e.target.value)}
             />
             <div className={stil.knoepfe}>
               <Knopf type="submit" groesse="sm">
@@ -182,6 +201,7 @@ function StaffelAnlegen({
   const [name, setName] = useState("");
   const [spielklasse, setSpielklasse] = useState("");
   const [saison, setSaison] = useState("");
+  const [spieltage, setSpieltage] = useState("");
   const [altersklasse, setAltersklasse] = useState<Altersklasse>("maenner");
 
   return (
@@ -190,12 +210,19 @@ function StaffelAnlegen({
         className={stil.formular}
         onSubmit={(e) => {
           e.preventDefault();
-          void onAnlegen({ name, spielklasse, saison, altersklasse }).then((geklappt) => {
+          void onAnlegen({
+            name,
+            spielklasse,
+            saison,
+            spieltage: zahl(spieltage),
+            altersklasse,
+          }).then((geklappt) => {
             // Ein fehlgeschlagenes Formular behält seine Eingabe.
             if (!geklappt) return;
             setName("");
             setSpielklasse("");
             setSaison("");
+            setSpieltage("");
           });
         }}
       >
@@ -219,6 +246,13 @@ function StaffelAnlegen({
           hinweis="Zum Beispiel 26/27. Sie steht auf jedem Aktenzeichen."
           value={saison}
           onChange={(e) => setSaison(e.target.value)}
+        />
+        <Feld
+          beschriftung="Spieltage"
+          hinweis="Wie viele die Saison hat. Leer heißt: nicht bekannt."
+          inputMode="numeric"
+          value={spieltage}
+          onChange={(e) => setSpieltage(e.target.value)}
         />
         <label className={stil.wahl}>
           <span className={stil.wahlName}>Altersklasse</span>
