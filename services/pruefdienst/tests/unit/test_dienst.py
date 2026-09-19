@@ -170,6 +170,30 @@ class TestStaffelkennung:
         assert k.saison == ""
 
 
+class TestFortschrittImSchritt:
+    """Eine Staffel mit achtzig Berichten dauert eine Viertelstunde."""
+
+    def test_am_anfang_null(self) -> None:
+        assert dienst.fortschritt_im_schritt(0, 2, 0, 80) == 0
+
+    def test_die_haelfte_der_ersten_staffel_ist_ein_viertel(self) -> None:
+        assert dienst.fortschritt_im_schritt(0, 2, 40, 80) == 25
+
+    def test_und_in_der_zweiten_geht_es_weiter(self) -> None:
+        assert dienst.fortschritt_im_schritt(1, 2, 40, 80) == 75
+
+    def test_nie_hundert(self) -> None:
+        """Die setzt der Abschluss. Ein voller Balken, der weiterlaeuft, ist
+        die Anzeige, der man beim naechsten Mal nicht mehr glaubt."""
+        assert dienst.fortschritt_im_schritt(1, 2, 80, 80) == 99
+
+    def test_ohne_berichte_bleibt_es_beim_schritt(self) -> None:
+        assert dienst.fortschritt_im_schritt(1, 4, 0, 0) == 25
+
+    def test_ohne_schritte_null(self) -> None:
+        assert dienst.fortschritt_im_schritt(0, 0, 5, 10) == 0
+
+
 class TestBerichtsadresse:
     def test_die_kennung_wird_eingesetzt(self) -> None:
         adresse = dienst.bericht_adresse("633203177")
@@ -267,6 +291,8 @@ class TestAusbeute:
                 "heim": "SG Gittersee",
                 "gast": "SV Fortschritt",
                 "ergebnis": "2 : 1",
+                "karten": [],
+                "wettbewerb": "",
                 "befunde": [],
             }
         ]

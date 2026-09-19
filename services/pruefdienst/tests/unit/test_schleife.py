@@ -175,6 +175,8 @@ class TestPrueflauf:
                         "heim": "SG Gittersee",
                         "gast": "SV Fortschritt",
                         "ergebnis": "2 : 1",
+                        "karten": [],
+                        "wettbewerb": "",
                         "befunde": UNGELESEN,
                     },
                     {
@@ -183,6 +185,8 @@ class TestPrueflauf:
                         "heim": "SG Gittersee",
                         "gast": "SV Fortschritt",
                         "ergebnis": "2 : 1",
+                        "karten": [],
+                        "wettbewerb": "",
                         "befunde": UNGELESEN,
                     },
                 ],

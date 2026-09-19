@@ -343,3 +343,152 @@ class TestZusammenfassung:
             "befunde_kritisch": 1,
             "staffeln_aktiv": 1,
         }
+
+
+# ── Karten ────────────────────────────────────────────────────────────────
+
+
+class TestKarten:
+    """Das Gedächtnis für § 58: die fünfte Verwarnung sperrt.
+
+    Gezählt wird hier nicht — die Schwellen stehen in den Regeldateien des
+    Staffelleiters. Dieses Artefakt gibt heraus, was es weiß.
+    """
+
+    async def karte(self, client: AsyncClient, **abweichend: object) -> str:
+        staffel_id = await staffel_anlegen(client)
+        eingang = {
+            "dfbnet_id": abweichend.pop("dfbnet_id", "M-1"),
+            "datum": abweichend.pop("datum", "2026-09-05"),
+            "heim": "SV Loschwitz",
+            "gast": "SG Gittersee",
+            "ergebnis": "1 : 0",
+            "wettbewerb": abweichend.pop("wettbewerb", "Meisterschaft"),
+            "karten": [
+                {
+                    "person": "Müller, Max",
+                    "pass_nr": "12345678",
+                    "art": "Gelbe Karte",
+                    "minute": "42",
+                    "mannschaft": "SV Loschwitz",
+                    **abweichend,
+                }
+            ],
+        }
+        antwort = await client.post(
+            "/staffelpilot/import", json={"staffel_id": staffel_id, "spiele": [eingang]}
+        )
+        assert antwort.status_code == 200, antwort.text
+        return staffel_id
+
+    async def test_eine_karte_kommt_an_und_zurueck(self, client: AsyncClient) -> None:
+        await self.karte(client)
+
+        gefunden = (await client.get("/staffelpilot/karten", params={"pass_nr": "12345678"})).json()
+
+        assert len(gefunden) == 1
+        assert gefunden[0]["art"] == "Gelbe Karte"
+        assert gefunden[0]["person"] == "Müller, Max"
+        assert gefunden[0]["datum"] == "2026-09-05"
+        assert gefunden[0]["wettbewerb"] == "Meisterschaft"
+
+    async def test_ohne_passnummer_findet_sie_niemand(self, client: AsyncClient) -> None:
+        """Nach Passnummer und nicht nach Namen: zwei Vereine haben zwei Maxe."""
+        await self.karte(client, pass_nr="")
+
+        gefunden = (await client.get("/staffelpilot/karten", params={"pass_nr": "12345678"})).json()
+
+        assert gefunden == []
+
+    async def test_der_wettbewerb_trennt(self, client: AsyncClient) -> None:
+        """§ 58 (2): Pokal und Meisterschaft werden getrennt gezählt."""
+        staffel_id = await self.karte(client)
+        await client.post(
+            "/staffelpilot/import",
+            json={
+                "staffel_id": staffel_id,
+                "spiele": [
+                    {
+                        "dfbnet_id": "M-2",
+                        "datum": "2026-09-12",
+                        "heim": "SV Loschwitz",
+                        "gast": "SG Gittersee",
+                        "wettbewerb": "Kreispokal",
+                        "karten": [
+                            {"person": "Müller, Max", "pass_nr": "12345678", "art": "Gelbe Karte"}
+                        ],
+                    }
+                ],
+            },
+        )
+
+        alle = (await client.get("/staffelpilot/karten", params={"pass_nr": "12345678"})).json()
+        pokal = (
+            await client.get(
+                "/staffelpilot/karten",
+                params={"pass_nr": "12345678", "wettbewerb": "Kreispokal"},
+            )
+        ).json()
+
+        assert len(alle) == 2
+        assert [k["dfbnet_id"] if "dfbnet_id" in k else k["wettbewerb"] for k in pokal] == [
+            "Kreispokal"
+        ]
+
+    async def test_seit_schneidet_die_zeit_vor_der_sperre_ab(self, client: AsyncClient) -> None:
+        """Nach einer verwirkten Sperre fängt der Zähler von vorn an."""
+        await self.karte(client)
+
+        spaeter = (
+            await client.get(
+                "/staffelpilot/karten", params={"pass_nr": "12345678", "seit": "2026-09-06"}
+            )
+        ).json()
+
+        assert spaeter == []
+
+    async def test_ein_zweiter_lauf_verdoppelt_nichts(self, client: AsyncClient) -> None:
+        """Sonst zählte § 58 nach dem dritten Lauf die dreifache Zahl."""
+        staffel_id = await self.karte(client)
+        await client.post(
+            "/staffelpilot/import",
+            json={
+                "staffel_id": staffel_id,
+                "spiele": [
+                    {
+                        "dfbnet_id": "M-1",
+                        "datum": "2026-09-05",
+                        "heim": "SV Loschwitz",
+                        "gast": "SG Gittersee",
+                        "wettbewerb": "Meisterschaft",
+                        "karten": [
+                            {"person": "Müller, Max", "pass_nr": "12345678", "art": "Gelbe Karte"}
+                        ],
+                    }
+                ],
+            },
+        )
+
+        gefunden = (await client.get("/staffelpilot/karten", params={"pass_nr": "12345678"})).json()
+
+        assert len(gefunden) == 1
+
+    async def test_die_karten_gehen_mit_der_staffel(self, client: AsyncClient) -> None:
+        """Wer eine Staffel löscht, löscht die Arbeit einer Saison — und die
+        Karten sind ein Teil davon."""
+        staffel_id = await self.karte(client)
+
+        await client.delete(f"/staffelpilot/staffeln/{staffel_id}")
+
+        gefunden = (await client.get("/staffelpilot/karten", params={"pass_nr": "12345678"})).json()
+
+        assert gefunden == []
+
+    async def test_ohne_passnummer_in_der_anfrage_ist_es_ein_fehler(
+        self, client: AsyncClient
+    ) -> None:
+        """Alle Karten aller Personen herauszugeben wäre keine Auskunft,
+        sondern ein Datenleck."""
+        antwort = await client.get("/staffelpilot/karten")
+
+        assert antwort.status_code == 422

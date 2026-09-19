@@ -13,6 +13,7 @@ import logging
 from typing import Any
 
 from . import dienst, katalog, regeln
+from .auskunft import GatewayAuskunft
 from .gateway import Gateway, GatewayFehler
 from .leser import BeispielLeser, Leser
 
@@ -83,27 +84,34 @@ class Prueflauf:
             return [s for s in alle if str(s["id"]) == str(staffel_id)]
         return [s for s in alle if s.get("aktiv")]
 
-    def _befunde_zu(
-        self, zeile: dienst.Spielzeile, staffel: dict[str, Any]
-    ) -> list[dict[str, object]]:
-        """Den Bericht holen und die Regeln darüber laufen lassen.
+    def _pruefung_zu(
+        self,
+        zeile: dienst.Spielzeile,
+        staffel: dict[str, Any],
+        auskunft: GatewayAuskunft | None,
+    ) -> tuple[list[dict[str, object]], list[dict[str, object]], str]:
+        """Den Bericht holen, prüfen — und sagen, was er enthielt.
 
-        Zwei Quellen, und beide laufen: die eingebauten Regeln (Fristen,
-        Bestätigungen, Ordnungsdienst — Verfahren, das niemand anpassen soll)
-        und der Katalog des Staffelleiters (die Spielordnung).
+        Zurück kommen drei Dinge: die Befunde, die **Karten** und der
+        Wettbewerb. Die Karten sind kein Befund; sie sind das Gedächtnis für
+        § 58, und ohne sie meldet die Regel bei jeder gelben Karte, dass sie
+        nicht zählen kann.
 
         Kommt kein Bericht, gibt es **eine Warnung und keine leere Liste**:
         ein Spiel ohne Befunde sieht in der Warteschlange aus wie eines, das
         geprüft und sauber war.
         """
         if isinstance(self._leser, BeispielLeser):
-            return self._leser.befunde_zu(zeile)
+            return self._leser.befunde_zu(zeile), [], "Meisterschaft"
+
         bericht = self._leser.bericht(zeile.dfbnet_id)
         if bericht is None:
-            return regeln.nicht_gelesen("der Prüfdienst hat ihn nicht bekommen")
-        return regeln.befunde_aus(bericht) + katalog.befunde_aus(
-            bericht, katalog.staffelangabe(staffel)
+            return regeln.nicht_gelesen("der Prüfdienst hat ihn nicht bekommen"), [], ""
+
+        befunde = regeln.befunde_aus(bericht) + katalog.befunde_aus(
+            bericht, katalog.staffelangabe(staffel), auskunft=auskunft
         )
+        return befunde, regeln.karten_aus(bericht), bericht.meta.competition
 
     def _anmelden(self, kennung: str) -> None:
         self._gateway.fortschritt(
@@ -128,6 +136,10 @@ class Prueflauf:
             zeile=f"Zeitraum {dienst.als_dfbnet_datum(von)} bis {dienst.als_dfbnet_datum(bis)}",
         )
 
+        # Der Verwarnungszaehler nach Paragraf 58. Einer je Lauf, damit die
+        # Karten einer Person einmal geholt werden und nicht je Spiel neu.
+        auskunft = GatewayAuskunft(self._gateway, regeln.saisonbeginn(bis.strftime("%d.%m.%Y")))
+
         gepruefte = befunde = 0
         nicht_geprueft: list[str] = []
         for i, staffel in enumerate(staffeln):
@@ -149,9 +161,25 @@ class Prueflauf:
                 logger.error("Staffel %s wurde nicht geprueft: %s", name, fehler)
                 continue
 
+            if zeilen:
+                self._gateway.fortschritt(
+                    kennung, zeile=f"{name}: {len(zeilen)} Spielbericht(e) im Zeitraum"
+                )
+
             ausbeute = dienst.Ausbeute()
-            for zeile in zeilen:
-                ausbeute.aufnehmen(zeile, self._befunde_zu(zeile, staffel))
+            for nummer, zeile in enumerate(zeilen):
+                gefunden, karten, wettbewerb = self._pruefung_zu(zeile, staffel, auskunft)
+                ausbeute.aufnehmen(zeile, gefunden, karten, wettbewerb)
+                # Je Bericht eine Meldung: ein Lauf ueber achtzig Berichte
+                # dauert eine Viertelstunde, und ein Balken, der dabei steht,
+                # sieht aus wie ein Dienst, der haengt.
+                self._gateway.fortschritt(
+                    kennung,
+                    fortschritt=dienst.fortschritt_im_schritt(
+                        i, len(staffeln), nummer + 1, len(zeilen)
+                    ),
+                    zeile=(f"{nummer + 1}/{len(zeilen)} gelesen: {zeile.heim} gegen {zeile.gast}"),
+                )
 
             if ausbeute.uebersprungen:
                 self._gateway.fortschritt(

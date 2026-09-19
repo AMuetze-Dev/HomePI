@@ -89,6 +89,20 @@ class Gateway:
     def einstellungen(self) -> dict[str, Any]:
         return self._json("GET", "/staffelpilot/einstellungen")  # type: ignore[no-any-return]
 
+    def karten(self, pass_nr: str, seit: object = None) -> list[dict[str, Any]]:
+        """Die Karten einer Person. Der Speicher fuer Paragraf 58.
+
+        Ohne Passnummer wird gar nicht gefragt: das Artefakt wuerde 422
+        antworten, und ein Fehler im Protokoll waere hier eine Falschmeldung
+        -- die Person hat schlicht keine Nummer im Bericht.
+        """
+        if not pass_nr:
+            return []
+        werte: dict[str, Any] = {"pass_nr": pass_nr}
+        if seit is not None:
+            werte["seit"] = str(seit)
+        return self._json("GET", "/staffelpilot/karten", params=werte)  # type: ignore[no-any-return]
+
     def zugang(self) -> tuple[str, str]:
         """Die DFBnet-Zugangsdaten. Der einzige Ort, an dem sie herauskommen."""
         daten = self._json("POST", "/staffelpilot/zugang/abholen")

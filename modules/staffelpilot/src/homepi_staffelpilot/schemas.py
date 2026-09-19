@@ -160,6 +160,41 @@ class EntscheidungSetzen(BaseModel):
 # ── Spielbericht ──────────────────────────────────────────────────────────
 
 
+class KarteEingang(BaseModel):
+    """Eine Karte, wie sie ein Prueflauf einreicht.
+
+    Sie wird **nicht umgedeutet**: `art` ist die Schreibweise von DFBnet. Was
+    eine Gelb-Rote Karte auslaest, steht in den Regeln, nicht hier.
+    """
+
+    person: KurzFeld = ""
+    pass_nr: Annotated[str, Field(max_length=40)] = ""
+    art: KurzFeld = ""
+    minute: Annotated[str, Field(max_length=10)] = ""
+    mannschaft: KurzFeld = ""
+
+    @field_validator("person", "pass_nr", "art", "minute", "mannschaft", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
+
+
+class KarteAusgabe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    datum: dt.date
+    wettbewerb: str
+    person: str
+    pass_nr: str
+    art: str
+    minute: str
+    mannschaft: str
+    #: Die Kennung des Spiels. Zwei Karten desselben Spiels gehoeren zusammen:
+    #: nach § 58 (1) c) ist die gelbe Karte eines Spiels mit Gelb-Rot
+    #: "verbraucht" und zaehlt nicht mit.
+    spielbericht_id: uuid.UUID
+
+
 class SpielEingang(BaseModel):
     """Ein geprueftes Spiel, wie es ein Prueflauf einreicht.
 
@@ -173,6 +208,12 @@ class SpielEingang(BaseModel):
     gast: NameFeld
     ergebnis: KurzFeld = ""
     befunde: list[BefundEingang] = Field(default_factory=list)
+    #: Die Karten dieses Spiels. Sie sind keine Befunde, sondern das
+    #: Gedaechtnis fuer § 58: die fuenfte Verwarnung sperrt.
+    karten: list[KarteEingang] = Field(default_factory=list)
+    #: Der Wettbewerb dieses Spiels, wie DFBnet ihn nennt. Pokal und
+    #: Meisterschaft werden nach § 58 (2) getrennt gezaehlt.
+    wettbewerb: KurzFeld = ""
 
     @field_validator("dfbnet_id", "heim", "gast", "ergebnis", mode="before")
     @classmethod

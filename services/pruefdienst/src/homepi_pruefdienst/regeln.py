@@ -26,6 +26,7 @@ entscheidet der Staffelleiter.
 
 from __future__ import annotations
 
+import datetime as _dt
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -33,7 +34,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 
-from .bericht import Confirmation, MatchReport, Player, TeamSquad
+from .bericht import CardEvent, Confirmation, MatchReport, Player, TeamSquad
 
 
 class Severity(Enum):
@@ -115,6 +116,88 @@ def als_befund(verstoss: Violation, mannschaft: str = "") -> dict[str, object]:
         "person": str(einzelheiten.get("player") or einzelheiten.get("person") or "")[:120],
         "mannschaft": (mannschaft or str(einzelheiten.get("team") or ""))[:120],
     }
+
+
+def passnummer_zu(report: MatchReport, karte: CardEvent) -> str:
+    """Die Passnummer zur Karte -- zuerst in der Mannschaft der Karte.
+
+    Erst dort, dann erst in der anderen: sonst bekommt der Trainer der einen
+    Mannschaft die Passnummer eines gleichnamigen Spielers der anderen, und
+    die Verwarnung zaehlt beim Falschen.
+
+    Uebernommen aus `_resolve_pass_number` der alten Anwendung.
+    """
+    if not karte.player:
+        return ""
+    eigene = report.home_squad if karte.team == "home" else report.away_squad
+    andere = report.away_squad if karte.team == "home" else report.home_squad
+    reihenfolge = (
+        (eigene, andere)
+        if karte.team in ("home", "away")
+        else (report.home_squad, report.away_squad)
+    )
+    for squad in reihenfolge:
+        for container in (squad.starting_eleven, squad.bench, squad.not_in_squad):
+            for spieler in container:
+                if spieler.name == karte.player:
+                    return spieler.pass_number or ""
+        # Nur innerhalb der eigenen Mannschaft weitersuchen, wenn die Karte
+        # gar keiner Seite zugeordnet ist.
+        if karte.team in ("home", "away"):
+            return ""
+    return ""
+
+
+def schluessel_zu(report: MatchReport, karte: CardEvent) -> str:
+    """Worauf der Verwarnungszaehler dieser Karte laeuft.
+
+    Die Passnummer, wann immer es eine gibt -- auch wenn die Karte unter
+    "Strafen fuer Trainer" steht. Ein Spielertrainer ist eine Person, und
+    Paragraf 58 zaehlt Personen. Bis zum 06.09.2026 entschied in der alten
+    Anwendung allein das Panel, und die Verwarnung eines Spielertrainers lief
+    unter seinem Namen, waehrend der Zaehler des Spielers bei null blieb.
+
+    Wer keine Passnummer hat -- der uebliche Trainer -- wird ueber den Namen
+    gezaehlt. Das Praefix haelt ihn aus dem Nummernraum heraus.
+    """
+    nummer = passnummer_zu(report, karte)
+    if nummer:
+        return nummer
+    if karte.person_kind == "offizieller" and karte.player:
+        return f"offizieller:{karte.player}"
+    return ""
+
+
+def mannschaft_zu(report: MatchReport, karte: CardEvent) -> str:
+    if karte.team == "home":
+        return report.home_squad.team_name or report.meta.home_team
+    if karte.team == "away":
+        return report.away_squad.team_name or report.meta.away_team
+    return karte.team
+
+
+def karten_aus(report: MatchReport) -> list[dict[str, object]]:
+    """Die Karten eines Berichts, wie das Artefakt sie aufhebt.
+
+    Sie sind keine Befunde. Sie sind das Gedaechtnis fuer Paragraf 58: die
+    fuenfte Verwarnung sperrt, und ohne die vier davor weiss das niemand.
+    """
+    return [
+        {
+            "person": karte.player,
+            "pass_nr": schluessel_zu(report, karte),
+            "art": karte.card_type,
+            "minute": karte.minute,
+            "mannschaft": mannschaft_zu(report, karte),
+        }
+        for karte in report.cards
+    ]
+
+
+def saisonbeginn(match_date: str) -> _dt.date | None:
+    """Der 1. Juli der Saison, zu der dieser Spieltag gehoert."""
+    iso = _season_start_from_match_date(match_date)
+    return _dt.date.fromisoformat(iso) if iso else None
 
 
 def befunde_aus(report: MatchReport) -> list[dict[str, object]]:

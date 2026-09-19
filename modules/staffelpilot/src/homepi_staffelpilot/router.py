@@ -47,6 +47,7 @@ from .schemas import (
     Fortschritt,
     ImportAuftrag,
     ImportErgebnis,
+    KarteAusgabe,
     MannschaftAusgabe,
     MannschaftenSetzen,
     Pause,
@@ -378,6 +379,26 @@ async def alle_befunde(
 
 
 # ── Einstellungen ─────────────────────────────────────────────────────────
+
+
+@router.get("/karten", summary="Karten einer Person")
+async def karten(
+    sitzung: DbSitzung,
+    pass_nr: Annotated[str, Query(min_length=1, max_length=40)],
+    wettbewerb: Annotated[str, Query(max_length=120)] = "",
+    seit: dt.date | None = None,
+) -> list[KarteAusgabe]:
+    """Was in dieser Saison an Karten zusammengekommen ist.
+
+    Gezaehlt wird hier **nicht**: die Schwellen (die fuenfte Verwarnung, im
+    Pokal die zweite) stehen in den Regeldateien des Staffelleiters. Dieses
+    Artefakt gibt heraus, was es weiss, und mischt sich nicht in die
+    Spielordnung ein.
+    """
+    return [
+        KarteAusgabe.model_validate(k)
+        for k in await speicher.karten(sitzung, pass_nr, wettbewerb, seit)
+    ]
 
 
 @router.get("/einstellungen", summary="Einstellungen dieser Installation")

@@ -263,6 +263,20 @@ def fortschritt(erledigt: int, gesamt: int) -> int:
     return max(0, min(99, round(erledigt / gesamt * 100)))
 
 
+def fortschritt_im_schritt(schritt: int, schritte: int, erledigt: int, gesamt: int) -> int:
+    """Wie weit ein Lauf ist, wenn ein Schritt selbst lange dauert.
+
+    Eine Staffel mit achtzig Spielberichten braucht eine Viertelstunde. Ein
+    Balken, der dabei auf demselben Wert steht, sieht aus wie ein Dienst, der
+    haengt -- und das ist die Anzeige, nach der jemand den Lauf abbricht,
+    kurz bevor er fertig ist.
+    """
+    if schritte <= 0:
+        return 0
+    anteil = (erledigt / gesamt) if gesamt > 0 else 0.0
+    return fortschritt(round((schritt + anteil) * 100), schritte * 100)
+
+
 # ── Warten ────────────────────────────────────────────────────────────────
 
 #: Ohne Arbeit wird der Abstand groesser, aber nie groesser als das.
@@ -320,7 +334,13 @@ class Ausbeute:
     uebersprungen: int = 0
     befunde: int = 0
 
-    def aufnehmen(self, zeile: Spielzeile, befunde: list[dict[str, object]] | None = None) -> None:
+    def aufnehmen(
+        self,
+        zeile: Spielzeile,
+        befunde: list[dict[str, object]] | None = None,
+        karten: list[dict[str, object]] | None = None,
+        wettbewerb: str = "",
+    ) -> None:
         if not zeile.brauchbar:
             self.uebersprungen += 1
             return
@@ -332,6 +352,10 @@ class Ausbeute:
                 "heim": zeile.heim,
                 "gast": zeile.gast,
                 "ergebnis": zeile.ergebnis,
+                # Karten sind keine Befunde, sondern das Gedaechtnis fuer
+                # Paragraf 58 -- die fuenfte Verwarnung sperrt.
+                "karten": karten or [],
+                "wettbewerb": wettbewerb,
                 # Leer, solange die Regelprüfung nicht portiert ist. Das ist
                 # die ehrliche Aussage: der Bericht ist da, geprüft ist er
                 # nicht. Der Beispiel-Leser füllt es, damit sich die

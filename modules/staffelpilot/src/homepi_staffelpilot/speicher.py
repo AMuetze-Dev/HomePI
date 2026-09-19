@@ -28,6 +28,7 @@ from .modelle import (
     Auftrag,
     Befund,
     Einstellung,
+    Karte,
     Mannschaft,
     Regel,
     Spielbericht,
@@ -220,11 +221,55 @@ async def einspielen(sitzung: AsyncSession, auftrag: ImportAuftrag) -> tuple[int
                 )
             )
             befunde_gesamt += 1
+
+        # Die Karten desselben Spiels ebenso: ein Prueflauf ist die
+        # vollstaendige Aussage ueber einen Bericht. Wuerden sie sich
+        # anhaeufen, zaehlte § 58 nach dem dritten Lauf die dreifache Zahl.
+        await sitzung.execute(delete(Karte).where(Karte.spielbericht_id == bericht.id))
+        for k in eingang.karten:
+            sitzung.add(
+                Karte(
+                    staffel_id=auftrag.staffel_id,
+                    spielbericht_id=bericht.id,
+                    datum=eingang.datum,
+                    wettbewerb=eingang.wettbewerb,
+                    person=k.person,
+                    pass_nr=k.pass_nr,
+                    art=k.art,
+                    minute=k.minute,
+                    mannschaft=k.mannschaft,
+                )
+            )
         await sitzung.flush()
         # Die Beziehung haelt sonst den Stand von vor dem Loeschen.
         await sitzung.refresh(bericht, ["befunde"])
 
     return angelegt, aktualisiert, befunde_gesamt
+
+
+async def karten(
+    sitzung: AsyncSession,
+    pass_nr: str,
+    wettbewerb: str = "",
+    seit: dt.date | None = None,
+) -> list[Karte]:
+    """Die Karten einer Person, aelteste zuerst.
+
+    Nach Passnummer und nicht nach Namen: dieselbe Person heisst im
+    Spielbericht mal "Mueller, Max" und mal "Müller, Max", und zwei Vereine
+    haben zwei Maxe.
+
+    `wettbewerb` und `seit` schraenken ein, weil § 58 (2) beides verlangt:
+    Pokal und Meisterschaft getrennt, und nach einer verwirkten Sperre faengt
+    der Zaehler von vorn an.
+    """
+    anfrage = select(Karte).where(Karte.pass_nr == pass_nr)
+    if wettbewerb:
+        anfrage = anfrage.where(Karte.wettbewerb == wettbewerb)
+    if seit is not None:
+        anfrage = anfrage.where(Karte.datum >= seit)
+    anfrage = anfrage.order_by(Karte.datum, Karte.minute)
+    return list((await sitzung.execute(anfrage)).scalars().all())
 
 
 async def entscheidung_setzen(

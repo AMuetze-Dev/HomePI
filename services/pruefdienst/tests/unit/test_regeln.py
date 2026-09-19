@@ -14,12 +14,14 @@ nachgerechnet, nicht mit der Uhr des Rechners.
 
 from __future__ import annotations
 
+from datetime import date as _datum
 from datetime import datetime, timedelta
 
 import pytest
 
 from homepi_pruefdienst import regeln
 from homepi_pruefdienst.bericht import (
+    CardEvent,
     Confirmation,
     MatchMeta,
     MatchReport,
@@ -747,3 +749,107 @@ class TestKleinkram:
 
     def test_ohne_spieltag_keine_saison(self) -> None:
         assert regeln._season_start_from_match_date("irgendwann") is None
+
+
+class TestKartenFuerDasArtefakt:
+    """Auf welche Person der Verwarnungszähler läuft.
+
+    § 58 zählt Personen. Die Karte selbst nennt nur einen Namen — die
+    Passnummer steht in der Aufstellung, und sie ist der einzige Schlüssel,
+    der über Vereine und Mannschaften hinweg trägt.
+    """
+
+    def spielbericht(self) -> MatchReport:
+        return bericht(
+            home_squad=elf(
+                "Post SV Dresden 2",
+                starting_eleven=[
+                    Player(name="Müller, Max", pass_number="1111"),
+                    Player(name="Färber, Jens", pass_number="2222"),
+                ],
+            ),
+            away_squad=elf(
+                "SV Fortuna Dresden-Rähnitz",
+                starting_eleven=[Player(name="Müller, Max", pass_number="9999")],
+            ),
+        )
+
+    def test_die_passnummer_aus_der_eigenen_mannschaft(self) -> None:
+        """Sonst bekommt der eine Müller die Nummer des anderen, und die
+        Verwarnung zählt beim Falschen."""
+        karte = CardEvent(player="Müller, Max", team="home", card_type="Gelbe Karte")
+
+        assert regeln.passnummer_zu(self.spielbericht(), karte) == "1111"
+
+    def test_und_beim_gast_die_seine(self) -> None:
+        karte = CardEvent(player="Müller, Max", team="away", card_type="Gelbe Karte")
+
+        assert regeln.passnummer_zu(self.spielbericht(), karte) == "9999"
+
+    def test_ohne_seite_wird_in_beiden_gesucht(self) -> None:
+        karte = CardEvent(player="Färber, Jens", team="", card_type="Gelbe Karte")
+
+        assert regeln.passnummer_zu(self.spielbericht(), karte) == "2222"
+
+    def test_wer_nicht_in_der_aufstellung_steht_hat_keine(self) -> None:
+        karte = CardEvent(player="Fremder, Fritz", team="home", card_type="Gelbe Karte")
+
+        assert regeln.passnummer_zu(self.spielbericht(), karte) == ""
+
+    def test_ein_trainer_wird_ueber_den_namen_gezaehlt(self) -> None:
+        """Das Präfix hält ihn aus dem Nummernraum heraus."""
+        karte = CardEvent(
+            player="Kern, Ute", team="home", card_type="Rote Karte", person_kind="offizieller"
+        )
+
+        assert regeln.schluessel_zu(self.spielbericht(), karte) == "offizieller:Kern, Ute"
+
+    def test_ein_spielertrainer_zaehlt_unter_seiner_passnummer(self) -> None:
+        """Bis zum 06.09.2026 entschied allein das Panel: seine Verwarnung
+        lief unter dem Namen, während der Zähler des Spielers bei null blieb.
+        Die fünfte Verwarnung wäre nie gekommen."""
+        karte = CardEvent(
+            player="Färber, Jens",
+            team="home",
+            card_type="Gelbe Karte",
+            person_kind="offizieller",
+        )
+
+        assert regeln.schluessel_zu(self.spielbericht(), karte) == "2222"
+
+    def test_eine_karte_ohne_namen_gehoert_niemandem(self) -> None:
+        karte = CardEvent(player="", team="home", card_type="Gelbe Karte")
+
+        assert regeln.schluessel_zu(self.spielbericht(), karte) == ""
+
+    def test_die_karten_kommen_fertig_fuer_das_artefakt(self) -> None:
+        b = self.spielbericht()
+        b.cards = [
+            CardEvent(player="Müller, Max", team="home", card_type="Gelbe Karte", minute="42")
+        ]
+
+        karten = regeln.karten_aus(b)
+
+        assert karten == [
+            {
+                "person": "Müller, Max",
+                "pass_nr": "1111",
+                "art": "Gelbe Karte",
+                "minute": "42",
+                "mannschaft": "Post SV Dresden 2",
+            }
+        ]
+
+    def test_ohne_karten_kommt_nichts(self) -> None:
+        assert regeln.karten_aus(bericht()) == []
+
+
+class TestSaisonbeginn:
+    def test_vor_juli_gehoert_der_spieltag_zur_vorigen_saison(self) -> None:
+        assert regeln.saisonbeginn("13.06.2026") == _datum(2025, 7, 1)
+
+    def test_ab_juli_zur_neuen(self) -> None:
+        assert regeln.saisonbeginn("13.08.2026") == _datum(2026, 7, 1)
+
+    def test_ohne_spieltag_gibt_es_keinen(self) -> None:
+        assert regeln.saisonbeginn("irgendwann") is None

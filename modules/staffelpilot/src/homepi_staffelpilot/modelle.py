@@ -68,6 +68,52 @@ class Spielbericht(Base, ZeitstempelMixin):
     befunde: Mapped[list[Befund]] = relationship(
         back_populates="spiel", cascade="all, delete-orphan", lazy="selectin"
     )
+    # Ohne `back_populates`: eine Karte zeigt auf ihr Spiel ueber die
+    # Fremdschluesselspalte und braucht keinen Rueckweg. Mit `delete-orphan`,
+    # damit ein erneuter Import die Karten desselben Spiels ersetzt statt sie
+    # zu verdoppeln.
+    karten: Mapped[list[Karte]] = relationship(cascade="all, delete-orphan")
+
+
+class Karte(Base, ZeitstempelMixin):
+    """Eine Karte aus einem Spielbericht.
+
+    Gespeichert, obwohl sie kein Befund ist: § 58 SpO rechnet ueber die
+    Saison -- die fuenfte Verwarnung sperrt, und nach jeder Sperre faengt der
+    Zaehler von vorn an. Nichts davon steht im einzelnen Spielbericht.
+
+    Ohne diese Tabelle meldet die Regel "Verwarnungszaehler nicht verfuegbar"
+    -- einmal je Karte. Am ersten echten Lauf waren das 78 von 108 Befunden,
+    und die Warteschlange war nicht mehr zu lesen.
+    """
+
+    __tablename__ = "staffelpilot_karten"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    staffel_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("staffelpilot_staffeln.id", ondelete="CASCADE"), index=True
+    )
+    spielbericht_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("staffelpilot_spielberichte.id", ondelete="CASCADE"),
+        index=True,
+    )
+    #: Der Spieltag. Danach wird gezaehlt: "seit der letzten Sperre".
+    datum: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    #: Der Wettbewerb, wie DFBnet ihn nennt. Pokal und Meisterschaft werden
+    #: nach § 58 (2) **getrennt** gezaehlt -- deshalb steht er an der Karte
+    #: und nicht nur am Spiel.
+    wettbewerb: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    person: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    #: Die Passnummer ist der Schluessel ueber Vereine und Mannschaften
+    #: hinweg. Fehlt sie, laesst sich nichts zaehlen -- dann sagt die Regel
+    #: das auch.
+    pass_nr: Mapped[str] = mapped_column(String(40), nullable=False, default="", index=True)
+    #: "Gelbe Karte", "Gelb-Rote Karte", "Rote Karte" -- die Schreibweise von
+    #: DFBnet, nicht umgedeutet.
+    art: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    minute: Mapped[str] = mapped_column(String(10), nullable=False, default="")
+    mannschaft: Mapped[str] = mapped_column(String(120), nullable=False, default="")
 
 
 class Befund(Base, ZeitstempelMixin):
