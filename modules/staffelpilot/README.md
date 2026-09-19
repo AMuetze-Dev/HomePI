@@ -123,7 +123,8 @@ eigenen Dienst - im gemeinsamen Gateway-Prozess wuerde sie jedes andere
 Artefakt blockieren, und die synchrone Playwright-API laesst sich aus einer
 laufenden Event-Loop ohnehin nicht aufrufen.
 
-Die Nahtstellen stehen dafuer bereit. Der Dienst
+**Er ist gebaut**: `services/pruefdienst` (eigener Container, eigene README).
+Was er schon tut und was ihm noch fehlt, steht dort. Der Dienst
 
 1. holt sich die Zugangsdaten (`POST /zugang/abholen`),
 2. nimmt den offenen Auftrag (`GET /auftraege/offen`),

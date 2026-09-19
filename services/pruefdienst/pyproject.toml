@@ -1,0 +1,66 @@
+[project]
+name = "homepi-pruefdienst"
+version = "0.1.0"
+description = "HomePI-Pruefdienst: liest DFBnet und spielt in das Artefakt staffelpilot ein"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28",
+    "playwright>=1.49",
+]
+
+[tool.homepi]
+service = "pruefdienst"
+stack = "apps"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/homepi_pruefdienst"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "ruff>=0.9",
+    "mypy>=1.14",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q --strict-markers --strict-config"
+
+# Die Schwelle steht beim Projekt, nicht in der CI - so gilt sie auch lokal.
+[tool.coverage.report]
+fail_under = 90
+
+[tool.coverage.run]
+source = ["homepi_pruefdienst"]
+branch = true
+# Ausgenommen, was nur mit einem echten Browser beziehungsweise einem echten
+# Prozess laeuft. Beides ist von hier aus nicht pruefbar, und eine Zahl, die
+# so tut, waere schlimmer als die ehrliche Luecke.
+omit = ["*/dfbnet.py", "*/__main__.py"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+packages = ["homepi_pruefdienst"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false

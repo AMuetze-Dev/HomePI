@@ -38,6 +38,37 @@ services:
       timeout: 5s
       retries: 20
 
+  # Liest DFBnet und spielt in das Artefakt staffelpilot ein. Eigener
+  # Container, weil er minutenlang einen echten Browser faehrt.
+  #
+  # Voreingestellt ist der Demo-Leser: er klopft nirgends an. Wer wirklich
+  # nach DFBnet will, setzt PRUEFDIENST_LESER=dfbnet - und traegt vorher in
+  # der Oberflaeche unter "DFBnet-Zugang" Zugangsdaten ein.
+  pruefdienst:
+    build:
+      context: .
+      dockerfile: services/pruefdienst/Dockerfile
+    container_name: ${DEV_PROJEKT:-homepi-dev}-pruefdienst
+    restart: unless-stopped
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      LOG_LEVEL: info
+      HOMEPI_URL: http://gateway:8000
+      # Ein eigenes Konto mit der Rolle "verwalter" fuer staffelpilot. Anlegen:
+      #   make dev-testkonto N=pruefdienst
+      PRUEFDIENST_BENUTZER: ${PRUEFDIENST_BENUTZER:-pruefdienst}
+      PRUEFDIENST_PASSWORT: ${PRUEFDIENST_PASSWORT:-}
+      PRUEFDIENST_LESER: ${PRUEFDIENST_LESER:-demo}
+      # Zweiter Schalter fuer das Eintragen in DFBnet. Der erste steht in der
+      # Oberflaeche. Beide muessen an sein.
+      PRUEFDIENST_DARF_SCHREIBEN: ${PRUEFDIENST_DARF_SCHREIBEN:-0}
+    volumes:
+      - ./services/pruefdienst/src:/app/services/pruefdienst/src
+    profiles: ["pruefdienst"]
+
   gateway:
     build:
       context: .

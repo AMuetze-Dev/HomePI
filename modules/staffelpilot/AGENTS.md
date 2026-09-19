@@ -24,7 +24,8 @@ Offen, in der Reihenfolge, in der es sich lohnt:
 
 | | |
 |---|---|
-| **DFBnet-Pruefdienst** | eigener Container mit Playwright. Er nimmt den offenen Auftrag, meldet Fortschritt, spielt ein und arbeitet die Uebertragungen ab. Alle Nahtstellen stehen (siehe README); das ist das letzte grosse Stueck -- ohne ihn kommen keine echten Daten herein |
+| **Regelpruefung im Pruefdienst** | der Dienst steht (`services/pruefdienst`) und holt Spiele herein -- aber mit `befunde: []`. Die 31 Regeln liegen fertig in `D:/DevLibrary/StaffelPilot/src/rules/` und werden uebernommen, nicht neu geschrieben |
+| **DFBnet-Automation vervollstaendigen** | Meldung einer Staffel holen (Initialisierung) und das Eintragen (Prueferfreigabe, Fallanlage). Vorlagen: `src/automation/staffel_initialisierung.py`, `freigabe.py`, `fallanlage.py` |
 | **Mahnung als PDF** | der Vordruck des Verbandes. Text und Felder stehen, das Formular fehlt. Vorlage: `D:/DevLibrary/StaffelPilot/src/core/mahnung.py` |
 | **Migrationen** | `homepi schema` legt nur an. Eine neue Spalte in einer bestehenden Tabelle haelt das Gateway auf `unhealthy` an |
 
