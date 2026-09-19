@@ -61,6 +61,11 @@ services:
       DB_SCHEMA_ANLEGEN: "true"
       # Leer: der Browser spricht nur mit dem Vite-Server, der proxyt.
       CORS_ORIGINS: ""
+      # Verschluesselt die DFBnet-Zugangsdaten des Artefakts staffelpilot.
+      # Hier fest, damit die Entwicklungsumgebung ohne .env laeuft; in
+      # Produktion gehoert er in ein Secret. Fehlt er, weigert sich das
+      # Artefakt, ein Passwort abzulegen - und sagt das.
+      STAFFELPILOT_SCHLUESSEL: ${STAFFELPILOT_SCHLUESSEL:-1WuoSsS9q2oVVI5snLycfEnX63URJyb38kZJNo6vQ04=}
       # Leer = alle Artefakte. Zum Arbeiten an einem einzelnen:
       #   make dev N=geraete
       HOMEPI_MODULE: ${HOMEPI_MODULE:-}

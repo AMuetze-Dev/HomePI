@@ -261,6 +261,7 @@ class EinstellungenAusgabe(BaseModel):
     absender: str
     pruefzeitraum_tage: int
     frist_tage: int
+    uebertragung_pausiert: bool
 
 
 class EinstellungenSetzen(BaseModel):
@@ -276,6 +277,7 @@ class EinstellungenSetzen(BaseModel):
     absender: Annotated[str, Field(max_length=200)] | None = None
     pruefzeitraum_tage: Annotated[int, Field(ge=1, le=365)] | None = None
     frist_tage: Annotated[int, Field(ge=1, le=90)] | None = None
+    uebertragung_pausiert: bool | None = None
 
     @field_validator("staffelleiter", "verband", "absender", mode="before")
     @classmethod
@@ -573,3 +575,111 @@ class Abschluss(BaseModel):
     @classmethod
     def _trimmen(cls, wert: object) -> object:
         return _getrimmt(wert)
+
+
+# ── Übertragung nach DFBnet ───────────────────────────────────────────────
+
+#: Was in DFBnet einzutragen wäre. `prueferfreigabe` gibt einen geprüften
+#: Bericht frei, `fallanlage` legt einen Sportgerichtsfall an.
+#:
+#: **Kein Mailversand.** Die alte Software kannte dafür einen fünften
+#: Auftragstyp; hier gibt es ihn nicht. Schreiben werden vorbereitet und von
+#: einem Menschen abgeschickt — siehe `Vorgang`.
+UebertragungAktion = Literal["prueferfreigabe", "fallanlage"]
+
+UebertragungZustand = Literal["offen", "laeuft", "fertig", "fehler"]
+
+
+class UebertragungEinreihen(BaseModel):
+    """Idempotent über `(aktion, referenz)`.
+
+    Abhaken, Haken entfernen und wieder abhaken darf keine zwei Freigaben
+    erzeugen. Eine gescheiterte Zeile wird dabei zurückgesetzt — das zweite
+    Abhaken ist der Staffelleiter, der es noch einmal versucht.
+    """
+
+    aktion: UebertragungAktion
+    referenz: NameFeld
+    spiel_id: uuid.UUID | None = None
+
+    @field_validator("referenz", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
+
+
+class UebertragungAusgabe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    aktion: UebertragungAktion
+    referenz: str
+    spiel_id: uuid.UUID | None
+    zustand: UebertragungZustand
+    versuche: int
+    letzter_fehler: str
+    erledigt_am: dt.datetime | None
+    angelegt: dt.datetime
+
+
+class UebertragungStand(BaseModel):
+    """Was die Warteschlange tut — für den Streifen über der Liste."""
+
+    pausiert: bool
+    offen: int
+    laeuft: int
+    fertig: int
+    fehler: int
+    #: Nur die gescheiterten, ausgeschrieben. Sie sind das Einzige, wozu
+    #: jemand etwas tun muss.
+    fehlerhafte: list[UebertragungAusgabe]
+
+
+class UebertragungAbschluss(BaseModel):
+    zustand: Literal["fertig", "fehler"]
+    meldung: Annotated[str, Field(max_length=1000)] = ""
+
+    @field_validator("meldung", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
+
+
+class Pause(BaseModel):
+    pausiert: bool
+
+
+# ── DFBnet-Zugang ─────────────────────────────────────────────────────────
+
+
+class ZugangSetzen(BaseModel):
+    """Was der Staffelleiter einträgt. Das Passwort kommt nie zurück."""
+
+    benutzer: NameFeld
+    passwort: Annotated[str, Field(min_length=1, max_length=200)]
+
+    @field_validator("benutzer", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
+
+
+class ZugangStand(BaseModel):
+    """Ob etwas hinterlegt ist, und für wen — mehr verrät diese Antwort nicht."""
+
+    gespeichert: bool
+    benutzer: str
+    #: Ob ein Schlüssel in der Umgebung steht. Ohne ihn lässt sich nichts
+    #: ablegen, und das soll die Oberfläche sagen können, bevor jemand tippt.
+    schluessel_vorhanden: bool
+
+
+class ZugangGeheim(BaseModel):
+    """Die Antwort für den Prüfdienst — und nur für ihn.
+
+    Der einzige Ort, an dem das Passwort wieder herauskommt. Der Endpunkt
+    dazu verlangt die Rolle `verwalter`.
+    """
+
+    benutzer: str
+    passwort: str

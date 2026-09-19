@@ -240,3 +240,62 @@ class Auftrag(Base, ZeitstempelMixin):
     protokoll: Mapped[list[dict[str, str]]] = mapped_column(JSONB, nullable=False, default=list)
     gestartet_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     beendet_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class Uebertragung(Base, ZeitstempelMixin):
+    """Was nach DFBnet hinaus soll - eine Zeile je Vorgang.
+
+    Getrennt von :class:`Auftrag`, weil es eine andere Sache ist: ein Auftrag
+    ist ein langer Lauf mit Fortschritt, eine Uebertragung ist ein kurzer
+    Handgriff, der klappt oder scheitert und dann wiederholt wird.
+
+    **Hier wird nichts uebertragen.** Die Zeile sagt nur, was zu tun waere.
+    Getan wird es vom DFBnet-Dienst, und der laeuft nur, wenn die Uebertragung
+    nicht pausiert ist -- und auf einer frischen Installation ist sie das.
+    """
+
+    __tablename__ = "staffelpilot_uebertragungen"
+    # Idempotent ueber den natuerlichen Schluessel: abhaken, Haken entfernen
+    # und wieder abhaken darf keine zwei Freigaben erzeugen.
+    __table_args__ = (UniqueConstraint("aktion", "referenz", name="uq_uebertragung"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    aktion: Mapped[str] = mapped_column(String(30), nullable=False)
+    #: Worauf sie sich bezieht - die Kennung des Spielberichts oder des
+    #: Vorgangs, als Text. Zwei Vorgaenge an einem Bericht sind zwei Zeilen.
+    referenz: Mapped[str] = mapped_column(String(120), nullable=False)
+    spiel_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("staffelpilot_spielberichte.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    zustand: Mapped[str] = mapped_column(String(20), nullable=False, default="offen", index=True)
+    versuche: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    letzter_fehler: Mapped[str] = mapped_column(String(1000), nullable=False, default="")
+    erledigt_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class Zugang(Base, ZeitstempelMixin):
+    """Die Anmeldedaten fuer DFBnet.
+
+    Der Benutzername steht im Klartext -- er steht ohnehin in jedem Protokoll
+    des Pruefdienstes. Das Passwort liegt **verschluesselt**, mit einem
+    Schluessel, der nicht in der Datenbank steht, sondern in der Umgebung
+    (``STAFFELPILOT_SCHLUESSEL``). Ein Datenbankabzug allein ist damit
+    wertlos.
+
+    Der Preis dafuer steht in der README: wer den Schluessel verliert, muss
+    die Zugangsdaten neu eintragen. Das ist der richtige Preis -- die
+    Alternative waere ein Passwort, das jeder lesen kann, der einmal an eine
+    Sicherung kommt.
+    """
+
+    __tablename__ = "staffelpilot_zugang"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    #: Es gibt genau einen DFBnet-Zugang je Installation.
+    dienst: Mapped[str] = mapped_column(String(30), nullable=False, unique=True, default="dfbnet")
+    benutzer: Mapped[str] = mapped_column(String(120), nullable=False)
+    #: Der Fernet-Token. Nie im Klartext, nie in einer Antwort.
+    geheimnis: Mapped[str] = mapped_column(Text, nullable=False)

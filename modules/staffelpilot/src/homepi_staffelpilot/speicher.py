@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
 import uuid
 
 from sqlalchemy import delete, func, select
@@ -14,10 +15,12 @@ from . import dienst
 from .dienst import (
     AuftragUnbekannt,
     BefundUnbekannt,
+    KeinZugang,
     RegelUnbekannt,
     SpielUnbekannt,
     StaffelUnbekannt,
     StaffelVergeben,
+    UebertragungUnbekannt,
     VorgangUnbekannt,
     VorgangVergeben,
 )
@@ -29,7 +32,9 @@ from .modelle import (
     Regel,
     Spielbericht,
     Staffel,
+    Uebertragung,
     Vorgang,
+    Zugang,
 )
 from .schemas import (
     Abschluss,
@@ -40,7 +45,10 @@ from .schemas import (
     RegelEingang,
     StaffelAendern,
     StaffelAnlegen,
+    UebertragungAbschluss,
+    UebertragungEinreihen,
     VorgangAnlegen,
+    ZugangSetzen,
 )
 
 # ── Staffeln ──────────────────────────────────────────────────────────────
@@ -635,3 +643,140 @@ async def auftrag_abschliessen(
         gefunden.fortschritt = 100
     await sitzung.flush()
     return gefunden
+
+
+# ── Uebertragung nach DFBnet ──────────────────────────────────────────────
+
+
+async def uebertragungen(sitzung: AsyncSession) -> list[Uebertragung]:
+    ergebnis = await sitzung.execute(select(Uebertragung).order_by(Uebertragung.angelegt.desc()))
+    return list(ergebnis.scalars())
+
+
+async def uebertragung(sitzung: AsyncSession, uebertragung_id: uuid.UUID) -> Uebertragung:
+    gefunden = await sitzung.get(Uebertragung, uebertragung_id)
+    if gefunden is None:
+        raise UebertragungUnbekannt(f"Es gibt keine Uebertragung mit der Kennung {uebertragung_id}")
+    return gefunden
+
+
+async def uebertragung_stand(sitzung: AsyncSession) -> dict[str, int]:
+    """Die Zahlen je Zustand, in einer Abfrage."""
+    ergebnis = await sitzung.execute(
+        select(Uebertragung.zustand, func.count()).group_by(Uebertragung.zustand)
+    )
+    gezaehlt = {zustand: int(anzahl) for zustand, anzahl in ergebnis.all()}
+    return {z: gezaehlt.get(z, 0) for z in ("offen", "laeuft", "fertig", "fehler")}
+
+
+async def uebertragung_einreihen(
+    sitzung: AsyncSession, daten: UebertragungEinreihen
+) -> Uebertragung:
+    """Idempotent ueber (aktion, referenz).
+
+    Eine gescheiterte Zeile wird dabei zurueckgesetzt: das zweite Abhaken ist
+    der Staffelleiter, der es noch einmal versucht.
+    """
+    ergebnis = await sitzung.execute(
+        select(Uebertragung).where(
+            Uebertragung.aktion == daten.aktion, Uebertragung.referenz == daten.referenz
+        )
+    )
+    vorhanden = ergebnis.scalar_one_or_none()
+    if vorhanden is not None:
+        if vorhanden.zustand == "fehler":
+            vorhanden.zustand = "offen"
+            vorhanden.letzter_fehler = ""
+        await sitzung.flush()
+        return vorhanden
+
+    neue = Uebertragung(aktion=daten.aktion, referenz=daten.referenz, spiel_id=daten.spiel_id)
+    sitzung.add(neue)
+    await sitzung.flush()
+    await sitzung.refresh(neue)
+    return neue
+
+
+async def uebertragung_wiederholen(sitzung: AsyncSession, uebertragung_id: uuid.UUID | None) -> int:
+    """Gescheitertes zurueck in die Schlange. Gibt zurueck, wie viele.
+
+    Ohne Kennung alle -- nach einem Netzausfall stehen dort zwanzig Zeilen mit
+    demselben Fehler, und die einzeln anzuklicken ist keine Arbeit, sondern
+    eine Strafe.
+    """
+    if uebertragung_id is not None:
+        gefunden = await uebertragung(sitzung, uebertragung_id)
+        dienst.darf_wiederholt_werden(gefunden.zustand)
+        gefunden.zustand = "offen"
+        gefunden.letzter_fehler = ""
+        await sitzung.flush()
+        return 1
+
+    ergebnis = await sitzung.execute(select(Uebertragung).where(Uebertragung.zustand == "fehler"))
+    betroffen = list(ergebnis.scalars())
+    for zeile in betroffen:
+        zeile.zustand = "offen"
+        zeile.letzter_fehler = ""
+    await sitzung.flush()
+    return len(betroffen)
+
+
+async def uebertragung_abschliessen(
+    sitzung: AsyncSession, uebertragung_id: uuid.UUID, daten: UebertragungAbschluss
+) -> Uebertragung:
+    gefunden = await uebertragung(sitzung, uebertragung_id)
+    gefunden.zustand = dienst.uebertragung_weiter(gefunden.zustand, daten.zustand)
+    gefunden.versuche += 1
+    gefunden.letzter_fehler = daten.meldung if daten.zustand == "fehler" else ""
+    gefunden.erledigt_am = dt.datetime.now(dt.UTC) if daten.zustand == "fertig" else None
+    await sitzung.flush()
+    return gefunden
+
+
+# ── DFBnet-Zugang ─────────────────────────────────────────────────────────
+
+#: Es gibt genau einen je Installation.
+DIENST = "dfbnet"
+
+
+async def _zugang(sitzung: AsyncSession) -> Zugang | None:
+    ergebnis = await sitzung.execute(select(Zugang).where(Zugang.dienst == DIENST))
+    return ergebnis.scalar_one_or_none()
+
+
+def schluessel_vorhanden() -> bool:
+    return bool(os.environ.get(dienst.SCHLUESSEL_VARIABLE, "").strip())
+
+
+async def zugang_stand(sitzung: AsyncSession) -> tuple[bool, str]:
+    """Ob etwas hinterlegt ist und fuer wen. Nie das Passwort."""
+    gefunden = await _zugang(sitzung)
+    return (gefunden is not None, gefunden.benutzer if gefunden else "")
+
+
+async def zugang_setzen(sitzung: AsyncSession, daten: ZugangSetzen) -> None:
+    schluessel = dienst.schluessel_aus(os.environ)
+    token = dienst.verschluesseln(daten.passwort, schluessel)
+    gefunden = await _zugang(sitzung)
+    if gefunden is None:
+        sitzung.add(Zugang(dienst=DIENST, benutzer=daten.benutzer, geheimnis=token))
+    else:
+        gefunden.benutzer = daten.benutzer
+        gefunden.geheimnis = token
+    await sitzung.flush()
+
+
+async def zugang_loeschen(sitzung: AsyncSession) -> None:
+    gefunden = await _zugang(sitzung)
+    if gefunden is not None:
+        await sitzung.delete(gefunden)
+        await sitzung.flush()
+
+
+async def zugang_abholen(sitzung: AsyncSession) -> tuple[str, str]:
+    """Der einzige Ort, an dem das Passwort wieder herauskommt."""
+    gefunden = await _zugang(sitzung)
+    if gefunden is None:
+        raise KeinZugang("Es ist kein DFBnet-Zugang hinterlegt")
+    schluessel = dienst.schluessel_aus(os.environ)
+    return gefunden.benutzer, dienst.entschluesseln(gefunden.geheimnis, schluessel)

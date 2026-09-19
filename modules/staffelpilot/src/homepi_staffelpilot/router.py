@@ -13,7 +13,8 @@ import uuid
 from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
+from homepi_core.auth import Rolle, erfordert
 from homepi_core.deps import DbSitzung
 
 from . import speicher
@@ -46,6 +47,7 @@ from .schemas import (
     ImportErgebnis,
     MannschaftAusgabe,
     MannschaftenSetzen,
+    Pause,
     RegelAusgabe,
     RegelkatalogSetzen,
     RegelUmschalten,
@@ -54,10 +56,17 @@ from .schemas import (
     StaffelAendern,
     StaffelAnlegen,
     StaffelAusgabe,
+    UebertragungAbschluss,
+    UebertragungAusgabe,
+    UebertragungEinreihen,
+    UebertragungStand,
     VorgangAendern,
     VorgangAnlegen,
     VorgangAusgabe,
     VorgangZeile,
+    ZugangGeheim,
+    ZugangSetzen,
+    ZugangStand,
     Zusammenfassung,
     ZustandSetzen,
 )
@@ -247,6 +256,13 @@ async def abhaken(spiel_id: uuid.UUID, sitzung: DbSitzung) -> SpielAusgabe:
         )
 
     await speicher.haken_setzen(sitzung, spiel_id, True)
+    # Ein abgehakter Bericht ist in DFBnet freizugeben. Vorgemerkt, nicht
+    # getan: eingetragen wird es vom DFBnet-Dienst, und der arbeitet nur, wenn
+    # die Uebertragung nicht pausiert ist.
+    await speicher.uebertragung_einreihen(
+        sitzung,
+        UebertragungEinreihen(aktion="prueferfreigabe", referenz=str(spiel_id), spiel_id=spiel_id),
+    )
     return await spiel(spiel_id, sitzung)
 
 
@@ -527,3 +543,144 @@ async def auftrag_abschliessen(
     return AuftragAusgabe.model_validate(
         await speicher.auftrag_abschliessen(sitzung, auftrag_id, daten)
     )
+
+
+# ── Übertragung nach DFBnet ───────────────────────────────────────────────
+#
+# **Hier wird nichts übertragen.** Diese Endpunkte führen eine Liste dessen,
+# was in DFBnet einzutragen wäre. Eintragen würde es der DFBnet-Dienst — und
+# der arbeitet nur, wenn die Übertragung nicht pausiert ist. Auf einer
+# frischen Installation ist sie das: eine Freigabe in DFBnet ist eine Handlung
+# nach außen, und die soll nicht passieren, weil jemand die Software zum
+# ersten Mal gestartet hat.
+
+
+@router.get("/uebertragungen", summary="Was nach DFBnet hinaus soll")
+async def uebertragungen(sitzung: DbSitzung) -> UebertragungStand:
+    werte = await speicher.einstellungen(sitzung)
+    zahlen = await speicher.uebertragung_stand(sitzung)
+    alle = await speicher.uebertragungen(sitzung)
+    return UebertragungStand(
+        pausiert=werte.uebertragung_pausiert,
+        **zahlen,
+        # Nur die gescheiterten ausgeschrieben: sie sind das Einzige, wozu
+        # jemand etwas tun muss.
+        fehlerhafte=[UebertragungAusgabe.model_validate(u) for u in alle if u.zustand == "fehler"],
+    )
+
+
+@router.post(
+    "/uebertragungen",
+    status_code=status.HTTP_201_CREATED,
+    summary="Etwas zur Übertragung vormerken",
+)
+async def uebertragung_einreihen(
+    daten: UebertragungEinreihen, sitzung: DbSitzung
+) -> UebertragungAusgabe:
+    """Vormerken, nicht ausführen.
+
+    Idempotent über `(aktion, referenz)`: abhaken, Haken entfernen und wieder
+    abhaken darf keine zwei Freigaben erzeugen.
+    """
+    return UebertragungAusgabe.model_validate(await speicher.uebertragung_einreihen(sitzung, daten))
+
+
+@router.post("/uebertragungen/pause", summary="Übertragung anhalten oder weiterlaufen lassen")
+async def uebertragung_pause(daten: Pause, sitzung: DbSitzung) -> UebertragungStand:
+    """Der eine Schalter, der entscheidet, ob draußen etwas passiert."""
+    await speicher.einstellungen_setzen(
+        sitzung, EinstellungenSetzen(uebertragung_pausiert=daten.pausiert)
+    )
+    return await uebertragungen(sitzung)
+
+
+@router.post("/uebertragungen/wiederholen", summary="Gescheitertes zurück in die Schlange")
+async def uebertragung_wiederholen(
+    sitzung: DbSitzung,
+    uebertragung_id: Annotated[
+        uuid.UUID | None, Query(description="Nur diese; ohne Angabe alle gescheiterten")
+    ] = None,
+) -> UebertragungStand:
+    """Nach einem Netzausfall stehen dort zwanzig Zeilen mit demselben Fehler.
+    Die einzeln anzuklicken ist keine Arbeit, sondern eine Strafe."""
+    await speicher.uebertragung_wiederholen(sitzung, uebertragung_id)
+    return await uebertragungen(sitzung)
+
+
+@router.post("/uebertragungen/{uebertragung_id}/abschluss", summary="Ergebnis melden")
+async def uebertragung_abschliessen(
+    uebertragung_id: uuid.UUID, daten: UebertragungAbschluss, sitzung: DbSitzung
+) -> UebertragungAusgabe:
+    """Vom DFBnet-Dienst aufgerufen, nicht von der Oberfläche."""
+    return UebertragungAusgabe.model_validate(
+        await speicher.uebertragung_abschliessen(sitzung, uebertragung_id, daten)
+    )
+
+
+# ── DFBnet-Zugang ─────────────────────────────────────────────────────────
+#
+# Das Passwort liegt verschlüsselt, mit einem Schlüssel aus der Umgebung
+# (`STAFFELPILOT_SCHLUESSEL`) und nicht aus der Datenbank — ein Abzug allein
+# ist damit wertlos. Es kommt an genau einer Stelle wieder heraus, und die
+# verlangt die Rolle `verwalter`.
+#
+# Ohne Schlüssel wird **nichts** abgelegt. Lieber gar nicht speichern als ein
+# Passwort im Klartext.
+
+#: Nur wer die Staffel verwaltet, fasst die Zugangsdaten an. Ein Leser sieht
+#: Spielberichte - er meldet sich nicht für die ganze Installation bei DFBnet
+#: an.
+NUR_VERWALTER = [erfordert("staffelpilot", Rolle.VERWALTER)]
+
+
+@router.get("/zugang", summary="Ist ein DFBnet-Zugang hinterlegt?")
+async def zugang_stand(sitzung: DbSitzung) -> ZugangStand:
+    """Ein Ja oder Nein und der Benutzername. Mehr verrät diese Antwort nicht."""
+    gespeichert, benutzer = await speicher.zugang_stand(sitzung)
+    return ZugangStand(
+        gespeichert=gespeichert,
+        benutzer=benutzer,
+        schluessel_vorhanden=speicher.schluessel_vorhanden(),
+    )
+
+
+@router.put(
+    "/zugang",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=NUR_VERWALTER,
+    summary="DFBnet-Zugang hinterlegen",
+)
+async def zugang_setzen(daten: ZugangSetzen, sitzung: DbSitzung) -> Response:
+    """Das Passwort wird verschlüsselt abgelegt und kommt hier nie zurück.
+
+    Fehlt der Schlüssel in der Umgebung, wird nichts gespeichert — die Antwort
+    ist dann 503, weil das ein Betriebsproblem ist und kein Tippfehler.
+    """
+    await speicher.zugang_setzen(sitzung, daten)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/zugang",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=NUR_VERWALTER,
+    summary="DFBnet-Zugang entfernen",
+)
+async def zugang_loeschen(sitzung: DbSitzung) -> Response:
+    await speicher.zugang_loeschen(sitzung)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/zugang/abholen",
+    dependencies=NUR_VERWALTER,
+    summary="Zugangsdaten für den Prüfdienst",
+)
+async def zugang_abholen(sitzung: DbSitzung) -> ZugangGeheim:
+    """Der einzige Ort, an dem das Passwort wieder herauskommt.
+
+    `POST` und nicht `GET`: ein Geheimnis gehört nicht in eine Adresse, die
+    ein Zwischenspeicher oder ein Protokoll mitschreibt.
+    """
+    benutzer, passwort = await speicher.zugang_abholen(sitzung)
+    return ZugangGeheim(benutzer=benutzer, passwort=passwort)

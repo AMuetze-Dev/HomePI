@@ -13,6 +13,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
+from cryptography.fernet import Fernet, InvalidToken
 from homepi_core import ServiceError
 
 from .schemas import Zusammenfassung
@@ -46,6 +47,26 @@ class AuftragUnbekannt(ServiceError):
 class SchonUnterwegs(ServiceError):
     status = 409
     title = "Es läuft schon einer"
+
+
+class UebertragungUnbekannt(ServiceError):
+    status = 404
+    title = "Übertragung unbekannt"
+
+
+class KeinZugang(ServiceError):
+    status = 404
+    title = "Kein DFBnet-Zugang hinterlegt"
+
+
+class SchluesselFehlt(ServiceError):
+    status = 503
+    title = "Kein Schlüssel für die Zugangsdaten"
+
+
+class SchluesselPasstNicht(ServiceError):
+    status = 503
+    title = "Die Zugangsdaten lassen sich nicht mehr lesen"
 
 
 class StaffelVergeben(ServiceError):
@@ -232,6 +253,13 @@ class Einstellungen:
     pruefzeitraum_tage: int = 30
     #: Wie lange ein Verein Zeit bekommt, auf ein Schreiben zu antworten.
     frist_tage: int = 14
+    #: Ob der DFBnet-Dienst gerade etwas eintragen darf.
+    #:
+    #: **Auf einer frischen Installation steht das auf an.** Eine Freigabe in
+    #: DFBnet ist eine Handlung nach aussen; sie soll nicht deshalb passieren,
+    #: weil jemand die Software zum ersten Mal gestartet hat. Wer sie will,
+    #: schaltet sie ein -- einmal, bewusst.
+    uebertragung_pausiert: bool = True
 
 
 #: Die Zahlen mit ihren Grenzen. Unten schaerfer als noetig: ein
@@ -239,6 +267,11 @@ class Einstellungen:
 #: den Fehler dann im Prueflauf statt in den Einstellungen.
 _ZAHLEN = {"pruefzeitraum_tage": (1, 365), "frist_tage": (1, 90)}
 _TEXTE = ("staffelleiter", "verband", "absender")
+_WAHRHEITEN = ("uebertragung_pausiert",)
+
+#: Was als "ja" gilt. Geschrieben wird immer "true"; gelesen wird grosszuegig,
+#: weil eine Zeile auch einmal von Hand in der Datenbank landet.
+_JA = {"1", "true", "ja", "yes", "on"}
 
 
 def einstellungen_aus(roh: Mapping[str, str]) -> Einstellungen:
@@ -251,6 +284,10 @@ def einstellungen_aus(roh: Mapping[str, str]) -> Einstellungen:
     felder: dict[str, object] = {s: roh.get(s, "").strip() for s in _TEXTE}
     for schluessel, (klein, gross) in _ZAHLEN.items():
         felder[schluessel] = _zahl(schluessel, roh.get(schluessel), klein, gross)
+    for schluessel in _WAHRHEITEN:
+        wert = roh.get(schluessel)
+        vorgabe: bool = getattr(Einstellungen(), schluessel)
+        felder[schluessel] = vorgabe if wert is None else str(wert).strip().lower() in _JA
     return Einstellungen(**felder)  # type: ignore[arg-type]
 
 
@@ -538,3 +575,84 @@ def fortschritt_pruefen(wert: int) -> int:
     kein Ergebnis.
     """
     return max(0, min(100, wert))
+
+
+# ── Uebertragung nach DFBnet ──────────────────────────────────────────────
+
+#: Der Weg einer Uebertragung. "fehler" geht zurueck auf "offen" - das ist
+#: das Wiederholen.
+_UEBERTRAGUNGSWEGE: dict[str, tuple[str, ...]] = {
+    "offen": ("laeuft", "fertig", "fehler"),
+    "laeuft": ("fertig", "fehler"),
+    "fehler": ("offen", "laeuft"),
+    "fertig": (),
+}
+
+
+def uebertragung_weiter(alt: str, neu: str) -> str:
+    if neu not in _UEBERTRAGUNGSWEGE.get(alt, ()):
+        moeglich = ", ".join(_UEBERTRAGUNGSWEGE.get(alt, ())) or "nichts"
+        raise ZustandUnmoeglich(f"Von {alt!r} aus geht nur: {moeglich}")
+    return neu
+
+
+def darf_wiederholt_werden(zustand: str) -> None:
+    """Wiederholt wird, was gescheitert ist.
+
+    Eine erledigte Uebertragung noch einmal zu fahren hiesse, dieselbe
+    Freigabe zweimal in DFBnet einzutragen -- und das sieht dort aus wie zwei
+    Vorgaenge zu einem Spiel.
+    """
+    if zustand != "fehler":
+        raise ZustandUnmoeglich(
+            f"Wiederholt wird, was gescheitert ist; diese steht auf {zustand!r}"
+        )
+
+
+# ── Zugangsdaten verschluesseln ───────────────────────────────────────────
+
+#: Woher der Schluessel kommt. Umgebung und nicht Datenbank: sonst laege er
+#: neben dem, was er schuetzt.
+SCHLUESSEL_VARIABLE = "STAFFELPILOT_SCHLUESSEL"
+
+
+def schluessel_aus(umgebung: Mapping[str, str]) -> bytes:
+    """Der Fernet-Schluessel, oder ein klarer Abbruch.
+
+    Lieber gar nichts speichern als ein Passwort im Klartext. Ein fehlender
+    Schluessel ist ein Betriebsproblem und wird als solches gemeldet (503),
+    nicht als Eingabefehler des Staffelleiters.
+    """
+    roh = umgebung.get(SCHLUESSEL_VARIABLE, "").strip()
+    if not roh:
+        raise SchluesselFehlt(
+            f"{SCHLUESSEL_VARIABLE} ist nicht gesetzt. Ohne Schlüssel werden hier "
+            "keine Zugangsdaten abgelegt."
+        )
+    return roh.encode()
+
+
+def verschluesseln(klartext: str, schluessel: bytes) -> str:
+    try:
+        return str(Fernet(schluessel).encrypt(klartext.encode()).decode())
+    except (ValueError, TypeError, InvalidToken) as fehler:
+        raise SchluesselFehlt(
+            f"{SCHLUESSEL_VARIABLE} ist kein gültiger Fernet-Schlüssel (32 Byte, urlsicher base64)."
+        ) from fehler
+
+
+def entschluesseln(token: str, schluessel: bytes) -> str:
+    """Zurueck in den Klartext -- oder eine ehrliche Fehlermeldung.
+
+    Ein vertauschter Schluessel darf nicht wie ein falsches Passwort aussehen:
+    sonst sucht jemand stundenlang bei DFBnet nach einem Fehler, der in der
+    Umgebung steht.
+    """
+    try:
+        return str(Fernet(schluessel).decrypt(token.encode()).decode())
+    except (InvalidToken, ValueError, TypeError) as fehler:
+        raise SchluesselPasstNicht(
+            f"Die hinterlegten Zugangsdaten passen nicht zu {SCHLUESSEL_VARIABLE}. "
+            "Entweder wurde der Schlüssel ersetzt, oder die Daten stammen aus einer "
+            "anderen Installation. Zugangsdaten neu eintragen."
+        ) from fehler
