@@ -683,3 +683,32 @@ class ZugangGeheim(BaseModel):
 
     benutzer: str
     passwort: str
+
+
+# ── Ergebnisse: die Auswertung ────────────────────────────────────────────
+
+
+class Posten(BaseModel):
+    """Eine Zeile der Auswertung."""
+
+    name: str
+    anzahl: int
+    offen: int
+
+
+class Auswertung(BaseModel):
+    """Was in dieser Saison aufgelaufen ist, gruppiert.
+
+    Die drei Schweren stehen immer alle da, auch mit null: „keine
+    kritischen" ist eine Aussage, eine fehlende Zeile nicht.
+    """
+
+    befunde: int
+    offen: int
+    spiele: int
+    abgehakt: int
+    vorgaenge: int
+    nach_schwere: list[Posten]
+    nach_regel: list[Posten]
+    nach_mannschaft: list[Posten]
+    nach_monat: list[Posten]

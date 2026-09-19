@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { Etikett, Hinweis, Karte, Leerzustand, Platzhalter } from "../../ui";
-import {
-  type Mannschaft,
-  type Staffel,
-  ladeMannschaften,
-  speichereMannschaften,
-} from "./api";
+import { Etikett, Hinweis, Karte, Platzhalter } from "../../ui";
+import { type Mannschaft, ladeMannschaften, speichereMannschaften } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
 
 function meldung(fehler: unknown): string {
@@ -21,17 +16,15 @@ function meldung(fehler: unknown): string {
  * Stammspieler zählen, und damit prüft eine Regel leise das Falsche. Deshalb
  * steht hier ausdrücklich „geraten" oder „bestätigt", und deshalb lässt sich
  * jede Zuordnung von Hand setzen.
+ *
+ * Sitzt in der Staffelkarte: eine Staffel wird einmal im Jahr eingerichtet,
+ * und dazu gehört, wer darin spielt.
  */
-export function MannschaftenTafel({ staffeln }: { staffeln: Staffel[] }) {
-  const [staffelId, setStaffelId] = useState(staffeln[0]?.id ?? "");
+export function MannschaftenListe({ staffelId }: { staffelId: string }) {
   const [mannschaften, setMannschaften] = useState<Mannschaft[] | null>(null);
   const [fehler, setFehler] = useState("");
 
   const laden = useCallback(async (id: string, signal?: AbortSignal) => {
-    if (!id) {
-      setMannschaften([]);
-      return;
-    }
     try {
       setMannschaften(await ladeMannschaften(id, signal));
     } catch (f) {
@@ -60,51 +53,36 @@ export function MannschaftenTafel({ staffeln }: { staffeln: Staffel[] }) {
     }
   }
 
-  if (staffeln.length === 0) {
+  if (fehler && mannschaften === null) {
+    // Sonst steht hier ewig ein Platzhalter und niemand erfaehrt, warum.
     return (
-      <Leerzustand titel="Noch keine Staffel angelegt">
-        Mannschaften gehören zu einer Staffel. Leg zuerst eine an.
-      </Leerzustand>
+      <Hinweis ton="fehler" dringend>
+        {fehler}
+      </Hinweis>
+    );
+  }
+
+  if (mannschaften === null) {
+    return (
+      <div role="status" aria-label="Mannschaften werden geladen">
+        <Platzhalter breite="100%" hoehe="6rem" />
+      </div>
     );
   }
 
   return (
     <>
-      {staffeln.length > 1 && (
-        <Karte>
-          <label className={stil.wahl}>
-            <span className={stil.wahlName}>Staffel</span>
-            <select
-              className={stil.auswahl}
-              value={staffelId}
-              onChange={(e) => setStaffelId(e.target.value)}
-            >
-              {staffeln.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </Karte>
-      )}
-
       {fehler && (
         <Hinweis ton="fehler" dringend>
           {fehler}
         </Hinweis>
       )}
 
-      {mannschaften === null ? (
-        <div role="status" aria-label="Mannschaften werden geladen">
-          <Platzhalter breite="100%" hoehe="10rem" />
-        </div>
-      ) : mannschaften.length === 0 ? (
-        <Leerzustand titel="Keine Mannschaften gemeldet">
-          Die Meldung kommt über{" "}
-          <code>PUT /staffelpilot/staffeln/&lt;id&gt;/mannschaften</code> herein — aus
-          DFBnet über den Prüfdienst.
-        </Leerzustand>
+      {mannschaften.length === 0 ? (
+        <p className={stil.vorgangHinweis}>
+          Noch keine Mannschaften gemeldet. Sie kommen mit „Saisondaten holen" aus DFBnet
+          — oder über <code>PUT /staffelpilot/staffeln/&lt;id&gt;/mannschaften</code>.
+        </p>
       ) : (
         <ul className={stil.liste} aria-label="Mannschaften">
           {mannschaften.map((m) => (
@@ -148,7 +126,7 @@ function MannschaftKarte({
   }
 
   return (
-    <Karte>
+    <Karte blank>
       <button
         type="button"
         className={stil.kopf}

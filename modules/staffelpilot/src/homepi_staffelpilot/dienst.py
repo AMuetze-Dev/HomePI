@@ -102,6 +102,11 @@ class BefundSicht:
     entscheidung: str
     regel: str = ""
     titel: str = ""
+    #: Fuer die Auswertung. Die Regeln selbst sehen nicht hinein.
+    mannschaft: str = ""
+    #: "2026-09". Der Monat und nicht der Tag: eine Saison hat zehn Monate
+    #: und zweihundert Spieltage.
+    monat: str = ""
     #: Womit der Aufrufer die Zeile wiederfindet, nachdem `sortiert` sie
     #: umgestellt hat. Undurchsichtig fuer die Regeln - sie sehen nur hinein,
     #: wenn jemand etwas falsch macht. Ueber (regel, titel) ging es nicht:
@@ -656,3 +661,83 @@ def entschluesseln(token: str, schluessel: bytes) -> str:
             "Entweder wurde der Schlüssel ersetzt, oder die Daten stammen aus einer "
             "anderen Installation. Zugangsdaten neu eintragen."
         ) from fehler
+
+
+# ── Auswertung ────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class Posten:
+    """Eine Zeile der Auswertung: Name, wie oft, wie viel davon offen."""
+
+    name: str
+    anzahl: int
+    offen: int
+
+
+@dataclass(frozen=True, slots=True)
+class Auswertung:
+    befunde: int
+    offen: int
+    nach_schwere: list[Posten]
+    nach_regel: list[Posten]
+    nach_mannschaft: list[Posten]
+    nach_monat: list[Posten]
+
+
+#: Wie viele Zeilen je Gruppe. Eine Liste mit achtzig Vereinen ist keine
+#: Auswertung mehr, sondern wieder die Liste, aus der sie entstanden ist.
+GRENZE = 12
+
+
+def _zaehlen(paare: Iterable[tuple[str, bool]], grenze: int | None = GRENZE) -> list[Posten]:
+    """Nach Haeufigkeit, bei Gleichstand nach Namen.
+
+    Der Name als zweiter Schluessel ist kein Schoenheitsfehler: ohne ihn
+    tauschen zwei gleich haeufige Zeilen bei jedem Laden die Plaetze, und man
+    verliert die Stelle, an der man gerade liest.
+    """
+    gesamt: dict[str, int] = {}
+    offen: dict[str, int] = {}
+    for name, ist_offen in paare:
+        gesamt[name] = gesamt.get(name, 0) + 1
+        offen[name] = offen.get(name, 0) + (1 if ist_offen else 0)
+
+    geordnet = sorted(gesamt.items(), key=lambda paar: (-paar[1], paar[0]))
+    if grenze is not None:
+        geordnet = geordnet[:grenze]
+    return [Posten(name=name, anzahl=anzahl, offen=offen[name]) for name, anzahl in geordnet]
+
+
+def auswerten(befunde: Iterable[BefundSicht]) -> Auswertung:
+    """Was in dieser Saison aufgelaufen ist, gruppiert.
+
+    Rein, also ohne Datenbank: die Gruppierung in SQL zu schreiben waere vier
+    Abfragen und dieselbe Entscheidung an vier Stellen -- und keine davon
+    liesse sich in Millisekunden pruefen.
+    """
+    liste = list(befunde)
+    return Auswertung(
+        befunde=len(liste),
+        offen=sum(1 for b in liste if b.entscheidung == "offen"),
+        # Die Schweren sind drei, und alle drei sollen dastehen - auch die mit
+        # null. "keine kritischen" ist eine Aussage, eine fehlende Zeile nicht.
+        nach_schwere=[
+            Posten(
+                name=schwere,
+                anzahl=sum(1 for b in liste if b.schwere == schwere),
+                offen=sum(1 for b in liste if b.schwere == schwere and b.entscheidung == "offen"),
+            )
+            for schwere in ("kritisch", "warnung", "hinweis")
+        ],
+        nach_regel=_zaehlen((b.regel, b.entscheidung == "offen") for b in liste if b.regel),
+        nach_mannschaft=_zaehlen(
+            (b.mannschaft, b.entscheidung == "offen") for b in liste if b.mannschaft
+        ),
+        # Die Monate ohne Grenze und in der Zeit sortiert: eine Saison hat
+        # zehn, und "welcher Monat war der schlimmste" ist nicht die Frage.
+        nach_monat=sorted(
+            _zaehlen(((b.monat, b.entscheidung == "offen") for b in liste if b.monat), None),
+            key=lambda p: p.name,
+        ),
+    )

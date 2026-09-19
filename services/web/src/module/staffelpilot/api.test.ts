@@ -16,6 +16,7 @@ import {
   ladeAuftrag,
   ladeAuftraege,
   ladeEinstellungen,
+  ladeErgebnisse,
   ladeMannschaften,
   ladeOffenenAuftrag,
   ladeUebertragung,
@@ -495,5 +496,23 @@ describe("Übertragung und Zugang", () => {
     await loescheZugang();
 
     expect(holen.mock.calls[0]?.[1]).toMatchObject({ method: "DELETE" });
+  });
+});
+
+describe("Die Auswertung", () => {
+  it("holt sie ohne Frage, wenn keine Staffel gewählt ist", async () => {
+    const holen = antworteMit({});
+
+    await ladeErgebnisse();
+
+    expect(String(holen.mock.calls[0]?.[0])).toMatch(/\/ergebnisse$/);
+  });
+
+  it("hängt die Staffel an", async () => {
+    const holen = antworteMit({});
+
+    await ladeErgebnisse("s1");
+
+    expect(holen.mock.calls[0]?.[0]).toContain("staffel_id=s1");
   });
 });

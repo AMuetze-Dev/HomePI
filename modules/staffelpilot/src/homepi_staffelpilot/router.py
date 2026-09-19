@@ -22,6 +22,7 @@ from .dienst import (
     BefundSicht,
     NochOffeneBefunde,
     SpielSicht,
+    auswerten,
     darf_abgehakt_werden,
     darf_angefordert_werden,
     darf_zurueckgenommen_werden,
@@ -37,6 +38,7 @@ from .schemas import (
     AuftragAnfordern,
     AuftragAusgabe,
     AuftragZeile,
+    Auswertung,
     BefundAusgabe,
     BefundZeile,
     EinstellungenAusgabe,
@@ -48,6 +50,7 @@ from .schemas import (
     MannschaftAusgabe,
     MannschaftenSetzen,
     Pause,
+    Posten,
     RegelAusgabe,
     RegelkatalogSetzen,
     RegelUmschalten,
@@ -163,6 +166,44 @@ async def uebersicht(sitzung: DbSitzung) -> Zusammenfassung:
         (SpielSicht(abgehakt=b.abgehakt, befunde=[_sicht(x) for x in b.befunde]) for b in berichte),
         staffeln_aktiv=await speicher.anzahl_aktiver_staffeln(sitzung),
         vorgaenge_entwurf=await speicher.anzahl_entwuerfe(sitzung),
+    )
+
+
+@router.get("/ergebnisse", summary="Auswertung der Saison")
+async def ergebnisse(
+    sitzung: DbSitzung,
+    staffel_id: Annotated[uuid.UUID | None, Query(description="Nur diese Staffel")] = None,
+) -> Auswertung:
+    """Was aufgelaufen ist — gruppiert nach Schwere, Regel, Mannschaft, Monat.
+
+    Gezählt wird in `dienst.auswerten` und nicht in SQL: vier
+    `GROUP BY`-Abfragen wären dieselbe Entscheidung an vier Stellen, und keine
+    davon ließe sich in Millisekunden prüfen.
+    """
+    paare = await speicher.alle_befunde(sitzung, staffel_id)
+    werte = auswerten(
+        BefundSicht(
+            schwere=b.schwere,
+            entscheidung=b.entscheidung,
+            regel=b.regel,
+            titel=b.titel,
+            mannschaft=b.mannschaft,
+            monat=s.datum.strftime("%Y-%m"),
+        )
+        for b, s in paare
+    )
+    berichte = await speicher.spiele(sitzung, staffel_id)
+    return Auswertung(
+        befunde=werte.befunde,
+        offen=werte.offen,
+        spiele=len(berichte),
+        abgehakt=sum(1 for b in berichte if b.abgehakt),
+        vorgaenge=len(await speicher.vorgaenge(sitzung)),
+        # asdict und nicht vars: `Posten` hat slots und damit kein __dict__.
+        nach_schwere=[Posten(**asdict(p)) for p in werte.nach_schwere],
+        nach_regel=[Posten(**asdict(p)) for p in werte.nach_regel],
+        nach_mannschaft=[Posten(**asdict(p)) for p in werte.nach_mannschaft],
+        nach_monat=[Posten(**asdict(p)) for p in werte.nach_monat],
     )
 
 

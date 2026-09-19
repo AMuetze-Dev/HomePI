@@ -3,20 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../api/client";
-import { MannschaftenTafel } from "./MannschaftenTafel";
+import { MannschaftenListe } from "./MannschaftenTafel";
 import * as api from "./api";
-
-function staffel(rest: Partial<api.Staffel> = {}): api.Staffel {
-  return {
-    id: "s1",
-    name: "Stadtliga C",
-    altersklasse: "maenner",
-    spielklasse: "3.Kreisliga (C)",
-    saison: "26/27",
-    aktiv: true,
-    ...rest,
-  };
-}
 
 function mannschaft(rest: Partial<api.Mannschaft> = {}): api.Mannschaft {
   return {
@@ -38,25 +26,21 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("Mannschaften", () => {
-  it("verlangt zuerst eine Staffel", () => {
-    render(<MannschaftenTafel staffeln={[]} />);
-
-    expect(screen.getByText("Noch keine Staffel angelegt")).toBeInTheDocument();
-  });
-
+describe("Mannschaften einer Staffel", () => {
   it("sagt beim leeren Stand, woher die Meldung kommt", async () => {
     vi.spyOn(api, "ladeMannschaften").mockResolvedValue([]);
-    render(<MannschaftenTafel staffeln={[staffel()]} />);
+    render(<MannschaftenListe staffelId="s1" />);
 
-    expect(await screen.findByText("Keine Mannschaften gemeldet")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Noch keine Mannschaften gemeldet/),
+    ).toBeInTheDocument();
   });
 
   it("zeigt den geratenen Aufbau als geraten", async () => {
     // Der Unterschied zwischen "geraten" und "bestaetigt" ist der ganze Zweck
     // dieser Ansicht: ein falscher Schluss faellt sonst nie auf.
     vi.spyOn(api, "ladeMannschaften").mockResolvedValue([ERSTE, mannschaft()]);
-    render(<MannschaftenTafel staffeln={[staffel()]} />);
+    render(<MannschaftenListe staffelId="s1" />);
 
     const liste = await screen.findByRole("list", { name: "Mannschaften" });
     expect(within(liste).getAllByText("geraten")).toHaveLength(2);
@@ -72,7 +56,7 @@ describe("Mannschaften", () => {
         hoehere: [],
       }),
     ]);
-    render(<MannschaftenTafel staffeln={[staffel()]} />);
+    render(<MannschaftenListe staffelId="s1" />);
 
     const liste = await screen.findByRole("list", { name: "Mannschaften" });
     expect(within(liste).getByText("SG")).toBeInTheDocument();
@@ -87,7 +71,7 @@ describe("Mannschaften", () => {
     const speichern = vi
       .spyOn(api, "speichereMannschaften")
       .mockResolvedValue([ERSTE, mannschaft({ bestaetigt: true })]);
-    render(<MannschaftenTafel staffeln={[staffel()]} />);
+    render(<MannschaftenListe staffelId="s1" />);
 
     const karten = await screen.findAllByRole("button", { expanded: false });
     await userEvent.click(karten[1]!);
@@ -105,7 +89,7 @@ describe("Mannschaften", () => {
 
   it("bietet sich selbst nicht als höherklassig an", async () => {
     vi.spyOn(api, "ladeMannschaften").mockResolvedValue([ERSTE, mannschaft()]);
-    render(<MannschaftenTafel staffeln={[staffel()]} />);
+    render(<MannschaftenListe staffelId="s1" />);
 
     const karten = await screen.findAllByRole("button", { expanded: false });
     await userEvent.click(karten[1]!);
@@ -125,22 +109,8 @@ describe("Mannschaften", () => {
     vi.spyOn(api, "ladeMannschaften").mockRejectedValue(
       new ApiError("kein Zugriff", 403),
     );
-    render(<MannschaftenTafel staffeln={[staffel()]} />);
+    render(<MannschaftenListe staffelId="s1" />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("kein Zugriff");
-  });
-
-  it("wechselt die Staffel", async () => {
-    const laden = vi.spyOn(api, "ladeMannschaften").mockResolvedValue([]);
-    render(
-      <MannschaftenTafel
-        staffeln={[staffel(), staffel({ id: "s2", name: "Stadtliga D" })]}
-      />,
-    );
-    await screen.findByText("Keine Mannschaften gemeldet");
-
-    await userEvent.selectOptions(screen.getByLabelText("Staffel"), "s2");
-
-    await waitFor(() => expect(laden).toHaveBeenCalledWith("s2", expect.anything()));
   });
 });

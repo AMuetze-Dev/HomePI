@@ -10,7 +10,9 @@ import {
   nimmEntscheidungZurueck,
   ladeWarteschlange,
   ladeZusammenfassung,
+  aendereStaffel,
   legeStaffelAn,
+  loescheStaffel,
   loeseHaken,
   type Befund,
   type Schwere,
@@ -21,9 +23,11 @@ import {
 } from "./api";
 import { alsDatum } from "./datum";
 import { EinstellungenTafel } from "./EinstellungenTafel";
-import { BefundeTafel } from "./BefundeTafel";
-import { MannschaftenTafel } from "./MannschaftenTafel";
+import { ErgebnisseTafel } from "./ErgebnisseTafel";
 import { PrueflaufTafel } from "./PrueflaufTafel";
+import { StaffelnTafel } from "./StaffelnTafel";
+import { UebersichtTafel } from "./UebersichtTafel";
+import { ZugangKarte } from "./ZugangKarte";
 import { RegelnTafel } from "./RegelnTafel";
 import { VorgaengeTafel } from "./VorgaengeTafel";
 import stil from "./StaffelpilotSeite.module.css";
@@ -38,13 +42,15 @@ type Daten = { staffeln: Staffel[]; spiele: SpielZeile[]; uebersicht: Zusammenfa
  * samt verlorener Stelle in der Liste.
  */
 const REITER = [
-  ["spiele", "Spielberichte"],
-  ["befunde", "Befunde"],
-  ["vorgaenge", "Vorgänge"],
+  ["uebersicht", "Übersicht"],
+  ["spiele", "Spielprüfung"],
   ["prueflauf", "Prüflauf"],
-  ["mannschaften", "Mannschaften"],
+  ["ergebnisse", "Ergebnisse"],
+  ["staffeln", "Staffeln"],
+  ["vorgaenge", "Vorgänge"],
   ["regeln", "Regeln"],
   ["einstellungen", "Einstellungen"],
+  ["zugang", "DFBnet-Zugang"],
 ] as const;
 
 type ReiterId = (typeof REITER)[number][0];
@@ -71,7 +77,7 @@ function meldung(fehler: unknown): string {
 }
 
 export function StaffelpilotSeite() {
-  const [reiter, setReiter] = useState<ReiterId>("spiele");
+  const [reiter, setReiter] = useState<ReiterId>("uebersicht");
   const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
   const [staffelFilter, setStaffelFilter] = useState<string>("");
   // Der haeufigste Handgriff am Montag: was ist seit dem Wochenende faellig.
@@ -175,7 +181,16 @@ export function StaffelpilotSeite() {
     );
   }
 
-  const { staffeln, spiele, uebersicht } = zustand.daten;
+  const { staffeln, spiele } = zustand.daten;
+
+  if (reiter === "uebersicht") {
+    return (
+      <>
+        {leiste}
+        <UebersichtTafel onWechsel={(ziel) => setReiter(ziel as ReiterId)} />
+      </>
+    );
+  }
 
   if (reiter === "einstellungen") {
     return (
@@ -186,20 +201,39 @@ export function StaffelpilotSeite() {
     );
   }
 
-  if (reiter === "mannschaften") {
+  if (reiter === "zugang") {
     return (
       <>
         {leiste}
-        <MannschaftenTafel staffeln={staffeln} />
+        <ZugangKarte />
       </>
     );
   }
 
-  if (reiter === "befunde") {
+  if (reiter === "staffeln") {
     return (
       <>
         {leiste}
-        <BefundeTafel staffeln={staffeln} />
+        {aktionsfehler && (
+          <Hinweis ton="fehler" dringend>
+            {aktionsfehler}
+          </Hinweis>
+        )}
+        <StaffelnTafel
+          staffeln={staffeln}
+          onAnlegen={(daten) => mitFehlerbehandlung(() => legeStaffelAn(daten))}
+          onAendern={(id, daten) => mitFehlerbehandlung(() => aendereStaffel(id, daten))}
+          onLoeschen={(id) => mitFehlerbehandlung(() => loescheStaffel(id))}
+        />
+      </>
+    );
+  }
+
+  if (reiter === "ergebnisse") {
+    return (
+      <>
+        {leiste}
+        <ErgebnisseTafel staffeln={staffeln} />
       </>
     );
   }
@@ -234,7 +268,6 @@ export function StaffelpilotSeite() {
   return (
     <>
       {leiste}
-      <Uebersicht daten={uebersicht} />
 
       {aktionsfehler && (
         <Hinweis ton="fehler" dringend>
@@ -243,7 +276,10 @@ export function StaffelpilotSeite() {
       )}
 
       {staffeln.length === 0 ? (
-        <Leerzustand titel="Noch keine Staffel angelegt">
+        <Leerzustand
+          titel="Noch keine Staffel angelegt"
+          aktion={<Knopf onClick={() => setReiter("staffeln")}>Staffeln verwalten</Knopf>}
+        >
           Eine Staffel ist der Ort, an dem Spielberichte ankommen. Leg die erste an — Name
           und Spielklasse genau so, wie sie in DFBnet heißen.
         </Leerzustand>
@@ -309,32 +345,7 @@ export function StaffelpilotSeite() {
           )}
         </>
       )}
-
-      <StaffelAnlegen
-        onAnlegen={(daten) => mitFehlerbehandlung(() => legeStaffelAn(daten))}
-      />
     </>
-  );
-}
-
-function Uebersicht({ daten }: { daten: Zusammenfassung }) {
-  return (
-    <ul className={stil.kennzahlen} aria-label="Überblick">
-      <Kennzahl wert={daten.offen} name="zu prüfen" />
-      <Kennzahl wert={daten.befunde_kritisch} name="kritische Befunde" ton="fehler" />
-      <Kennzahl wert={daten.befunde_offen} name="offene Befunde" />
-      <Kennzahl wert={daten.vorgaenge_entwurf} name="Entwürfe" />
-      <Kennzahl wert={daten.abgehakt} name="abgehakt" />
-    </ul>
-  );
-}
-
-function Kennzahl({ wert, name, ton }: { wert: number; name: string; ton?: "fehler" }) {
-  return (
-    <li className={stil.kennzahl}>
-      <span className={ton && wert > 0 ? stil.zahlWarnend : stil.zahl}>{wert}</span>
-      <span className={stil.zahlName}>{name}</span>
-    </li>
   );
 }
 
@@ -581,91 +592,6 @@ function BefundZeile({
             </p>
           ))}
       </div>
-    </Karte>
-  );
-}
-
-const ALTERSKLASSEN = [
-  ["maenner", "Männer"],
-  ["frauen", "Frauen"],
-  ["ue32", "Ü32"],
-  ["ue35", "Ü35"],
-  ["ue40", "Ü40"],
-  ["ue50", "Ü50"],
-] as const;
-
-function StaffelAnlegen({
-  onAnlegen,
-}: {
-  onAnlegen: (daten: {
-    name: string;
-    altersklasse: (typeof ALTERSKLASSEN)[number][0];
-    spielklasse: string;
-    saison: string;
-  }) => Promise<boolean>;
-}) {
-  const [name, setName] = useState("");
-  const [spielklasse, setSpielklasse] = useState("");
-  const [saison, setSaison] = useState("");
-  const [altersklasse, setAltersklasse] =
-    useState<(typeof ALTERSKLASSEN)[number][0]>("maenner");
-
-  return (
-    <Karte>
-      <form
-        className={stil.formular}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void onAnlegen({ name, altersklasse, spielklasse, saison }).then((geklappt) => {
-            // Nur bei Erfolg leeren - sonst tippt man alles noch einmal.
-            if (geklappt) {
-              setName("");
-              setSpielklasse("");
-              setSaison("");
-            }
-          });
-        }}
-      >
-        <h2 className={stil.formularTitel}>Staffel anlegen</h2>
-        <Feld
-          beschriftung="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <Feld
-          beschriftung="Spielklasse"
-          hinweis="Genau wie in DFBnet, z. B. „1.Kreisklasse“."
-          value={spielklasse}
-          onChange={(e) => setSpielklasse(e.target.value)}
-          required
-        />
-        <label className={stil.wahl}>
-          <span className={stil.wahlName}>Altersklasse</span>
-          <select
-            className={stil.auswahl}
-            value={altersklasse}
-            onChange={(e) =>
-              setAltersklasse(e.target.value as (typeof ALTERSKLASSEN)[number][0])
-            }
-          >
-            {ALTERSKLASSEN.map(([wert, name]) => (
-              <option key={wert} value={wert}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <Feld
-          beschriftung="Saison"
-          hinweis="Optional, z. B. 26/27."
-          value={saison}
-          onChange={(e) => setSaison(e.target.value)}
-        />
-        <Knopf type="submit" auspraegung="primaer">
-          Anlegen
-        </Knopf>
-      </form>
     </Karte>
   );
 }

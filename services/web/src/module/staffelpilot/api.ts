@@ -90,6 +90,25 @@ export interface Einstellungen {
   uebertragung_pausiert: boolean;
 }
 
+/** Eine Zeile der Auswertung. */
+export interface Posten {
+  name: string;
+  anzahl: number;
+  offen: number;
+}
+
+export interface Auswertung {
+  befunde: number;
+  offen: number;
+  spiele: number;
+  abgehakt: number;
+  vorgaenge: number;
+  nach_schwere: Posten[];
+  nach_regel: Posten[];
+  nach_mannschaft: Posten[];
+  nach_monat: Posten[];
+}
+
 export type AuftragArt = "pruflauf" | "initialisierung";
 export type AuftragZustand =
   "angefordert" | "laeuft" | "fertig" | "abgebrochen" | "gescheitert";
@@ -494,4 +513,14 @@ export function speichereZugang(benutzer: string, passwort: string): Promise<voi
 
 export function loescheZugang(): Promise<void> {
   return anfrage<void>("/zugang", { method: "DELETE" });
+}
+
+// ── Ergebnisse: die Auswertung ───────────────────────────────────────────
+
+export function ladeErgebnisse(
+  staffelId?: string,
+  signal?: AbortSignal,
+): Promise<Auswertung> {
+  const frage = staffelId ? `?staffel_id=${encodeURIComponent(staffelId)}` : "";
+  return anfrage<Auswertung>(`/ergebnisse${frage}`, {}, signal);
 }
