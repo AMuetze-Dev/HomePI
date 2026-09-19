@@ -86,6 +86,12 @@ class Gateway:
     def staffeln(self) -> list[dict[str, Any]]:
         return self._json("GET", "/staffelpilot/staffeln")  # type: ignore[no-any-return]
 
+    def staffel_aendern(self, staffel_id: str, felder: dict[str, Any]) -> dict[str, Any]:
+        """Einzelne Felder einer Staffel. Ausgelassene bleiben stehen."""
+        return self._json(  # type: ignore[no-any-return]
+            "PATCH", f"/staffelpilot/staffeln/{staffel_id}", json=felder
+        )
+
     def einstellungen(self) -> dict[str, Any]:
         return self._json("GET", "/staffelpilot/einstellungen")  # type: ignore[no-any-return]
 

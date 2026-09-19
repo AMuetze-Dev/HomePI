@@ -85,3 +85,42 @@ def mannschaften_lesen(html: str) -> list[dict[str, object]]:
             }
         )
     return gefunden
+
+
+def spalte_mit(ueberschriften: list[str], gesucht: str) -> int:
+    """Die Nummer der Spalte mit dieser Ueberschrift, oder -1.
+
+    Nach der Ueberschrift und nicht nach einer festen Nummer: die alte
+    Anwendung zaehlte Spalten ab, und als DFBnet die Liste umbaute, stand in
+    der siebten Spalte die Rundennummer. Aus "Rd 1" wurde "1 Spieltag", und
+    die Staffel galt als einen Spieltag lang.
+    """
+    ziel = gesucht.strip().lower()
+    for nummer, text in enumerate(ueberschriften):
+        if (text or "").strip().lower() == ziel:
+            return nummer
+    return -1
+
+
+def spieltage_aus(ueberschriften: list[str], zellen: list[str]) -> int:
+    """Wie viele Spieltage die Saison hat. 0 heisst *nicht bekannt*.
+
+    Ohne diese Zahl laesst sich die U23-Ausnahme nach Paragraf 68 (2) c) an
+    den letzten vier Spieltagen nicht aufheben, und die Regel sagt das bei
+    jedem Spiel. Sie mitzunehmen kostet nichts -- die Zeile steht ohnehin auf
+    dem Schirm.
+
+    **Geraten wird nichts.** Nennt die Liste keine Spalte "Spieltage", kommt
+    0 zurueck, und die Zahl bleibt, wie sie im Artefakt steht. Am 19.09.2026
+    nennt DFBnet dort: Kennung, Mannschaftsart, Spielklasse, Gebiet,
+    Bezeichnung, Rd, Nr, St -- also keine.
+    """
+    spalte = spalte_mit(ueberschriften, "Spieltage")
+    if spalte < 0 or spalte >= len(zellen):
+        return 0
+    treffer = re.search(r"\d+", zellen[spalte] or "")
+    if not treffer:
+        return 0
+    zahl = int(treffer.group(0))
+    # Das Artefakt nimmt 0 bis 99. Alles darueber ist keine Saisonlaenge.
+    return zahl if 0 <= zahl <= 99 else 0

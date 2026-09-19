@@ -31,6 +31,9 @@ class Leser(Protocol):
         self, staffel: Staffelkennung, verband: str = ""
     ) -> list[dict[str, object]]: ...
 
+    #: Die Spieltage der zuletzt geholten Meldung. 0 heisst *nicht bekannt*.
+    spieltage: int
+
     def schliessen(self) -> None: ...
 
 
@@ -53,6 +56,7 @@ class DemoLeser:
         self._berichte = berichte_je_spiel or {}
         self.angemeldet_als = ""
         self.geschlossen = False
+        self.spieltage = 0
 
     def anmelden(self, benutzer: str, passwort: str) -> None:
         # Das Passwort wird bewusst nicht gemerkt: auch ein Demo-Leser soll

@@ -72,6 +72,7 @@ class FalschesGateway:
         self.abschluesse: list[tuple[str, str, str]] = []
         self.importe: list[tuple[str, list[dict[str, Any]]]] = []
         self.meldungen: list[tuple[str, list[dict[str, Any]]]] = []
+        self.geaendert: list[tuple[str, dict[str, Any]]] = []
         self.zugang_geholt = 0
         self.uebernommen: list[str] = []
         self.gemeldet: list[tuple[str, str, str]] = []
@@ -106,6 +107,10 @@ class FalschesGateway:
     ) -> list[dict[str, Any]]:
         self.meldungen.append((staffel_id, mannschaften))
         return mannschaften
+
+    def staffel_aendern(self, staffel_id: str, felder: dict[str, Any]) -> dict[str, Any]:
+        self.geaendert.append((staffel_id, felder))
+        return {**STAFFEL, **felder}
 
     def uebertragung(self) -> dict[str, Any]:
         return {
@@ -344,6 +349,38 @@ class TestInitialisierung:
 
         assert gateway.meldungen == [("s1", [{"name": "SV Loschwitz"}])]
         assert gateway.abschluesse == [("a1", "fertig", "1 Mannschaften übernommen")]
+
+    def test_die_spieltage_kommen_mit(self) -> None:
+        """Sie stehen in der Meisterschaftsliste, an der die Initialisierung
+        ohnehin vorbeikommt. Ohne sie meldet `spieltage_unbekannt` bei jedem
+        einzelnen Spiel."""
+        gateway = FalschesGateway({"id": "a1", "art": "initialisierung", "staffel_id": None})
+        leser = DemoLeser(mannschaften_je_staffel={"Stadtliga C": [{"name": "SV Loschwitz"}]})
+        leser.spieltage = 26
+
+        lauf(gateway, leser).runde()
+
+        assert gateway.geaendert == [("s1", {"spieltage": 26})]
+
+    def test_ohne_zahl_wird_nichts_geaendert(self) -> None:
+        """0 heisst *nicht bekannt*. Sie zu schreiben hiesse, eine von Hand
+        eingetragene Zahl wegzuwerfen."""
+        gateway = FalschesGateway({"id": "a1", "art": "initialisierung", "staffel_id": None})
+        leser = DemoLeser(mannschaften_je_staffel={"Stadtliga C": [{"name": "SV Loschwitz"}]})
+
+        lauf(gateway, leser).runde()
+
+        assert gateway.geaendert == []
+
+    def test_dieselbe_zahl_wird_nicht_noch_einmal_geschrieben(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "initialisierung", "staffel_id": None})
+        gateway._staffeln = [{**STAFFEL, "spieltage": 26}]
+        leser = DemoLeser(mannschaften_je_staffel={"Stadtliga C": [{"name": "SV Loschwitz"}]})
+        leser.spieltage = 26
+
+        lauf(gateway, leser).runde()
+
+        assert gateway.geaendert == []
 
     def test_eine_leere_meldung_ueberschreibt_nichts(self) -> None:
         """Sonst waere ein Leser, der die Meldung nicht holen kann, ein Leser,

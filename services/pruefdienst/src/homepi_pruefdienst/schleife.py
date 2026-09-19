@@ -260,6 +260,17 @@ class Prueflauf:
                 self._gateway.fortschritt(kennung, zeile=f"{name}: {fehler}")
                 logger.error("Meldung zu %s nicht geholt: %s", name, fehler)
                 continue
+            # Die Spieltage stehen in der Meisterschaftsliste, an der die
+            # Initialisierung ohnehin vorbeikommt. Ohne sie meldet die Regel
+            # `spieltage_unbekannt` bei **jedem** Spiel, dass die U23-Ausnahme
+            # an den letzten vier Spieltagen nicht aufgehoben werden kann.
+            spieltage = int(getattr(self._leser, "spieltage", 0) or 0)
+            if spieltage and spieltage != int(staffel.get("spieltage") or 0):
+                self._gateway.staffel_aendern(str(staffel["id"]), {"spieltage": spieltage})
+                self._gateway.fortschritt(
+                    kennung, zeile=f"{name}: {spieltage} Spieltage übernommen"
+                )
+
             if mannschaften:
                 self._gateway.mannschaften_setzen(str(staffel["id"]), mannschaften)
                 gesamt += len(mannschaften)

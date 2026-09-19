@@ -13,6 +13,8 @@ die nicht in den Namen gehört, und das SG-Kürzel in der Ms-Nr.-Spalte.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from homepi_pruefdienst import meldung
 
 TABELLE = """
@@ -107,3 +109,65 @@ class TestEinzelteile:
         assert meldung.ist_sg("7 sg") is True
         assert meldung.ist_sg("7") is False
         assert meldung.ist_sg("") is False
+
+
+class TestSpieltage:
+    """Die Saisonlänge — wenn die Liste sie überhaupt nennt.
+
+    Die alte Anwendung zählte Spalten ab. Als DFBnet die Liste umbaute, stand
+    in der siebten die Rundennummer: aus „Rd 1" wurde „1 Spieltag", und die
+    Staffel galt als einen Spieltag lang. Gesucht wird deshalb nach der
+    Überschrift.
+    """
+
+    KOPF: ClassVar = [
+        "",
+        "Kennung",
+        "Mannschaftsart",
+        "Spielklasse",
+        "Gebiet",
+        "Bezeichnung",
+        "Spieltage",
+    ]
+    #: So sieht die Liste am 19.09.2026 aus -- ohne Spalte "Spieltage".
+    HEUTE: ClassVar = [
+        "",
+        "Kennung",
+        "Mannschaftsart",
+        "Spielklasse",
+        "Gebiet",
+        "Bezeichnung",
+        "Rd",
+        "Nr",
+    ]
+
+    def test_die_zahl_unter_der_ueberschrift(self) -> None:
+        zeile = ["", "633203", "Herren", "Kreisliga C", "Kreis Dresden", "Stadtliga C", "26"]
+
+        assert meldung.spieltage_aus(self.KOPF, zeile) == 26
+
+    def test_ohne_spalte_spieltage_bleibt_es_unbekannt(self) -> None:
+        """So sieht die Liste am 19.09.2026 aus. Die 1 aus der Spalte „Nr"
+        wäre eine erfundene Saisonlänge."""
+        zeile = ["", "633203", "Herren", "Kreisliga C", "Kreis Dresden", "Stadtliga C", "1", "1"]
+
+        assert meldung.spieltage_aus(self.HEUTE, zeile) == 0
+
+    def test_eine_leere_zelle_ebenso(self) -> None:
+        zeile = ["", "633203", "Herren", "Kreisliga C", "Kreis Dresden", "Stadtliga C", ""]
+
+        assert meldung.spieltage_aus(self.KOPF, zeile) == 0
+
+    def test_eine_zu_kurze_zeile_faellt_nicht_um(self) -> None:
+        assert meldung.spieltage_aus(self.KOPF, ["", "633203"]) == 0
+        assert meldung.spieltage_aus([], []) == 0
+
+    def test_eine_unsinnige_zahl_gilt_als_unbekannt(self) -> None:
+        zeile = ["", "633203", "Herren", "Kreisliga C", "Kreis Dresden", "Stadtliga C", "2026"]
+
+        assert meldung.spieltage_aus(self.KOPF, zeile) == 0
+
+    def test_die_spalte_wird_ueber_ihren_namen_gefunden(self) -> None:
+        assert meldung.spalte_mit(self.KOPF, "Spieltage") == 6
+        assert meldung.spalte_mit(self.KOPF, "spieltage ") == 6
+        assert meldung.spalte_mit(self.HEUTE, "Spieltage") == -1

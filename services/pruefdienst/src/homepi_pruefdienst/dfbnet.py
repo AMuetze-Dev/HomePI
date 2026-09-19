@@ -102,6 +102,10 @@ class DfbnetLeser:
         self._playwright: Any = None
         self._browser: Any = None
         self._seite: Any = None
+        #: Die Spieltage der zuletzt geoeffneten Staffel, 0 = nicht bekannt.
+        #: Sie stehen in der Meisterschaftsliste und nirgends sonst; wer die
+        #: Meldung holt, kommt ohnehin dort vorbei.
+        self.spieltage = 0
 
     # ── Anmelden ──────────────────────────────────────────────────────────
 
@@ -585,6 +589,13 @@ class DfbnetLeser:
             knopf = zeile.locator("button[title='Staffel bearbeiten']").first
             if knopf.count() == 0:
                 continue
+            # Die Zeile jetzt lesen, nicht spaeter: nach dem Klick ist sie weg.
+            # Gesucht wird die Spalte "Spieltage"; nennt die Liste sie nicht,
+            # kommt 0 -- und im Artefakt bleibt stehen, was dort steht.
+            self.spieltage = meldung.spieltage_aus(
+                [(z or "").strip() for z in seite.locator("table th").all_text_contents()],
+                [(z or "").strip() for z in zeile.locator("td").all_text_contents()],
+            )
             knopf.click(timeout=ZEIT_MS)
             seite.wait_for_load_state("domcontentloaded")
             return True
