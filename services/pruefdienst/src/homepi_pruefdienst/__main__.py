@@ -8,9 +8,11 @@ import signal
 import sys
 import time
 
+import httpx
+
 from .dienst import wartezeit
 from .gateway import Gateway, GatewayFehler
-from .leser import DemoLeser, Leser
+from .leser import BeispielLeser, Leser
 from .schleife import Prueflauf
 
 logger = logging.getLogger("homepi.pruefdienst")
@@ -50,8 +52,43 @@ def _leser() -> Leser:
         logger.info("Leser: DFBnet (echter Browser)")
         return DfbnetLeser(sichtbar=_ja("PRUEFDIENST_BROWSER_SICHTBAR"))
 
-    logger.info("Leser: Demo — es wird nichts von DFBnet geholt")
-    return DemoLeser()
+    logger.info("Leser: Beispieldaten — es wird nichts von DFBnet geholt")
+    return BeispielLeser()
+
+
+def _warten(stopp: Stopp, sekunden: float) -> None:
+    """Warten, aber auf ein SIGTERM hören."""
+    ende = time.monotonic() + sekunden
+    while time.monotonic() < ende and not stopp.gewuenscht:
+        time.sleep(min(0.5, ende - time.monotonic()))
+
+
+def _anmelden_bis_es_klappt(gateway: Gateway, stopp: Stopp, benutzer: str, basis: str) -> bool:
+    """Warten statt abstürzen.
+
+    Das Gateway ist beim Start vielleicht noch nicht da, und das Konto wird
+    manchmal erst danach angelegt. Ein Container, der deswegen in einer
+    Neustartschleife hängt, füllt das Protokoll mit Abstürzen und verdeckt
+    damit den einen Satz, auf den es ankommt: **warum** die Anmeldung nicht
+    geht. Der steht hier, einmal, und dann wird gewartet.
+    """
+    versuche = 0
+    while not stopp.gewuenscht:
+        try:
+            gateway.anmelden()
+            logger.info("Am Gateway angemeldet als %s (%s)", benutzer, basis)
+            return True
+        except (GatewayFehler, httpx.HTTPError) as fehler:
+            if versuche == 0:
+                logger.error("Anmeldung geht nicht: %s", fehler)
+                logger.error(
+                    "Konto anlegen:  homepi benutzer anlegen %s "
+                    "--artefakt staffelpilot --rolle verwalter --passwort-stdin",
+                    benutzer,
+                )
+            versuche += 1
+            _warten(stopp, wartezeit(versuche))
+    return False
 
 
 def main() -> int:
@@ -81,8 +118,8 @@ def main() -> int:
     leerlauf = 0
 
     with Gateway(basis, benutzer, passwort) as gateway:
-        gateway.anmelden()
-        logger.info("Am Gateway angemeldet als %s (%s)", benutzer, basis)
+        if not _anmelden_bis_es_klappt(gateway, stopp, benutzer, basis):
+            return 0
         lauf = Prueflauf(gateway, _leser(), darf_schreiben=darf_schreiben)
 
         while not stopp.gewuenscht:
@@ -94,10 +131,7 @@ def main() -> int:
                 logger.exception("Das Artefakt antwortet nicht")
                 leerlauf += 1
 
-            pause = wartezeit(leerlauf)
-            ende = time.monotonic() + pause
-            while time.monotonic() < ende and not stopp.gewuenscht:
-                time.sleep(min(0.5, ende - time.monotonic()))
+            _warten(stopp, wartezeit(leerlauf))
 
     logger.info("Beendet")
     return 0

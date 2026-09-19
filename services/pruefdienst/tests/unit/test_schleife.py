@@ -15,7 +15,7 @@ import pytest
 
 from homepi_pruefdienst.dienst import Spielzeile
 from homepi_pruefdienst.gateway import GatewayFehler
-from homepi_pruefdienst.leser import DemoLeser
+from homepi_pruefdienst.leser import BeispielLeser, DemoLeser
 from homepi_pruefdienst.schleife import Prueflauf
 
 HEUTE = dt.date.today()
@@ -61,6 +61,9 @@ class FalschesGateway:
         self.importe: list[tuple[str, list[dict[str, Any]]]] = []
         self.meldungen: list[tuple[str, list[dict[str, Any]]]] = []
         self.zugang_geholt = 0
+        self.uebernommen: list[str] = []
+        self.gemeldet: list[tuple[str, str, str]] = []
+        self._warteschlange = [{"id": f"u{i + 1}"} for i in range(offen)]
 
     # Was der Prueflauf davon braucht:
     def offener_auftrag(self) -> dict[str, Any] | None:
@@ -93,7 +96,23 @@ class FalschesGateway:
         return mannschaften
 
     def uebertragung(self) -> dict[str, Any]:
-        return {"pausiert": self._pausiert, "offen": self._offen, "fehler": 0}
+        return {
+            "pausiert": self._pausiert,
+            "offen": len(self._warteschlange),
+            "fehler": 0,
+        }
+
+    def uebertragung_uebernehmen(self) -> dict[str, Any] | None:
+        if not self._warteschlange:
+            return None
+        naechste = self._warteschlange.pop(0)
+        self.uebernommen.append(str(naechste["id"]))
+        return naechste
+
+    def uebertragung_abschliessen(
+        self, uebertragung_id: str, zustand: str, meldung: str = ""
+    ) -> None:
+        self.gemeldet.append((uebertragung_id, zustand, meldung))
 
     # Hilfen fuer die Tests:
     @property
@@ -209,9 +228,20 @@ class TestPrueflauf:
 
         lauf(gateway, leser).runde()
 
-        assert gateway.abschluesse == [("a1", "fertig", "")]
+        assert gateway.abschluesse[0][1] == "fertig"
         assert leser.angemeldet_als == ""
         assert gateway.zugang_geholt == 0
+
+    def test_und_sagt_in_der_liste_warum(self) -> None:
+        """Ein Lauf, der "fertig, 0 geprueft" meldet, sieht aus wie einer, der
+        nichts gefunden hat. Genau das war die verwirrende Auskunft."""
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None}, staffeln=[])
+
+        lauf(gateway).runde()
+
+        _, _, meldung = gateway.abschluesse[0]
+        assert "Keine aktive Staffel" in meldung
+        assert "Staffeln" in meldung
 
     def test_unbrauchbare_zeilen_werden_gemeldet_und_nicht_verschwiegen(self) -> None:
         gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
@@ -295,7 +325,7 @@ class TestInitialisierung:
         lauf(gateway, leser).runde()
 
         assert gateway.meldungen == [("s1", [{"name": "SV Loschwitz"}])]
-        assert gateway.abschluesse == [("a1", "fertig", "")]
+        assert gateway.abschluesse == [("a1", "fertig", "1 Mannschaften übernommen")]
 
     def test_eine_leere_meldung_ueberschreibt_nichts(self) -> None:
         """Sonst waere ein Leser, der die Meldung nicht holen kann, ein Leser,
@@ -305,7 +335,7 @@ class TestInitialisierung:
         lauf(gateway, DemoLeser()).runde()
 
         assert gateway.meldungen == []
-        assert gateway.abschluesse == [("a1", "fertig", "")]
+        assert gateway.abschluesse == [("a1", "fertig", "Es kam keine Meldung — nichts geändert")]
 
 
 class TestUebertragung:
@@ -328,11 +358,14 @@ class TestUebertragung:
 
         assert ergebnis is False
 
-    def test_auch_mit_beiden_schaltern_wird_noch_nichts_gemeldet(self) -> None:
+    def test_mit_dem_echten_leser_wird_noch_nichts_gemeldet(self) -> None:
         """Das Eintragen ist nicht portiert. Eine Zeile auf 'fertig' zu
         setzen, ohne dass etwas passiert ist, waere die schlimmste aller
         Auskuenfte."""
         gateway = FalschesGateway(pausiert=False, offen=3)
+
+        assert lauf(gateway, DemoLeser(), darf_schreiben=True).runde() is False
+        assert gateway.gemeldet == []
 
         assert lauf(gateway, darf_schreiben=True).runde() is False
 
@@ -354,3 +387,108 @@ class TestDemoLeser:
 
     def test_eine_unbekannte_staffel_gibt_nichts(self) -> None:
         assert DemoLeser().spiele("gibt es nicht", HEUTE, HEUTE) == []
+
+
+class TestBeispielLeser:
+    """Der Leser, mit dem sich der ganze Weg durchklicken laesst."""
+
+    def test_er_erfindet_spiele_zu_jeder_staffel(self) -> None:
+        gefunden = BeispielLeser().spiele(
+            "Egal wie sie heisst", HEUTE - dt.timedelta(days=30), HEUTE
+        )
+
+        assert len(gefunden) == BeispielLeser.SPIELTAGE
+        assert all(z.brauchbar for z in gefunden)
+
+    def test_und_sagt_an_jeder_kennung_dass_es_eine_attrappe_ist(self) -> None:
+        """Wer das in der Oberflaeche sieht, weiss, dass niemand bei DFBnet
+        war."""
+        gefunden = BeispielLeser().spiele("A", HEUTE - dt.timedelta(days=30), HEUTE)
+
+        assert all(z.dfbnet_id.startswith("DEMO-") for z in gefunden)
+
+    def test_die_spiele_liegen_im_zeitraum(self) -> None:
+        von, bis = HEUTE - dt.timedelta(days=30), HEUTE
+
+        gefunden = BeispielLeser().spiele("A", von, bis)
+
+        assert all(z.datum is not None and von <= z.datum <= bis for z in gefunden)
+
+    def test_ein_enger_zeitraum_liefert_weniger(self) -> None:
+        assert len(BeispielLeser().spiele("A", HEUTE - dt.timedelta(days=3), HEUTE)) == 1
+
+    def test_befunde_gibt_es_nur_am_ersten_spiel(self) -> None:
+        """An jedem Spiel waere die Warteschlange voller Arbeit, die es nicht
+        gibt - und "geprueft und sauber" nicht mehr von "geprueft und
+        auffaellig" zu unterscheiden."""
+        leser = BeispielLeser()
+        spiele = leser.spiele("A", HEUTE - dt.timedelta(days=30), HEUTE)
+
+        assert len([z for z in spiele if leser.befunde_zu(z)]) == 1
+
+    def test_jeder_befund_traegt_den_hinweis(self) -> None:
+        leser = BeispielLeser()
+        erstes = leser.spiele("A", HEUTE - dt.timedelta(days=30), HEUTE)[0]
+
+        befunde = leser.befunde_zu(erstes)
+
+        assert befunde
+        assert all("Beispieldaten" in str(b["text"]) for b in befunde)
+
+    def test_die_mannschaften_enthalten_eine_spielgemeinschaft(self) -> None:
+        """Sonst zeigt die Oberflaeche nie, wozu "pruefen" da ist."""
+        assert any(m["ist_sg"] for m in BeispielLeser().mannschaften("A"))
+
+
+class TestSimulierteUebertragung:
+    def test_mit_beispieldaten_wird_sie_simuliert(self) -> None:
+        gateway = FalschesGateway(pausiert=False, offen=2)
+
+        assert lauf(gateway, BeispielLeser(), darf_schreiben=True).runde() is True
+        assert gateway.uebernommen == ["u1", "u2"]
+        assert [z for _, z, _ in gateway.gemeldet] == ["fertig", "fertig"]
+
+    def test_und_jede_zeile_sagt_dass_sie_simuliert_ist(self) -> None:
+        """Sonst steht in der Akte eine Freigabe, die es nicht gibt."""
+        gateway = FalschesGateway(pausiert=False, offen=1)
+
+        lauf(gateway, BeispielLeser(), darf_schreiben=True).runde()
+
+        assert "Simuliert" in gateway.gemeldet[0][2]
+
+    @pytest.mark.parametrize(("pausiert", "darf_schreiben"), [(True, True), (False, False)])
+    def test_auch_simuliert_braucht_es_beide_schalter(
+        self, pausiert: bool, darf_schreiben: bool
+    ) -> None:
+        gateway = FalschesGateway(pausiert=pausiert, offen=2)
+
+        lauf(gateway, BeispielLeser(), darf_schreiben=darf_schreiben).runde()
+
+        assert gateway.gemeldet == []
+
+
+class TestBefundeImLauf:
+    def test_der_beispiel_leser_bringt_befunde_mit(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+
+        lauf(gateway, BeispielLeser()).runde()
+
+        _, spiele = gateway.importe[0]
+        assert sum(len(s["befunde"]) for s in spiele) > 0
+
+    def test_und_sie_werden_mitgezaehlt(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+
+        lauf(gateway, BeispielLeser()).runde()
+
+        assert any(f.get("befunde") for f in gateway.fortschritte)
+
+    def test_der_echte_leser_meldet_keine(self) -> None:
+        """Sie hier vorzutaeuschen hiesse, einen Bericht als geprueft
+        auszugeben, den niemand geprueft hat."""
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+
+        lauf(gateway, DemoLeser({"Stadtliga C": [zeile()]})).runde()
+
+        _, spiele = gateway.importe[0]
+        assert all(s["befunde"] == [] for s in spiele)

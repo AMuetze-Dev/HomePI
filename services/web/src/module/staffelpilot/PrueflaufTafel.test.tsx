@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../api/client";
 import { PrueflaufTafel } from "./PrueflaufTafel";
+import { ergebnisSatz } from "./ergebnis";
 import * as api from "./api";
 
 function staffel(rest: Partial<api.Staffel> = {}): api.Staffel {
@@ -201,9 +202,9 @@ describe("Der Verlauf", () => {
     ]);
     render(<PrueflaufTafel staffeln={[staffel()]} />);
 
+    // Die Meldung geht vor: sie sagt, was los war, die Zahlen nur, wie viel.
     const liste = await screen.findByRole("list", { name: "Bisherige Läufe" });
-    expect(within(liste).getByText(/12 geprüft, 3 Befunde/)).toBeInTheDocument();
-    expect(within(liste).getByText(/DFBnet weg/)).toBeInTheDocument();
+    expect(within(liste).getByText("DFBnet weg")).toBeInTheDocument();
     expect(within(liste).getByText("Gescheitert")).toBeInTheDocument();
   });
 });
@@ -290,5 +291,82 @@ describe("Die Übertragung", () => {
     expect(
       screen.queryByRole("button", { name: "Gescheiterte wiederholen" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("Was ein beendeter Auftrag gebracht hat", () => {
+  it("nennt die Meldung, wenn es eine gibt", () => {
+    // "0 geprüft, 0 Befunde" unter "Keine aktive Staffel" ist keine Auskunft.
+    const satz = ergebnisSatz(
+      auftrag({
+        zustand: "fertig",
+        meldung: "Keine aktive Staffel — erst eine anlegen.",
+      }),
+    );
+
+    expect(satz).toBe("Keine aktive Staffel — erst eine anlegen.");
+  });
+
+  it("zählt beim Prüflauf, was geprüft wurde", () => {
+    expect(ergebnisSatz(auftrag({ zustand: "fertig", gepruefte: 12, befunde: 3 }))).toBe(
+      "12 geprüft, 3 Befunde",
+    );
+  });
+
+  it("sagt beim leeren Prüflauf, warum nichts kam", () => {
+    expect(ergebnisSatz(auftrag({ zustand: "fertig" }))).toBe(
+      "Keine Spielberichte im Prüfzeitraum",
+    );
+  });
+
+  it("verwechselt eine Initialisierung nicht mit einem Prüflauf", () => {
+    // Sie holt Mannschaften und prüft nichts - "0 geprüft" wäre eine
+    // Verwechslung und keine Null.
+    const satz = ergebnisSatz(auftrag({ art: "initialisierung", zustand: "fertig" }));
+
+    expect(satz).toBe("Mannschaften geholt");
+    expect(satz).not.toContain("geprüft");
+  });
+
+  it("sagt beim wartenden Auftrag, worauf er wartet", () => {
+    expect(ergebnisSatz(auftrag({ zustand: "angefordert" }))).toBe(
+      "Wartet auf den Prüfdienst",
+    );
+  });
+});
+
+describe("Wenn ein Lauf zu Ende ist", () => {
+  it("sagt die Tafel Bescheid", async () => {
+    // Ohne das steht die Spielprüfung noch auf dem Stand von vorhin, und die
+    // frisch eingespielten Berichte erscheinen erst nach einem Neuladen.
+    // Genau das hat der Oberflächentest gefunden.
+    //
+    // Echte Uhr statt `vi.useFakeTimers`: der Takt startet erst, wenn der
+    // erste Ladevorgang durch ist, und dieses Zusammenspiel aus Versprechen
+    // und Zeitgeber lässt sich mit gestellter Zeit nicht ehrlich nachstellen.
+    const fertig = vi.fn();
+    vi.spyOn(api, "ladeAuftraege").mockResolvedValue([]);
+    vi.spyOn(api, "ladeUebertragung").mockResolvedValue(stand());
+    const offen = vi
+      .spyOn(api, "ladeOffenenAuftrag")
+      .mockResolvedValue(auftrag({ zustand: "laeuft" }));
+
+    render(<PrueflaufTafel staffeln={[staffel()]} onFertig={fertig} />);
+    await screen.findByRole("button", { name: "Abbrechen" });
+    expect(fertig).not.toHaveBeenCalled();
+
+    offen.mockResolvedValue(null);
+
+    await waitFor(() => expect(fertig).toHaveBeenCalledTimes(1), { timeout: 8000 });
+  }, 12_000);
+
+  it("aber nicht, wenn ohnehin keiner lief", async () => {
+    const fertig = vi.fn();
+    mitStand();
+
+    render(<PrueflaufTafel staffeln={[staffel()]} onFertig={fertig} />);
+    await screen.findByRole("button", { name: "Prüflauf anfordern" });
+
+    expect(fertig).not.toHaveBeenCalled();
   });
 });

@@ -115,6 +115,14 @@ class Gateway:
     def uebertragung(self) -> dict[str, Any]:
         return self._json("GET", "/staffelpilot/uebertragungen")  # type: ignore[no-any-return]
 
+    def uebertragung_uebernehmen(self) -> dict[str, Any] | None:
+        """Die naechste offene Zeile - und sie gehoert dann uns.
+
+        Uebernehmen und nicht nur lesen: sonst greifen zwei Dienste nach
+        derselben Zeile und tragen dieselbe Freigabe zweimal ein.
+        """
+        return self._json("POST", "/staffelpilot/uebertragungen/naechste")  # type: ignore[no-any-return]
+
     def uebertragung_abschliessen(
         self, uebertragung_id: str, zustand: str, meldung: str = ""
     ) -> None:

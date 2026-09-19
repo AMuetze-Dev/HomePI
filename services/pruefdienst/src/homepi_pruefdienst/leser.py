@@ -11,6 +11,7 @@ in `dfbnet.py` noch zur Seite passen.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 from typing import Protocol
 
 from .dienst import Spielzeile
@@ -63,3 +64,100 @@ class DemoLeser:
 
     def schliessen(self) -> None:
         self.geschlossen = True
+
+
+# ── Beispieldaten ─────────────────────────────────────────────────────────
+
+#: Vier Vereine, davon eine Spielgemeinschaft und ein Verein mit zweiter
+#: Mannschaft -- damit die Oberflaeche zeigen kann, was sie kann: geratene
+#: Zuordnung, "pruefen" an der SG, und eine echte Paarung.
+_VEREINE = [
+    ("SG Gittersee/Coschütz", True),
+    ("SV Loschwitz", False),
+    ("SV Loschwitz 2", False),
+    ("Dresdner SC 1898", False),
+]
+
+#: Zwei Befunde, einer davon kritisch und mit Weg -- sonst gibt es in der
+#: Oberflaeche nichts zu entscheiden und nichts zu entwerfen.
+_BEFUNDE = [
+    {
+        "regel": "rote_karte",
+        "schwere": "kritisch",
+        "titel": "Feldverweis auf Dauer",
+        "text": "Feldverweis in Minute 71 wegen Tätlichkeit.",
+        "person": "Max Müller",
+        "weg": "sportgericht",
+    },
+    {
+        "regel": "ordnungsdienst_fehlt",
+        "schwere": "warnung",
+        "titel": "Ordnungsdienst nicht benannt",
+        "text": "Im Spielbericht ist kein Ordnungsdienst eingetragen.",
+        "person": "",
+        "weg": "mahnung",
+    },
+]
+
+
+def _kurz(staffel: str) -> str:
+    """Eine kurze, **stabile** Kennung aus dem Staffelnamen.
+
+    Nicht `hash()`: der ist je Prozess anders gesalzen, und derselbe
+    Prueflauf haette nach jedem Neustart des Containers andere Kennungen --
+    also lauter neue Spiele statt aufgefrischter.
+    """
+    return hashlib.sha256(staffel.encode()).hexdigest()[:4]
+
+
+class BeispielLeser(DemoLeser):
+    """Ein Leser, der zu jeder Staffel plausible Daten erfindet.
+
+    **Er ist eine Attrappe und sagt das auch:** jedes Spiel traegt eine
+    Kennung, die mit ``DEMO-`` anfaengt, und jeder Befund den Hinweis im Text.
+    Wer das in der Oberflaeche sieht, weiss, dass niemand bei DFBnet war.
+
+    Wozu er da ist: ohne ihn laesst sich der Weg von "Staffel anlegen" bis
+    "freigeben" nirgends durchklicken, ohne einen Verband anzufassen.
+    """
+
+    #: So viele Spieltage zurueck. Drei reichen, um eine Liste zu fuellen, und
+    #: liegen sicher im voreingestellten Pruefzeitraum von dreissig Tagen.
+    SPIELTAGE = 3
+
+    def spiele(self, staffel: str, von: dt.date, bis: dt.date) -> list[Spielzeile]:
+        gefunden: list[Spielzeile] = []
+        for nummer in range(self.SPIELTAGE):
+            tag = bis - dt.timedelta(days=7 * nummer)
+            if tag < von:
+                break
+            heim, gast = _VEREINE[nummer % 2][0], _VEREINE[(nummer % 2) + 2][0]
+            gefunden.append(
+                Spielzeile(
+                    dfbnet_id=f"DEMO-{_kurz(staffel)}-{nummer + 1}",
+                    datum=tag,
+                    heim=heim,
+                    gast=gast,
+                    ergebnis=f"{nummer + 1} : {nummer}",
+                    status="freigegeben",
+                )
+            )
+        return gefunden
+
+    def mannschaften(self, staffel: str) -> list[dict[str, object]]:
+        return [{"name": name, "ist_sg": ist_sg} for name, ist_sg in _VEREINE]
+
+    @staticmethod
+    def befunde_zu(zeile: Spielzeile) -> list[dict[str, object]]:
+        """Nur am ersten Spiel, und deutlich als Attrappe gekennzeichnet.
+
+        An jedem Spiel waere die Warteschlange voller Arbeit, die es nicht
+        gibt -- und der Unterschied zwischen "geprueft und sauber" und
+        "geprueft und auffaellig" waere nicht mehr zu sehen.
+        """
+        if not zeile.dfbnet_id.endswith("-1"):
+            return []
+        return [
+            {**befund, "mannschaft": zeile.heim, "text": f"{befund['text']} (Beispieldaten)"}
+            for befund in _BEFUNDE
+        ]

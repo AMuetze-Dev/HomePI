@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
 import {
@@ -15,6 +15,7 @@ import {
   setzeUebertragungPause,
   wiederholeUebertragung,
 } from "./api";
+import { ergebnisSatz } from "./ergebnis";
 import stil from "./StaffelpilotSeite.module.css";
 
 function meldung(fehler: unknown): string {
@@ -59,12 +60,24 @@ function alsZeit(wert: string): string {
  * DFBnet-Dienst. Solange der nicht läuft, bleibt ein Auftrag auf „Wartet"
  * stehen — und das steht auch so da, statt einen Fortschritt vorzutäuschen.
  */
-export function PrueflaufTafel({ staffeln }: { staffeln: Staffel[] }) {
+export function PrueflaufTafel({
+  staffeln,
+  onFertig,
+}: {
+  staffeln: Staffel[];
+  /** Ein Lauf ist zu Ende — was er eingespielt hat, steht woanders. */
+  onFertig?: (() => void) | undefined;
+}) {
   const [offen, setOffen] = useState<Auftrag | null>(null);
   const [verlauf, setVerlauf] = useState<AuftragZeile[] | null>(null);
   const [uebertragung, setUebertragung] = useState<UebertragungStand | null>(null);
   const [staffelId, setStaffelId] = useState("");
   const [fehler, setFehler] = useState("");
+
+  // In einer Referenz, damit `laden` nicht bei jedem Rendern neu entsteht -
+  // sonst startet der Takt unten immer wieder von vorn.
+  const onFertigRef = useRef(onFertig);
+  onFertigRef.current = onFertig;
 
   const laden = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -73,7 +86,13 @@ export function PrueflaufTafel({ staffeln }: { staffeln: Staffel[] }) {
         ladeAuftraege(signal),
         ladeUebertragung(signal),
       ]);
-      setOffen(aktuell);
+      // Von "da" auf "weg": der Lauf ist zu Ende. Ohne diesen Ruf steht die
+      // Spielprüfung noch auf dem Stand von vorhin, und der Staffelleiter
+      // sieht seine frisch eingespielten Berichte erst nach einem Neuladen.
+      setOffen((vorher) => {
+        if (vorher !== null && aktuell === null) onFertigRef.current?.();
+        return aktuell;
+      });
       setVerlauf(alle);
       setUebertragung(stand);
     } catch (f) {
@@ -199,10 +218,7 @@ export function PrueflaufTafel({ staffeln }: { staffeln: Staffel[] }) {
                   </Etikett>
                   <span className={stil.datum}>{alsZeit(z.angelegt)}</span>
                 </div>
-                <p className={stil.vorgangHinweis}>
-                  {z.gepruefte} geprüft, {z.befunde} Befunde
-                  {z.meldung && ` — ${z.meldung}`}
-                </p>
+                <p className={stil.vorgangHinweis}>{ergebnisSatz(z)}</p>
               </Karte>
             </li>
           ))}

@@ -648,6 +648,21 @@ async def uebertragung_wiederholen(
     return await uebertragungen(sitzung)
 
 
+@router.post("/uebertragungen/naechste", summary="Die nächste offene übernehmen")
+async def uebertragung_uebernehmen(sitzung: DbSitzung) -> UebertragungAusgabe | None:
+    """Vom Prüfdienst aufgerufen. `null`, wenn nichts offen ist.
+
+    Übernehmen und nicht nur lesen: sonst greifen zwei Dienste nach derselben
+    Zeile und tragen dieselbe Freigabe zweimal in DFBnet ein.
+
+    **Die Pause wird hier nicht geprüft.** Ob übertragen werden darf, steht im
+    Stand, und der Dienst liest ihn — eine zweite Prüfung an dieser Stelle
+    wäre dieselbe Regel an zwei Orten.
+    """
+    gefunden = await speicher.uebertragung_uebernehmen(sitzung)
+    return UebertragungAusgabe.model_validate(gefunden) if gefunden else None
+
+
 @router.post("/uebertragungen/{uebertragung_id}/abschluss", summary="Ergebnis melden")
 async def uebertragung_abschliessen(
     uebertragung_id: uuid.UUID, daten: UebertragungAbschluss, sitzung: DbSitzung

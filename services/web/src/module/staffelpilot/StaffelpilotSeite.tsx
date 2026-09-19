@@ -242,7 +242,10 @@ export function StaffelpilotSeite() {
     return (
       <>
         {leiste}
-        <PrueflaufTafel staffeln={staffeln} />
+        <PrueflaufTafel
+          staffeln={staffeln}
+          onFertig={() => void laden(staffelFilter, nurFaellig)}
+        />
       </>
     );
   }

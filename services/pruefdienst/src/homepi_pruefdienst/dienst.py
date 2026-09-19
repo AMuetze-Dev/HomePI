@@ -240,8 +240,9 @@ class Ausbeute:
 
     spiele: list[dict[str, object]] = field(default_factory=list)
     uebersprungen: int = 0
+    befunde: int = 0
 
-    def aufnehmen(self, zeile: Spielzeile) -> None:
+    def aufnehmen(self, zeile: Spielzeile, befunde: list[dict[str, object]] | None = None) -> None:
         if not zeile.brauchbar:
             self.uebersprungen += 1
             return
@@ -253,9 +254,11 @@ class Ausbeute:
                 "heim": zeile.heim,
                 "gast": zeile.gast,
                 "ergebnis": zeile.ergebnis,
-                # Die Regelprüfung ist noch nicht portiert. Ein leeres Feld
-                # ist hier die ehrliche Aussage: der Bericht ist da, geprüft
-                # ist er nicht.
-                "befunde": [],
+                # Leer, solange die Regelprüfung nicht portiert ist. Das ist
+                # die ehrliche Aussage: der Bericht ist da, geprüft ist er
+                # nicht. Der Beispiel-Leser füllt es, damit sich die
+                # Oberfläche durchklicken lässt.
+                "befunde": befunde or [],
             }
         )
+        self.befunde += len(befunde or [])

@@ -236,3 +236,58 @@ class TestWiederholen:
         stand = (await client.post("/staffelpilot/uebertragungen/wiederholen")).json()
 
         assert stand["offen"] == 1
+
+
+class TestUebernehmen:
+    async def test_ohne_offene_kommt_null(self, client: AsyncClient) -> None:
+        """Der Pruefdienst fragt das im Takt ab. Ein 404 waere dort ein Fehler
+        und kein Ergebnis."""
+        antwort = await client.post("/staffelpilot/uebertragungen/naechste")
+
+        assert antwort.status_code == 200
+        assert antwort.json() is None
+
+    async def test_die_uebernommene_laeuft(self, client: AsyncClient) -> None:
+        await einreihen(client)
+
+        antwort = await client.post("/staffelpilot/uebertragungen/naechste")
+
+        assert antwort.json()["zustand"] == "laeuft"
+
+    async def test_und_wird_kein_zweites_mal_ausgegeben(self, client: AsyncClient) -> None:
+        """Sonst greifen zwei Dienste nach derselben Zeile und tragen dieselbe
+        Freigabe zweimal in DFBnet ein."""
+        await einreihen(client)
+
+        erste = (await client.post("/staffelpilot/uebertragungen/naechste")).json()
+        zweite = (await client.post("/staffelpilot/uebertragungen/naechste")).json()
+
+        assert erste is not None
+        assert zweite is None
+
+    async def test_die_aelteste_zuerst(self, client: AsyncClient) -> None:
+        await einreihen(client, referenz="M-1")
+        await einreihen(client, referenz="M-2")
+
+        erste = (await client.post("/staffelpilot/uebertragungen/naechste")).json()
+
+        assert erste["referenz"] == "M-1"
+
+    async def test_eine_gescheiterte_wird_nicht_uebernommen(self, client: AsyncClient) -> None:
+        """Erst wiederholen, dann laufen - sonst haengt der Dienst an einer
+        Zeile, die gerade eben schon nicht ging."""
+        zeile = await einreihen(client)
+        await scheitern(client, str(zeile["id"]))
+
+        assert (await client.post("/staffelpilot/uebertragungen/naechste")).json() is None
+
+    async def test_nach_dem_wiederholen_schon(self, client: AsyncClient) -> None:
+        zeile = await einreihen(client)
+        await scheitern(client, str(zeile["id"]))
+        await client.post("/staffelpilot/uebertragungen/wiederholen")
+
+        assert (await client.post("/staffelpilot/uebertragungen/naechste")).json() is not None
+
+    async def test_naechste_steht_vor_der_kennung(self, client: AsyncClient) -> None:
+        """Waere es umgekehrt, versuchte FastAPI 'naechste' als UUID zu lesen."""
+        assert (await client.post("/staffelpilot/uebertragungen/naechste")).status_code == 200

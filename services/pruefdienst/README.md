@@ -34,16 +34,24 @@ hat, und ein Konto, das abhandenkommt, lässt sich sperren wie jedes andere.
 
 ## Einrichten
 
-```bash
-# Ein Konto mit "verwalter" für staffelpilot. --passwort-stdin, nicht
-# --startpasswort: ein Dienst kann kein Passwort wechseln.
-printf '%s' "$PW" | docker compose -f compose.dev.yml exec -T \
-  -w /app/services/gateway gateway uv run homepi benutzer anlegen \
-  pruefdienst --artefakt staffelpilot --rolle verwalter --passwort-stdin
+Der Container läuft in der Entwicklungsumgebung mit. Was ihm fehlt, ist ein
+Konto:
 
-PRUEFDIENST_PASSWORT="$PW" docker compose -f compose.dev.yml \
-  --profile pruefdienst up -d --build pruefdienst
+```bash
+make dev
+make dev-pruefdienst
 ```
+
+Nur `verwalter` für **staffelpilot**, nicht für `verwaltung`: Letzteres wäre
+ein Administrator, und dann gälte die Installation als eingerichtet — die
+Wache der Oberflächentests bricht dort ab.
+
+`--passwort-stdin` und nicht `--startpasswort`: ein Dienst kann kein Passwort
+wechseln.
+
+Ohne Konto **stürzt er nicht ab**, sondern sagt einmal, was fehlt, und wartet.
+Ein Container in einer Neustartschleife füllt das Protokoll mit Abstürzen und
+verdeckt genau den Satz, auf den es ankommt.
 
 Danach in der Oberfläche unter **DFBnet-Zugang** die Anmeldedaten hinterlegen.
 Ohne sie bricht jeder Lauf mit einer klaren Meldung ab.
@@ -52,12 +60,32 @@ Ohne sie bricht jeder Lauf mit einer klaren Meldung ab.
 
 | `PRUEFDIENST_LESER` | |
 |---|---|
-| `demo` *(Voreinstellung)* | klopft nirgends an, gibt zurück, was ihm mitgegeben wurde. Damit lässt sich die ganze Kette ansehen, bevor je ein Passwort im Spiel war |
+| `demo` *(Voreinstellung)* | **Beispieldaten.** Klopft nirgends an, erfindet zu jeder Staffel drei Spiele, vier Mannschaften (davon eine SG) und zwei Befunde am ersten Spiel |
 | `dfbnet` | ein echter Browser, echte Anmeldung |
 
 Wer nichts sagt, bekommt den, der nirgends anklopft. Ein Dienst, der beim
 ersten Start ungefragt einen Browser nach DFBnet schickt, ist eine Überraschung
 zu viel.
+
+Die Beispieldaten sagen, dass sie welche sind: jede Spielkennung fängt mit
+`DEMO-` an, und in jedem Befundtext steht „(Beispieldaten)". Wer das in der
+Oberfläche sieht, weiß, dass niemand bei DFBnet war.
+
+## Zusehen
+
+Im Container gibt es keinen Bildschirm. Wer dem Prüflauf bei der Arbeit
+zusehen will, lässt ihn auf dem eigenen Rechner laufen:
+
+```bash
+make pruefdienst-zusehen            # Beispieldaten, kein Browser
+make pruefdienst-zusehen L=dfbnet   # echter, sichtbarer Browser
+```
+
+Der Container wird dafür angehalten: es gibt genau eine DFBnet-Sitzung, und
+zwei Dienste würden sich um jeden Auftrag streiten.
+
+Ohne sichtbaren Browser steht der Fortschritt in der Oberfläche unter
+**Prüflauf** — Schritt, Balken und Protokoll, im Drei-Sekunden-Takt.
 
 ## Was er **nicht** tut
 
@@ -78,8 +106,9 @@ passieren, weil ein Container gestartet wurde.
 | Anfordern, anmelden, Fortschritt, Abschluss, Fehlerbehandlung | **geprüft** — gegen ein nachgebautes Gateway und den Demo-Leser |
 | Anmelden bei DFBnet, Trefferliste lesen | gebaut, **nicht gegen das echte DFBnet geprüft** |
 | Regelprüfung (die 31 Regeln) | **fehlt**. Eingespielte Spiele haben `befunde: []` — der Bericht ist da, geprüft ist er nicht |
-| Meldung einer Staffel holen (Initialisierung) | **fehlt**. Der Leser gibt eine leere Liste zurück, und die überschreibt im Artefakt nichts |
-| Eintragen in DFBnet (Prüferfreigabe, Fallanlage) | **fehlt**. Vorgemerktes bleibt stehen, statt still auf „fertig" zu springen |
+| Meldung einer Staffel holen (Initialisierung) | **fehlt** — im DFBnet-Leser. Er gibt eine leere Liste zurück, und die überschreibt im Artefakt nichts; der Auftrag meldet dann, dass nichts kam, statt einen Erfolg |
+| Eintragen in DFBnet (Prüferfreigabe, Fallanlage) | **fehlt**. Mit `PRUEFDIENST_LESER=dfbnet` bleibt Vorgemerktes stehen, statt still auf „fertig" zu springen |
+| Eintragen **simuliert** | mit den Beispieldaten wird jede Übertragung als erledigt gemeldet — mit dem Vermerk „Simuliert — es war kein Browser bei DFBnet" an der Zeile. Nur so lässt sich der Weg bis zum Freigeben einmal durchklicken |
 
 Was fehlt, liegt fertig in der alten Anwendung unter
 `D:/DevLibrary/StaffelPilot/src/automation/` und `src/rules/` — rund 5000
@@ -119,3 +148,18 @@ uv run pytest --cov
 `dfbnet.py` und `__main__.py` sind von der Abdeckung ausgenommen: das eine
 braucht einen Browser, das andere einen Prozess. Eine Zahl, die so tut, wäre
 schlimmer als die ehrliche Lücke.
+
+### Der ganze Weg
+
+`services/web/e2e/staffelpilot.spec.ts` geht ihn durch — Ersteinrichtung,
+Recht vergeben, Staffel anlegen, Zugang hinterlegen, Saisondaten holen,
+Prüflauf, Befund entscheiden, abhaken, freigeben. Gegen einen echten
+Container, eine echte Datenbank und diesen Dienst:
+
+```bash
+make e2e
+```
+
+Beide Reisen dort brauchen eine **frische** Installation — die eine richtet
+ein, die andere prüft, dass die Einrichtung noch offen ist. Sie bekommen
+deshalb je einen eigenen Durchgang.

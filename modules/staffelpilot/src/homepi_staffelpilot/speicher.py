@@ -721,6 +721,28 @@ async def uebertragung_wiederholen(sitzung: AsyncSession, uebertragung_id: uuid.
     return len(betroffen)
 
 
+async def uebertragung_uebernehmen(sitzung: AsyncSession) -> Uebertragung | None:
+    """Die naechste offene Zeile - und sie gehoert dann dem Aufrufer.
+
+    Uebernehmen und nicht nur lesen: sonst greifen zwei Dienste nach derselben
+    Zeile und tragen dieselbe Freigabe zweimal in DFBnet ein. `FOR UPDATE SKIP
+    LOCKED` laesst den zweiten die naechste nehmen, statt zu warten.
+    """
+    ergebnis = await sitzung.execute(
+        select(Uebertragung)
+        .where(Uebertragung.zustand == "offen")
+        .order_by(Uebertragung.angelegt)
+        .limit(1)
+        .with_for_update(skip_locked=True)
+    )
+    gefunden = ergebnis.scalar_one_or_none()
+    if gefunden is None:
+        return None
+    gefunden.zustand = dienst.uebertragung_weiter(gefunden.zustand, "laeuft")
+    await sitzung.flush()
+    return gefunden
+
+
 async def uebertragung_abschliessen(
     sitzung: AsyncSession, uebertragung_id: uuid.UUID, daten: UebertragungAbschluss
 ) -> Uebertragung:

@@ -60,14 +60,19 @@ services:
       # Ein eigenes Konto mit der Rolle "verwalter" fuer staffelpilot. Anlegen:
       #   make dev-testkonto N=pruefdienst
       PRUEFDIENST_BENUTZER: ${PRUEFDIENST_BENUTZER:-pruefdienst}
-      PRUEFDIENST_PASSWORT: ${PRUEFDIENST_PASSWORT:-}
+      # Fest, weil das Konto von `make dev-testkonto` mit genau diesem
+      # Passwort angelegt wird. Es ist eine Entwicklungsumgebung.
+      PRUEFDIENST_PASSWORT: ${PRUEFDIENST_PASSWORT:-nur-zum-durchklicken-im-eigenen-netz}
       PRUEFDIENST_LESER: ${PRUEFDIENST_LESER:-demo}
       # Zweiter Schalter fuer das Eintragen in DFBnet. Der erste steht in der
       # Oberflaeche. Beide muessen an sein.
-      PRUEFDIENST_DARF_SCHREIBEN: ${PRUEFDIENST_DARF_SCHREIBEN:-0}
+      # In der Entwicklung an: mit dem Beispiel-Leser wird die
+      # Uebertragung nur **simuliert**, und jede Zeile sagt das auch.
+      # Mit PRUEFDIENST_LESER=dfbnet weigert sich der Dienst weiterhin --
+      # das Eintragen ist nicht portiert.
+      PRUEFDIENST_DARF_SCHREIBEN: ${PRUEFDIENST_DARF_SCHREIBEN:-1}
     volumes:
       - ./services/pruefdienst/src:/app/services/pruefdienst/src
-    profiles: ["pruefdienst"]
 
   gateway:
     build:

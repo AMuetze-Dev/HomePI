@@ -222,15 +222,41 @@ dev-ps:
 E2E_WEB_PORT ?= 5273
 E2E_API_PORT ?= 18100
 E2E_DB_PORT ?= 15532
+#: Das Passwort des Dienstkontos. Nur fuer Entwicklung und Tests - in
+#: Produktion kommt es aus einem Secret.
+PRUEFDIENST_PW ?= nur-zum-durchklicken-im-eigenen-netz
+#: Der Port der Entwicklungsumgebung. Dieselbe Vorgabe wie in
+#: compose.dev.yml -- wer dort umstellt, stellt hier mit um.
+DEV_API_PORT ?= 18000
 E2E := DEV_PROJEKT=homepi-e2e DEV_WEB_PORT=$(E2E_WEB_PORT) DEV_API_PORT=$(E2E_API_PORT) DEV_DB_PORT=$(E2E_DB_PORT) docker compose -f compose.dev.yml
 
-e2e: e2e-hoch
-	@cd services/web && E2E_URL=http://127.0.0.1:$(E2E_WEB_PORT) 	  E2E_EINRICHTUNGSTOKEN="$$(cd ../.. && $(MAKE) --no-print-directory e2e-token)" 	  npm run test:e2e; 	  ergebnis=$$?; 	  cd ../.. && $(MAKE) --no-print-directory e2e-runter; 	  exit $$ergebnis
+# Beide Reisen brauchen eine **frische** Installation: die eine richtet ein,
+# die andere prueft, dass die Einrichtung noch offen ist. Sie koennen sich
+# also keine Datenbank teilen - deshalb je ein eigener Durchgang.
+e2e:
+	@for spec in weg staffelpilot; do \
+	  echo "=== $$spec"; \
+	  $(MAKE) --no-print-directory e2e-hoch || exit 1; \
+	  ( cd services/web && E2E_URL=http://127.0.0.1:$(E2E_WEB_PORT) \
+	      E2E_EINRICHTUNGSTOKEN="$$(cd ../.. && $(MAKE) --no-print-directory e2e-token)" \
+	      npx playwright test $$spec ); \
+	  ergebnis=$$?; \
+	  $(MAKE) --no-print-directory e2e-runter; \
+	  [ $$ergebnis -eq 0 ] || exit $$ergebnis; \
+	done
 
 ## e2e-hoch: die Testumgebung starten, mit frischer Datenbank
 e2e-hoch:
 	-@$(E2E) down -v >/dev/null 2>&1
 	$(E2E) up -d --build --wait --wait-timeout 300
+	@# Der Pruefdienst braucht ein Konto. Die Oberflaechentests gehen sonst
+	@# bis zum Prueflauf und warten dort auf einen Dienst, der nicht darf.
+	@#
+	@# Nur 'staffelpilot', nicht 'verwaltung': ein Verwalter fuer die
+	@# Verwaltung waere ein Administrator, und dann gilt die Installation
+	@# als eingerichtet - die Wache der Oberflaechentests bricht dann ab.
+	$(E2E) exec -T -w /app/services/gateway gateway sh -c "printf '%s' '$(PRUEFDIENST_PW)' | uv run homepi benutzer anlegen pruefdienst --artefakt staffelpilot --rolle verwalter --passwort-stdin"
+	$(E2E) restart pruefdienst
 
 ## e2e-token: Einrichtungstoken der Testumgebung ausgeben
 e2e-token:
@@ -249,6 +275,35 @@ e2e-runter:
 # Mit N=<name> ein anderes Konto, mit R=<rolle> eine andere Rolle.
 dev-testkonto:
 	$(DEV) exec -T -w /app/services/gateway gateway uv run homepi benutzer testkonto $(or $(N),tester) $(if $(R),--rolle $(R),)
+
+## dev-pruefdienst: Konto fuer den Pruefdienst, damit er arbeiten kann
+#
+# Er ist ein Benutzer wie jeder andere und braucht deshalb eines. Ohne
+# das Konto laeuft der Container und kommt an kein Artefakt.
+dev-pruefdienst:
+	$(DEV) exec -T -w /app/services/gateway gateway sh -c "printf '%s' '$(PRUEFDIENST_PW)' | uv run homepi benutzer anlegen pruefdienst --artefakt staffelpilot --rolle verwalter --passwort-stdin" || true
+	$(DEV) restart pruefdienst
+
+## pruefdienst-zusehen: den Pruefdienst hier laufen lassen, mit sichtbarem Browser
+#
+# Im Container gibt es keinen Bildschirm - wer dem Prueflauf zusehen will,
+# laesst ihn auf diesem Rechner laufen. Der Container wird dafuer angehalten:
+# es gibt genau eine DFBnet-Sitzung, und zwei Dienste wuerden sich um jeden
+# Auftrag streiten.
+#
+#   make pruefdienst-zusehen            # Beispieldaten, kein Browser
+#   make pruefdienst-zusehen L=dfbnet   # echter, sichtbarer Browser
+pruefdienst-zusehen:
+	-$(DEV) stop pruefdienst
+	cd services/pruefdienst && \
+	  HOMEPI_URL=http://127.0.0.1:$(DEV_API_PORT) \
+	  PRUEFDIENST_BENUTZER=pruefdienst \
+	  PRUEFDIENST_PASSWORT='$(PRUEFDIENST_PW)' \
+	  PRUEFDIENST_LESER=$(or $(L),demo) \
+	  PRUEFDIENST_BROWSER_SICHTBAR=1 \
+	  PRUEFDIENST_DARF_SCHREIBEN=$(or $(W),0) \
+	  LOG_LEVEL=info \
+	  uv run python -m homepi_pruefdienst
 
 ## smoke: Rauchtests gegen die laufende lokale Umgebung
 # Die Tests, die GET /module auswerten, brauchen ein Konto - ohne Anmeldung ist
