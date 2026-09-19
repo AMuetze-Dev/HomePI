@@ -120,6 +120,14 @@ class TestKennung:
         assert dienst.kennung_aus_href("") == ""
 
 
+class TestBerichtsadresse:
+    def test_die_kennung_wird_eingesetzt(self) -> None:
+        adresse = dienst.bericht_adresse("633203177")
+
+        assert "match-report/report/633203177" in adresse
+        assert adresse.startswith("https://www.dfbnet.org/")
+
+
 class TestZeitraum:
     def test_bis_heute_und_nicht_weiter(self) -> None:
         """Ein Spiel in der Zukunft ist nicht gespielt, und ein Befund darauf

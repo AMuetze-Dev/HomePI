@@ -84,6 +84,7 @@ _TITEL = {
     "player_eligibility": "Spielrecht fraglich",
     "release_late": "Freigabe des Schiedsrichters zu spät",
     "rule_error": "Eine Regel ist gescheitert",
+    "bericht_ungelesen": "Spielbericht nicht gelesen",
 }
 
 
@@ -112,6 +113,31 @@ def als_befund(verstoss: Violation, mannschaft: str = "") -> dict[str, object]:
         "person": str(einzelheiten.get("player") or einzelheiten.get("person") or "")[:120],
         "mannschaft": (mannschaft or str(einzelheiten.get("team") or ""))[:120],
     }
+
+
+def befunde_aus(report: MatchReport) -> list[dict[str, object]]:
+    """Alle Regeln ueber einen Bericht, fertig fuer das Artefakt."""
+    return [als_befund(v) for v in pruefe(report)]
+
+
+def nicht_gelesen(grund: str) -> list[dict[str, object]]:
+    """Ein Bericht, den der Dienst nicht aufbekommen hat.
+
+    Das **muss** ein Befund werden. Ein Spiel ohne Befunde sieht in der
+    Warteschlange aus wie eines, das geprueft und sauber war -- und dieses
+    hier hat niemand angesehen. Lieber eine Warnung, die jemand wegklickt,
+    als eine Liste, die Vollstaendigkeit vortaeuscht.
+    """
+    return [
+        {
+            "regel": "bericht_ungelesen",
+            "schwere": "warnung",
+            "titel": titel_zu("bericht_ungelesen"),
+            "text": f"Der Spielbericht liess sich nicht lesen: {grund}"[:2000],
+            "person": "",
+            "mannschaft": "",
+        }
+    ]
 
 
 #: Eine Regel: Bericht hinein, Befunde heraus. Mehr braucht sie nicht --

@@ -153,6 +153,22 @@ def kennung_aus_href(href: str) -> str:
     return treffer.group(1) if treffer else (href or "")
 
 
+#: Die Adresse einer Spielberichtsseite. Uebernommen aus
+#: `src/automation/freigabe.py` der alten Anwendung.
+BERICHT_ADRESSE = (
+    "https://www.dfbnet.org/sbo-mobile/v2/#/match-report/report/{kennung}?dmg_company=DFBNET"
+)
+
+
+def bericht_adresse(kennung: str) -> str:
+    """Wo der Bericht zu dieser Kennung steht.
+
+    Hier und nicht im Browser-Leser, damit sich nachlesen laesst, wohin der
+    Dienst geht -- ohne Playwright zu starten.
+    """
+    return BERICHT_ADRESSE.format(kennung=kennung)
+
+
 # ── Der Zeitraum ──────────────────────────────────────────────────────────
 
 

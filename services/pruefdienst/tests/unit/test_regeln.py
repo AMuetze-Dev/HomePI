@@ -593,6 +593,43 @@ class TestFreigabe:
         assert gefunden[0].severity is regeln.Severity.CRITICAL
 
 
+class TestBestaetigungsfrist:
+    def test_ohne_endzeit_bleibt_es_bei_achtzehn_uhr(self) -> None:
+        b = bericht(meta=MatchMeta(match_date="13.06.2026"))
+
+        assert regeln._confirmation_deadline(b) == datetime(2026, 6, 13, 18, 0)
+
+    def test_ohne_spieltag_gibt_es_keine(self) -> None:
+        assert regeln._confirmation_deadline(bericht(meta=MatchMeta())) is None
+
+    def test_ohne_schiedsrichter_und_ohne_heim_bleibt_die_grundfrist(self) -> None:
+        """Der Gast bekommt erst dann spaeter, wenn das Heim wirklich
+        bestaetigt hat -- geraten wird nichts."""
+        b = bericht(meta=MatchMeta(match_date="13.06.2026", kickoff="15:00", end_time="16:45"))
+
+        assert regeln._confirmation_deadline(b, gast=True) == datetime(2026, 6, 13, 18, 0)
+
+
+class TestFuerDasArtefakt:
+    def test_befunde_aus_liefert_fertige_zeilen(self) -> None:
+        b = bericht(documents=[{"name": "Attest.pdf"}])
+
+        befunde = regeln.befunde_aus(b)
+
+        assert {"documents_present"} <= {str(x["regel"]) for x in befunde}
+        assert all(
+            set(x) == {"regel", "schwere", "titel", "text", "person", "mannschaft"} for x in befunde
+        )
+
+    def test_ein_nicht_gelesener_bericht_ist_eine_warnung_und_keine_leere_liste(self) -> None:
+        befunde = regeln.nicht_gelesen("die Seite kam nicht")
+
+        assert [x["regel"] for x in befunde] == ["bericht_ungelesen"]
+        assert befunde[0]["schwere"] == "warnung"
+        assert "die Seite kam nicht" in str(befunde[0]["text"])
+        assert befunde[0]["titel"] == "Spielbericht nicht gelesen"
+
+
 class TestDokumente:
     def test_ohne_dokumente_kein_hinweis(self) -> None:
         assert regeln._check_documents(bericht()) == []

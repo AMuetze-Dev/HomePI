@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import time
 from collections.abc import Callable
 from typing import Any
 
 from . import dienst
+from .bericht import MatchReport, MatchReportExtractor
 from .dienst import Spielzeile
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,28 @@ ANMELDESEITE = "https://www.dfbnet.org/spielplus/login.do"
 #: DFBnet ist an manchen Abenden zaeh. Zwei Minuten sind laenger, als es
 #: bequem ist, und kuerzer als ein haengender Lauf.
 ZEIT_MS = 120_000
+
+
+def _warten_auf(seite: Any, sucher: list[str], grenze_ms: int = 9000) -> bool:
+    """Warten, bis eines von mehreren Dingen sichtbar ist.
+
+    Uebernommen aus `_wait_for_any` der alten Anwendung. Mehrere Sucher, weil
+    dieselbe Seite je nach Sprache und Fuellstand anders aussieht -- "keine
+    Eintraege" ist auch eine Antwort.
+    """
+    schluss = time.time() + grenze_ms / 1000
+    while time.time() < schluss:
+        for eintrag in sucher:
+            try:
+                if eintrag.startswith("text="):
+                    seite.get_by_text(eintrag[5:]).first.wait_for(state="visible", timeout=500)
+                else:
+                    seite.locator(eintrag).first.wait_for(state="visible", timeout=500)
+                return True
+            except Exception:
+                continue
+        time.sleep(0.25)
+    return False
 
 
 class DfbnetLeser:
@@ -144,6 +168,67 @@ class DfbnetLeser:
             dienst.zeile_zerlegen(eintrag["zellen"], dienst.kennung_aus_href(eintrag["href"]))
             for eintrag in roh
         ]
+
+    def bericht(self, kennung: str) -> MatchReport | None:
+        """Die Seite eines Spielberichts lesen -- Info und Spielverlauf.
+
+        Die Aufstellung fehlt mit Absicht: sie steht nicht im HTML, sondern in
+        der Aufstellungsschnittstelle (siehe `aufstellung.py`), und deren
+        Abruf ist noch nicht portiert. Ein leerer Kader ist fuer die Regeln
+        *unbekannt* und kein Verstoss -- `regeln.aufstellung_bekannt` haelt
+        genau das fest.
+
+        `None` heisst: nicht gelesen. Der Aufrufer macht daraus eine Warnung
+        am Spiel; er darf es nicht als "geprueft und sauber" durchgehen
+        lassen.
+        """
+        seite = self._seite
+        if seite is None:
+            raise RuntimeError("Erst anmelden, dann lesen")
+
+        unterseite = seite.context.new_page()
+        try:
+            unterseite.set_default_timeout(ZEIT_MS)
+            unterseite.goto(dienst.bericht_adresse(kennung), wait_until="domcontentloaded")
+            if not _warten_auf(unterseite, ["mr-report-info"]):
+                logger.warning("Bericht %s: die Infoseite kam nicht", kennung)
+                return None
+            info_html = unterseite.content()
+
+            verlauf_html = ""
+            try:
+                unterseite.locator(".nav-tab").nth(2).click(timeout=ZEIT_MS)
+                if _warten_auf(
+                    unterseite,
+                    [
+                        ".event-list mr-match-event",
+                        ".no-events",
+                        "text=Es sind keine Eintraege vorhanden",
+                        "text=Endergebnis",
+                    ],
+                ):
+                    verlauf_html = unterseite.content()
+                else:
+                    # Ohne Spielverlauf fehlen Karten und Tore. Das ist eine
+                    # Luecke und keine Fehlanzeige -- sie gehoert ins
+                    # Protokoll, nicht in ein stilles leeres Feld.
+                    logger.warning("Bericht %s: der Spielverlauf kam nicht", kennung)
+            except Exception:
+                logger.exception(
+                    "Bericht %s: der Reiter Spielverlauf liess sich nicht oeffnen", kennung
+                )
+
+            return MatchReportExtractor(
+                info_html=info_html, teams_html="", history_html=verlauf_html
+            ).extract()
+        except Exception:
+            logger.exception("Bericht %s liess sich nicht lesen", kennung)
+            return None
+        finally:
+            try:
+                unterseite.close()
+            except Exception:
+                logger.exception("Die Berichtsseite liess sich nicht schliessen")
 
     def mannschaften(self, staffel: str) -> list[dict[str, object]]:
         """Die Meldung einer Staffel.

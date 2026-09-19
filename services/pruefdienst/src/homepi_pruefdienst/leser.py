@@ -14,6 +14,7 @@ import datetime as dt
 import hashlib
 from typing import Protocol
 
+from .bericht import MatchReport
 from .dienst import Spielzeile
 
 
@@ -23,6 +24,8 @@ class Leser(Protocol):
     def anmelden(self, benutzer: str, passwort: str) -> None: ...
 
     def spiele(self, staffel: str, von: dt.date, bis: dt.date) -> list[Spielzeile]: ...
+
+    def bericht(self, kennung: str) -> MatchReport | None: ...
 
     def mannschaften(self, staffel: str) -> list[dict[str, object]]: ...
 
@@ -41,9 +44,11 @@ class DemoLeser:
         self,
         spiele_je_staffel: dict[str, list[Spielzeile]] | None = None,
         mannschaften_je_staffel: dict[str, list[dict[str, object]]] | None = None,
+        berichte_je_spiel: dict[str, MatchReport] | None = None,
     ) -> None:
         self._spiele = spiele_je_staffel or {}
         self._mannschaften = mannschaften_je_staffel or {}
+        self._berichte = berichte_je_spiel or {}
         self.angemeldet_als = ""
         self.geschlossen = False
 
@@ -58,6 +63,16 @@ class DemoLeser:
             for z in self._spiele.get(staffel, [])
             if z.datum is not None and von <= z.datum <= bis
         ]
+
+    def bericht(self, kennung: str) -> MatchReport | None:
+        """Den Bericht, den man ihm mitgegeben hat -- sonst keinen.
+
+        `None` heisst durchgehend: **nicht gelesen**. Einen leeren Bericht
+        zurueckzugeben hiesse, einen Spielbericht ohne Karten, ohne
+        Bestaetigungen und ohne Vorkommnisse zu behaupten -- und die Regeln
+        wuerden ihn pruefen und sauber nennen.
+        """
+        return self._berichte.get(kennung)
 
     def mannschaften(self, staffel: str) -> list[dict[str, object]]:
         return self._mannschaften.get(staffel, [])

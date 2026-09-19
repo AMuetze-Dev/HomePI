@@ -12,7 +12,7 @@ import datetime as dt
 import logging
 from typing import Any
 
-from . import dienst
+from . import dienst, regeln
 from .gateway import Gateway, GatewayFehler
 from .leser import BeispielLeser, Leser
 
@@ -84,14 +84,18 @@ class Prueflauf:
         return [s for s in alle if s.get("aktiv")]
 
     def _befunde_zu(self, zeile: dienst.Spielzeile) -> list[dict[str, object]]:
-        """Befunde gibt es nur vom Beispiel-Leser.
+        """Den Bericht holen und die Regeln darüber laufen lassen.
 
-        Die echte Regelprüfung ist nicht portiert. Sie hier vorzutäuschen
-        hieße, einen Bericht als geprüft auszugeben, den niemand geprüft hat.
+        Kommt keiner, gibt es **eine Warnung und keine leere Liste**: ein
+        Spiel ohne Befunde sieht in der Warteschlange aus wie eines, das
+        geprüft und sauber war.
         """
         if isinstance(self._leser, BeispielLeser):
             return self._leser.befunde_zu(zeile)
-        return []
+        bericht = self._leser.bericht(zeile.dfbnet_id)
+        if bericht is None:
+            return regeln.nicht_gelesen("der Prüfdienst hat ihn nicht bekommen")
+        return regeln.befunde_aus(bericht)
 
     def _anmelden(self, kennung: str) -> None:
         self._gateway.fortschritt(

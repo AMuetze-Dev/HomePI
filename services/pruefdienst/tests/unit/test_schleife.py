@@ -13,12 +13,18 @@ from typing import Any
 
 import pytest
 
+from homepi_pruefdienst import regeln
+from homepi_pruefdienst.bericht import MatchMeta, MatchReport
 from homepi_pruefdienst.dienst import Spielzeile
 from homepi_pruefdienst.gateway import GatewayFehler
 from homepi_pruefdienst.leser import BeispielLeser, DemoLeser
 from homepi_pruefdienst.schleife import Prueflauf
 
 HEUTE = dt.date.today()
+
+#: Was am Spiel steht, wenn der Bericht nicht kam. Eine leere Liste waere die
+#: gefaehrlichere Auskunft: sie sieht aus wie "geprueft und sauber".
+UNGELESEN = regeln.nicht_gelesen("der Prüfdienst hat ihn nicht bekommen")
 
 STAFFEL = {
     "id": "s1",
@@ -163,7 +169,7 @@ class TestPrueflauf:
                         "heim": "SG Gittersee",
                         "gast": "SV Fortschritt",
                         "ergebnis": "2 : 1",
-                        "befunde": [],
+                        "befunde": UNGELESEN,
                     },
                     {
                         "dfbnet_id": "M-2",
@@ -171,7 +177,7 @@ class TestPrueflauf:
                         "heim": "SG Gittersee",
                         "gast": "SV Fortschritt",
                         "ergebnis": "2 : 1",
-                        "befunde": [],
+                        "befunde": UNGELESEN,
                     },
                 ],
             )
@@ -483,12 +489,36 @@ class TestBefundeImLauf:
 
         assert any(f.get("befunde") for f in gateway.fortschritte)
 
-    def test_der_echte_leser_meldet_keine(self) -> None:
-        """Sie hier vorzutaeuschen hiesse, einen Bericht als geprueft
-        auszugeben, den niemand geprueft hat."""
+    def test_ein_bericht_der_nicht_kam_wird_zur_warnung(self) -> None:
+        """Eine leere Liste sieht in der Warteschlange aus wie "geprueft und
+        sauber" -- dieses Spiel hat aber niemand angesehen."""
         gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
 
         lauf(gateway, DemoLeser({"Stadtliga C": [zeile()]})).runde()
 
         _, spiele = gateway.importe[0]
-        assert all(s["befunde"] == [] for s in spiele)
+        befunde = spiele[0]["befunde"]
+        assert [b["regel"] for b in befunde] == ["bericht_ungelesen"]
+        assert befunde[0]["schwere"] == "warnung"
+
+    def test_ein_bericht_wird_durch_die_regeln_geschickt(self) -> None:
+        bericht = MatchReport(
+            meta=MatchMeta(
+                match_id="M-1",
+                home_team="SG Gittersee",
+                away_team="SV Fortschritt",
+                match_date=(HEUTE - dt.timedelta(days=1)).strftime("%d.%m.%Y"),
+                kickoff="15:00",
+                end_time="16:45",
+            )
+        )
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+        leser = DemoLeser({"Stadtliga C": [zeile("M-1")]}, berichte_je_spiel={"M-1": bericht})
+
+        lauf(gateway, leser).runde()
+
+        _, spiele = gateway.importe[0]
+        regelnamen = [b["regel"] for b in spiele[0]["befunde"]]
+        # Keine Bestaetigung im Bericht, also meldet die Regel sie an -- und
+        # "bericht_ungelesen" steht gerade nicht dabei.
+        assert regelnamen == ["confirmation_missing", "confirmation_missing"]

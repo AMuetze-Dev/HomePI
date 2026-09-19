@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pytest
 
+from homepi_pruefdienst import regeln
 from homepi_pruefdienst.bericht import MatchReport, MatchReportExtractor
 
 AUFNAHMEN = Path(__file__).resolve().parent.parent / "aufnahmen"
@@ -159,6 +160,44 @@ class TestVorkommnisse:
         damit war jeder Spielbericht ein kritischer Befund."""
         assert bericht.incidents_reported is False
         assert bericht.incidents_details["text"] == ""
+
+
+class TestRegelnUeberDenEchtenBericht:
+    """Was am Ende in der Warteschlange stuende -- an einem echten Spiel.
+
+    Die Zahl ist klein, und das ist der Punkt: an diesem Bericht ist genau
+    eine Sache auffaellig. Die beiden Fehlalarme, die hier einmal standen,
+    sind als eigene Behauptungen festgehalten -- sie kosten einen
+    Staffelleiter sonst zwei Telefonate mit Vereinen, die nichts getan haben.
+    """
+
+    def test_genau_ein_befund(self, bericht: MatchReport) -> None:
+        gefunden = regeln.pruefe(bericht)
+
+        assert [v.rule for v in gefunden] == ["confirmation_late"]
+
+    def test_die_heimmannschaft_hat_nach_der_frist_bestaetigt(self, bericht: MatchReport) -> None:
+        """Freigabe 19:14:41, also Frist 20:14:41 -- bestaetigt 20:35:49."""
+        gefunden = regeln.pruefe(bericht)
+
+        assert gefunden[0].details["team"] == "Post SV Dresden 2"
+        assert gefunden[0].details["signed_at"] == "13.06.2026, 20:35"
+
+    def test_kein_fehlender_ordnungsdienst(self, bericht: MatchReport) -> None:
+        """Er stand hier, weil die Aufstellung leer ist -- aus dem HTML kommt
+        sie nicht. Unwissen ist kein Verstoss."""
+        assert "order_manager_missing" not in {v.rule for v in regeln.pruefe(bericht)}
+
+    def test_keine_regel_ist_gescheitert(self, bericht: MatchReport) -> None:
+        """`rule_error` heisst: eine Regel kam mit dem echten Bericht nicht
+        zurecht. Am aufgezeichneten darf das nicht passieren."""
+        assert "rule_error" not in {v.rule for v in regeln.pruefe(bericht)}
+
+    def test_die_befunde_sind_fertig_fuer_das_artefakt(self, bericht: MatchReport) -> None:
+        befunde = regeln.befunde_aus(bericht)
+
+        assert befunde[0]["titel"] == "Bestätigung zu spät"
+        assert befunde[0]["mannschaft"] == "Post SV Dresden 2"
 
 
 class TestNachsichtig:
