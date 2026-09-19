@@ -3,7 +3,12 @@ name = "homepi-staffelpilot"
 version = "0.1.0"
 description = "HomePI-Artefakt: StaffelPilot"
 requires-python = ">=3.12"
-dependencies = ["homepi-core"]
+dependencies = [
+    "homepi-core",
+    # Fuer die DFBnet-Zugangsdaten: sie liegen verschluesselt in der
+    # Datenbank, der Schluessel steht in der Umgebung.
+    "cryptography>=44",
+]
 
 # Die ganze Anmeldung. Das Gateway findet das Modul beim Start hierueber -
 # ein Tippfehler in dieser Zeile heisst: die Kachel fehlt.

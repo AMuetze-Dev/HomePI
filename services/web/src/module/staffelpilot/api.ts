@@ -86,6 +86,82 @@ export interface Einstellungen {
   absender: string;
   pruefzeitraum_tage: number;
   frist_tage: number;
+  /** Ob der DFBnet-Dienst gerade etwas eintragen darf. Frisch: pausiert. */
+  uebertragung_pausiert: boolean;
+}
+
+export type AuftragArt = "pruflauf" | "initialisierung";
+export type AuftragZustand =
+  "angefordert" | "laeuft" | "fertig" | "abgebrochen" | "gescheitert";
+
+export interface AuftragZeile {
+  id: string;
+  art: AuftragArt;
+  staffel_id: string | null;
+  zustand: AuftragZustand;
+  schritt: string;
+  fortschritt: number;
+  gepruefte: number;
+  befunde: number;
+  meldung: string;
+  gestartet_am: string | null;
+  beendet_am: string | null;
+  angelegt: string;
+}
+
+export interface Auftrag extends AuftragZeile {
+  protokoll: { zeit: string; text: string }[];
+}
+
+export type UebertragungAktion = "prueferfreigabe" | "fallanlage";
+export type UebertragungZustand = "offen" | "laeuft" | "fertig" | "fehler";
+
+export interface Uebertragung {
+  id: string;
+  aktion: UebertragungAktion;
+  referenz: string;
+  spiel_id: string | null;
+  zustand: UebertragungZustand;
+  versuche: number;
+  letzter_fehler: string;
+  erledigt_am: string | null;
+  angelegt: string;
+}
+
+export interface UebertragungStand {
+  pausiert: boolean;
+  offen: number;
+  laeuft: number;
+  fertig: number;
+  fehler: number;
+  fehlerhafte: Uebertragung[];
+}
+
+export interface ZugangStand {
+  gespeichert: boolean;
+  benutzer: string;
+  /** Ohne Schlüssel in der Umgebung lässt sich nichts ablegen. */
+  schluessel_vorhanden: boolean;
+}
+
+/** Ein Befund mit dem Spiel, zu dem er gehört. */
+export interface BefundZeile {
+  id: string;
+  spiel_id: string;
+  staffel_id: string;
+  dfbnet_id: string;
+  datum: string;
+  heim: string;
+  gast: string;
+  regel: string;
+  schwere: Schwere;
+  titel: string;
+  person: string;
+  mannschaft: string;
+  entscheidung: Entscheidung;
+  grund: string;
+  weg: Weg;
+  vorgang_id: string | null;
 }
 
 export interface Mannschaft {
@@ -306,4 +382,116 @@ export function ladeRegeln(signal?: AbortSignal): Promise<Regel[]> {
 /** Der Schalter gehört dem Staffelleiter; geprüft wird trotzdem im Prüfdienst. */
 export function schalteRegel(id: string, aktiv: boolean): Promise<Regel> {
   return anfrage<Regel>(`/regeln/${id}`, mitKoerper("PATCH", { aktiv }));
+}
+
+// ── Eine Staffel ändern ──────────────────────────────────────────────────
+
+/** Nur die mitgeschickten Felder. Ausgelassene bleiben stehen. */
+export function aendereStaffel(
+  id: string,
+  daten: Partial<Omit<Staffel, "id">>,
+): Promise<Staffel> {
+  return anfrage<Staffel>(`/staffeln/${id}`, mitKoerper("PATCH", daten));
+}
+
+export function loescheStaffel(id: string): Promise<void> {
+  return anfrage<void>(`/staffeln/${id}`, { method: "DELETE" });
+}
+
+// ── Eine Entscheidung zurücknehmen ───────────────────────────────────────
+
+/**
+ * Der Befund ist danach wieder offen und das Spiel nicht mehr abgehakt.
+ * Ist zu dem Befund schon ein Schreiben hinaus, antwortet das Backend mit
+ * 409 — dann erst den Vorgang zurückholen.
+ */
+export function nimmEntscheidungZurueck(befundId: string): Promise<Befund> {
+  return anfrage<Befund>(`/befunde/${befundId}/entscheidung`, { method: "DELETE" });
+}
+
+// ── Alle Befunde ─────────────────────────────────────────────────────────
+
+export function ladeAlleBefunde(
+  optionen: { staffelId?: string | undefined; nurOffen?: boolean } = {},
+  signal?: AbortSignal,
+): Promise<BefundZeile[]> {
+  const teile = [];
+  if (optionen.staffelId)
+    teile.push(`staffel_id=${encodeURIComponent(optionen.staffelId)}`);
+  if (optionen.nurOffen) teile.push("nur_offen=true");
+  const frage = teile.length > 0 ? `?${teile.join("&")}` : "";
+  return anfrage<BefundZeile[]>(`/befunde${frage}`, {}, signal);
+}
+
+// ── Aufträge: Prüflauf und Initialisierung ───────────────────────────────
+
+export function ladeAuftraege(signal?: AbortSignal): Promise<AuftragZeile[]> {
+  return anfrage<AuftragZeile[]>("/auftraege", {}, signal);
+}
+
+/** `null`, wenn keiner unterwegs ist — kein 404, das wird im Takt abgefragt. */
+export function ladeOffenenAuftrag(signal?: AbortSignal): Promise<Auftrag | null> {
+  return anfrage<Auftrag | null>("/auftraege/offen", {}, signal);
+}
+
+export function ladeAuftrag(id: string, signal?: AbortSignal): Promise<Auftrag> {
+  return anfrage<Auftrag>(`/auftraege/${id}`, {}, signal);
+}
+
+/**
+ * Fordert an — startet nicht. Gearbeitet wird im DFBnet-Dienst; solange der
+ * nicht läuft, bleibt der Auftrag auf „angefordert" stehen.
+ */
+export function fordereAuftragAn(
+  art: AuftragArt = "pruflauf",
+  staffelId?: string,
+): Promise<Auftrag> {
+  return anfrage<Auftrag>(
+    "/auftraege",
+    mitKoerper("POST", { art, staffel_id: staffelId ?? null }),
+  );
+}
+
+export function brichAuftragAb(id: string): Promise<Auftrag> {
+  return anfrage<Auftrag>(
+    `/auftraege/${id}/abschluss`,
+    mitKoerper("POST", { zustand: "abgebrochen" }),
+  );
+}
+
+// ── Übertragung nach DFBnet ──────────────────────────────────────────────
+
+export function ladeUebertragung(signal?: AbortSignal): Promise<UebertragungStand> {
+  return anfrage<UebertragungStand>("/uebertragungen", {}, signal);
+}
+
+/** Der eine Schalter, der entscheidet, ob draußen etwas passiert. */
+export function setzeUebertragungPause(pausiert: boolean): Promise<UebertragungStand> {
+  return anfrage<UebertragungStand>(
+    "/uebertragungen/pause",
+    mitKoerper("POST", { pausiert }),
+  );
+}
+
+/** Ohne Kennung alle gescheiterten. */
+export function wiederholeUebertragung(id?: string): Promise<UebertragungStand> {
+  const frage = id ? `?uebertragung_id=${encodeURIComponent(id)}` : "";
+  return anfrage<UebertragungStand>(`/uebertragungen/wiederholen${frage}`, {
+    method: "POST",
+  });
+}
+
+// ── DFBnet-Zugang ────────────────────────────────────────────────────────
+
+export function ladeZugang(signal?: AbortSignal): Promise<ZugangStand> {
+  return anfrage<ZugangStand>("/zugang", {}, signal);
+}
+
+/** Das Passwort kommt hier nie zurück. */
+export function speichereZugang(benutzer: string, passwort: string): Promise<void> {
+  return anfrage<void>("/zugang", mitKoerper("PUT", { benutzer, passwort }));
+}
+
+export function loescheZugang(): Promise<void> {
+  return anfrage<void>("/zugang", { method: "DELETE" });
 }

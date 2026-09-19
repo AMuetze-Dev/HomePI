@@ -23,6 +23,8 @@ Menschen, in seinem Mailprogramm.
 | `GET /spiele/{id}` | ein Bericht mit seinen Befunden, sortiert |
 | `POST/DELETE /spiele/{id}/haken` | abhaken und wieder loesen |
 | `POST /befunde/{id}/entscheidung` | `kenntnis` oder `verworfen` (mit Grund) |
+| `DELETE /befunde/{id}/entscheidung` | zurücknehmen — der Haken fällt mit |
+| `GET /befunde` | alle Befunde flach, `?staffel_id=` und `?nur_offen=` |
 
 ### Was aus einem Befund wird
 
@@ -40,8 +42,24 @@ Menschen, in seinem Mailprogramm.
 | `GET/POST /staffeln`, `PATCH/DELETE /staffeln/{id}` | Staffeln verwalten |
 | `GET/PUT /staffeln/{id}/mannschaften` | Mannschaften und ihr Aufbau |
 | `GET/PUT /regeln`, `PATCH /regeln/{id}` | Regelkatalog und die Schalter |
-| `GET/PUT /einstellungen` | Staffelleiter, Verband, Zeitraeume |
+| `GET/PUT /einstellungen` | Staffelleiter, Verband, Zeitraeume, Pause |
+| `GET/PUT/DELETE /zugang` | DFBnet-Zugangsdaten (verschluesselt) |
 | `POST /import` | geprueftte Berichte einspielen |
+
+### Was der Prüfdienst treibt
+
+| Endpunkt | |
+|---|---|
+| `GET/POST /auftraege` | Prueflauf oder Initialisierung anfordern |
+| `GET /auftraege/offen` | der eine, der laeuft -- oder `null` |
+| `GET /auftraege/{id}` | einer mit seinem Protokoll |
+| `POST /auftraege/{id}/fortschritt` | vom Pruefdienst |
+| `POST /auftraege/{id}/abschluss` | vom Pruefdienst, oder Abbruch |
+| `GET/POST /uebertragungen` | was nach DFBnet hinaus soll |
+| `POST /uebertragungen/pause` | der eine Schalter |
+| `POST /uebertragungen/wiederholen` | Gescheitertes zurueck in die Schlange |
+| `POST /uebertragungen/{id}/abschluss` | vom Pruefdienst |
+| `POST /zugang/abholen` | Zugangsdaten fuer den Pruefdienst |
 
 ## Die Entscheidungen, die hier stecken
 
@@ -72,6 +90,31 @@ verspricht etwas, das nicht passiert.
 **`faellig` wird berechnet, nicht gespeichert.** Der Pruefzeitraum verschiebt
 sich mit jedem Tag; ein geschriebener Wert waere am Morgen darauf falsch.
 
+**Ein Auftrag ist ein Datensatz, kein Prozess.** Der Prueflauf faehrt
+minutenlang einen Browser und laeuft im Pruefdienst; hier steht nur, wer ihn
+angefordert hat, wie weit er ist und was herauskam. Das Gateway darf neu
+starten, ohne dass jemand vor einer Anzeige sitzt, die nie wieder
+weiterzaehlt. Es gibt genau **einen** offenen Auftrag, weil es genau eine
+DFBnet-Sitzung gibt.
+
+**Eine Entscheidung laesst sich zuruecknehmen -- solange nichts hinaus ist.**
+Der Haken faellt dabei mit: abgehakt heisst, zu jedem Befund liegt eine
+Entscheidung vor. Ist zu dem Befund schon ein Schreiben **versandt**, geht es
+nicht; der Verein hat es, und ein Befund, der hier wieder "offen" heisst,
+waere eine Akte, die dem widerspricht.
+
+**Die Uebertragung ist auf einer frischen Installation pausiert.** Eine
+Freigabe in DFBnet ist eine Handlung nach aussen; sie soll nicht passieren,
+weil jemand die Software zum ersten Mal gestartet hat. Sie ist idempotent
+ueber `(aktion, referenz)` -- abhaken, Haken entfernen und wieder abhaken
+erzeugt keine zwei Freigaben.
+
+**Das DFBnet-Passwort liegt verschluesselt.** Der Schluessel steht in der
+Umgebung (`STAFFELPILOT_SCHLUESSEL`), nicht in der Datenbank -- sonst laege er
+neben dem, was er schuetzt. Fehlt er, wird **nichts** abgelegt, und die
+Oberflaeche sagt das, bevor jemand tippt. Der Preis: wer den Schluessel
+verliert, traegt die Zugangsdaten neu ein. Das ist der richtige Preis.
+
 ## Was hier bewusst nicht liegt
 
 Die **DFBnet-Automation**. Sie faehrt minutenlang einen echten Browser und
@@ -80,17 +123,25 @@ eigenen Dienst - im gemeinsamen Gateway-Prozess wuerde sie jedes andere
 Artefakt blockieren, und die synchrone Playwright-API laesst sich aus einer
 laufenden Event-Loop ohnehin nicht aufrufen.
 
-Drei Nahtstellen stehen dafuer bereit:
+Die Nahtstellen stehen dafuer bereit. Der Dienst
 
-| | |
-|---|---|
-| `POST /import` | geprueftte Berichte mit ihren Befunden und Wegen |
-| `PUT /regeln` | der Katalog, den der Dienst prueft |
-| `PUT /staffeln/{id}/mannschaften` | die Meldung aus DFBnet |
+1. holt sich die Zugangsdaten (`POST /zugang/abholen`),
+2. nimmt den offenen Auftrag (`GET /auftraege/offen`),
+3. meldet Fortschritt (`POST /auftraege/{id}/fortschritt`),
+4. spielt ein (`POST /import`, `PUT /regeln`,
+   `PUT /staffeln/{id}/mannschaften`),
+5. schliesst ab (`POST /auftraege/{id}/abschluss`),
+6. arbeitet die Uebertragungen ab -- **nur wenn sie nicht pausiert ist** --
+   und meldet jede einzeln (`POST /uebertragungen/{id}/abschluss`).
 
 Noch offen: die **Mahnung als PDF**. Der Vordruck des Verbandes wird im alten
 StaffelPilot ausgefuellt (`src/core/mahnung.py`); hier gibt es den Text, aber
 kein Formular.
+
+Ebenfalls nicht uebernommen: der Auftragstyp `sportrichter_mail` der alten
+Warteschlange. Schreiben werden vorbereitet und von einem Menschen
+abgeschickt; ein Programm, das Post an einen Sportrichter verschickt, ist
+etwas anderes als eines, das einen Entwurf hinlegt.
 
 Die bestehende Anwendung, aus der die Fachlichkeit stammt, liegt unter
 `D:/DevLibrary/StaffelPilot` und ist von diesem Artefakt unberuehrt.
@@ -135,6 +186,18 @@ Schema unvollständig: staffelpilot_befunde ohne weg
 Das ist richtig so: lieber gar nicht starten als halb. In der Entwicklung
 entweder `make dev-reset` (wirft die Datenbank weg) oder die Spalte von Hand
 nachziehen.
+
+### Der Schlüssel für die Zugangsdaten
+
+`compose.dev.yml` setzt `STAFFELPILOT_SCHLUESSEL` fest -- zum Entwickeln, und
+nur dafuer. In Produktion gehoert er in ein Secret:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Ohne ihn laeuft alles andere weiter; nur der DFBnet-Zugang laesst sich nicht
+hinterlegen, und das steht dann in der Oberflaeche.
 
 ## Ausrollen
 

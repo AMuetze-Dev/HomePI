@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
 import uuid
 
 from sqlalchemy import delete, func, select
@@ -12,22 +13,42 @@ from sqlalchemy.orm import selectinload
 
 from . import dienst
 from .dienst import (
+    AuftragUnbekannt,
     BefundUnbekannt,
+    KeinZugang,
     RegelUnbekannt,
     SpielUnbekannt,
     StaffelUnbekannt,
     StaffelVergeben,
+    UebertragungUnbekannt,
     VorgangUnbekannt,
     VorgangVergeben,
 )
-from .modelle import Befund, Einstellung, Mannschaft, Regel, Spielbericht, Staffel, Vorgang
+from .modelle import (
+    Auftrag,
+    Befund,
+    Einstellung,
+    Mannschaft,
+    Regel,
+    Spielbericht,
+    Staffel,
+    Uebertragung,
+    Vorgang,
+    Zugang,
+)
 from .schemas import (
+    Abschluss,
     EinstellungenSetzen,
+    Fortschritt,
     ImportAuftrag,
     MannschaftEingang,
     RegelEingang,
+    StaffelAendern,
     StaffelAnlegen,
+    UebertragungAbschluss,
+    UebertragungEinreihen,
     VorgangAnlegen,
+    ZugangSetzen,
 )
 
 # ── Staffeln ──────────────────────────────────────────────────────────────
@@ -56,6 +77,24 @@ async def staffel_anlegen(sitzung: AsyncSession, daten: StaffelAnlegen) -> Staff
         raise StaffelVergeben(f"Eine Staffel namens '{daten.name}' gibt es bereits") from fehler
     await sitzung.refresh(neue)
     return neue
+
+
+async def staffel_aendern(
+    sitzung: AsyncSession, staffel_id: uuid.UUID, daten: StaffelAendern
+) -> Staffel:
+    """Nur die mitgeschickten Felder. Ausgelassene bleiben stehen."""
+    gefunden = await staffel(sitzung, staffel_id)
+    felder = daten.model_dump(exclude_none=True)
+    for name, wert in felder.items():
+        setattr(gefunden, name, wert)
+    try:
+        await sitzung.flush()
+    except IntegrityError as fehler:
+        await sitzung.rollback()
+        raise StaffelVergeben(
+            f"Eine Staffel namens '{felder.get('name')}' gibt es bereits"
+        ) from fehler
+    return gefunden
 
 
 async def staffel_loeschen(sitzung: AsyncSession, staffel_id: uuid.UUID) -> None:
@@ -195,6 +234,23 @@ async def entscheidung_setzen(
     gefunden.entscheidung = art
     gefunden.grund = grund
     gefunden.entschieden_am = dt.datetime.now(dt.UTC)
+    await sitzung.flush()
+    return gefunden
+
+
+async def entscheidung_zuruecknehmen(sitzung: AsyncSession, befund_id: uuid.UUID) -> Befund:
+    """Der Befund ist wieder offen - und das Spiel damit nicht mehr abgehakt.
+
+    Den Haken stehen zu lassen waere die eine Zusage dieses Artefakts
+    gebrochen: abgehakt heisst, zu jedem Befund liegt eine Entscheidung vor.
+    """
+    gefunden = await befund(sitzung, befund_id)
+    gefunden.entscheidung = "offen"
+    gefunden.grund = ""
+    gefunden.entschieden_am = None
+    bericht = await spiel(sitzung, gefunden.spiel_id)
+    bericht.abgehakt = False
+    bericht.abgehakt_am = None
     await sitzung.flush()
     return gefunden
 
@@ -473,3 +529,254 @@ async def regel_umschalten(sitzung: AsyncSession, regel_id: uuid.UUID, aktiv: bo
     gefunden.aktiv = aktiv
     await sitzung.flush()
     return gefunden
+
+
+# ── Alle Befunde auf einmal ───────────────────────────────────────────────
+
+
+async def alle_befunde(
+    sitzung: AsyncSession,
+    staffel_id: uuid.UUID | None = None,
+    nur_offen: bool = False,
+) -> list[tuple[Befund, Spielbericht]]:
+    """Jeder Befund mit seinem Spiel, in einer Abfrage.
+
+    Der Verbund und nicht zwei Runden: die Spiele einzeln nachzuladen waere
+    bei dreihundert Befunden dreihundert Abfragen -- und das faellt erst auf
+    dem Pi auf.
+    """
+    frage = (
+        select(Befund, Spielbericht)
+        .join(Spielbericht, Befund.spiel_id == Spielbericht.id)
+        .order_by(Spielbericht.datum.desc(), Spielbericht.heim, Befund.rang)
+    )
+    if staffel_id is not None:
+        frage = frage.where(Spielbericht.staffel_id == staffel_id)
+    if nur_offen:
+        frage = frage.where(Befund.entscheidung == "offen")
+    ergebnis = await sitzung.execute(frage)
+    return [(b, s) for b, s in ergebnis.all()]
+
+
+# ── Auftraege ─────────────────────────────────────────────────────────────
+
+
+async def auftraege(sitzung: AsyncSession, grenze: int = 50) -> list[Auftrag]:
+    """Die juengsten zuerst -- das ist der, nach dem gerade gefragt wird."""
+    ergebnis = await sitzung.execute(
+        select(Auftrag).order_by(Auftrag.angelegt.desc()).limit(grenze)
+    )
+    return list(ergebnis.scalars())
+
+
+async def auftrag(sitzung: AsyncSession, auftrag_id: uuid.UUID) -> Auftrag:
+    gefunden = await sitzung.get(Auftrag, auftrag_id)
+    if gefunden is None:
+        raise AuftragUnbekannt(f"Es gibt keinen Auftrag mit der Kennung {auftrag_id}")
+    return gefunden
+
+
+async def offener_auftrag(sitzung: AsyncSession) -> Auftrag | None:
+    """Der eine, der gerade laeuft oder wartet -- oder keiner."""
+    ergebnis = await sitzung.execute(
+        select(Auftrag)
+        .where(Auftrag.zustand.in_(dienst.OFFENE_ZUSTAENDE))
+        .order_by(Auftrag.angelegt)
+        .limit(1)
+    )
+    return ergebnis.scalar_one_or_none()
+
+
+async def auftrag_anfordern(
+    sitzung: AsyncSession, art: str, staffel_id: uuid.UUID | None
+) -> Auftrag:
+    if staffel_id is not None:
+        await staffel(sitzung, staffel_id)
+    neuer = Auftrag(art=art, staffel_id=staffel_id)
+    sitzung.add(neuer)
+    await sitzung.flush()
+    await sitzung.refresh(neuer)
+    return neuer
+
+
+async def auftrag_fortschreiben(
+    sitzung: AsyncSession, auftrag_id: uuid.UUID, daten: Fortschritt
+) -> Auftrag:
+    """Was der Pruefdienst meldet, waehrend er laeuft.
+
+    Die erste Meldung setzt ihn auf `laeuft`: dass er sich meldet, **ist** der
+    Beleg dafuer, dass er angefangen hat. Ein eigener Startaufruf waere eine
+    zweite Stelle, an der derselbe Umstand steht.
+    """
+    gefunden = await auftrag(sitzung, auftrag_id)
+    dienst.darf_fortschreiben(gefunden.zustand)
+    if gefunden.zustand == "angefordert":
+        gefunden.zustand = dienst.auftrag_weiter(gefunden.zustand, "laeuft")
+        gefunden.gestartet_am = dt.datetime.now(dt.UTC)
+
+    if daten.schritt is not None:
+        gefunden.schritt = daten.schritt
+    if daten.fortschritt is not None:
+        gefunden.fortschritt = dienst.fortschritt_pruefen(daten.fortschritt)
+    if daten.gepruefte is not None:
+        gefunden.gepruefte = daten.gepruefte
+    if daten.befunde is not None:
+        gefunden.befunde = daten.befunde
+    if daten.zeile:
+        # Eine neue Liste und nicht append: eine JSONB-Spalte merkt sich eine
+        # Aenderung in der Liste nicht, die SQLAlchemy nicht gesehen hat.
+        jetzt = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
+        gefunden.protokoll = [*gefunden.protokoll, {"zeit": jetzt, "text": daten.zeile}]
+    await sitzung.flush()
+    return gefunden
+
+
+async def auftrag_abschliessen(
+    sitzung: AsyncSession, auftrag_id: uuid.UUID, daten: Abschluss
+) -> Auftrag:
+    gefunden = await auftrag(sitzung, auftrag_id)
+    gefunden.zustand = dienst.auftrag_weiter(gefunden.zustand, daten.zustand)
+    gefunden.beendet_am = dt.datetime.now(dt.UTC)
+    if daten.meldung:
+        gefunden.meldung = daten.meldung
+    if daten.zustand == "fertig":
+        gefunden.fortschritt = 100
+    await sitzung.flush()
+    return gefunden
+
+
+# ── Uebertragung nach DFBnet ──────────────────────────────────────────────
+
+
+async def uebertragungen(sitzung: AsyncSession) -> list[Uebertragung]:
+    ergebnis = await sitzung.execute(select(Uebertragung).order_by(Uebertragung.angelegt.desc()))
+    return list(ergebnis.scalars())
+
+
+async def uebertragung(sitzung: AsyncSession, uebertragung_id: uuid.UUID) -> Uebertragung:
+    gefunden = await sitzung.get(Uebertragung, uebertragung_id)
+    if gefunden is None:
+        raise UebertragungUnbekannt(f"Es gibt keine Uebertragung mit der Kennung {uebertragung_id}")
+    return gefunden
+
+
+async def uebertragung_stand(sitzung: AsyncSession) -> dict[str, int]:
+    """Die Zahlen je Zustand, in einer Abfrage."""
+    ergebnis = await sitzung.execute(
+        select(Uebertragung.zustand, func.count()).group_by(Uebertragung.zustand)
+    )
+    gezaehlt = {zustand: int(anzahl) for zustand, anzahl in ergebnis.all()}
+    return {z: gezaehlt.get(z, 0) for z in ("offen", "laeuft", "fertig", "fehler")}
+
+
+async def uebertragung_einreihen(
+    sitzung: AsyncSession, daten: UebertragungEinreihen
+) -> Uebertragung:
+    """Idempotent ueber (aktion, referenz).
+
+    Eine gescheiterte Zeile wird dabei zurueckgesetzt: das zweite Abhaken ist
+    der Staffelleiter, der es noch einmal versucht.
+    """
+    ergebnis = await sitzung.execute(
+        select(Uebertragung).where(
+            Uebertragung.aktion == daten.aktion, Uebertragung.referenz == daten.referenz
+        )
+    )
+    vorhanden = ergebnis.scalar_one_or_none()
+    if vorhanden is not None:
+        if vorhanden.zustand == "fehler":
+            vorhanden.zustand = "offen"
+            vorhanden.letzter_fehler = ""
+        await sitzung.flush()
+        return vorhanden
+
+    neue = Uebertragung(aktion=daten.aktion, referenz=daten.referenz, spiel_id=daten.spiel_id)
+    sitzung.add(neue)
+    await sitzung.flush()
+    await sitzung.refresh(neue)
+    return neue
+
+
+async def uebertragung_wiederholen(sitzung: AsyncSession, uebertragung_id: uuid.UUID | None) -> int:
+    """Gescheitertes zurueck in die Schlange. Gibt zurueck, wie viele.
+
+    Ohne Kennung alle -- nach einem Netzausfall stehen dort zwanzig Zeilen mit
+    demselben Fehler, und die einzeln anzuklicken ist keine Arbeit, sondern
+    eine Strafe.
+    """
+    if uebertragung_id is not None:
+        gefunden = await uebertragung(sitzung, uebertragung_id)
+        dienst.darf_wiederholt_werden(gefunden.zustand)
+        gefunden.zustand = "offen"
+        gefunden.letzter_fehler = ""
+        await sitzung.flush()
+        return 1
+
+    ergebnis = await sitzung.execute(select(Uebertragung).where(Uebertragung.zustand == "fehler"))
+    betroffen = list(ergebnis.scalars())
+    for zeile in betroffen:
+        zeile.zustand = "offen"
+        zeile.letzter_fehler = ""
+    await sitzung.flush()
+    return len(betroffen)
+
+
+async def uebertragung_abschliessen(
+    sitzung: AsyncSession, uebertragung_id: uuid.UUID, daten: UebertragungAbschluss
+) -> Uebertragung:
+    gefunden = await uebertragung(sitzung, uebertragung_id)
+    gefunden.zustand = dienst.uebertragung_weiter(gefunden.zustand, daten.zustand)
+    gefunden.versuche += 1
+    gefunden.letzter_fehler = daten.meldung if daten.zustand == "fehler" else ""
+    gefunden.erledigt_am = dt.datetime.now(dt.UTC) if daten.zustand == "fertig" else None
+    await sitzung.flush()
+    return gefunden
+
+
+# ── DFBnet-Zugang ─────────────────────────────────────────────────────────
+
+#: Es gibt genau einen je Installation.
+DIENST = "dfbnet"
+
+
+async def _zugang(sitzung: AsyncSession) -> Zugang | None:
+    ergebnis = await sitzung.execute(select(Zugang).where(Zugang.dienst == DIENST))
+    return ergebnis.scalar_one_or_none()
+
+
+def schluessel_vorhanden() -> bool:
+    return bool(os.environ.get(dienst.SCHLUESSEL_VARIABLE, "").strip())
+
+
+async def zugang_stand(sitzung: AsyncSession) -> tuple[bool, str]:
+    """Ob etwas hinterlegt ist und fuer wen. Nie das Passwort."""
+    gefunden = await _zugang(sitzung)
+    return (gefunden is not None, gefunden.benutzer if gefunden else "")
+
+
+async def zugang_setzen(sitzung: AsyncSession, daten: ZugangSetzen) -> None:
+    schluessel = dienst.schluessel_aus(os.environ)
+    token = dienst.verschluesseln(daten.passwort, schluessel)
+    gefunden = await _zugang(sitzung)
+    if gefunden is None:
+        sitzung.add(Zugang(dienst=DIENST, benutzer=daten.benutzer, geheimnis=token))
+    else:
+        gefunden.benutzer = daten.benutzer
+        gefunden.geheimnis = token
+    await sitzung.flush()
+
+
+async def zugang_loeschen(sitzung: AsyncSession) -> None:
+    gefunden = await _zugang(sitzung)
+    if gefunden is not None:
+        await sitzung.delete(gefunden)
+        await sitzung.flush()
+
+
+async def zugang_abholen(sitzung: AsyncSession) -> tuple[str, str]:
+    """Der einzige Ort, an dem das Passwort wieder herauskommt."""
+    gefunden = await _zugang(sitzung)
+    if gefunden is None:
+        raise KeinZugang("Es ist kein DFBnet-Zugang hinterlegt")
+    schluessel = dienst.schluessel_aus(os.environ)
+    return gefunden.benutzer, dienst.entschluesseln(gefunden.geheimnis, schluessel)
