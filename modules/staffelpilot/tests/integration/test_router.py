@@ -49,23 +49,17 @@ class TestStaffeln:
 
         assert (await client.get("/staffelpilot/staffeln")).json()[0]["spieltage"] == 0
 
-    async def test_die_spieltage_lassen_sich_setzen_und_aendern(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_die_spieltage_lassen_sich_setzen_und_aendern(self, client: AsyncClient) -> None:
         staffel_id = await staffel_anlegen(client, spieltage=26)
         assert (await client.get("/staffelpilot/staffeln")).json()[0]["spieltage"] == 26
 
-        antwort = await client.patch(
-            f"/staffelpilot/staffeln/{staffel_id}", json={"spieltage": 30}
-        )
+        antwort = await client.patch(f"/staffelpilot/staffeln/{staffel_id}", json={"spieltage": 30})
 
         assert antwort.status_code == 200
         assert antwort.json()["spieltage"] == 30
 
     async def test_hundert_spieltage_gibt_es_nicht(self, client: AsyncClient) -> None:
-        antwort = await client.post(
-            "/staffelpilot/staffeln", json={**STAFFEL, "spieltage": 100}
-        )
+        antwort = await client.post("/staffelpilot/staffeln", json={**STAFFEL, "spieltage": 100})
 
         assert antwort.status_code == 422
 
