@@ -57,6 +57,43 @@ def _warten_auf(seite: Any, sucher: list[str], grenze_ms: int = 9000) -> bool:
     return False
 
 
+def _hat_paarung(html: str) -> bool:
+    """Ob die Infoseite die beiden Mannschaften nennt."""
+    meta = MatchReportExtractor(info_html=html).extract().meta
+    return bool(meta.home_team and meta.away_team)
+
+
+def _hat_verlauf(html: str) -> bool:
+    """Ob der Spielverlauf da ist.
+
+    Die Bestaetigungen zaehlen, und ersatzweise die Ereignisse: ein Spiel ohne
+    jede Karte und ohne Tor gibt es, ein Spielbericht ohne Bestaetigungsblock
+    in der Praxis nicht.
+    """
+    bericht = MatchReportExtractor(history_html=html).extract()
+    return bool(bericht.confirmations or bericht.cards or bericht.goals)
+
+
+def _html_mit(seite: Any, hat_inhalt: Callable[[str], bool], grenze_ms: int = 20_000) -> str:
+    """Den Seiteninhalt holen, sobald er den gesuchten Inhalt traegt.
+
+    Auf ein Element zu warten reicht bei dieser Anwendung nicht: das Geruest
+    steht da, bevor die Daten kommen, und wer dann liest, bekommt eine leere
+    Seite, die aussieht wie ein Bericht ohne Vorkommnisse.
+    """
+    schluss = time.time() + grenze_ms / 1000
+    html = ""
+    while time.time() < schluss:
+        html = str(seite.content())
+        try:
+            if hat_inhalt(html):
+                return html
+        except Exception:
+            logger.exception("Der Seiteninhalt liess sich nicht pruefen")
+        seite.wait_for_timeout(500)
+    return ""
+
+
 class DfbnetLeser:
     """Ein Browser, der sich anmeldet und die Trefferliste ausliest."""
 
@@ -167,7 +204,18 @@ class DfbnetLeser:
             felder[0].fill(dienst.als_dfbnet_datum(von))
             felder[1].fill(dienst.als_dfbnet_datum(bis))
         seite.get_by_role("button", name="Suchen").first.click(timeout=ZEIT_MS)
-        seite.wait_for_load_state("networkidle")
+        # Auf die Treffer warten und **nicht** auf "networkidle": die Seite
+        # haelt eine Verbindung offen, und dann wartet der Lauf zwei Minuten
+        # und faellt um -- an einer Stelle, an der die Liste laengst dasteht.
+        _warten_auf(
+            seite,
+            [
+                "a[href*='/match-report/report/']",
+                "text=Es sind keine Eintraege vorhanden",
+                "text=Keine Ergebnisse",
+            ],
+            grenze_ms=30_000,
+        )
 
         return self._trefferliste()
 
@@ -302,7 +350,15 @@ class DfbnetLeser:
             if not _warten_auf(popup, ["mr-report-info"]):
                 logger.warning("Bericht %s: die Infoseite kam nicht", kennung)
                 return None
-            info_html = popup.content()
+
+            # Das Geruest steht frueher da als die Daten. Gewartet wird
+            # deshalb auf **die Paarung** und nicht auf ein Element: ohne sie
+            # laesst sich kein Kader einer Seite zuordnen, und die Karten
+            # finden ihre Spieler nicht mehr.
+            info_html = _html_mit(popup, _hat_paarung)
+            if not info_html:
+                logger.warning("Bericht %s: die Infoseite blieb leer", kennung)
+                return None
 
             # Die Schnittstelle fragt nach der Kennung aus der geoeffneten
             # Adresse -- die ist eine andere als die aus der Trefferliste.
@@ -317,12 +373,24 @@ class DfbnetLeser:
                 # Bestaetigungen anzudichten.
                 return None
 
-            return MatchReportExtractor(
+            bericht = MatchReportExtractor(
                 info_html=info_html,
                 teams_html="",
                 history_html=verlauf_html,
                 teams_data=aufstellungen,
             ).extract()
+
+            # Die Kader werden ueber die Namen zugeordnet. Passt das nicht,
+            # liegt der Gastkader auf der Heimseite -- und jede Karte sucht
+            # ihren Spieler in der falschen Mannschaft.
+            if aufstellungen and bericht.home_squad.team_name != bericht.meta.home_team:
+                logger.warning(
+                    "Bericht %s: Kader %r passt nicht zur Heimmannschaft %r",
+                    kennung,
+                    bericht.home_squad.team_name,
+                    bericht.meta.home_team,
+                )
+            return bericht
         except Exception:
             logger.exception("Bericht %s liess sich nicht lesen", kennung)
             return None
@@ -347,19 +415,14 @@ class DfbnetLeser:
             logger.exception("Bericht %s: der Reiter Spielverlauf ging nicht auf", kennung)
             return ""
 
-        if not _warten_auf(
-            popup,
-            [
-                ".event-list mr-match-event",
-                ".no-events",
-                "text=Vorkommnisse",
-                "text=Endergebnis",
-                "text=Es sind keine Eintraege vorhanden",
-            ],
-        ):
+        # Auf die Bestaetigungen warten, nicht auf ein Element: sie sind der
+        # Grund, warum dieser Reiter geoeffnet wird. Ein Bericht ohne sie
+        # laesst jede Mannschaft unbestaetigt aussehen.
+        verlauf = _html_mit(popup, _hat_verlauf)
+        if not verlauf:
             logger.warning("Bericht %s: der Spielverlauf kam nicht", kennung)
             return ""
-        return str(popup.content())
+        return verlauf
 
     def _aufstellungen(self, seite: Any, kennung: str) -> list[dict[str, Any]]:
         """Die Kader ueber die Schnittstelle, mit der Sitzung der Seite.
