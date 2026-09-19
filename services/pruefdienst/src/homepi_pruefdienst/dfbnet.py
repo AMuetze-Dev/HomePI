@@ -549,12 +549,17 @@ class DfbnetLeser:
         except Exception:
             logger.warning("Die Suchmaske liess sich nicht leeren")
 
+        # Dieselben Felder wie in der Spielberichtssuche: nachgebaute
+        # Auswahlfelder aus `li[role='option']`, kein `<select>`. Mit
+        # `select_option` liess sich keines davon setzen, und Saison und
+        # Verband blieben stumm auf ihrer Vorgabe stehen.
         if saison:
-            self._auswahl(seite, "Saison", saison)
+            self._feld(seite, "Saison", [saison])
+
         # Auf dieser Seite heisst das Feld "Verband", woanders "Landesverband".
         # Beides versuchen, sonst bleibt der Filter leer.
-        if verband and not self._auswahl(seite, "Verband", verband):
-            self._auswahl(seite, "Landesverband", verband)
+        if verband and not self._feld(seite, "Verband", [verband]):
+            self._feld(seite, "Landesverband", [verband])
 
         for sucher in ("Eigene Staffeln", "label:has-text('Eigene Staffeln')"):
             try:
@@ -566,14 +571,6 @@ class DfbnetLeser:
             except Exception:
                 continue
         logger.warning("Der Haken 'Eigene Staffeln' liess sich nicht setzen")
-
-    def _auswahl(self, seite: Any, feld: str, wert: str) -> bool:
-        try:
-            seite.get_by_label(feld).first.select_option(label=wert, timeout=3000)
-            return True
-        except Exception:
-            logger.info("Das Feld %r liess sich nicht auf %r setzen", feld, wert)
-            return False
 
     def _staffel_oeffnen(self, seite: Any, staffel: Staffelkennung) -> bool:
         """Die Zeile mit diesem Namen aufmachen.
