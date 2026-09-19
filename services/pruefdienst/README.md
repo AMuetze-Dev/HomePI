@@ -106,8 +106,11 @@ passieren, weil ein Container gestartet wurde.
 | Anfordern, anmelden, Fortschritt, Abschluss, Fehlerbehandlung | **geprüft** — gegen ein nachgebautes Gateway und den Demo-Leser |
 | Anmelden bei DFBnet, Trefferliste lesen | gebaut, **nicht gegen das echte DFBnet geprüft** |
 | Spielbericht aus HTML lesen | **geprüft** — gegen echtes, aufgezeichnetes DFBnet-HTML (`tests/aufnahmen/`): Kopfdaten, Karten, Tore, Wechsel, Bestätigungen, Vorkommnisse |
+| Die Berichtsseite im Browser aufmachen | gebaut, **nicht gegen das echte DFBnet geprüft** — Info- und Verlaufsreiter, Adresse in `dienst.bericht_adresse` |
 | Aufstellung aus der Schnittstelle | die **Übersetzung** ist geprüft (`aufstellung.py`, 100 %). Der Abruf selbst fehlt noch |
-| Regelprüfung (die 31 Regeln) | **fehlt**. Eingespielte Spiele haben `befunde: []` — der Bericht ist da, geprüft ist er nicht |
+| Regeln, die **nur den Bericht** brauchen | **übernommen und geprüft** (`regeln.py`, 100 %): Vorkommnisse, Kommentare an Bestätigungen, Ordnungsdienst, fehlende Bestätigungen, Fristen nach § 59 (17), Dokumente, Spielrecht aus der Aufstellung |
+| Regeln, die **mehr** brauchen | **fehlen**: gelbe Karten und Stammspieler brauchen die Saisongeschichte, der Regelkatalog des Staffelleiters (`config/regeln/*.py`) ist ein eigenes Stück |
+| Ein Bericht, der nicht kam | wird eine **Warnung am Spiel**, keine leere Liste. Eine leere Liste sieht in der Warteschlange aus wie „geprüft und sauber" |
 | Meldung einer Staffel holen (Initialisierung) | **fehlt** — im DFBnet-Leser. Er gibt eine leere Liste zurück, und die überschreibt im Artefakt nichts; der Auftrag meldet dann, dass nichts kam, statt einen Erfolg |
 | Eintragen in DFBnet (Prüferfreigabe, Fallanlage) | **fehlt**. Mit `PRUEFDIENST_LESER=dfbnet` bleibt Vorgemerktes stehen, statt still auf „fertig" zu springen |
 | Eintragen **simuliert** | mit den Beispieldaten wird jede Übertragung als erledigt gemeldet — mit dem Vermerk „Simuliert — es war kein Browser bei DFBnet" an der Zeile. Nur so lässt sich der Weg bis zum Freigeben einmal durchklicken |
@@ -127,6 +130,7 @@ beziehungsweise mehrere tausend Zeilen, über eine Saison gewachsen. Das wird
 src/homepi_pruefdienst/
   dienst.py       REINE Entscheidungen - Zeile zerlegen, Fortschritt, Wartezeit
   bericht.py      Spielbericht aus HTML (uebernommen, woertlich)
+  regeln.py       die Regeln, die nur den Bericht brauchen (uebernommen)
   aufstellung.py  Aufstellung aus der DFBnet-Schnittstelle (uebernommen)
   gateway.py      HTTP zum Artefakt
   leser.py        das Protokoll, und ein Leser ohne DFBnet
@@ -158,6 +162,23 @@ Das Zerlegen einer Tabellenzeile steht in `dienst.py` und nicht in
 `dfbnet.py` — es ist die Stelle, die kaputtgeht, wenn DFBnet eine Spalte
 verschiebt, und dort ist sie in Millisekunden prüfbar. Beide Anordnungen, die
 DFBnet bisher hatte, haben einen Test.
+
+## Was die Regeln **nicht** tun
+
+Sie beurteilen nichts. Ein Vorkommnis wird vorgelegt, nicht bewertet;
+Stichworte heben nur die Schwere an, damit ein Eintrag über Gewalt nicht
+zwischen zwanzig Routinenotizen verschwindet. Was er bedeutet, entscheidet der
+Staffelleiter.
+
+Und sie machen aus **Unwissen keinen Verstoß**. Das ist die Regel, an der die
+beiden echten Fehlalarme hingen:
+
+* Eine leere Aufstellung heißt *nicht abgerufen*, nicht *niemand da* — sonst
+  bekommt jeder Heimverein eine Mahnung wegen fehlendem Ordnungsdienst.
+* Ein unlesbarer Zeitstempel wird gemeldet (`confirmation_unlesbar`) und nicht
+  verschwiegen: Schweigen sähe genauso aus wie „fristgerecht".
+
+Dasselbe Prinzip wie beim Spielerfoto in `aufstellung.py`.
 
 ## Entwickeln
 
