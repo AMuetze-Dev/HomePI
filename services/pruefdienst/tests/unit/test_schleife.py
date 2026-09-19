@@ -13,14 +13,20 @@ from typing import Any
 
 import pytest
 
-from homepi_pruefdienst import regeln
+from homepi_pruefdienst import dienst, regeln
 from homepi_pruefdienst.bericht import MatchMeta, MatchReport, Player, TeamSquad
-from homepi_pruefdienst.dienst import Spielzeile
+from homepi_pruefdienst.dienst import Spielzeile, Staffelkennung
 from homepi_pruefdienst.gateway import GatewayFehler
 from homepi_pruefdienst.leser import BeispielLeser, DemoLeser
 from homepi_pruefdienst.schleife import Prueflauf
 
 HEUTE = dt.date.today()
+
+
+def kennung(name: str) -> Staffelkennung:
+    """Eine Staffel, wie der Leser sie bekommt."""
+    return Staffelkennung(name=name, spielklasse="3.Kreisliga (C)", altersklasse="maenner")
+
 
 #: Was am Spiel steht, wenn der Bericht nicht kam. Eine leere Liste waere die
 #: gefaehrlichere Auskunft: sie sieht aus wie "geprueft und sauber".
@@ -294,7 +300,9 @@ class TestWennEsSchiefgeht:
 
     def test_und_der_browser_wird_trotzdem_geschlossen(self) -> None:
         class KaputterLeser(DemoLeser):
-            def spiele(self, staffel: str, von: dt.date, bis: dt.date) -> list[Spielzeile]:
+            def spiele(
+                self, staffel: Staffelkennung, von: dt.date, bis: dt.date
+            ) -> list[Spielzeile]:
                 raise RuntimeError("Seite hat sich geaendert")
 
         gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
@@ -376,6 +384,64 @@ class TestUebertragung:
         assert lauf(gateway, darf_schreiben=True).runde() is False
 
 
+class TestStaffelNichtGefunden:
+    """Der teuerste stille Ausfall: eine Staffel, die niemand geprueft hat.
+
+    In der alten Anwendung war das der Fall "Ue35 1. Stadtklasse wird nicht
+    geprueft" -- das Feld liess sich nicht setzen, der Lauf lief weiter und
+    meldete "keine Spiele". Eine ganze Staffel war eine Saison lang ungeprueft.
+    """
+
+    def kaputt(self) -> DemoLeser:
+        class Unauffindbar(DemoLeser):
+            def spiele(
+                self, staffel: Staffelkennung, von: dt.date, bis: dt.date
+            ) -> list[Spielzeile]:
+                raise dienst.StaffelNichtGefunden("Angeboten: 1.Kreisklasse, 2.Kreisklasse")
+
+            def mannschaften(
+                self, staffel: Staffelkennung, verband: str = ""
+            ) -> list[dict[str, object]]:
+                raise dienst.StaffelNichtGefunden("steht nicht in der Liste")
+
+        return Unauffindbar()
+
+    def test_der_prueflauf_meldet_sie_und_gilt_nicht_als_fertig(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+
+        lauf(gateway, self.kaputt()).runde()
+
+        zustand, meldung = gateway.abschluesse[0][1], gateway.abschluesse[0][2]
+        assert zustand == "gescheitert"
+        assert "Stadtliga C" in meldung
+
+    def test_der_grund_steht_im_protokoll(self) -> None:
+        """Mit den Optionen, die DFBnet angeboten hat -- sonst ist die naechste
+        Frage 'warum' und die Antwort ein Screenshot."""
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+
+        lauf(gateway, self.kaputt()).runde()
+
+        zeilen = [f.get("zeile", "") for f in gateway.fortschritte]
+        assert any("Angeboten" in str(z) for z in zeilen)
+
+    def test_nichts_wird_eingespielt(self) -> None:
+        """Eine Suche ohne Filter liefert alles, was das Konto sieht."""
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+
+        lauf(gateway, self.kaputt()).runde()
+
+        assert gateway.importe == []
+
+    def test_die_initialisierung_ebenso(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "initialisierung", "staffel_id": None})
+
+        lauf(gateway, self.kaputt()).runde()
+
+        assert gateway.abschluesse[0][1] == "gescheitert"
+        assert gateway.meldungen == []
+
+
 class TestDemoLeser:
     def test_er_merkt_sich_das_passwort_nicht(self) -> None:
         leser = DemoLeser()
@@ -387,12 +453,12 @@ class TestDemoLeser:
     def test_er_filtert_nach_zeitraum(self) -> None:
         leser = DemoLeser({"A": [zeile("M-1", tage_her=1), zeile("M-2", tage_her=40)]})
 
-        gefunden = leser.spiele("A", HEUTE - dt.timedelta(days=30), HEUTE)
+        gefunden = leser.spiele(kennung("A"), HEUTE - dt.timedelta(days=30), HEUTE)
 
         assert [z.dfbnet_id for z in gefunden] == ["M-1"]
 
     def test_eine_unbekannte_staffel_gibt_nichts(self) -> None:
-        assert DemoLeser().spiele("gibt es nicht", HEUTE, HEUTE) == []
+        assert DemoLeser().spiele(kennung("gibt es nicht"), HEUTE, HEUTE) == []
 
 
 class TestBeispielLeser:
@@ -400,7 +466,7 @@ class TestBeispielLeser:
 
     def test_er_erfindet_spiele_zu_jeder_staffel(self) -> None:
         gefunden = BeispielLeser().spiele(
-            "Egal wie sie heisst", HEUTE - dt.timedelta(days=30), HEUTE
+            kennung("Egal wie sie heisst"), HEUTE - dt.timedelta(days=30), HEUTE
         )
 
         assert len(gefunden) == BeispielLeser.SPIELTAGE
@@ -409,32 +475,32 @@ class TestBeispielLeser:
     def test_und_sagt_an_jeder_kennung_dass_es_eine_attrappe_ist(self) -> None:
         """Wer das in der Oberflaeche sieht, weiss, dass niemand bei DFBnet
         war."""
-        gefunden = BeispielLeser().spiele("A", HEUTE - dt.timedelta(days=30), HEUTE)
+        gefunden = BeispielLeser().spiele(kennung("A"), HEUTE - dt.timedelta(days=30), HEUTE)
 
         assert all(z.dfbnet_id.startswith("DEMO-") for z in gefunden)
 
     def test_die_spiele_liegen_im_zeitraum(self) -> None:
         von, bis = HEUTE - dt.timedelta(days=30), HEUTE
 
-        gefunden = BeispielLeser().spiele("A", von, bis)
+        gefunden = BeispielLeser().spiele(kennung("A"), von, bis)
 
         assert all(z.datum is not None and von <= z.datum <= bis for z in gefunden)
 
     def test_ein_enger_zeitraum_liefert_weniger(self) -> None:
-        assert len(BeispielLeser().spiele("A", HEUTE - dt.timedelta(days=3), HEUTE)) == 1
+        assert len(BeispielLeser().spiele(kennung("A"), HEUTE - dt.timedelta(days=3), HEUTE)) == 1
 
     def test_befunde_gibt_es_nur_am_ersten_spiel(self) -> None:
         """An jedem Spiel waere die Warteschlange voller Arbeit, die es nicht
         gibt - und "geprueft und sauber" nicht mehr von "geprueft und
         auffaellig" zu unterscheiden."""
         leser = BeispielLeser()
-        spiele = leser.spiele("A", HEUTE - dt.timedelta(days=30), HEUTE)
+        spiele = leser.spiele(kennung("A"), HEUTE - dt.timedelta(days=30), HEUTE)
 
         assert len([z for z in spiele if leser.befunde_zu(z)]) == 1
 
     def test_jeder_befund_traegt_den_hinweis(self) -> None:
         leser = BeispielLeser()
-        erstes = leser.spiele("A", HEUTE - dt.timedelta(days=30), HEUTE)[0]
+        erstes = leser.spiele(kennung("A"), HEUTE - dt.timedelta(days=30), HEUTE)[0]
 
         befunde = leser.befunde_zu(erstes)
 
@@ -443,7 +509,7 @@ class TestBeispielLeser:
 
     def test_die_mannschaften_enthalten_eine_spielgemeinschaft(self) -> None:
         """Sonst zeigt die Oberflaeche nie, wozu "pruefen" da ist."""
-        assert any(m["ist_sg"] for m in BeispielLeser().mannschaften("A"))
+        assert any(m["ist_sg"] for m in BeispielLeser().mannschaften(kennung("A")))
 
 
 class TestSimulierteUebertragung:

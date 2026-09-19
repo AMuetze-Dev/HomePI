@@ -15,7 +15,7 @@ import hashlib
 from typing import Protocol
 
 from .bericht import MatchReport
-from .dienst import Spielzeile
+from .dienst import Spielzeile, Staffelkennung
 
 
 class Leser(Protocol):
@@ -23,12 +23,12 @@ class Leser(Protocol):
 
     def anmelden(self, benutzer: str, passwort: str) -> None: ...
 
-    def spiele(self, staffel: str, von: dt.date, bis: dt.date) -> list[Spielzeile]: ...
+    def spiele(self, staffel: Staffelkennung, von: dt.date, bis: dt.date) -> list[Spielzeile]: ...
 
     def bericht(self, kennung: str) -> MatchReport | None: ...
 
     def mannschaften(
-        self, staffel: str, saison: str = "", verband: str = ""
+        self, staffel: Staffelkennung, verband: str = ""
     ) -> list[dict[str, object]]: ...
 
     def schliessen(self) -> None: ...
@@ -59,10 +59,10 @@ class DemoLeser:
         # nicht das Muster vorleben, eines in einem Feld liegen zu lassen.
         self.angemeldet_als = benutzer
 
-    def spiele(self, staffel: str, von: dt.date, bis: dt.date) -> list[Spielzeile]:
+    def spiele(self, staffel: Staffelkennung, von: dt.date, bis: dt.date) -> list[Spielzeile]:
         return [
             z
-            for z in self._spiele.get(staffel, [])
+            for z in self._spiele.get(staffel.name, [])
             if z.datum is not None and von <= z.datum <= bis
         ]
 
@@ -76,10 +76,8 @@ class DemoLeser:
         """
         return self._berichte.get(kennung)
 
-    def mannschaften(
-        self, staffel: str, saison: str = "", verband: str = ""
-    ) -> list[dict[str, object]]:
-        return self._mannschaften.get(staffel, [])
+    def mannschaften(self, staffel: Staffelkennung, verband: str = "") -> list[dict[str, object]]:
+        return self._mannschaften.get(staffel.name, [])
 
     def schliessen(self) -> None:
         self.geschlossen = True
@@ -144,7 +142,7 @@ class BeispielLeser(DemoLeser):
     #: liegen sicher im voreingestellten Pruefzeitraum von dreissig Tagen.
     SPIELTAGE = 3
 
-    def spiele(self, staffel: str, von: dt.date, bis: dt.date) -> list[Spielzeile]:
+    def spiele(self, staffel: Staffelkennung, von: dt.date, bis: dt.date) -> list[Spielzeile]:
         gefunden: list[Spielzeile] = []
         for nummer in range(self.SPIELTAGE):
             tag = bis - dt.timedelta(days=7 * nummer)
@@ -153,7 +151,7 @@ class BeispielLeser(DemoLeser):
             heim, gast = _VEREINE[nummer % 2][0], _VEREINE[(nummer % 2) + 2][0]
             gefunden.append(
                 Spielzeile(
-                    dfbnet_id=f"DEMO-{_kurz(staffel)}-{nummer + 1}",
+                    dfbnet_id=f"DEMO-{_kurz(staffel.name)}-{nummer + 1}",
                     datum=tag,
                     heim=heim,
                     gast=gast,
@@ -163,9 +161,7 @@ class BeispielLeser(DemoLeser):
             )
         return gefunden
 
-    def mannschaften(
-        self, staffel: str, saison: str = "", verband: str = ""
-    ) -> list[dict[str, object]]:
+    def mannschaften(self, staffel: Staffelkennung, verband: str = "") -> list[dict[str, object]]:
         return [{"name": name, "ist_sg": ist_sg} for name, ist_sg in _VEREINE]
 
     @staticmethod

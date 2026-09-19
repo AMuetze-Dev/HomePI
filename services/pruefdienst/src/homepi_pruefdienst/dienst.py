@@ -143,6 +143,62 @@ def _paarung(zellen: list[str], stelle: int) -> tuple[str, str]:
     return tuple([*namen, "", ""][:2])  # type: ignore[return-value]
 
 
+class StaffelNichtGefunden(RuntimeError):
+    """DFBnet hat diese Staffel nicht angeboten.
+
+    Ein eigener Fehler, weil er anders behandelt gehoert als ein Absturz: der
+    Lauf geht mit der naechsten Staffel weiter, aber diese hier gilt **nicht**
+    als geprueft. Sie stillschweigend zu ueberspringen sah aus wie "keine
+    Spiele im Zeitraum".
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class Staffelkennung:
+    """Was DFBnet braucht, um genau diese Staffel zu zeigen.
+
+    Vier Felder statt eines Namens, und jedes hat einen Grund:
+
+    * `spielklasse` ist der Text, unter dem DFBnet sie fuehrt
+      ("3.Kreisliga (C)"). Der Name des Staffelleiters ("Stadtliga C") steht
+      dort nicht.
+    * `altersklasse` entscheidet die Mannschaftsart -- Herren und Ue35 teilen
+      sich dieselben Spielklassennamen, und ohne sie liest ein Ue35-Lauf die
+      Herrenspiele.
+    * `saison` steht in DFBnet auf der laufenden; wer die vorige prueft, muss
+      sie umstellen.
+    """
+
+    name: str
+    spielklasse: str = ""
+    altersklasse: str = ""
+    saison: str = ""
+
+    @property
+    def kandidaten(self) -> list[str]:
+        """Was in den Feldern Spielklasse und Staffel zu versuchen ist.
+
+        Die Spielklasse zuerst: sie ist die Schreibweise von DFBnet. Der Name
+        ist der Rueckfall fuer Staffeln, die dort genauso heissen.
+        """
+        gesehen: list[str] = []
+        for text in (self.spielklasse, self.name):
+            text = (text or "").strip()
+            if text and text not in gesehen:
+                gesehen.append(text)
+        return gesehen
+
+
+def kennung_aus(staffel: dict[str, object]) -> Staffelkennung:
+    """Die Staffel des Artefakts als das, was der Leser braucht."""
+    return Staffelkennung(
+        name=str(staffel.get("name") or ""),
+        spielklasse=str(staffel.get("spielklasse") or ""),
+        altersklasse=str(staffel.get("altersklasse") or ""),
+        saison=str(staffel.get("saison") or ""),
+    )
+
+
 def kennung_aus_href(href: str) -> str:
     """Die DFBnet-Kennung steckt im Link auf den Bericht.
 

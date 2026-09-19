@@ -120,6 +120,56 @@ class TestKennung:
         assert dienst.kennung_aus_href("") == ""
 
 
+class TestStaffelkennung:
+    """Was DFBnet braucht, um genau diese Staffel zu zeigen."""
+
+    def test_die_spielklasse_kommt_zuerst(self) -> None:
+        """Sie ist die Schreibweise von DFBnet -- "Stadtliga C" steht dort
+        nicht."""
+        k = dienst.Staffelkennung(name="Stadtliga C", spielklasse="3.Kreisliga (C)")
+
+        assert k.kandidaten == ["3.Kreisliga (C)", "Stadtliga C"]
+
+    def test_ohne_spielklasse_bleibt_der_name(self) -> None:
+        assert dienst.Staffelkennung(name="Stadtliga C").kandidaten == ["Stadtliga C"]
+
+    def test_derselbe_text_steht_nur_einmal_da(self) -> None:
+        k = dienst.Staffelkennung(name="1.Kreisklasse", spielklasse=" 1.Kreisklasse ")
+
+        assert k.kandidaten == ["1.Kreisklasse"]
+
+    def test_ohne_alles_gibt_es_nichts_zu_versuchen(self) -> None:
+        """Und der Leser sucht dann nicht -- eine Suche ohne Filter liefert
+        alles, was das Konto sieht."""
+        assert dienst.Staffelkennung(name="  ").kandidaten == []
+
+    def test_aus_der_staffel_des_artefakts(self) -> None:
+        k = dienst.kennung_aus(
+            {
+                "id": "s1",
+                "name": "Stadtliga C",
+                "spielklasse": "3.Kreisliga (C)",
+                "altersklasse": "maenner",
+                "saison": "26/27",
+                "aktiv": True,
+            }
+        )
+
+        assert (k.name, k.spielklasse, k.altersklasse, k.saison) == (
+            "Stadtliga C",
+            "3.Kreisliga (C)",
+            "maenner",
+            "26/27",
+        )
+
+    def test_fehlende_felder_werden_leer_und_nicht_none(self) -> None:
+        k = dienst.kennung_aus({"name": "Stadtliga C"})
+
+        assert k.spielklasse == ""
+        assert k.altersklasse == ""
+        assert k.saison == ""
+
+
 class TestBerichtsadresse:
     def test_die_kennung_wird_eingesetzt(self) -> None:
         adresse = dienst.bericht_adresse("633203177")

@@ -129,6 +129,7 @@ class Prueflauf:
         )
 
         gepruefte = befunde = 0
+        nicht_geprueft: list[str] = []
         for i, staffel in enumerate(staffeln):
             name = str(staffel["name"])
             self._gateway.fortschritt(
@@ -137,8 +138,19 @@ class Prueflauf:
                 fortschritt=dienst.fortschritt(i, len(staffeln)),
             )
 
+            try:
+                zeilen = self._leser.spiele(dienst.kennung_aus(staffel), von, bis)
+            except dienst.StaffelNichtGefunden as fehler:
+                # Nicht weiterwerfen: die anderen Staffeln sollen laufen. Aber
+                # auch nicht verschweigen -- diese hier ist ungeprueft, und das
+                # sieht sonst aus wie "keine Spiele im Zeitraum".
+                nicht_geprueft.append(name)
+                self._gateway.fortschritt(kennung, zeile=f"{name}: {fehler}")
+                logger.error("Staffel %s wurde nicht geprueft: %s", name, fehler)
+                continue
+
             ausbeute = dienst.Ausbeute()
-            for zeile in self._leser.spiele(name, von, bis):
+            for zeile in zeilen:
                 ausbeute.aufnehmen(zeile, self._befunde_zu(zeile, staffel))
 
             if ausbeute.uebersprungen:
@@ -163,6 +175,17 @@ class Prueflauf:
                 )
             else:
                 self._gateway.fortschritt(kennung, zeile=f"{name}: nichts im Zeitraum")
+
+        if nicht_geprueft:
+            # Nicht "fertig": der Lauf hat nicht getan, wofuer er angefordert
+            # wurde. Ein gruener Haken ueber einer halben Pruefung ist die
+            # gefaehrlichste Auskunft, die diese Anzeige geben kann.
+            self._gateway.abschluss(
+                kennung,
+                "gescheitert",
+                "Nicht geprüft, weil DFBnet sie nicht angeboten hat: " + ", ".join(nicht_geprueft),
+            )
+            return
 
         self._gateway.abschluss(kennung, "fertig")
 
@@ -194,6 +217,7 @@ class Prueflauf:
         verband = str(self._gateway.einstellungen().get("verband") or "")
 
         gesamt = 0
+        nicht_gefunden: list[str] = []
         for i, staffel in enumerate(staffeln):
             name = str(staffel["name"])
             self._gateway.fortschritt(
@@ -201,9 +225,13 @@ class Prueflauf:
                 schritt=f"Hole die Meldung zu {name}",
                 fortschritt=dienst.fortschritt(i, len(staffeln)),
             )
-            mannschaften = self._leser.mannschaften(
-                name, saison=str(staffel.get("saison") or ""), verband=verband
-            )
+            try:
+                mannschaften = self._leser.mannschaften(dienst.kennung_aus(staffel), verband)
+            except dienst.StaffelNichtGefunden as fehler:
+                nicht_gefunden.append(name)
+                self._gateway.fortschritt(kennung, zeile=f"{name}: {fehler}")
+                logger.error("Meldung zu %s nicht geholt: %s", name, fehler)
+                continue
             if mannschaften:
                 self._gateway.mannschaften_setzen(str(staffel["id"]), mannschaften)
                 gesamt += len(mannschaften)
@@ -216,6 +244,14 @@ class Prueflauf:
                 self._gateway.fortschritt(
                     kennung, zeile=f"{name}: nichts gemeldet, nichts geändert"
                 )
+
+        if nicht_gefunden:
+            self._gateway.abschluss(
+                kennung,
+                "gescheitert",
+                "In DFBnet nicht gefunden: " + ", ".join(nicht_gefunden),
+            )
+            return
 
         meldung = (
             f"{gesamt} Mannschaften übernommen"

@@ -82,6 +82,8 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 # selbst: sie sind woertlich uebernommen, und die deutsche Typografie in den
 # Paragrafenzitaten ist dort Absicht.
 "tests/unit/regelwerk/**" = ["E501", "RUF002", "RUF005", "RUF015"]
+# Ebenfalls uebernommen: die Tests der Feldauswahl.
+"tests/unit/test_auswahl.py" = ["E501", "RUF002", "RUF012"]
 # Woertlich uebernommen aus der bestehenden Anwendung und dort ueber eine
 # Saison an echten Seiten gewachsen. Ihn nach unserem Geschmack umzuformen
 # hiesse, jede Zeile anzufassen, die sich bewaehrt hat -- und der Vergleich

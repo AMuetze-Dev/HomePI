@@ -22,9 +22,9 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from . import aufstellung, dienst, meldung
+from . import aufstellung, auswahl, dienst, meldung
 from .bericht import MatchReport, MatchReportExtractor
-from .dienst import Spielzeile
+from .dienst import Spielzeile, Staffelkennung, StaffelNichtGefunden
 
 logger = logging.getLogger(__name__)
 
@@ -118,23 +118,118 @@ class DfbnetLeser:
 
     # ── Lesen ─────────────────────────────────────────────────────────────
 
-    def spiele(self, staffel: str, von: dt.date, bis: dt.date) -> list[Spielzeile]:
+    def spiele(self, staffel: Staffelkennung, von: dt.date, bis: dt.date) -> list[Spielzeile]:
+        """Die Trefferliste einer Staffel im Zeitraum.
+
+        Die Reihenfolge der Felder ist nicht beliebig, sie ist teuer bezahlt:
+
+        1. **Saison** -- DFBnet steht auf der laufenden. Wer die vorige prueft,
+           sieht sonst nichts.
+        2. **Mannschaftsart vor Spielklasse** -- Herren und Ue35 teilen sich
+           dieselben Spielklassennamen ("1.Kreisklasse"). Ohne diesen Schritt
+           liest ein Ue35-Lauf die Herrenspiele.
+        3. **Spielklasse und Staffel** -- je nach Verband steht die Staffel in
+           dem einen oder dem anderen Feld. Beide versuchen, eines muss sitzen.
+
+        Sitzt keines von beiden, wird **nicht** gesucht: eine Suche ohne Filter
+        liefert alles, was das Konto sieht, und das landete dann als Spiele
+        dieser Staffel im Artefakt.
+        """
         seite = self._seite
         if seite is None:
             raise RuntimeError("Erst anmelden, dann lesen")
 
-        seite.get_by_role("link", name="Spielberichte").first.click()
+        seite.get_by_role("link", name="Spielberichte").first.click(timeout=ZEIT_MS)
         seite.wait_for_load_state("domcontentloaded")
         seite.get_by_role("button", name="Suchen").first.wait_for(state="visible")
+
+        if staffel.saison:
+            self._feld(seite, "Saison", [staffel.saison])
+
+        # Zuerst genau, dann als Teilstueck: "Herren" darf nicht "Herren Ue35"
+        # verschlucken.
+        arten = auswahl.mannschaftsart_kandidaten(staffel.altersklasse)
+        if arten and not self._feld(seite, "Mannschaftsart", arten, genau=True):
+            self._feld(seite, "Mannschaftsart", arten)
+
+        spielklasse_ok = self._feld(seite, "Spielklasse", staffel.kandidaten)
+        staffel_ok = self._feld(seite, "Staffel", staffel.kandidaten)
+        if not spielklasse_ok and not staffel_ok:
+            raise StaffelNichtGefunden(
+                f"Weder Spielklasse noch Staffel liessen sich auf {staffel.kandidaten!r} "
+                "setzen. Die angebotenen Optionen stehen im Protokoll des Dienstes; "
+                "der Wert muss der Spielklasse in DFBnet entsprechen -- die "
+                "Altersklasse steckt in der Mannschaftsart."
+            )
 
         felder = seite.locator("input[id*='datepicker']").all()
         if len(felder) >= 2:
             felder[0].fill(dienst.als_dfbnet_datum(von))
             felder[1].fill(dienst.als_dfbnet_datum(bis))
-        seite.get_by_role("button", name="Suchen").first.click()
+        seite.get_by_role("button", name="Suchen").first.click(timeout=ZEIT_MS)
         seite.wait_for_load_state("networkidle")
 
         return self._trefferliste()
+
+    def _feld(
+        self, seite: Any, beschriftung: str, kandidaten: list[str], genau: bool = False
+    ) -> bool:
+        """Ein Auswahlfeld von DFBnet auf einen der Kandidaten setzen.
+
+        Uebernommen aus `navigator._select_dropdown`. Es ist kein `<select>`,
+        sondern ein nachgebautes Feld aus `li[role='option']` -- deshalb
+        klicken und nicht `select_option`.
+
+        **Verglichen wird in `auswahl.py`**, nicht hier: dort laesst sich ohne
+        Browser pruefen, dass "1. Stadtklasse" nicht gegen "11. Stadtklasse"
+        gewinnt.
+        """
+        try:
+            feld = seite.locator(
+                f".dfb-Dropdown:has(.dfb-Dropdown-label:has-text('{beschriftung}'))"
+            ).first
+            if feld.count() == 0:
+                logger.warning("Das Feld %r gibt es auf dieser Seite nicht", beschriftung)
+                return False
+
+            erweitert = auswahl.expand_candidates(kandidaten)
+
+            steht_schon = feld.locator(".dfb-Dropdown-value").first
+            if steht_schon.count() > 0:
+                text = (steht_schon.text_content() or "").strip()
+                if text and auswahl.best_option([text], erweitert, exact=genau):
+                    logger.info("%s steht schon auf %r", beschriftung, text)
+                    return True
+
+            klappe = feld.locator(".dfb-Dropdown-combobox").first
+            klappe.click()
+            seite.wait_for_timeout(400)
+
+            elemente = feld.locator("li[role='option']").all()
+            texte = [(el.text_content() or "").strip() for el in elemente]
+            treffer = auswahl.best_option(texte, erweitert, exact=genau)
+            if treffer is not None:
+                elemente[texte.index(treffer)].click()
+                # Warten, bis das Feld zu ist und die abhaengigen Felder neu
+                # geladen haben.
+                seite.wait_for_timeout(800)
+                logger.info("%s auf %r gesetzt", beschriftung, treffer)
+                return True
+
+            klappe.press("Escape")
+            seite.wait_for_timeout(200)
+            # Die Optionen zu nennen macht aus "warum wird die Staffel
+            # uebersprungen" einen Blick statt einer Suche.
+            logger.warning(
+                "%s liess sich nicht setzen. Gesucht: %s. Angeboten: %s",
+                beschriftung,
+                erweitert,
+                texte or "(keine Optionen)",
+            )
+            return False
+        except Exception:
+            logger.exception("%s liess sich nicht setzen", beschriftung)
+            return False
 
     def _trefferliste(self) -> list[Spielzeile]:
         """Jede Zeile mit einem Link auf einen Bericht.
@@ -286,9 +381,7 @@ class DfbnetLeser:
                 gefunden.append(eintrag)
         return gefunden
 
-    def mannschaften(
-        self, staffel: str, saison: str = "", verband: str = ""
-    ) -> list[dict[str, object]]:
+    def mannschaften(self, staffel: Staffelkennung, verband: str = "") -> list[dict[str, object]]:
         """Die Meldung einer Staffel: Meisterschaft, Staffel, Reiter, Tabelle.
 
         Der Weg stammt aus `navigator.py` der alten Anwendung. Nicht
@@ -309,20 +402,24 @@ class DfbnetLeser:
 
         try:
             self._zur_spielplanbearbeitung(seite)
-            self._suchmaske_fuellen(seite, saison, verband)
+            self._suchmaske_fuellen(seite, staffel.saison, verband)
             seite.locator("button:has-text('SUCHEN')").first.click(timeout=ZEIT_MS)
             _warten_auf(seite, ["table tbody tr"])
 
             if not self._staffel_oeffnen(seite, staffel):
-                logger.warning("Staffel %r steht nicht in der Meisterschaftsliste", staffel)
-                return []
+                raise StaffelNichtGefunden(
+                    f"{staffel.name!r} steht nicht in der Meisterschaftsliste "
+                    f"(gesucht wurde nach {staffel.kandidaten!r})"
+                )
 
             reiter = seite.get_by_role("tab", name=re.compile("Mannschaften", re.IGNORECASE)).first
             reiter.click(timeout=ZEIT_MS)
             _warten_auf(seite, ["table"])
             return meldung.mannschaften_lesen(self._mannschaftstabelle(seite))
+        except StaffelNichtGefunden:
+            raise
         except Exception:
-            logger.exception("Die Meldung zu %r liess sich nicht holen", staffel)
+            logger.exception("Die Meldung zu %r liess sich nicht holen", staffel.name)
             return []
 
     def _zur_spielplanbearbeitung(self, seite: Any) -> None:
@@ -370,7 +467,7 @@ class DfbnetLeser:
             logger.info("Das Feld %r liess sich nicht auf %r setzen", feld, wert)
             return False
 
-    def _staffel_oeffnen(self, seite: Any, staffel: str) -> bool:
+    def _staffel_oeffnen(self, seite: Any, staffel: Staffelkennung) -> bool:
         """Die Zeile mit diesem Namen aufmachen.
 
         Verglichen wird ohne Gross- und Kleinschreibung und als Teilstueck:
@@ -379,7 +476,7 @@ class DfbnetLeser:
         """
         for zeile in seite.locator("table tbody tr").all():
             text = (zeile.text_content() or "").strip()
-            if staffel.lower() not in text.lower():
+            if not any(k.lower() in text.lower() for k in staffel.kandidaten):
                 continue
             knopf = zeile.locator("button[title='Staffel bearbeiten']").first
             if knopf.count() == 0:
