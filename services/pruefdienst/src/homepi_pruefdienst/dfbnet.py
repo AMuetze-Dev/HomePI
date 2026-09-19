@@ -266,13 +266,14 @@ class DfbnetLeser:
         ]
 
     def bericht(self, kennung: str) -> MatchReport | None:
-        """Die Seite eines Spielberichts lesen -- Info und Spielverlauf.
+        """Einen Spielbericht lesen -- Kopfdaten, Aufstellung, Spielverlauf.
 
-        Die Aufstellung fehlt mit Absicht: sie steht nicht im HTML, sondern in
-        der Aufstellungsschnittstelle (siehe `aufstellung.py`), und deren
-        Abruf ist noch nicht portiert. Ein leerer Kader ist fuer die Regeln
-        *unbekannt* und kein Verstoss -- `regeln.aufstellung_bekannt` haelt
-        genau das fest.
+        **Ueber den Verweis in der Trefferliste, nicht ueber die Adresse.**
+        Direkt angesprungen laedt DFBnet eine Seite, die aussieht wie der
+        Bericht, aber leer bleibt: keine Ereignisse, keine Bestaetigungen, und
+        die Schnittstelle antwortet 401. Ueber den Verweis oeffnet sich ein
+        eigenes Fenster mit einer Sitzung, die alles beantwortet. Genau so
+        macht es die alte Anwendung.
 
         `None` heisst: nicht gelesen. Der Aufrufer macht daraus eine Warnung
         am Spiel; er darf es nicht als "geprueft und sauber" durchgehen
@@ -282,52 +283,83 @@ class DfbnetLeser:
         if seite is None:
             raise RuntimeError("Erst anmelden, dann lesen")
 
-        unterseite = seite.context.new_page()
+        verweis = seite.locator(f"a[href*='{kennung}']").first
+        if verweis.count() == 0:
+            logger.warning("Bericht %s: der Verweis steht nicht in der Trefferliste", kennung)
+            return None
+
         try:
-            unterseite.set_default_timeout(ZEIT_MS)
-            unterseite.goto(dienst.bericht_adresse(kennung), wait_until="domcontentloaded")
-            if not _warten_auf(unterseite, ["mr-report-info"]):
+            with seite.expect_popup(timeout=ZEIT_MS) as fenster:
+                verweis.click()
+            popup = fenster.value
+        except Exception:
+            logger.exception("Bericht %s: das Fenster ging nicht auf", kennung)
+            return None
+
+        try:
+            popup.set_default_timeout(ZEIT_MS)
+            popup.wait_for_load_state("domcontentloaded")
+            if not _warten_auf(popup, ["mr-report-info"]):
                 logger.warning("Bericht %s: die Infoseite kam nicht", kennung)
                 return None
-            info_html = unterseite.content()
+            info_html = popup.content()
 
-            verlauf_html = ""
-            try:
-                unterseite.locator(".nav-tab").nth(2).click(timeout=ZEIT_MS)
-                if _warten_auf(
-                    unterseite,
-                    [
-                        ".event-list mr-match-event",
-                        ".no-events",
-                        "text=Es sind keine Eintraege vorhanden",
-                        "text=Endergebnis",
-                    ],
-                ):
-                    verlauf_html = unterseite.content()
-                else:
-                    # Ohne Spielverlauf fehlen Karten und Tore. Das ist eine
-                    # Luecke und keine Fehlanzeige -- sie gehoert ins
-                    # Protokoll, nicht in ein stilles leeres Feld.
-                    logger.warning("Bericht %s: der Spielverlauf kam nicht", kennung)
-            except Exception:
-                logger.exception(
-                    "Bericht %s: der Reiter Spielverlauf liess sich nicht oeffnen", kennung
-                )
+            # Die Schnittstelle fragt nach der Kennung aus der geoeffneten
+            # Adresse -- die ist eine andere als die aus der Trefferliste.
+            api_kennung = dienst.kennung_aus_href(popup.url) or kennung
+            aufstellungen = self._aufstellungen(popup, api_kennung)
+
+            verlauf_html = self._verlauf(popup, kennung)
+            if not verlauf_html:
+                # Ohne den Spielverlauf fehlen Karten, Tore **und** die
+                # Bestaetigungen der Mannschaften. Den Bericht trotzdem
+                # auszuwerten hiesse, jedem Spiel zwei fehlende
+                # Bestaetigungen anzudichten.
+                return None
 
             return MatchReportExtractor(
                 info_html=info_html,
                 teams_html="",
                 history_html=verlauf_html,
-                teams_data=self._aufstellungen(unterseite, kennung),
+                teams_data=aufstellungen,
             ).extract()
         except Exception:
             logger.exception("Bericht %s liess sich nicht lesen", kennung)
             return None
         finally:
             try:
-                unterseite.close()
+                popup.close()
             except Exception:
-                logger.exception("Die Berichtsseite liess sich nicht schliessen")
+                logger.exception("Das Berichtsfenster liess sich nicht schliessen")
+
+    def _verlauf(self, popup: Any, kennung: str) -> str:
+        """Der Reiter "Spielverlauf".
+
+        Dort stehen nicht nur Tore und Karten, sondern auch die
+        **elektronischen Bestaetigungen** und die **Vorkommnisse**; die
+        Infoseite kennt sie nicht. Ohne diesen Reiter sieht jedes Spiel aus,
+        als haette keine Mannschaft bestaetigt -- am ersten echten Lauf waren
+        das 48 erfundene Befunde auf 24 Spielen.
+        """
+        try:
+            popup.locator(".nav-tab").nth(2).click(timeout=ZEIT_MS)
+        except Exception:
+            logger.exception("Bericht %s: der Reiter Spielverlauf ging nicht auf", kennung)
+            return ""
+
+        if not _warten_auf(
+            popup,
+            [
+                ".event-list mr-match-event",
+                ".no-events",
+                "text=Vorkommnisse",
+                "text=Endergebnis",
+                "text=Es sind keine Eintraege vorhanden",
+            ],
+        ):
+            logger.warning("Bericht %s: der Spielverlauf kam nicht", kennung)
+            return ""
+        return str(popup.content())
 
     def _aufstellungen(self, seite: Any, kennung: str) -> list[dict[str, Any]]:
         """Die Kader ueber die Schnittstelle, mit der Sitzung der Seite.
@@ -342,6 +374,15 @@ class DfbnetLeser:
         Verstoss (`regeln.aufstellung_bekannt`).
         """
         try:
+            # Erst den Reiter, dann die Schnittstelle: die alte Anwendung tat
+            # es in dieser Reihenfolge, und ein 401 an dieser Stelle kostet den
+            # ganzen Kader -- also die Regeln, die etwas wert sind.
+            try:
+                seite.locator(".nav-tab").nth(1).click(timeout=10_000)
+                seite.wait_for_timeout(1500)
+            except Exception:
+                logger.info("Der Reiter Mannschaften liess sich nicht antippen")
+
             antwort = seite.context.request.get(
                 aufstellung.ADRESSE_MANNSCHAFTEN.format(kennung=kennung), timeout=ZEIT_MS
             )

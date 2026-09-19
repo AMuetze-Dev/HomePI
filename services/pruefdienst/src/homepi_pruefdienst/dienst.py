@@ -204,8 +204,14 @@ def kennung_aus_href(href: str) -> str:
 
     Sie ist der Schlüssel, unter dem das Artefakt den Bericht wiederfindet —
     ein zweiter Prüflauf desselben Spiels darf ihn nicht verdoppeln.
+
+    **Zwei Schreibweisen, und beide zählen.** In der Trefferliste steht
+    `/match-report/report/<kennung>`; öffnet man den Bericht, wird daraus
+    `/match-report/report-details/<andere kennung>`. Die zweite ist die, nach
+    der die Aufstellungsschnittstelle fragt — ohne sie antwortet DFBnet mit
+    404, und der Kader bleibt leer.
     """
-    treffer = re.search(r"/match-report/report/([^/?#]+)", href or "")
+    treffer = re.search(r"/match-report/report(?:-details)?/([^/?#]+)", href or "")
     return treffer.group(1) if treffer else (href or "")
 
 

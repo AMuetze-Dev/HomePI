@@ -39,3 +39,8 @@ coverage/
 services/web/test-results/
 services/web/playwright-report/
 services/web/blob-report/
+
+# Die Regeldateien eines oertlichen Prueflaufs (make pruefdienst-zusehen).
+# Sie gehoeren dem Rechner, nicht dem Projekt -- im Container liegen sie
+# auf einem Band.
+.dev-regeln/

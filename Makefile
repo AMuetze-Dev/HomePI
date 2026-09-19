@@ -302,6 +302,7 @@ pruefdienst-zusehen:
 	  PRUEFDIENST_LESER=$(or $(L),demo) \
 	  PRUEFDIENST_BROWSER_SICHTBAR=1 \
 	  PRUEFDIENST_DARF_SCHREIBEN=$(or $(W),0) \
+	  PRUEFDIENST_REGELN=$(CURDIR)/.dev-regeln \
 	  LOG_LEVEL=info \
 	  uv run python -m homepi_pruefdienst
 
