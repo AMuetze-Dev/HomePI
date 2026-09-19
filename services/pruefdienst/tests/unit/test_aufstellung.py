@@ -185,3 +185,131 @@ class TestVereinswappen:
 
     def test_eine_leere_adresse_faellt_nicht_um(self) -> None:
         assert aufstellung.vereinswappen_aus_url("") == ""
+
+
+class TestAntwortLesen:
+    def test_utf8_wie_versprochen(self) -> None:
+        assert aufstellung.json_lesen('{"name": "Müller"}'.encode()) == {"name": "Müller"}
+
+    def test_und_die_kodierung_die_wirklich_drinsteht(self) -> None:
+        """DFBnet sagt UTF-8 und schickt manchmal ISO-8859-1. Wer das nicht
+        abfängt, findet 'Müller' in keiner DFBnet-Warnung wieder."""
+        assert aufstellung.json_lesen('{"name": "Müller"}'.encode("latin-1")) == {"name": "Müller"}
+
+    def test_ein_ersatzzeichen_im_text_gilt_als_falsche_kodierung(self) -> None:
+        """Es decodiert sauber und ist trotzdem kaputt -- dann wird die
+        andere Kodierung versucht, statt das Zeichen stehen zu lassen."""
+        gelesen = aufstellung.json_lesen('{"name": "M�ller"}'.encode())
+
+        assert "�" not in str(gelesen["name"])
+
+    def test_eine_liste_kommt_auch_durch(self) -> None:
+        assert aufstellung.json_lesen(b"[]") == []
+
+
+class TestFotoBerechtigung:
+    def test_ohne_angabe_gilt_sie_als_da(self) -> None:
+        assert aufstellung.fotos_sichtbar({}) is True
+
+    def test_nur_ein_ausdrueckliches_nein_zaehlt(self) -> None:
+        """Sonst spricht man jeder fremden Mannschaft sämtliche Fotos ab."""
+        assert aufstellung.fotos_sichtbar({"authorizedToViewPlayerPhotos": False}) is False
+        assert aufstellung.fotos_sichtbar({"authorizedToViewPlayerPhotos": True}) is True
+
+
+class TestOffizielle:
+    def test_die_rollen_stehen_in_badges(self) -> None:
+        """Daran hängt die Regel zum Ordnungsdienst — der Extraktor liest sie
+        genau dort."""
+        roh = aufstellung.offizieller_aus_api(
+            {
+                "firstName": "Jens",
+                "lastName": "Färber",
+                "types": [{"name": "Leiter Ordnungsdienst"}, {"name": "Trainer"}],
+            }
+        )
+
+        assert roh["name"] == "Färber, Jens"
+        assert roh["badges"] == ["Leiter Ordnungsdienst", "Trainer"]
+        assert roh["is_official"] is True
+
+    def test_eine_rolle_ohne_namen_faellt_weg(self) -> None:
+        roh = aufstellung.offizieller_aus_api({"types": [{"name": ""}, {}]})
+
+        assert roh["badges"] == []
+
+
+def lineup(**abweichend: object) -> dict[str, object]:
+    vorgabe: dict[str, object] = {
+        "lineUpPlayers": [spieler()],
+        "reservePlayers": [spieler(firstName="Paul", lastName="Schmidt")],
+        "teamOfficials": [{"firstName": "Jens", "lastName": "Färber", "types": []}],
+    }
+    return {**vorgabe, **abweichend}
+
+
+class TestAbschnitte:
+    def test_die_drei_abschnitte_mit_ihren_ueberschriften(self) -> None:
+        """Die Überschriften sind keine Zierde: der Extraktor entscheidet an
+        ihnen, was Startelf und was Bank ist."""
+        abschnitte = aufstellung.abschnitte_aus(lineup())
+
+        assert [a["title"] for a in abschnitte] == [
+            "Trainerbank (1 Teamoffizielle)",
+            "Startaufstellung (1 Spieler)",
+            "Ersatzbank (1 Spieler)",
+        ]
+
+    def test_ein_leerer_abschnitt_steht_nicht_da(self) -> None:
+        abschnitte = aufstellung.abschnitte_aus(
+            {"lineUpPlayers": [spieler()], "reservePlayers": []}
+        )
+
+        assert [a["title"] for a in abschnitte] == ["Startaufstellung (1 Spieler)"]
+
+    def test_eine_leere_aufstellung_gibt_nichts(self) -> None:
+        """Und bleibt damit für die Regeln *unbekannt* statt leer gemeldet."""
+        assert aufstellung.abschnitte_aus({}) == []
+
+    def test_die_bankoffiziellen_kommen_mit(self) -> None:
+        abschnitte = aufstellung.abschnitte_aus(
+            lineup(additionalBenchOfficials=[{"firstName": "Ute", "lastName": "Kern"}])
+        )
+
+        assert abschnitte[0]["title"] == "Trainerbank (2 Teamoffizielle)"
+
+    def test_ohne_berechtigung_bleibt_das_foto_unbekannt(self) -> None:
+        abschnitte = aufstellung.abschnitte_aus(
+            lineup(authorizedToViewPlayerPhotos=False, lineUpPlayers=[spieler()])
+        )
+        startelf = next(a for a in abschnitte if "Start" in str(a["title"]))
+
+        assert startelf["players"][0]["photo_state"] == ""
+
+
+class TestMannschaft:
+    def test_alles_zusammen(self) -> None:
+        eintrag = aufstellung.mannschaft_aus_api(
+            {
+                "id": "t1",
+                "teamName": "Post SV Dresden 2",
+                "clubLogoUrl": "https://www.dfbnet.org/logo?id=4711&groesse=klein",
+            },
+            lineup(),
+        )
+
+        assert eintrag is not None
+        assert eintrag["teamName"] == "Post SV Dresden 2"
+        assert eintrag["team_id"] == "t1"
+        assert eintrag["club_logo_id"] == "4711"
+        assert len(eintrag["sections"]) == 3
+
+    def test_ohne_kennung_kommt_nichts(self) -> None:
+        """Ein Kader am falschen Verein ist schlimmer als keiner."""
+        assert aufstellung.mannschaft_aus_api({"teamName": "irgendwer"}, lineup()) is None
+
+    def test_ein_fehlendes_wappen_faellt_nicht_um(self) -> None:
+        eintrag = aufstellung.mannschaft_aus_api({"id": "t1", "clubLogoUrl": None}, {})
+
+        assert eintrag is not None
+        assert eintrag["club_logo_id"] == ""

@@ -21,7 +21,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from . import dienst
+from . import aufstellung, dienst
 from .bericht import MatchReport, MatchReportExtractor
 from .dienst import Spielzeile
 
@@ -219,7 +219,10 @@ class DfbnetLeser:
                 )
 
             return MatchReportExtractor(
-                info_html=info_html, teams_html="", history_html=verlauf_html
+                info_html=info_html,
+                teams_html="",
+                history_html=verlauf_html,
+                teams_data=self._aufstellungen(unterseite, kennung),
             ).extract()
         except Exception:
             logger.exception("Bericht %s liess sich nicht lesen", kennung)
@@ -229,6 +232,58 @@ class DfbnetLeser:
                 unterseite.close()
             except Exception:
                 logger.exception("Die Berichtsseite liess sich nicht schliessen")
+
+    def _aufstellungen(self, seite: Any, kennung: str) -> list[dict[str, Any]]:
+        """Die Kader ueber die Schnittstelle, mit der Sitzung der Seite.
+
+        Nicht aus dem HTML: dort stehen nur die beiden Mannschaftsnamen. An
+        diesen Daten haengen die Regeln, die etwas wert sind -- Spielerfoto,
+        Spielrecht, Altersklasse.
+
+        Geht etwas schief, kommt eine **leere** Liste. Die alte Anwendung
+        faellt hier auf das Aufklappen im DOM zurueck; das ist nicht portiert,
+        und eine leere Aufstellung ist fuer die Regeln *unbekannt* und kein
+        Verstoss (`regeln.aufstellung_bekannt`).
+        """
+        try:
+            antwort = seite.context.request.get(
+                aufstellung.ADRESSE_MANNSCHAFTEN.format(kennung=kennung), timeout=ZEIT_MS
+            )
+            if antwort.status != 200:
+                logger.warning(
+                    "Bericht %s: die Mannschaften kamen mit Status %s", kennung, antwort.status
+                )
+                return []
+            mannschaften = aufstellung.json_lesen(antwort.body())
+        except Exception:
+            logger.exception("Bericht %s: die Mannschaften liessen sich nicht holen", kennung)
+            return []
+
+        gefunden: list[dict[str, Any]] = []
+        for mannschaft in mannschaften:
+            nummer = mannschaft.get("id")
+            if not nummer:
+                continue
+            try:
+                antwort = seite.context.request.get(
+                    aufstellung.ADRESSE_AUFSTELLUNG.format(mannschaft=nummer), timeout=ZEIT_MS
+                )
+                if antwort.status != 200:
+                    logger.warning(
+                        "Aufstellung %s: Status %s -- diese Mannschaft bleibt leer",
+                        nummer,
+                        antwort.status,
+                    )
+                    continue
+                eintrag = aufstellung.mannschaft_aus_api(
+                    mannschaft, aufstellung.json_lesen(antwort.body())
+                )
+            except Exception:
+                logger.exception("Aufstellung %s liess sich nicht holen", nummer)
+                continue
+            if eintrag is not None:
+                gefunden.append(eintrag)
+        return gefunden
 
     def mannschaften(self, staffel: str) -> list[dict[str, object]]:
         """Die Meldung einer Staffel.

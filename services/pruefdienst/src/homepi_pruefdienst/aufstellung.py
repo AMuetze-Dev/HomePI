@@ -16,6 +16,7 @@ bedeutet, steht in der Regel, die es liest, und nicht hier.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 
@@ -107,3 +108,109 @@ def vereinswappen_aus_url(url: str) -> str:
     if not url or "id=" not in url:
         return ""
     return url.split("id=", 1)[1].split("&", 1)[0]
+
+
+# ── Die Schnittstelle ─────────────────────────────────────────
+
+#: Welche Mannschaften an diesem Spielbericht haengen.
+ADRESSE_MANNSCHAFTEN = "https://www.dfbnet.org/sbo-mobile/v2/oauth/report/{kennung}/teams"
+
+#: Die Aufstellung einer dieser Mannschaften.
+ADRESSE_AUFSTELLUNG = "https://www.dfbnet.org/sbo-mobile/v2/oauth/team/{mannschaft}/line-up"
+
+
+def json_lesen(rumpf: bytes) -> Any:
+    """Die Antwort lesen -- notfalls in der Kodierung, die wirklich drinsteht.
+
+    DFBnet sagt UTF-8 und schickt manchmal ISO-8859-1. Wer das nicht
+    abfaengt, bekommt "Mueller" als "M?ller" -- und dann findet die Regel,
+    die eine DFBnet-Warnung einem Spieler zuordnet, den Namen nicht mehr.
+    """
+    try:
+        text = rumpf.decode("utf-8")
+        if "\ufffd" not in text:  # das Ersatzzeichen
+            return json.loads(text)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        pass
+    return json.loads(rumpf.decode("latin-1"))
+
+
+def fotos_sichtbar(lineup: dict[str, Any]) -> bool:
+    """Ob wir die Fotos ueberhaupt sehen duerfen.
+
+    Ohne diese Berechtigung liefert DFBnet fuer jeden Spieler `null`. Das als
+    "Foto fehlt" zu melden hiesse, jeder Mannschaft eines anderen
+    Staffelleiters saemtliche Fotos abzusprechen.
+    """
+    return lineup.get("authorizedToViewPlayerPhotos") is not False
+
+
+def offizieller_aus_api(offizieller: dict[str, Any]) -> dict[str, Any]:
+    """Ein Teamoffizieller. Seine Rollen stehen in `badges` -- so liest der
+    Extraktor sie, und daran haengt die Regel zum Ordnungsdienst."""
+    rollen = [t.get("name", "") for t in offizieller.get("types", []) if t.get("name")]
+    return {
+        "name": name_zusammensetzen(
+            offizieller.get("firstName", ""), offizieller.get("lastName", "")
+        ),
+        "pass_number": "",
+        "birthdate": "",
+        "jersey_number": "",
+        "is_goalkeeper": False,
+        "is_captain": False,
+        "badges": rollen,
+        "photo_title": "",
+        "is_official": True,
+    }
+
+
+def abschnitte_aus(lineup: dict[str, Any]) -> list[dict[str, Any]]:
+    """Trainerbank, Startaufstellung, Ersatzbank -- in der Form, die der
+    Extraktor erwartet.
+
+    Die Ueberschriften sind nicht Zierde: der Extraktor entscheidet an ihnen,
+    was Startelf und was Bank ist.
+    """
+    abschnitte: list[dict[str, Any]] = []
+
+    offizielle = [
+        offizieller_aus_api(o)
+        for o in [
+            *lineup.get("teamOfficials", []),
+            *lineup.get("additionalBenchOfficials", []),
+        ]
+    ]
+    if offizielle:
+        abschnitte.append(
+            {"title": f"Trainerbank ({len(offizielle)} Teamoffizielle)", "players": offizielle}
+        )
+
+    sichtbar = fotos_sichtbar(lineup)
+    for schluessel, ueberschrift in (
+        ("lineUpPlayers", "Startaufstellung"),
+        ("reservePlayers", "Ersatzbank"),
+    ):
+        spieler = [spieler_aus_api(s, sichtbar) for s in lineup.get(schluessel, [])]
+        if spieler:
+            abschnitte.append(
+                {"title": f"{ueberschrift} ({len(spieler)} Spieler)", "players": spieler}
+            )
+    return abschnitte
+
+
+def mannschaft_aus_api(mannschaft: dict[str, Any], lineup: dict[str, Any]) -> dict[str, Any] | None:
+    """Eine Mannschaft samt Aufstellung, wie der Extraktor sie nimmt.
+
+    `None`, wenn die Mannschaft keine Kennung hat -- ohne sie laesst sich
+    nichts zuordnen, und ein Kader am falschen Verein ist schlimmer als
+    keiner.
+    """
+    kennung = mannschaft.get("id")
+    if not kennung:
+        return None
+    return {
+        "teamName": mannschaft.get("teamName", ""),
+        "team_id": kennung,
+        "club_logo_id": vereinswappen_aus_url(mannschaft.get("clubLogoUrl", "") or ""),
+        "sections": abschnitte_aus(lineup),
+    }
