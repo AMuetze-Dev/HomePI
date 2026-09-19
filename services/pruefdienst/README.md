@@ -105,6 +105,8 @@ passieren, weil ein Container gestartet wurde.
 |---|---|
 | Anfordern, anmelden, Fortschritt, Abschluss, Fehlerbehandlung | **geprüft** — gegen ein nachgebautes Gateway und den Demo-Leser |
 | Anmelden bei DFBnet, Trefferliste lesen | gebaut, **nicht gegen das echte DFBnet geprüft** |
+| Spielbericht aus HTML lesen | **geprüft** — gegen echtes, aufgezeichnetes DFBnet-HTML (`tests/aufnahmen/`): Kopfdaten, Karten, Tore, Wechsel, Bestätigungen, Vorkommnisse |
+| Aufstellung aus der Schnittstelle | die **Übersetzung** ist geprüft (`aufstellung.py`, 100 %). Der Abruf selbst fehlt noch |
 | Regelprüfung (die 31 Regeln) | **fehlt**. Eingespielte Spiele haben `befunde: []` — der Bericht ist da, geprüft ist er nicht |
 | Meldung einer Staffel holen (Initialisierung) | **fehlt** — im DFBnet-Leser. Er gibt eine leere Liste zurück, und die überschreibt im Artefakt nichts; der Auftrag meldet dann, dass nichts kam, statt einen Erfolg |
 | Eintragen in DFBnet (Prüferfreigabe, Fallanlage) | **fehlt**. Mit `PRUEFDIENST_LESER=dfbnet` bleibt Vorgemerktes stehen, statt still auf „fertig" zu springen |
@@ -123,13 +125,34 @@ beziehungsweise mehrere tausend Zeilen, über eine Saison gewachsen. Das wird
 
 ```
 src/homepi_pruefdienst/
-  dienst.py     REINE Entscheidungen - Zeile zerlegen, Fortschritt, Wartezeit
-  gateway.py    HTTP zum Artefakt
-  leser.py      das Protokoll, und ein Leser ohne DFBnet
-  dfbnet.py     der echte Browser
-  schleife.py   der Ablauf
-  __main__.py   Umgebung, Signale, Schleife
+  dienst.py       REINE Entscheidungen - Zeile zerlegen, Fortschritt, Wartezeit
+  bericht.py      Spielbericht aus HTML (uebernommen, woertlich)
+  aufstellung.py  Aufstellung aus der DFBnet-Schnittstelle (uebernommen)
+  gateway.py      HTTP zum Artefakt
+  leser.py        das Protokoll, und ein Leser ohne DFBnet
+  dfbnet.py       der echte Browser
+  schleife.py     der Ablauf
+  __main__.py     Umgebung, Signale, Schleife
 ```
+
+### Was übernommen ist und warum
+
+`bericht.py` und `aufstellung.py` sind **wörtlich** aus
+`D:/DevLibrary/StaffelPilot/src/automation/` übernommen. Sie sind dort über
+eine Saison an echten Seiten gewachsen und haben zwei Fehler gefunden, die 630
+andere Tests nicht sahen. Sie neu zu schreiben hieße, dieselben Fehler noch
+einmal zu machen.
+
+Deshalb sind sie auch von `ruff` und `mypy` ausgenommen: sie nach unserem
+Geschmack umzuformen hieße, jede Zeile anzufassen, die sich bewährt hat — und
+der Vergleich mit dem Original wäre danach keiner mehr. Gehalten werden sie
+durch die Golden-Tests.
+
+**Aus dem HTML kommt keine Aufstellung.** Die Seite nennt die beiden
+Mannschaftsnamen und sonst nichts; Spieler, Geburtsdaten, Spielrecht und Fotos
+kommen aus der Aufstellungsschnittstelle. Ein eigener Test hält das fest —
+sonst sähe der leere Kader aus wie ein Extraktor, der aufgehört hat zu
+arbeiten.
 
 Das Zerlegen einer Tabellenzeile steht in `dienst.py` und nicht in
 `dfbnet.py` — es ist die Stelle, die kaputtgeht, wenn DFBnet eine Spalte
@@ -148,6 +171,13 @@ uv run pytest --cov
 `dfbnet.py` und `__main__.py` sind von der Abdeckung ausgenommen: das eine
 braucht einen Browser, das andere einen Prozess. Eine Zahl, die so tut, wäre
 schlimmer als die ehrliche Lücke.
+
+`bericht.py` ebenfalls, aus einem anderen Grund: er ist durch die Golden-Tests
+gehalten und kommt dabei auf **70 %**. Was fehlt, sind Zweige für
+Auszeichnungsvarianten, von denen hier keine Aufnahme existiert — sie mit
+selbst erfundenem HTML anzufahren hieße, die eigene Erfindung zu prüfen und
+nicht DFBnet. Die Schwelle von 90 % gilt damit für das, was wir selbst
+geschrieben haben.
 
 ### Der ganze Weg
 
