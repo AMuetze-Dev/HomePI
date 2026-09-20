@@ -195,6 +195,35 @@ def karten_aus(report: MatchReport) -> list[dict[str, object]]:
     ]
 
 
+def kopfdaten_aus(report: MatchReport) -> dict[str, str]:
+    """Was das Mahnungsformular verlangt und sonst nirgends steht.
+
+    Spielnummer, Anstoss, Spielort, Spieltag, Mannschaftsart, Wettkampftyp:
+    der Vordruck des Verbandes fragt danach, und ohne diese Felder muesste der
+    Staffelleiter sie von Hand nachtragen -- auf einem Schreiben, das an einen
+    Verein geht.
+
+    Die **Spielnummer** ist nicht dieselbe Kennung, unter der das Artefakt den
+    Bericht fuehrt: die ist die des Verweises ("031DHM04G4..."), die hier ist
+    die, die DFBnet auf den Bericht druckt ("633203177").
+    """
+    meta = report.meta
+    return {
+        "spielnummer": meta.match_id or "",
+        "anstoss": _uhrzeit(meta.kickoff),
+        "spielort": meta.venue or "",
+        "spieltag": str(meta.match_day or ""),
+        "mannschaftsart": meta.match_type or "",
+        "wettbewerb": meta.competition or "",
+    }
+
+
+def _uhrzeit(anstoss: str) -> str:
+    """DFBnet schreibt "17:00 (17:00 )"; das Formular will eine Zeit."""
+    treffer = re.search(r"\d{1,2}:\d{2}", anstoss or "")
+    return treffer.group(0) if treffer else ""
+
+
 def saisonbeginn(match_date: str) -> _dt.date | None:
     """Der 1. Juli der Saison, zu der dieser Spieltag gehoert."""
     iso = _season_start_from_match_date(match_date)

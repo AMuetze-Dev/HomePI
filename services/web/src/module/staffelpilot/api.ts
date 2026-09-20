@@ -217,6 +217,18 @@ export interface Vorgang extends VorgangZeile {
   versandt_am: string | null;
 }
 
+/** Was in ein Mailfenster gehört — und nichts, was es abschickt. */
+export interface Mailentwurf {
+  /** Vorschlag. Wer die Mail bekommt, entscheidet der Staffelleiter. */
+  empfaenger: string;
+  betreff: string;
+  text: string;
+  /** Adresse des gefüllten Formulars, leer bei einem Sportgerichtsfall. */
+  anhang: string;
+  /** Felder des Vordrucks, die niemand kennt. */
+  fehlende_felder: string[];
+}
+
 export interface NeueStaffel {
   name: string;
   altersklasse: Altersklasse;
@@ -365,6 +377,20 @@ export function ladeVorgaenge(
 
 export function ladeVorgang(id: string, signal?: AbortSignal): Promise<Vorgang> {
   return anfrage<Vorgang>(`/vorgaenge/${id}`, {}, signal);
+}
+
+export function ladeMailentwurf(id: string, signal?: AbortSignal): Promise<Mailentwurf> {
+  return anfrage<Mailentwurf>(`/vorgaenge/${id}/mail`, {}, signal);
+}
+
+/**
+ * Die Adresse des ausgefüllten Mahnungsformulars.
+ *
+ * Als Link und nicht als Abruf: das PDF geht in den Download-Ordner oder in
+ * den Viewer des Browsers, und beides kann die Seite nicht besser.
+ */
+export function mahnungAdresse(id: string): string {
+  return `${BASE_URL}/staffelpilot/vorgaenge/${id}/mahnung.pdf`;
 }
 
 /** Erzeugt den Entwurf aus der Vorlage - und verschickt ihn nicht. */

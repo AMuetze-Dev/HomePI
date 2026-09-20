@@ -188,6 +188,30 @@ anhaeufen, zaehlte Paragraf 58 nach dem dritten Prueflauf die dreifache Zahl.
 Artefakt weiss; die Schwellen stehen in den Regeldateien des Staffelleiters
 (`30_karten.py`), und der Zaehler selbst im Pruefdienst (`auskunft.py`).
 
+### Die Mahnung
+
+Der Vordruck des Verbandes ("Mahnungsformular Bagatellsachen") liegt im Paket
+unter `vordrucke/`. Er ist ein echtes AcroForm mit siebzehn benannten Feldern:
+die Werte gehen in die Felder, die der Verband definiert hat, und nichts wird
+an geratenen Koordinaten darueber gedruckt. Eine geaenderte Fassung faellt
+deshalb **laut** auf -- unbekanntes Feld -- statt Text in den falschen Kasten
+zu setzen.
+
+`GET /vorgaenge/{id}/mahnung.pdf` liefert es gefuellt. Was nicht bekannt ist,
+bleibt **leer** und steht im Kopf `X-Fehlende-Felder`; die Oberflaeche nennt
+die Luecken, bevor jemand das Schreiben abschickt. Ein Schriftstueck an einen
+Verein traegt keine erfundenen Angaben.
+
+Ein Kreuz wird nur gesetzt, wo der Verband einen Tatbestand vorsieht
+(`REGEL_ZU_BAGATELLE`). Die Liste ist **geschlossen**: eine Regel ohne
+Zuordnung bekommt keins. Ein geratenes Kreuz behauptete etwas, das niemand
+geprueft hat.
+
+`GET /vorgaenge/{id}/mail` gibt Betreff, Text und die Adresse des Formulars --
+alles, was in ein Mailfenster gehoert. **Abgeschickt wird hier nichts**, und
+es gibt auch keinen Weg dorthin: der Empfaenger ist ein Vorschlag, und
+gesendet wird im Mailprogramm des Staffelleiters.
+
 ### Wenn das Schema sich geaendert hat
 
 `homepi schema` legt Fehlendes an und aendert nichts Vorhandenes - es ist kein
@@ -214,6 +238,21 @@ ALTER TABLE staffelpilot_staffeln
 0 heisst dabei *nicht bekannt* und nicht "keine": ohne die Saisonlaenge laesst
 sich die U23-Ausnahme nach Paragraf 68 (2) c) an den letzten vier Spieltagen
 nicht aufheben, und die Regel sagt das dann selbst.
+
+**Seit 20.09.2026: die Kopfdaten fuer das Mahnungsformular.**
+
+```sql
+ALTER TABLE staffelpilot_spielberichte
+  ADD COLUMN spielnummer    VARCHAR(40)  NOT NULL DEFAULT '',
+  ADD COLUMN anstoss        VARCHAR(10)  NOT NULL DEFAULT '',
+  ADD COLUMN spielort       VARCHAR(200) NOT NULL DEFAULT '',
+  ADD COLUMN spieltag       VARCHAR(10)  NOT NULL DEFAULT '',
+  ADD COLUMN mannschaftsart VARCHAR(60)  NOT NULL DEFAULT '',
+  ADD COLUMN wettbewerb     VARCHAR(120) NOT NULL DEFAULT '';
+```
+
+Der naechste Prueflauf traegt sie nach. Leer heisst auch hier: nicht bekannt --
+das Formular nennt die Luecke, statt sie zu fuellen.
 
 ### Der Schlüssel für die Zugangsdaten
 

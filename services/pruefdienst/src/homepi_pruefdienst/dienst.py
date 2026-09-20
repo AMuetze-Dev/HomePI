@@ -351,6 +351,7 @@ class Ausbeute:
         befunde: list[dict[str, object]] | None = None,
         karten: list[dict[str, object]] | None = None,
         wettbewerb: str = "",
+        kopfdaten: dict[str, str] | None = None,
     ) -> None:
         if not zeile.brauchbar:
             self.uebersprungen += 1
@@ -367,6 +368,9 @@ class Ausbeute:
                 # Paragraf 58 -- die fuenfte Verwarnung sperrt.
                 "karten": karten or [],
                 "wettbewerb": wettbewerb,
+                # Was das Mahnungsformular verlangt. Leer heisst: nicht
+                # bekannt -- das Artefakt ueberschreibt dann nichts.
+                **(kopfdaten or {}),
                 # Leer, solange die Regelprüfung nicht portiert ist. Das ist
                 # die ehrliche Aussage: der Bericht ist da, geprüft ist er
                 # nicht. Der Beispiel-Leser füllt es, damit sich die

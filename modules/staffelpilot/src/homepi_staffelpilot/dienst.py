@@ -752,3 +752,40 @@ def auswerten(befunde: Iterable[BefundSicht]) -> Auswertung:
             key=lambda p: p.name,
         ),
     )
+
+
+# ── Das Mahnungsformular ──────────────────────────────────────────────────
+
+#: Wie die Altersklasse der Staffel auf dem Formular heisst.
+MANNSCHAFTSART = {
+    "maenner": "Herren",
+    "frauen": "Frauen",
+    "ue32": "Herren Ü32",
+    "ue35": "Herren Ü35",
+    "ue40": "Herren Ü40",
+}
+
+
+def mannschaftsart_fuer(altersklasse: str, aus_dfbnet: str = "") -> str:
+    """Was in das Feld "Mannschaftsart" gehoert.
+
+    Was DFBnet am Spielbericht fuehrt, hat Vorrang: es ist die Angabe des
+    Verbandes selbst. Fehlt sie, wird aus der Altersklasse der Staffel
+    uebersetzt -- und ist die unbekannt, bleibt das Feld leer, damit es auf
+    dem Formular als Luecke auffaellt.
+    """
+    if aus_dfbnet.strip():
+        return aus_dfbnet.strip()
+    return MANNSCHAFTSART.get((altersklasse or "").strip().lower(), "")
+
+
+def betreff_fuer(aktenzeichen: str, heim: str, gast: str, datum: date | None) -> str:
+    """Die Betreffzeile eines Schreibens.
+
+    Aktenzeichen zuerst: daran findet der Verein die Sache wieder, und daran
+    ordnet der Staffelleiter die Antwort zu.
+    """
+    teile = [t for t in (aktenzeichen, f"{heim} - {gast}" if heim or gast else "") if t]
+    if datum is not None:
+        teile.append(datum.strftime("%d.%m.%Y"))
+    return " | ".join(teile)

@@ -510,3 +510,23 @@
   flex-direction: column;
   gap: var(--raum-1);
 }
+
+/* Ein Verweis, der aussieht wie ein Knopf. Fuer das PDF: es geht in den
+   Download-Ordner oder in den Viewer des Browsers, und beides kann die Seite
+   nicht besser -- ein <a> ist hier ehrlicher als ein <button>. */
+.dateiknopf {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--raum-1);
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--radius-1);
+  background: var(--farbe-flaeche-2);
+  color: var(--farbe-text);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.dateiknopf:hover {
+  border-color: var(--farbe-akzent);
+}

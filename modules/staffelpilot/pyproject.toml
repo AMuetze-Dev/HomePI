@@ -8,6 +8,10 @@ dependencies = [
     # Fuer die DFBnet-Zugangsdaten: sie liegen verschluesselt in der
     # Datenbank, der Schluessel steht in der Umgebung.
     "cryptography>=44",
+    # Fuer das Mahnungsformular: der Vordruck des Verbandes ist ein AcroForm,
+    # und seine Felder werden gefuellt -- nicht an geratenen Koordinaten
+    # ueberdruckt.
+    "pypdf>=5.1",
 ]
 
 # Die ganze Anmeldung. Das Gateway findet das Modul beim Start hierueber -

@@ -31,9 +31,25 @@ function vorgang(rest: Partial<api.Vorgang> = {}): api.Vorgang {
   };
 }
 
-function mitListe(zeilen: api.VorgangZeile[] = [zeile()], offen = vorgang()) {
+function entwurf(rest: Partial<api.Mailentwurf> = {}): api.Mailentwurf {
+  return {
+    empfaenger: "verein@example.org",
+    betreff: "2026/0007 | SV Loschwitz - SG Gittersee | 05.09.2026",
+    text: "Sehr geehrte Damen und Herren,",
+    anhang: "/staffelpilot/vorgaenge/v1/mahnung.pdf",
+    fehlende_felder: [],
+    ...rest,
+  };
+}
+
+function mitListe(
+  zeilen: api.VorgangZeile[] = [zeile()],
+  offen = vorgang(),
+  mail = entwurf(),
+) {
   vi.spyOn(api, "ladeVorgaenge").mockResolvedValue(zeilen);
   vi.spyOn(api, "ladeVorgang").mockResolvedValue(offen);
+  vi.spyOn(api, "ladeMailentwurf").mockResolvedValue(mail);
 }
 
 async function aufklappen() {
@@ -207,5 +223,55 @@ describe("Ein Vorgang", () => {
     await userEvent.click(await inDerKarte().findByRole("button", { name: "Verwerfen" }));
 
     await waitFor(() => expect(verwerfen).toHaveBeenCalledWith("v1"));
+  });
+
+  describe("Mahnung und Mail", () => {
+    it("bietet das ausgefüllte Formular an", async () => {
+      mitListe();
+      render(<VorgaengeTafel />);
+      await aufklappen();
+
+      const verweis = await screen.findByRole("link", { name: /Mahnung \(PDF\)/ });
+      expect(verweis).toHaveAttribute("href", expect.stringContaining("/mahnung.pdf"));
+    });
+
+    it("nennt die Felder, die im Formular fehlen", async () => {
+      // Ein Vordruck mit Lücken ist besser als einer mit erfundenen Angaben —
+      // aber nur, wenn die Lücken auffallen.
+      mitListe(
+        [zeile()],
+        vorgang(),
+        entwurf({ fehlende_felder: ["Spielort", "Spieltag"] }),
+      );
+      render(<VorgaengeTafel />);
+      await aufklappen();
+
+      expect(await screen.findByText(/Spielort, Spieltag/)).toBeInTheDocument();
+    });
+
+    it("hat einen Knopf, der das Mailprogramm öffnet", async () => {
+      mitListe();
+      render(<VorgaengeTafel />);
+      await aufklappen();
+
+      expect(
+        await inDerKarte().findByRole("button", { name: "E-Mail öffnen" }),
+      ).toBeInTheDocument();
+    });
+
+    it("bietet bei einem Sportgerichtsfall kein Formular an", async () => {
+      // Der läuft über das Verbandspostfach, nicht über den Vordruck für
+      // Bagatellsachen.
+      mitListe(
+        [zeile({ art: "sportgericht" })],
+        vorgang({ art: "sportgericht" }),
+        entwurf({ anhang: "" }),
+      );
+      render(<VorgaengeTafel />);
+      await aufklappen();
+
+      await screen.findByRole("button", { name: "Speichern" });
+      expect(screen.queryByRole("link", { name: /Mahnung/ })).toBeNull();
+    });
   });
 });

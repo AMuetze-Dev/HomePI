@@ -2,12 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
 import {
+  type Mailentwurf,
   type Vorgang,
   type VorgangZeile,
   type VorgangZustand,
   aendereVorgang,
+  ladeMailentwurf,
   ladeVorgaenge,
   ladeVorgang,
+  mahnungAdresse,
   setzeVorgangZustand,
   verwerfeVorgang,
 } from "./api";
@@ -221,6 +224,18 @@ function VorgangInhalt({
   const [empfaenger, setEmpfaenger] = useState(offen.empfaenger);
   const [text, setText] = useState(offen.text);
   const [kopiert, setKopiert] = useState(false);
+  const [entwurf, setEntwurf] = useState<Mailentwurf | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    ladeMailentwurf(offen.id, controller.signal)
+      .then(setEntwurf)
+      .catch(() => {
+        // Der Entwurf ist eine Zugabe: Betreff und Lücken des Formulars. Ohne
+        // ihn bleiben Text und Empfänger, und die sind die Hauptsache.
+      });
+    return () => controller.abort();
+  }, [offen.id]);
 
   async function kopieren() {
     try {
@@ -231,11 +246,30 @@ function VorgangInhalt({
     }
   }
 
+  /**
+   * Das Mailprogramm mit Betreff und Text öffnen.
+   *
+   * `mailto:` und kein eigener Versand: dieses Programm verschickt nichts,
+   * und es hat auch keinen Weg dorthin. Der Empfänger steht drin, wenn einer
+   * eingetragen ist — sonst wählt ihn der Staffelleiter im Mailfenster.
+   *
+   * Lange Texte kürzt mancher Mailclient. Deshalb steht „Text kopieren"
+   * daneben und nicht darunter.
+   */
+  function mailOeffnen() {
+    const betreff = entwurf?.betreff ?? offen.betreff;
+    const ziel =
+      `mailto:${encodeURIComponent(empfaenger)}` +
+      `?subject=${encodeURIComponent(betreff)}` +
+      `&body=${encodeURIComponent(text)}`;
+    window.location.href = ziel;
+  }
+
   return (
     <div className={stil.befunde}>
       <p className={stil.vorgangHinweis}>
-        Dieses Programm verschickt nichts. Text kopieren, im Mailprogramm senden — und
-        danach hier auf „Versandt" stellen.
+        Dieses Programm verschickt nichts. Formular herunterladen, E-Mail öffnen,
+        Empfänger wählen, anhängen, senden — und danach hier auf „Versandt" stellen.
       </p>
 
       <Feld
@@ -260,6 +294,13 @@ function VorgangInhalt({
         />
       </label>
 
+      {entwurf !== null && entwurf.fehlende_felder.length > 0 && (
+        <Hinweis ton="warnung">
+          Im Formular fehlen: {entwurf.fehlende_felder.join(", ")}. Bitte vor dem Absenden
+          von Hand eintragen — erfunden wird hier nichts.
+        </Hinweis>
+      )}
+
       <div className={stil.knoepfe}>
         <Knopf groesse="sm" onClick={() => void onSpeichern({ empfaenger, text })}>
           Speichern
@@ -267,6 +308,19 @@ function VorgangInhalt({
         <Knopf groesse="sm" auspraegung="sekundaer" onClick={() => void kopieren()}>
           {kopiert ? "Kopiert" : "Text kopieren"}
         </Knopf>
+        <Knopf groesse="sm" auspraegung="sekundaer" onClick={mailOeffnen}>
+          E-Mail öffnen
+        </Knopf>
+        {offen.art === "mahnung" && (
+          <a
+            className={stil.dateiknopf}
+            href={mahnungAdresse(offen.id)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Mahnung (PDF)
+          </a>
+        )}
         {NAECHSTE[offen.zustand].map((z) => (
           <Knopf
             key={z}

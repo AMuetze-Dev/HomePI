@@ -134,7 +134,7 @@ class Prueflauf:
         auskunft: GatewayAuskunft | None,
         abgeschaltet: set[str],
         mannschaften: list[dict[str, Any]],
-    ) -> tuple[list[dict[str, object]], list[dict[str, object]], str]:
+    ) -> tuple[list[dict[str, object]], list[dict[str, object]], str, dict[str, str]]:
         """Den Bericht holen, prüfen — und sagen, was er enthielt.
 
         Zurück kommen drei Dinge: die Befunde, die **Karten** und der
@@ -147,18 +147,18 @@ class Prueflauf:
         geprüft und sauber war.
         """
         if isinstance(self._leser, BeispielLeser):
-            return self._leser.befunde_zu(zeile), [], "Meisterschaft"
+            return self._leser.befunde_zu(zeile), [], "Meisterschaft", {}
 
         if not zeile.gespielt:
             # Das Spiel läuft erst noch: es gibt keinen Bericht, und ihn zu
             # öffnen kostet eine Minute Warten auf eine Seite, die leer bleibt.
             # Am Spieltag ist das der Normalfall und keine Warnung.
             logger.info("Spiel %s ist noch nicht gespielt", zeile.dfbnet_id)
-            return [], [], ""
+            return [], [], "", {}
 
         bericht = self._leser.bericht(zeile.dfbnet_id)
         if bericht is None:
-            return regeln.nicht_gelesen("der Prüfdienst hat ihn nicht bekommen"), [], ""
+            return regeln.nicht_gelesen("der Prüfdienst hat ihn nicht bekommen"), [], "", {}
 
         befunde = regeln.befunde_aus(bericht, abgeschaltet) + katalog.befunde_aus(
             bericht,
@@ -171,7 +171,12 @@ class Prueflauf:
             # Ein Spiel, das nur deshalb sauber aussieht, ist die
             # gefährlichste Zeile in der Warteschlange.
             befunde += regeln.ohne_aufstellung()
-        return befunde, regeln.karten_aus(bericht), bericht.meta.competition
+        return (
+            befunde,
+            regeln.karten_aus(bericht),
+            bericht.meta.competition,
+            regeln.kopfdaten_aus(bericht),
+        )
 
     def _anmelden(self, kennung: str) -> None:
         self._gateway.fortschritt(
@@ -238,10 +243,10 @@ class Prueflauf:
 
             ausbeute = dienst.Ausbeute()
             for nummer, zeile in enumerate(zeilen):
-                gefunden, karten, wettbewerb = self._pruefung_zu(
+                gefunden, karten, wettbewerb, kopfdaten = self._pruefung_zu(
                     zeile, staffel, auskunft, abgeschaltet, mannschaften
                 )
-                ausbeute.aufnehmen(zeile, gefunden, karten, wettbewerb)
+                ausbeute.aufnehmen(zeile, gefunden, karten, wettbewerb, kopfdaten)
                 # Je Bericht eine Meldung: ein Lauf ueber achtzig Berichte
                 # dauert eine Viertelstunde, und ein Balken, der dabei steht,
                 # sieht aus wie ein Dienst, der haengt.

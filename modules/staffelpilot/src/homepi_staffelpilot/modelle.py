@@ -61,6 +61,29 @@ class Spielbericht(Base, ZeitstempelMixin):
     heim: Mapped[str] = mapped_column(String(120), nullable=False)
     gast: Mapped[str] = mapped_column(String(120), nullable=False)
     ergebnis: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+
+    # ── Was auf dem Mahnungsformular steht ────────────────────────────────
+    #
+    # Der Vordruck des Verbandes verlangt mehr als Datum und Paarung:
+    # Spielnummer, Anstoss, Spielort, Spieltag, Mannschaftsart, Wettkampftyp.
+    # Sie stehen im Spielbericht bei DFBnet und nirgends sonst -- ohne sie
+    # muesste der Staffelleiter sie von Hand nachtragen, auf einem Schreiben,
+    # das an einen Verein geht.
+    #
+    # Leer heisst: nicht bekannt. Das Formular nennt die fehlenden Felder,
+    # statt sie mit einem Platzhalter zu fuellen -- ein Schriftstueck mit
+    # erfundenen Angaben ist schlimmer als eine Luecke.
+
+    #: Die Nummer, unter der DFBnet das Spiel fuehrt ("633203177"). Nicht
+    #: dieselbe wie `dfbnet_id`: die ist die Kennung des Verweises.
+    spielnummer: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    anstoss: Mapped[str] = mapped_column(String(10), nullable=False, default="")
+    spielort: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    spieltag: Mapped[str] = mapped_column(String(10), nullable=False, default="")
+    mannschaftsart: Mapped[str] = mapped_column(String(60), nullable=False, default="")
+    #: "Meisterschaft", "Kreispokal Herren" -- wie DFBnet ihn nennt.
+    wettbewerb: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+
     abgehakt: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     abgehakt_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 

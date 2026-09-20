@@ -17,22 +17,24 @@ from fastapi import APIRouter, Query, Response, status
 from homepi_core.auth import Rolle, erfordert
 from homepi_core.deps import DbSitzung
 
-from . import speicher
+from . import mahnung, speicher
 from .dienst import (
     BefundSicht,
     NochOffeneBefunde,
     SpielSicht,
     auswerten,
+    betreff_fuer,
     darf_abgehakt_werden,
     darf_angefordert_werden,
     darf_zurueckgenommen_werden,
     entscheidung_pruefen,
     ist_faellig,
     mannschaft_unsicher,
+    mannschaftsart_fuer,
     sortiert,
     zusammenfassen,
 )
-from .modelle import Befund, Mannschaft, Regel, Vorgang
+from .modelle import Befund, Mannschaft, Regel, Spielbericht, Staffel, Vorgang
 from .schemas import (
     Abschluss,
     AuftragAnfordern,
@@ -48,6 +50,7 @@ from .schemas import (
     ImportAuftrag,
     ImportErgebnis,
     KarteAusgabe,
+    MailEntwurf,
     MannschaftAusgabe,
     MannschaftenSetzen,
     Pause,
@@ -451,6 +454,92 @@ async def vorgaenge(
 @router.get("/vorgaenge/{vorgang_id}", summary="Ein Vorgang mit seinem Text")
 async def vorgang(vorgang_id: uuid.UUID, sitzung: DbSitzung) -> VorgangAusgabe:
     return _vorgang(await speicher.vorgang(sitzung, vorgang_id))
+
+
+def _formular(
+    vorgang: Vorgang,
+    befund: Befund,
+    spiel: Spielbericht,
+    staffel: Staffel,
+    staffelleiter: str,
+) -> mahnung.Mahnung:
+    """Der Vordruck, gefüllt aus dem, was das Artefakt weiß."""
+    return mahnung.Mahnung(
+        mannschaftsart=mannschaftsart_fuer(staffel.altersklasse, spiel.mannschaftsart),
+        spielklasse=staffel.spielklasse,
+        spieltag=spiel.spieltag,
+        staffelleiter=staffelleiter,
+        spielnummer=spiel.spielnummer,
+        datum=spiel.datum.strftime("%d.%m.%Y"),
+        uhrzeit=spiel.anstoss,
+        wettkampftyp=spiel.wettbewerb,
+        heim=spiel.heim,
+        gast=spiel.gast,
+        spielort=spiel.spielort,
+        verein=vorgang.verein or befund.mannschaft,
+        kreuze=mahnung.kreuze_fuer([befund.regel]),
+    )
+
+
+@router.get(
+    "/vorgaenge/{vorgang_id}/mahnung.pdf",
+    summary="Das ausgefüllte Mahnungsformular",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+async def vorgang_mahnung(vorgang_id: uuid.UUID, sitzung: DbSitzung) -> Response:
+    """Der Vordruck des Verbandes, gefüllt aus Spiel, Befund und Einstellungen.
+
+    **Verschickt wird nichts.** Das PDF geht an den Staffelleiter, der es
+    prüft und selbst verschickt.
+
+    Was nicht bekannt ist, bleibt leer -- die fehlenden Felder stehen im Kopf
+    `X-Fehlende-Felder`, damit die Oberfläche sie nennen kann, ohne das PDF zu
+    lesen. Ein Schriftstück an einen Verein trägt keine erfundenen Angaben.
+    """
+    vorgang, befund, spiel, staffel = await speicher.vorgang_mit_spiel(sitzung, vorgang_id)
+    werte = await speicher.einstellungen(sitzung)
+
+    formular = _formular(vorgang, befund, spiel, staffel, werte.staffelleiter)
+    inhalt = mahnung.als_pdf(formular)
+    name = f"Mahnung_{vorgang.aktenzeichen.replace('/', '-')}.pdf"
+    return Response(
+        content=inhalt,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{name}"',
+            "X-Fehlende-Felder": ", ".join(formular.fehlende_felder()),
+        },
+    )
+
+
+@router.get("/vorgaenge/{vorgang_id}/mail", summary="Der Mailentwurf zu einem Vorgang")
+async def vorgang_mail(vorgang_id: uuid.UUID, sitzung: DbSitzung) -> MailEntwurf:
+    """Betreff und Text, fertig zum Einfügen -- und wer als Empfänger passt.
+
+    **Abgeschickt wird hier nichts**, und es gibt auch keinen Weg dorthin.
+    Der Staffelleiter wählt den Empfänger und schickt in seinem Mailprogramm.
+
+    Der Text ist der des Vorgangs: aus einer Vorlage entstanden, Wort für Wort
+    vorhersagbar, ohne erzeugte Sprache.
+    """
+    vorgang, befund, spiel, staffel = await speicher.vorgang_mit_spiel(sitzung, vorgang_id)
+    werte = await speicher.einstellungen(sitzung)
+
+    fehlt: list[str] = []
+    if vorgang.art == "mahnung":
+        fehlt = _formular(vorgang, befund, spiel, staffel, werte.staffelleiter).fehlende_felder()
+
+    return MailEntwurf(
+        empfaenger=vorgang.empfaenger,
+        betreff=vorgang.betreff
+        or betreff_fuer(vorgang.aktenzeichen, spiel.heim, spiel.gast, spiel.datum),
+        text=vorgang.text,
+        anhang=f"/staffelpilot/vorgaenge/{vorgang_id}/mahnung.pdf"
+        if vorgang.art == "mahnung"
+        else "",
+        fehlende_felder=fehlt,
+    )
 
 
 @router.patch("/vorgaenge/{vorgang_id}", summary="Text oder Empfänger eines Vorgangs ändern")

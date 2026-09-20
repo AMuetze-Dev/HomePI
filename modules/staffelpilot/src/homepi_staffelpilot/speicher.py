@@ -184,6 +184,12 @@ async def einspielen(sitzung: AsyncSession, auftrag: ImportAuftrag) -> tuple[int
                 heim=eingang.heim,
                 gast=eingang.gast,
                 ergebnis=eingang.ergebnis,
+                spielnummer=eingang.spielnummer,
+                anstoss=eingang.anstoss,
+                spielort=eingang.spielort,
+                spieltag=eingang.spieltag,
+                mannschaftsart=eingang.mannschaftsart,
+                wettbewerb=eingang.wettbewerb,
             )
             sitzung.add(bericht)
             await sitzung.flush()
@@ -193,6 +199,20 @@ async def einspielen(sitzung: AsyncSession, auftrag: ImportAuftrag) -> tuple[int
             bericht.heim = eingang.heim
             bericht.gast = eingang.gast
             bericht.ergebnis = eingang.ergebnis
+            # Kopfdaten nur ueberschreiben, wenn der Lauf welche mitbringt:
+            # ein Bericht, den DFBnet gerade nicht hergab, soll nicht die
+            # Angaben loeschen, die beim letzten Mal ankamen.
+            for feld in (
+                "spielnummer",
+                "anstoss",
+                "spielort",
+                "spieltag",
+                "mannschaftsart",
+                "wettbewerb",
+            ):
+                wert = getattr(eingang, feld)
+                if wert:
+                    setattr(bericht, feld, wert)
             frueher = {(b.regel, b.person): b for b in bericht.befunde}
             # Ein Prueflauf ist die vollstaendige Aussage ueber einen Bericht:
             # was er nicht mehr meldet, ist keine offene Arbeit mehr.
@@ -406,6 +426,29 @@ async def vorgang(sitzung: AsyncSession, vorgang_id: uuid.UUID) -> Vorgang:
     if gefunden is None:
         raise VorgangUnbekannt(f"Es gibt keinen Vorgang mit der Kennung {vorgang_id}")
     return gefunden
+
+
+async def vorgang_mit_spiel(
+    sitzung: AsyncSession, vorgang_id: uuid.UUID
+) -> tuple[Vorgang, Befund, Spielbericht, Staffel]:
+    """Ein Vorgang samt allem, was auf dem Mahnungsformular steht.
+
+    In einer Abfrage statt in vier: das Formular braucht den Befund (welches
+    Kreuz), das Spiel (Kopfdaten) und die Staffel (Spielklasse), und jede
+    weitere Runde zur Datenbank waere eine, die unter `async` an der falschen
+    Stelle nachlaedt.
+    """
+    ergebnis = await sitzung.execute(
+        select(Vorgang, Befund, Spielbericht, Staffel)
+        .join(Befund, Befund.id == Vorgang.befund_id)
+        .join(Spielbericht, Spielbericht.id == Befund.spiel_id)
+        .join(Staffel, Staffel.id == Spielbericht.staffel_id)
+        .where(Vorgang.id == vorgang_id)
+    )
+    zeile = ergebnis.first()
+    if zeile is None:
+        raise VorgangUnbekannt(f"Es gibt keinen Vorgang mit der Kennung {vorgang_id}")
+    return zeile[0], zeile[1], zeile[2], zeile[3]
 
 
 async def vorgang_zu_befund(sitzung: AsyncSession, befund_id: uuid.UUID) -> Vorgang | None:

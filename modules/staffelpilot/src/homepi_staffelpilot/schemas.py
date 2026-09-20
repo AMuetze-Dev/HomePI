@@ -214,8 +214,26 @@ class SpielEingang(BaseModel):
     #: Der Wettbewerb dieses Spiels, wie DFBnet ihn nennt. Pokal und
     #: Meisterschaft werden nach § 58 (2) getrennt gezaehlt.
     wettbewerb: KurzFeld = ""
+    #: Was das Mahnungsformular verlangt. Leer heisst: nicht bekannt.
+    spielnummer: Annotated[str, Field(max_length=40)] = ""
+    anstoss: Annotated[str, Field(max_length=10)] = ""
+    spielort: Annotated[str, Field(max_length=200)] = ""
+    spieltag: Annotated[str, Field(max_length=10)] = ""
+    mannschaftsart: Annotated[str, Field(max_length=60)] = ""
 
-    @field_validator("dfbnet_id", "heim", "gast", "ergebnis", mode="before")
+    @field_validator(
+        "dfbnet_id",
+        "heim",
+        "gast",
+        "ergebnis",
+        "wettbewerb",
+        "spielnummer",
+        "anstoss",
+        "spielort",
+        "spieltag",
+        "mannschaftsart",
+        mode="before",
+    )
     @classmethod
     def _trimmen(cls, wert: object) -> object:
         return _getrimmt(wert)
@@ -250,6 +268,13 @@ class SpielAusgabe(BaseModel):
     heim: str
     gast: str
     ergebnis: str
+    #: Die Kopfdaten fuer das Mahnungsformular. Leer heisst: nicht bekannt.
+    spielnummer: str = ""
+    anstoss: str = ""
+    spielort: str = ""
+    spieltag: str = ""
+    mannschaftsart: str = ""
+    wettbewerb: str = ""
     abgehakt: bool
     abgehakt_am: dt.datetime | None
     befunde: list[BefundAusgabe]
@@ -502,6 +527,27 @@ class RegelAusgabe(BaseModel):
 
 class RegelUmschalten(BaseModel):
     aktiv: bool
+
+
+class MailEntwurf(BaseModel):
+    """Was in ein Mailfenster gehoert -- und nichts, was es abschickt.
+
+    Der Empfaenger ist ein **Vorschlag**: er steht am Vorgang, wenn dort einer
+    eingetragen wurde, und sonst leer. Wer die Mail bekommt, entscheidet der
+    Staffelleiter.
+    """
+
+    empfaenger: str
+    betreff: str
+    text: str
+    #: Wo das gefuellte Formular liegt. Leer bei einem Vorgang, zu dem es
+    #: keines gibt -- ein Sportgerichtsfall laeuft ueber das Verbandspostfach.
+    anhang: str
+    #: Felder des Formulars, die niemand kennt. Sie stehen hier, damit die
+    #: Oberflaeche sie nennen kann, bevor jemand das Schreiben abschickt --
+    #: ein Vordruck mit Luecken ist besser als einer mit erfundenen Angaben,
+    #: aber nur, wenn die Luecken auffallen.
+    fehlende_felder: list[str] = Field(default_factory=list)
 
 
 # ── Alle Befunde auf einmal ───────────────────────────────────────────────

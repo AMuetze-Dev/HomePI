@@ -853,3 +853,62 @@ class TestSaisonbeginn:
 
     def test_ohne_spieltag_gibt_es_keinen(self) -> None:
         assert regeln.saisonbeginn("irgendwann") is None
+
+
+class TestKopfdatenFuerDasFormular:
+    """Was der Vordruck des Verbandes verlangt.
+
+    Ohne diese Felder müsste der Staffelleiter sie von Hand nachtragen — auf
+    einem Schreiben, das an einen Verein geht.
+    """
+
+    def test_die_felder_kommen_aus_dem_bericht(self) -> None:
+        b = bericht(
+            meta=MatchMeta(
+                match_id="633203177",
+                kickoff="15:00 (15:00 )",
+                venue="Sportplatz Loschwitz",
+                match_day="5",
+                match_type="Herren",
+                competition="Meisterschaft",
+            )
+        )
+
+        assert regeln.kopfdaten_aus(b) == {
+            "spielnummer": "633203177",
+            "anstoss": "15:00",
+            "spielort": "Sportplatz Loschwitz",
+            "spieltag": "5",
+            "mannschaftsart": "Herren",
+            "wettbewerb": "Meisterschaft",
+        }
+
+    def test_die_spielnummer_ist_nicht_die_kennung_des_verweises(self) -> None:
+        """ "633203177" steht auf dem Bericht, "031DHM04G4..." im Link."""
+        b = bericht(meta=MatchMeta(match_id="633203177"))
+
+        assert regeln.kopfdaten_aus(b)["spielnummer"] == "633203177"
+
+    def test_aus_der_doppelten_uhrzeit_wird_eine(self) -> None:
+        b = bericht(meta=MatchMeta(kickoff="17:00 (17:00 )"))
+
+        assert regeln.kopfdaten_aus(b)["anstoss"] == "17:00"
+
+    def test_ohne_anstoss_bleibt_es_leer(self) -> None:
+        """Und das Formular nennt die Lücke, statt eine Zeit zu erfinden."""
+        b = bericht(meta=MatchMeta(kickoff=""))
+
+        assert regeln.kopfdaten_aus(b)["anstoss"] == ""
+
+    def test_ein_leerer_bericht_liefert_lauter_leere_felder(self) -> None:
+        kopf = regeln.kopfdaten_aus(MatchReport())
+
+        assert set(kopf) == {
+            "spielnummer",
+            "anstoss",
+            "spielort",
+            "spieltag",
+            "mannschaftsart",
+            "wettbewerb",
+        }
+        assert all(wert == "" for wert in kopf.values())

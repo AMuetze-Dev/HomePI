@@ -12,9 +12,11 @@ uebersehen - und deshalb steht sie hier und nicht im Router.
 from __future__ import annotations
 
 import datetime as dt
+from datetime import date as _datum
 
 import pytest
 
+from homepi_staffelpilot import dienst
 from homepi_staffelpilot.dienst import (
     BefundSicht,
     GrundFehlt,
@@ -197,3 +199,35 @@ class TestZusammenfassung:
             )
         ]
         assert zusammenfassen(spiele, staffeln_aktiv=1).befunde_kritisch == 0
+
+
+class TestMahnungsformular:
+    """Was auf dem Vordruck des Verbandes steht."""
+
+    def test_die_mannschaftsart_aus_dfbnet_hat_vorrang(self) -> None:
+        """Sie ist die Angabe des Verbandes selbst."""
+        assert dienst.mannschaftsart_fuer("maenner", "Herren Ü35") == "Herren Ü35"
+
+    def test_sonst_wird_die_altersklasse_uebersetzt(self) -> None:
+        assert dienst.mannschaftsart_fuer("maenner") == "Herren"
+        assert dienst.mannschaftsart_fuer("UE35") == "Herren Ü35"
+
+    def test_eine_unbekannte_altersklasse_bleibt_leer(self) -> None:
+        """Damit sie auf dem Formular als Lücke auffällt, statt geraten zu
+        werden."""
+        assert dienst.mannschaftsart_fuer("ue99") == ""
+        assert dienst.mannschaftsart_fuer("") == ""
+
+    def test_der_betreff_beginnt_mit_dem_aktenzeichen(self) -> None:
+        """Daran findet der Verein die Sache wieder."""
+        betreff = dienst.betreff_fuer(
+            "2026/0007", "SV Loschwitz", "SG Gittersee", _datum(2026, 9, 5)
+        )
+
+        assert betreff == "2026/0007 | SV Loschwitz - SG Gittersee | 05.09.2026"
+
+    def test_ohne_datum_bleibt_der_rest(self) -> None:
+        assert dienst.betreff_fuer("2026/0007", "A", "B", None) == "2026/0007 | A - B"
+
+    def test_ohne_paarung_auch(self) -> None:
+        assert dienst.betreff_fuer("2026/0007", "", "", None) == "2026/0007"
