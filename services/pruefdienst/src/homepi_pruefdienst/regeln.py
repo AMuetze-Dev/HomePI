@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -200,9 +200,87 @@ def saisonbeginn(match_date: str) -> _dt.date | None:
     return _dt.date.fromisoformat(iso) if iso else None
 
 
-def befunde_aus(report: MatchReport) -> list[dict[str, object]]:
-    """Alle Regeln ueber einen Bericht, fertig fuer das Artefakt."""
-    return [als_befund(v) for v in pruefe(report)]
+#: Was ein Befund dieser Regel nach sich zieht -- als **Vorschlag**.
+#:
+#: Der Weg gehoert dem Staffelleiter: in der Regeluebersicht steht er an jeder
+#: Regel und laesst sich umstellen. Was hier steht, ist der Stand, mit dem
+#: eine frische Installation anfaengt.
+#:
+#: "kein" heisst nicht "egal", sondern "kein Schreiben an einen Verein": ein
+#: Vorkommnis wird gelesen und entschieden, eine verspaetete
+#: Schiedsrichterfreigabe geht den Verein nichts an.
+_WEG = {
+    "bericht_ungelesen": "kein",
+    "confirmation_comment": "kein",
+    "confirmation_late": "mahnung",
+    "confirmation_missing": "mahnung",
+    "confirmation_unlesbar": "kein",
+    "dfbnet_warning": "kein",
+    "documents_present": "kein",
+    "incidents": "kein",
+    "order_manager_dual_role": "mahnung",
+    "order_manager_is_player": "mahnung",
+    "order_manager_missing": "mahnung",
+    "player_eligibility": "sportgericht",
+    "release_late": "kein",
+    "rule_error": "kein",
+}
+
+#: Die Schwere, mit der eine Regel ueblicherweise meldet. Sie steht im Katalog
+#: nur zur Orientierung -- am einzelnen Befund entscheidet die Regel selbst,
+#: und eine fehlende Bestaetigung ist vor der Frist eine Warnung und danach
+#: kritisch.
+_SCHWERE_IM_KATALOG = {
+    "bericht_ungelesen": "warnung",
+    "confirmation_comment": "warnung",
+    "confirmation_late": "kritisch",
+    "confirmation_missing": "kritisch",
+    "confirmation_unlesbar": "warnung",
+    "dfbnet_warning": "warnung",
+    "documents_present": "hinweis",
+    "incidents": "warnung",
+    "order_manager_dual_role": "warnung",
+    "order_manager_is_player": "kritisch",
+    "order_manager_missing": "kritisch",
+    "player_eligibility": "kritisch",
+    "release_late": "warnung",
+    "rule_error": "warnung",
+}
+
+#: Woher diese Regeln kommen -- steht in der Uebersicht hinter dem Namen.
+HERKUNFT = "eingebaut"
+
+
+def katalog() -> list[dict[str, str]]:
+    """Die eingebauten Regeln, wie der Regelkatalog sie fuehrt.
+
+    Sie stehen neben denen des Staffelleiters in derselben Liste, damit die
+    Uebersicht die Frage beantwortet, die man ihr stellt: **was wird
+    geprueft?** Eine Liste, die nur die Haelfte zeigt, beantwortet sie
+    falsch.
+    """
+    return [
+        {
+            "schluessel": kennung,
+            "name": f"{titel} ({HERKUNFT})",
+            "beschreibung": "",
+            "schwere": _SCHWERE_IM_KATALOG.get(kennung, "warnung"),
+            "weg": _WEG.get(kennung, "kein"),
+        }
+        for kennung, titel in sorted(_TITEL.items(), key=lambda paar: paar[1])
+    ]
+
+
+def befunde_aus(report: MatchReport, abgeschaltet: Collection[str] = ()) -> list[dict[str, object]]:
+    """Alle Regeln ueber einen Bericht, fertig fuer das Artefakt.
+
+    `abgeschaltet` kommt aus der Regeluebersicht. Eine abgeschaltete Regel
+    laeuft trotzdem -- nur ihr Befund wird nicht gemeldet. Das ist billiger
+    als eine zweite Liste und haelt die Regeln davon frei, ihren eigenen
+    Schalter zu kennen.
+    """
+    aus = set(abgeschaltet)
+    return [als_befund(v) for v in pruefe(report) if v.rule not in aus]
 
 
 def nicht_gelesen(grund: str) -> list[dict[str, object]]:

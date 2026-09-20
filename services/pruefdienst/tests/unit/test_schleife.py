@@ -74,6 +74,8 @@ class FalschesGateway:
         self.meldungen: list[tuple[str, list[dict[str, Any]]]] = []
         self.geaendert: list[tuple[str, dict[str, Any]]] = []
         self.werte: dict[str, Any] = {"pruefzeitraum_tage": 30, "frist_tage": 14}
+        self.katalog: list[dict[str, Any]] = []
+        self.abgeschaltet: set[str] = set()
         self.zugang_geholt = 0
         self.uebernommen: list[str] = []
         self.gemeldet: list[tuple[str, str, str]] = []
@@ -112,6 +114,10 @@ class FalschesGateway:
     def staffel_aendern(self, staffel_id: str, felder: dict[str, Any]) -> dict[str, Any]:
         self.geaendert.append((staffel_id, felder))
         return {**STAFFEL, **felder}
+
+    def regelkatalog_setzen(self, regeln: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        self.katalog = regeln
+        return [{**r, "aktiv": r["schluessel"] not in self.abgeschaltet} for r in regeln]
 
     def uebertragung(self) -> dict[str, Any]:
         return {
@@ -161,6 +167,90 @@ class TestOhneArbeit:
         lauf(gateway).runde()
 
         assert gateway.zugang_geholt == 0
+
+
+class TestRegelkatalog:
+    """Was geprüft wird, gehört in die Übersicht — und zwar vollständig.
+
+    Eine Liste, die nur die Regeldateien zeigt und die eingebauten verschweigt,
+    beantwortet die Frage falsch, die man ihr stellt.
+    """
+
+    def test_der_katalog_wird_gemeldet(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+
+        lauf(gateway, DemoLeser({"Stadtliga C": [zeile()]})).runde()
+
+        kennungen = {r["schluessel"] for r in gateway.katalog}
+        # Eine aus regeln.py und eine aus den Regeldateien.
+        assert "confirmation_missing" in kennungen
+        assert "spielfuehrer_fehlt" in kennungen
+
+    def test_jede_regel_hat_name_schwere_und_weg(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+
+        lauf(gateway, DemoLeser({"Stadtliga C": [zeile()]})).runde()
+
+        assert gateway.katalog
+        for r in gateway.katalog:
+            assert r["name"]
+            assert r["schwere"] in ("kritisch", "warnung", "hinweis")
+            assert r["weg"] in ("kein", "mahnung", "sportgericht")
+
+    def test_eine_abgeschaltete_regel_meldet_nichts(self, tmp_path: Any, monkeypatch: Any) -> None:
+        monkeypatch.setenv("PRUEFDIENST_REGELN", str(tmp_path / "regeln"))
+        from homepi_pruefdienst import katalog
+
+        katalog.zuruecksetzen()
+        bericht = MatchReport(
+            meta=MatchMeta(
+                match_id="M-1",
+                home_team="SG Gittersee",
+                away_team="SV Fortschritt",
+                match_date=(HEUTE - dt.timedelta(days=1)).strftime("%d.%m.%Y"),
+            ),
+            home_squad=TeamSquad(
+                team_name="SG Gittersee",
+                starting_eleven=[Player(name=f"S{i}", pass_number=f"P{i}") for i in range(11)],
+            ),
+        )
+        leser = DemoLeser({"Stadtliga C": [zeile("M-1")]}, berichte_je_spiel={"M-1": bericht})
+
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+        gateway.abgeschaltet = {"spielfuehrer_fehlt", "confirmation_missing"}
+
+        lauf(gateway, leser).runde()
+
+        _, spiele = gateway.importe[0]
+        gefunden = {b["regel"] for b in spiele[0]["befunde"]}
+        assert "spielfuehrer_fehlt" not in gefunden
+        assert "confirmation_missing" not in gefunden
+
+    def test_und_das_steht_im_protokoll(self) -> None:
+        """Eine abgeschaltete Regel ist nicht dasselbe wie eine, die nichts
+        gefunden hat."""
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+        gateway.abgeschaltet = {"spielfuehrer_fehlt"}
+
+        lauf(gateway, DemoLeser({"Stadtliga C": [zeile()]})).runde()
+
+        zeilen = [str(f.get("zeile", "")) for f in gateway.fortschritte]
+        assert any("abgeschaltet" in z for z in zeilen)
+
+    def test_ein_fehler_beim_melden_kippt_den_lauf_nicht(self) -> None:
+        """Eine veraltete Übersicht ist ärgerlich. Achtzig ungeprüfte
+        Spielberichte sind schlimmer."""
+
+        class Stur(FalschesGateway):
+            def regelkatalog_setzen(self, regeln: list[dict[str, Any]]) -> list[dict[str, Any]]:
+                raise GatewayFehler("Artefakt weg")
+
+        gateway = Stur({"id": "a1", "art": "pruflauf", "staffel_id": None})
+
+        lauf(gateway, DemoLeser({"Stadtliga C": [zeile()]})).runde()
+
+        assert gateway.abschluesse[0][1] == "fertig"
+        assert gateway.importe
 
 
 class TestZusehen:

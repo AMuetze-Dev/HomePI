@@ -92,6 +92,21 @@ class Gateway:
             "PATCH", f"/staffelpilot/staffeln/{staffel_id}", json=felder
         )
 
+    def regeln(self) -> list[dict[str, Any]]:
+        """Der Regelkatalog, wie er im Artefakt steht -- mit den Schaltern."""
+        return self._json("GET", "/staffelpilot/regeln")  # type: ignore[no-any-return]
+
+    def regelkatalog_setzen(self, regeln: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Melden, was es gibt.
+
+        Vollstaendig und nicht als Aenderung: eine Regel, die es nicht mehr
+        gibt, soll auch keinen Schalter mehr haben. Die Schalter der uebrigen
+        bleiben stehen -- sie gehoeren dem Staffelleiter.
+        """
+        return self._json(  # type: ignore[no-any-return]
+            "PUT", "/staffelpilot/regeln", json={"regeln": regeln}
+        )
+
     def einstellungen(self) -> dict[str, Any]:
         return self._json("GET", "/staffelpilot/einstellungen")  # type: ignore[no-any-return]
 

@@ -84,11 +84,42 @@ class Prueflauf:
             return [s for s in alle if str(s["id"]) == str(staffel_id)]
         return [s for s in alle if s.get("aktiv")]
 
+    def _katalog_melden(self, kennung: str) -> set[str]:
+        """Was geprüft wird, dem Artefakt sagen -- und holen, was aus ist.
+
+        Einmal je Lauf und nicht beim Start des Dienstes: wer eine Regeldatei
+        ändert, sieht die neue Regel im nächsten Lauf in der Übersicht, ohne
+        etwas neu zu starten.
+
+        Geht es schief, läuft der Prüflauf trotzdem. Die Übersicht ist dann
+        veraltet; das ist ärgerlich, aber kein Grund, achtzig Spielberichte
+        ungeprüft zu lassen.
+        """
+        try:
+            gemeldet = regeln.katalog() + katalog.katalog()
+            stand = self._gateway.regelkatalog_setzen(gemeldet)
+        except Exception:
+            logger.exception("Der Regelkatalog liess sich nicht melden")
+            self._gateway.fortschritt(
+                kennung, zeile="Der Regelkatalog liess sich nicht melden -- geprüft wird trotzdem"
+            )
+            return set()
+
+        aus = {str(r["schluessel"]) for r in stand if not r.get("aktiv", True)}
+        if aus:
+            # Nicht verschweigen: eine abgeschaltete Regel ist nicht dasselbe
+            # wie eine, die nichts gefunden hat.
+            self._gateway.fortschritt(
+                kennung, zeile=f"{len(aus)} von {len(stand)} Regeln sind abgeschaltet"
+            )
+        return aus
+
     def _pruefung_zu(
         self,
         zeile: dienst.Spielzeile,
         staffel: dict[str, Any],
         auskunft: GatewayAuskunft | None,
+        abgeschaltet: set[str],
     ) -> tuple[list[dict[str, object]], list[dict[str, object]], str]:
         """Den Bericht holen, prüfen — und sagen, was er enthielt.
 
@@ -115,8 +146,11 @@ class Prueflauf:
                 return [], [], ""
             return regeln.nicht_gelesen("der Prüfdienst hat ihn nicht bekommen"), [], ""
 
-        befunde = regeln.befunde_aus(bericht) + katalog.befunde_aus(
-            bericht, katalog.staffelangabe(staffel), auskunft=auskunft
+        befunde = regeln.befunde_aus(bericht, abgeschaltet) + katalog.befunde_aus(
+            bericht,
+            katalog.staffelangabe(staffel),
+            auskunft=auskunft,
+            abgeschaltet=abgeschaltet,
         )
         return befunde, regeln.karten_aus(bericht), bericht.meta.competition
 
@@ -153,6 +187,7 @@ class Prueflauf:
         # Der Verwarnungszaehler nach Paragraf 58. Einer je Lauf, damit die
         # Karten einer Person einmal geholt werden und nicht je Spiel neu.
         auskunft = GatewayAuskunft(self._gateway, regeln.saisonbeginn(bis.strftime("%d.%m.%Y")))
+        abgeschaltet = self._katalog_melden(kennung)
 
         gepruefte = befunde = 0
         nicht_geprueft: list[str] = []
@@ -182,7 +217,9 @@ class Prueflauf:
 
             ausbeute = dienst.Ausbeute()
             for nummer, zeile in enumerate(zeilen):
-                gefunden, karten, wettbewerb = self._pruefung_zu(zeile, staffel, auskunft)
+                gefunden, karten, wettbewerb = self._pruefung_zu(
+                    zeile, staffel, auskunft, abgeschaltet
+                )
                 ausbeute.aufnehmen(zeile, gefunden, karten, wettbewerb)
                 # Je Bericht eine Meldung: ein Lauf ueber achtzig Berichte
                 # dauert eine Viertelstunde, und ein Balken, der dabei steht,

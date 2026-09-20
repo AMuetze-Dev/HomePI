@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -117,6 +118,7 @@ def pruefen(
     staffel: Staffelangabe | None = None,
     ordner: Path | None = None,
     auskunft: regelwerk.Auskunft | None = None,
+    abgeschaltet: Collection[str] = (),
 ) -> list[Violation]:
     """Alle Regeln aus den Regeldateien auf einen Spielbericht anwenden.
 
@@ -159,9 +161,12 @@ def pruefen(
         )
         return verstoesse
 
-    abgeschaltet = set(schalter.laden())
+    # Zwei Quellen, und beide zaehlen: die Regeluebersicht der Oberflaeche
+    # und die Datei neben den Regeln. Wer ohne Oberflaeche arbeitet, soll
+    # trotzdem abschalten koennen.
+    stillgelegt = set(abgeschaltet) | set(schalter.laden())
     for regel in ladung.registry:
-        if regel.id in abgeschaltet:
+        if regel.id in stillgelegt:
             # Nicht ausfuehren, aber auch nicht verschweigen: die Zahl steht
             # im Protokoll des Prueflaufs.
             continue
@@ -197,14 +202,50 @@ def pruefen(
     return verstoesse
 
 
+#: Die Wege der Regeldateien auf die des Artefakts.
+#:
+#: Das Artefakt kennt drei: kein Schreiben, Mahnung, Sportgericht. Die
+#: Regeldateien kennen "beides" -- Mahnung **und** Sportgericht. Es wird zur
+#: Mahnung: der Weg, der ohne Verfahren auskommt. Betroffen sind die drei
+#: Spielerfoto-Regeln, und das Mahnungsformular des Verbandes hat fuer sie ein
+#: eigenes Feld. Wer eine davon vor das Sportgericht bringen will, stellt sie
+#: in der Regeluebersicht um.
+_WEG_IM_ARTEFAKT = {
+    "sportgericht": "sportgericht",
+    "mahnung": "mahnung",
+    "beides": "mahnung",
+    "hinweis": "kein",
+}
+
+
+def katalog(ordner: Path | None = None) -> list[dict[str, str]]:
+    """Die Regeln des Staffelleiters, wie der Regelkatalog sie fuehrt."""
+    return [
+        {
+            "schluessel": r.id,
+            "name": r.name,
+            "beschreibung": (getattr(r, "beschreibung", "") or "")[:1000],
+            "schwere": r.schwere,
+            "weg": _WEG_IM_ARTEFAKT.get(r.weg, "kein"),
+        }
+        for r in regeln(ordner).registry
+    ]
+
+
 def befunde_aus(
     report: MatchReport,
     staffel: Staffelangabe | None = None,
     ordner: Path | None = None,
     auskunft: regelwerk.Auskunft | None = None,
+    abgeschaltet: Collection[str] = (),
 ) -> list[dict[str, object]]:
     """Die Regeln des Katalogs, fertig für das Artefakt."""
-    return [als_befund(v) for v in pruefen(report, staffel, ordner, auskunft)]
+    aus = set(abgeschaltet)
+    return [
+        als_befund(v)
+        for v in pruefen(report, staffel, ordner, auskunft, abgeschaltet=aus)
+        if v.rule not in aus
+    ]
 
 
 def _ganzzahl(wert: object) -> int:
