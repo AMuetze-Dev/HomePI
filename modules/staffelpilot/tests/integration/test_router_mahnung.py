@@ -29,6 +29,7 @@ async def vorgang_mit_befund(
     client: AsyncClient,
     regel: str = "confirmation_missing",
     weg: str = "mahnung",
+    einzelheiten: dict[str, str] | None = None,
     **spielfelder: object,
 ) -> tuple[str, str]:
     """Eine Staffel, ein Spiel, ein Befund, ein Vorgang. Gibt (vorgang_id, spiel_id)."""
@@ -55,6 +56,7 @@ async def vorgang_mit_befund(
                 "text": "Die Heimmannschaft hat nicht bestätigt.",
                 "mannschaft": "SV Loschwitz",
                 "weg": weg,
+                "einzelheiten": einzelheiten or {},
             }
         ],
         **spielfelder,
@@ -160,3 +162,48 @@ class TestMailentwurf:
         entwurf = (await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mail")).json()
 
         assert entwurf["anhang"] == ""
+
+
+class TestDerSatzZumVergehen:
+    """Der Weg vom Befund bis in den Brief -- ueber Schema, Spalte und Vorlage.
+
+    Die Einzelheiten reisen weit: der Prueflauf legt sie an, das Artefakt legt
+    sie in eine JSONB-Spalte, und aus ihr wird ein Satz in einem Schreiben an
+    einen Verein. Bricht der Weg an einer Stelle, faellt das erst dort auf --
+    wenn niemand hinschaut, erst im Briefkasten.
+    """
+
+    async def test_der_paragraf_steht_im_text(self, client: AsyncClient) -> None:
+        vorgang_id, _ = await vorgang_mit_befund(client, regel="order_manager_missing")
+
+        entwurf = (await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mail")).json()
+
+        assert "kein Leiter Ordnungsdienst" in entwurf["text"]
+        assert "§ 53" in entwurf["text"]
+
+    async def test_die_einzelheiten_ueberleben_die_datenbank(self, client: AsyncClient) -> None:
+        vorgang_id, _ = await vorgang_mit_befund(
+            client,
+            regel="confirmation_late",
+            einzelheiten={"signed_at": "22:35", "deadline": "20:14"},
+        )
+
+        entwurf = (await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mail")).json()
+
+        assert "erst am 22:35" in entwurf["text"]
+        assert "(20:14)" in entwurf["text"]
+
+    async def test_ohne_einzelheiten_bleibt_kein_satz_angefangen(self, client: AsyncClient) -> None:
+        vorgang_id, _ = await vorgang_mit_befund(client, regel="confirmation_late")
+
+        entwurf = (await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mail")).json()
+
+        assert "erst am" not in entwurf["text"]
+        assert "nach Ablauf der Frist bestätigt" in entwurf["text"]
+
+    async def test_eine_regel_ohne_vorlage_behaelt_den_befundtext(self, client: AsyncClient) -> None:
+        vorgang_id, _ = await vorgang_mit_befund(client, regel="dfbnet_warning")
+
+        entwurf = (await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mail")).json()
+
+        assert "Die Heimmannschaft hat nicht bestätigt." in entwurf["text"]

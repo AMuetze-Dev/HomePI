@@ -117,6 +117,10 @@ class BefundEingang(BaseModel):
     #: Wohin der Befund fuehrt. Der Prueflauf weiss es; hier wird es nur
     #: mitgefuehrt, damit die Oberflaeche den passenden Knopf anbietet.
     weg: Weg = "kein"
+    #: Einzelheiten zum Verstoss -- Zeitstempel, Rollen, Passnummer. Sie
+    #: stehen spaeter im Schreiben an den Verein, dort, wo die Vorlage einen
+    #: Platzhalter hat. Was fehlt, laesst den Satzteil verschwinden.
+    einzelheiten: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("regel", "titel", "text", "person", "mannschaft", mode="before")
     @classmethod

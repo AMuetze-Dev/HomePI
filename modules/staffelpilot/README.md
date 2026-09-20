@@ -207,6 +207,19 @@ Ein Kreuz wird nur gesetzt, wo der Verband einen Tatbestand vorsieht
 Zuordnung bekommt keins. Ein geratenes Kreuz behauptete etwas, das niemand
 geprueft hat.
 
+### Die Saetze
+
+Welcher Satz zu welchem Vergehen gehoert, steht in `vordrucke/texte.yaml`:
+je Regel ein Sachverhalt und ein Hinweis, mit Paragraf. **Es wird nichts
+formuliert.** Fuer denselben Verstoss steht jedes Mal derselbe Satz -- das ist
+der Sinn der Sache, wenn ein Schreiben vor dem Sportgericht landen kann.
+
+Die Werte kommen aus den Einzelheiten des Befundes: Zeitstempel, Rollen,
+Namen. Fehlt einer, verschwindet der Satzteil in den eckigen Klammern **ganz**,
+statt als "erst am " mit einer Luecke dahinter stehen zu bleiben. Kennt die
+Datei eine Regel nicht, bleibt es beim Text des Prueflaufs -- der sagt, was
+war, nur in der Sprache der Pruefung statt in der des Verbandes.
+
 `GET /vorgaenge/{id}/mail` gibt Betreff, Text und die Adresse des Formulars --
 alles, was in ein Mailfenster gehoert. **Abgeschickt wird hier nichts**, und
 es gibt auch keinen Weg dorthin: der Empfaenger ist ein Vorschlag, und
@@ -253,6 +266,17 @@ ALTER TABLE staffelpilot_spielberichte
 
 Der naechste Prueflauf traegt sie nach. Leer heisst auch hier: nicht bekannt --
 das Formular nennt die Luecke, statt sie zu fuellen.
+
+**Ebenfalls seit 20.09.2026: die Einzelheiten am Befund.**
+
+```sql
+ALTER TABLE staffelpilot_befunde
+  ADD COLUMN einzelheiten JSONB NOT NULL DEFAULT '{}'::jsonb;
+```
+
+Darin stehen Zeitstempel, Rollen und Passnummern -- die Werte, die im
+Schreiben an der Stelle eines Platzhalters landen. Ein alter Befund hat sie
+nicht; dann faellt der Satzteil weg, statt eine Luecke zu hinterlassen.
 
 ### Der Schlüssel für die Zugangsdaten
 

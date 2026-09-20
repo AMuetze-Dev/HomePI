@@ -234,6 +234,7 @@ async def einspielen(sitzung: AsyncSession, auftrag: ImportAuftrag) -> tuple[int
                     person=b.person,
                     mannschaft=b.mannschaft,
                     weg=b.weg,
+                    einzelheiten=b.einzelheiten,
                     rang=rang,
                     entscheidung=alt.entscheidung if alt else "offen",
                     grund=alt.grund if alt else "",
@@ -509,6 +510,8 @@ async def vorgang_anlegen(
         verein=daten.verein or gefunden.mannschaft,
         betroffener=daten.betroffener or gefunden.person,
         grund=daten.grund or gefunden.titel,
+        regel=gefunden.regel,
+        einzelheiten=gefunden.einzelheiten or {},
     )
     schreiben = dienst.vorgang_entwurf(art, anlass, werte, dt.date.today())
 

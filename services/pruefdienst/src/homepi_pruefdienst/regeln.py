@@ -116,7 +116,39 @@ def als_befund(verstoss: Violation, mannschaft: str = "") -> dict[str, object]:
         "text": verstoss.message[:2000],
         "person": str(einzelheiten.get("player") or einzelheiten.get("person") or "")[:120],
         "mannschaft": (mannschaft or str(einzelheiten.get("team") or ""))[:120],
+        "einzelheiten": _einzelheiten(einzelheiten),
     }
+
+
+#: Wie die Textvorlagen einen Wert nennen, den die Regeln anders nennen. Die
+#: Vorlagen sind deutsch, weil ein Staffelleiter sie aendert; die Regeln sind
+#: aus der alten Anwendung uebernommen und heissen dort englisch.
+_ALS_PLATZHALTER = {"roles": "rollen", "name": "person", "team": "verein"}
+
+#: Was nicht in ein Schreiben gehoert: Angaben ueber die Regel selbst.
+_NICHT_IM_SCHREIBEN = ("regel", "regelname", "severe")
+
+
+def _einzelheiten(roh: dict[str, Any]) -> dict[str, str]:
+    """Was von den Einzelheiten in ein Schreiben darf.
+
+    Nur Zeichenketten, und begrenzt: dieser Wert geht als JSON in die
+    Datenbank und von dort in einen Brief. Eine Regel, die versehentlich einen
+    halben Spielbericht in die Einzelheiten legt, soll ihn nicht mitschleppen.
+
+    Leere Werte fliegen raus, statt als "" zu ueberleben: die Vorlage laesst
+    einen Satzteil ohne Wert verschwinden, und das kann sie nur, wenn der
+    fehlende Wert auch wirklich fehlt.
+    """
+    aus: dict[str, str] = {}
+    for schluessel, wert in roh.items():
+        if schluessel in _NICHT_IM_SCHREIBEN or len(aus) >= 12:
+            continue
+        text = ", ".join(str(e) for e in wert) if isinstance(wert, (list, tuple)) else str(wert)
+        text = text.strip()[:200]
+        if text:
+            aus[_ALS_PLATZHALTER.get(schluessel, schluessel)[:40]] = text
+    return aus
 
 
 def passnummer_zu(report: MatchReport, karte: CardEvent) -> str:

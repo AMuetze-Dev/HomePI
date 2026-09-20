@@ -225,6 +225,18 @@ beiden echten Fehlalarme hingen:
 
 Dasselbe Prinzip wie beim Spielerfoto in `aufstellung.py`.
 
+## Was an einem Befund haengt
+
+Neben Text und Schwere gibt jede Regel ihre **Einzelheiten** mit: Zeitstempel,
+Rollen, Namen. Sie sind keine Zierde -- aus ihnen wird im Artefakt der Satz im
+Schreiben an den Verein: aus `signed_at` wird "erst am 22:35", aus `roles` die
+Aufzaehlung der Doppelfunktion.
+
+`als_befund` laesst nur Zeichenketten durch, hoechstens zwoelf und je 200
+Zeichen, und wirft Leeres weg. Das Wegwerfen ist Absicht: die Vorlage laesst
+einen Satzteil verschwinden, wenn sein Wert **fehlt** -- ein leeres `""` waere
+ein Wert, und im Brief stuende "erst am " mit einer Luecke dahinter.
+
 ## Die Regeln, die dem Staffelleiter gehören
 
 Dreißig Prüfungen der Spielordnung stehen **nicht im Programm**, sondern in

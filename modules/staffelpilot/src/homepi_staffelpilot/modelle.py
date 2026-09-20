@@ -158,6 +158,10 @@ class Befund(Base, ZeitstempelMixin):
     # Wohin der Befund fuehrt, wenn er stehen bleibt. Kommt vom Prueflauf:
     # dieses Artefakt kennt die Spielordnung nicht.
     weg: Mapped[str] = mapped_column(String(20), nullable=False, default="kein")
+    # Zeitstempel, Rollen, Passnummer -- was im Schreiben an den Verein an der
+    # Stelle eines Platzhalters steht. Nicht abgefragt, nur eingesetzt:
+    # deshalb JSONB und keine zwoelf Spalten, von denen elf leer sind.
+    einzelheiten: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False, default=dict)
     entscheidung: Mapped[str] = mapped_column(String(20), nullable=False, default="offen")
     grund: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     entschieden_am: Mapped[dt.datetime | None] = mapped_column(

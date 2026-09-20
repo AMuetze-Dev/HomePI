@@ -12,6 +12,10 @@ dependencies = [
     # und seine Felder werden gefuellt -- nicht an geratenen Koordinaten
     # ueberdruckt.
     "pypdf>=5.1",
+    # Fuer die Textvorlagen der Schreiben. Sie liegen als YAML, damit sie
+    # lesbar bleiben: wer einen Satz aendern will, soll keinen Python-Code
+    # anfassen muessen.
+    "pyyaml>=6.0",
 ]
 
 # Die ganze Anmeldung. Das Gateway findet das Modul beim Start hierueber -
@@ -41,6 +45,7 @@ dev = [
     "httpx>=0.28",
     "ruff>=0.9",
     "mypy>=1.14",
+    "types-PyYAML>=6.0",
 ]
 
 [tool.pytest.ini_options]

@@ -127,6 +127,55 @@ class TestAlsBefund:
         assert len(str(regeln.als_befund(verstoss)["text"])) == 2000
 
 
+class TestEinzelheiten:
+    """Was aus einer Regel in ein Schreiben an einen Verein darf."""
+
+    def _befund(self, **einzelheiten: object) -> dict[str, str]:
+        verstoss = regeln.Violation(
+            rule="confirmation_late",
+            severity=regeln.Severity.CRITICAL,
+            message="x",
+            details=dict(einzelheiten),
+        )
+        aus = regeln.als_befund(verstoss)["einzelheiten"]
+        assert isinstance(aus, dict)
+        return aus
+
+    def test_zeitstempel_kommen_durch(self) -> None:
+        """Ohne sie steht im Brief kein "erst am 22:35" — und das ist der
+        Nachweis, auf den sich die Mahnung stützt."""
+        assert self._befund(signed_at="22:35", deadline="20:14") == {
+            "signed_at": "22:35",
+            "deadline": "20:14",
+        }
+
+    def test_die_vorlage_bekommt_ihre_eigenen_namen(self) -> None:
+        """Die Vorlage gehört dem Staffelleiter und heißt deutsch."""
+        aus = self._befund(roles=["Trainer", "Betreuer"], name="Max Müller", team="SV Loschwitz")
+
+        assert aus == {
+            "rollen": "Trainer, Betreuer",
+            "person": "Max Müller",
+            "verein": "SV Loschwitz",
+        }
+
+    def test_angaben_ueber_die_regel_selbst_bleiben_draußen(self) -> None:
+        assert self._befund(regel="pruefe_x", regelname="Eigene Regel", severe=True) == {}
+
+    def test_ein_leerer_wert_faellt_weg_statt_leer_zu_bleiben(self) -> None:
+        """Nur ein fehlender Wert lässt den Satzteil verschwinden. Ein "" wäre
+        ein Wert — und der Brief hätte die Lücke."""
+        assert self._befund(signed_at="", deadline="   ") == {}
+
+    def test_ein_langer_wert_wird_gekappt(self) -> None:
+        assert len(self._befund(comment="x" * 5000)["comment"]) == 200
+
+    def test_sehr_viele_angaben_kommen_nicht_alle_mit(self) -> None:
+        """Eine Regel, die einen halben Spielbericht mitgibt, schleppt ihn
+        nicht in die Datenbank und von dort in einen Brief."""
+        assert len(self._befund(**{f"f{i}": str(i) for i in range(50)})) == 12
+
+
 class TestPruefe:
     def test_eine_gescheiterte_regel_nimmt_die_anderen_nicht_mit(
         self, monkeypatch: pytest.MonkeyPatch
@@ -620,7 +669,8 @@ class TestFuerDasArtefakt:
 
         assert {"documents_present"} <= {str(x["regel"]) for x in befunde}
         assert all(
-            set(x) == {"regel", "schwere", "titel", "text", "person", "mannschaft"} for x in befunde
+            set(x) == {"regel", "schwere", "titel", "text", "person", "mannschaft", "einzelheiten"}
+            for x in befunde
         )
 
     def test_ein_nicht_gelesener_bericht_ist_eine_warnung_und_keine_leere_liste(self) -> None:

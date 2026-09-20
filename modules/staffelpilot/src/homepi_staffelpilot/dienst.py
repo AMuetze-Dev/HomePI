@@ -16,6 +16,10 @@ from datetime import date, timedelta
 from cryptography.fernet import Fernet, InvalidToken
 from homepi_core import ServiceError
 
+# Liest eine Datei -- aber eine, die im Paket liegt und sich nie aendert,
+# einmal gelesen und danach im Speicher. Das ist eine Tabelle von Konstanten
+# in einer Textdatei und kein I/O im Sinn der Faustregel oben.
+from . import texte
 from .schemas import Zusammenfassung
 
 
@@ -464,6 +468,12 @@ class Anlass:
     verein: str
     betroffener: str
     grund: str
+    #: Die Kennung der Regel. An ihr haengt der Satz, der im Schreiben steht --
+    #: fuer denselben Verstoss jedes Mal derselbe.
+    regel: str = ""
+    #: Was in die Platzhalter des Satzes geht. Was hier fehlt, laesst den
+    #: Satzteil verschwinden, statt eine Luecke zu hinterlassen.
+    einzelheiten: Mapping[str, str] = field(default_factory=dict)
 
 
 def _tag(datum: date) -> str:
@@ -499,18 +509,48 @@ def vorgang_entwurf(
     )
     betroffen = anlass.betroffener or anlass.verein
 
+    # Der Satz zum Vergehen, in der Sprache des Verbandes und mit Paragraf.
+    # Die eigenen Angaben stehen hinter den Einzelheiten des Befundes: wen der
+    # Staffelleiter als Betroffenen eingetragen hat, gilt gegen das, was die
+    # Regel gefunden hatte.
+    bausteine = texte.bausteine_fuer(
+        anlass.regel,
+        {
+            **dict(anlass.einzelheiten),
+            "person": betroffen,
+            "verein": anlass.verein,
+            "heim": anlass.heim,
+            "gast": anlass.gast,
+            "datum": _tag(anlass.spieldatum),
+        },
+    )
+    # Kennt die Vorlage die Regel nicht, bleibt es beim Text des Befundes. Der
+    # sagt, was war -- nur eben so, wie die Pruefung es formuliert, und nicht,
+    # wie ein Schreiben an einen Verein es tut.
+    sachverhalt = (
+        f"Im Spiel {partie} am {_tag(anlass.spieldatum)} {bausteine.sachverhalt}"
+        if bausteine.sachverhalt
+        else anlass.sachverhalt
+    )
+    hinweis = f"{bausteine.hinweis}\n\n" if bausteine.hinweis else ""
+
     if art == "mahnung":
         betreff = f"Mahnung {partie} am {_tag(anlass.spieldatum)}"
+        # Der Satz, der eine Mahnung zur Mahnung macht. Ohne ihn waere sie
+        # eine Notiz, und ein spaeterer Sportgerichtsantrag beruft sich auf ihn.
+        folge = texte.folgesatz()
         text = (
             "Sehr geehrte Damen und Herren,\n\n"
             "bei der Prüfung des Spielberichts wurde Folgendes festgestellt:\n\n"
             f"{kopf}\n\n"
             f"Feststellung: {anlass.titel}\n"
-            f"{anlass.sachverhalt}\n\n"
+            f"{sachverhalt}\n\n"
+            f"{hinweis}"
             f"Betroffen:    {betroffen}\n"
             f"Grund:        {anlass.grund}\n\n"
             f"Wir bitten um Abstellung und um eine Stellungnahme bis zum {_tag(frist)}.\n\n"
-            f"{unterschrift}"
+            + (f"{folge}\n\n" if folge else "")
+            + f"{unterschrift}"
         )
     else:
         betreff = f"Antrag an das Sportgericht{STRICH}{partie} am {_tag(anlass.spieldatum)}"
@@ -521,7 +561,8 @@ def vorgang_entwurf(
             f"Verein:       {anlass.verein}\n"
             f"Tatbestand:   {anlass.titel}\n"
             f"Grund:        {anlass.grund}\n\n"
-            f"Sachverhalt:\n{anlass.sachverhalt}\n\n"
+            f"Sachverhalt:\n{sachverhalt}\n\n"
+            f"{hinweis}"
             f"Die Stellungnahme des Vereins wird bis zum {_tag(frist)} erbeten.\n\n"
             f"{unterschrift}"
         )

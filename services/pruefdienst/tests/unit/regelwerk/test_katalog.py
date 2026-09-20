@@ -166,7 +166,9 @@ class TestFuerDasArtefakt:
 
         assert befunde
         assert all(
-            set(b) == {"regel", "schwere", "titel", "text", "person", "mannschaft"} for b in befunde
+            set(b)
+            == {"regel", "schwere", "titel", "text", "person", "mannschaft", "einzelheiten"}
+            for b in befunde
         )
 
     def test_der_titel_ist_der_name_der_regel_und_nicht_der_verein(self, tmp_path: Path) -> None:

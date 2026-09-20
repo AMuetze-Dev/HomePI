@@ -1,0 +1,115 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Texte für Mahnungen — diese Datei darf geändert werden.
+#
+#  Sie gehört Ihnen. Ein Update von StaffelPilot fasst sie nicht an.
+#
+#  Je Regel zwei Sätze:
+#    sachverhalt: was passiert ist. Folgt auf "Im Spiel … am … "
+#    hinweis:     worauf Sie hinweisen. Steht danach als eigener Absatz.
+#
+#  PLATZHALTER
+#    {person}      Name der betroffenen Person
+#    {verein}      Verein, an den die Mahnung geht
+#    {heim} {gast} {datum}   Angaben zum Spiel
+#    {rollen}      weitere Funktionen (bei Doppelfunktionen)
+#    {signed_at} {deadline} {released_at}   Zeitstempel, falls vorhanden
+#    Alles Weitere aus den Details des Befundes ist ebenfalls einsetzbar.
+#
+#  ECKIGE KLAMMERN
+#    Ein Abschnitt in [ ] verschwindet ganz, wenn einer seiner Platzhalter
+#    leer ist. So bleibt kein "erst am " mit einer Lücke stehen.
+#
+#  Es wird nichts formuliert und nichts erzeugt. Für denselben Verstoß steht
+#  jedes Mal derselbe Satz — das ist der Sinn der Sache, wenn ein Schreiben
+#  vor dem Sportgericht landen kann.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Der Satz unter jeder Mahnung. Er macht sie zur Mahnung statt zur Notiz, und
+# ein späterer Sportgerichtsantrag beruft sich auf ihn.
+folgesatz: >-
+  Erfolgt nach dieser schriftlichen Ermahnung ein weiterer Verstoß dieser
+  Mannschaft, so wird ein Antrag an das Sportgericht gestellt.
+
+regeln:
+
+  order_manager_dual_role:
+    sachverhalt: >-
+      wurde {person} gleichzeitig als Leiter Ordnungsdienst und {rollen}
+      eingetragen.
+    hinweis: >-
+      Ich weise darauf hin, dass eine solche Doppelfunktion nicht zulässig ist.
+      Nach § 53 (1) d) der Spielordnung des Sächsischen Fußball-Verbandes ist für jedes Spiel ein verantwortlicher Leiter des
+      Ordnungsdienstes zu benennen und namentlich auf dem Spielbericht
+      einzutragen. Diese Aufgabe muss durch eine neutrale, nicht am Coaching
+      beteiligte Person wahrgenommen werden, die sich außerhalb der
+      Coachingzone aufhält.
+
+  order_manager_is_player:
+    sachverhalt: >-
+      wurde {person} gleichzeitig als Leiter Ordnungsdienst und als Spieler
+      eingetragen.
+    hinweis: >-
+      Ich weise darauf hin, dass diese Doppelfunktion nicht zulässig ist. Nach
+      § 53 (1) d) der Spielordnung des Sächsischen Fußball-Verbandes ist für jedes Spiel ein verantwortlicher Leiter des
+      Ordnungsdienstes zu benennen. Ein am Spiel teilnehmender Spieler kann
+      diese Aufgabe nicht wahrnehmen; sie ist einer neutralen, nicht am Spiel
+      beteiligten Person zu übertragen.
+
+  order_manager_missing:
+    sachverhalt: >-
+      wurde durch {verein} kein Leiter Ordnungsdienst eingetragen.
+    hinweis: >-
+      Ich weise darauf hin, dass der Platzverein nach § 53 (1) d) der Spielordnung des Sächsischen Fußball-Verbandes verpflichtet
+      ist, für jedes Spiel einen verantwortlichen Leiter des Ordnungsdienstes
+      zu benennen und namentlich auf dem Spielbericht einzutragen.
+
+  confirmation_missing:
+    sachverhalt: >-
+      wurde der elektronische Spielberichtsbogen durch {verein} nicht
+      bestätigt.
+    hinweis: >-
+      Ich weise darauf hin, dass beide Mannschaften den elektronischen
+      Spielberichtsbogen nach dem Spiel fristgerecht zu bestätigen haben.
+
+  confirmation_late:
+    sachverhalt: >-
+      wurde der elektronische Spielberichtsbogen durch {verein}[ erst am
+      {signed_at}] und damit nach Ablauf der Frist[ ({deadline})] bestätigt.
+    hinweis: >-
+      Ich weise darauf hin, dass der elektronische Spielberichtsbogen
+      innerhalb der vorgegebenen Frist zu bestätigen ist.
+
+  release_late:
+    sachverhalt: >-
+      wurde der Spielbericht[ erst am {released_at}] und damit nach Ablauf der
+      Frist[ ({deadline})] freigegeben.
+    hinweis: >-
+      Ich weise darauf hin, dass der Spielbericht innerhalb der vorgegebenen
+      Frist freizugeben ist.
+
+  spielerfoto_fehlt:
+    sachverhalt: >-
+      war für {person} kein Spielerfoto in DFBnet hinterlegt.
+    hinweis: >-
+      Ich weise darauf hin, dass nach § 67 (2) der Spielordnung des
+      Sächsischen Fußball-Verbandes zu jeder Spielerlaubnis ein aktuelles
+      Spielerfoto zu hinterlegen ist. Nachweis der Spielberechtigung ist nach
+      § 56 (1) die Spielberechtigungsliste mit Lichtbild; ohne Foto ist eine
+      Überprüfung am Spieltag nicht möglich.
+
+  spielerfoto_zu_alt:
+    sachverhalt: >-
+      war das Spielerfoto von {person} älter als zehn Jahre[ (Stand
+      {foto_stand}, {foto_alter} Jahre)].
+    hinweis: >-
+      Ich weise darauf hin, dass Spielerfotos im Erwachsenenbereich nach
+      § 67 (3) b) der Spielordnung des Sächsischen Fußball-Verbandes
+      mindestens alle zehn Jahre zu erneuern sind.
+
+  spielerfoto_aus_juniorenzeit:
+    sachverhalt: >-
+      stammten Spielerfotos noch aus der Juniorenzeit[: {spieler}].
+    hinweis: >-
+      Ich weise darauf hin, dass nach § 67 (3) a) der Spielordnung des
+      Sächsischen Fußball-Verbandes beim Wechsel aus dem Junioren- in den
+      Erwachsenenbereich ein neues Spielerfoto zu erstellen ist.

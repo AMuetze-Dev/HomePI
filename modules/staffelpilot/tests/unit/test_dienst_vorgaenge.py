@@ -258,3 +258,75 @@ def test_die_paarung_traegt_einen_halbgeviertstrich() -> None:
     )
 
     assert "SG Gittersee – SV Fortschritt Meißen-West" in schreiben.text  # noqa: RUF001
+
+
+# ── Der Satz zum Vergehen ───────────────────────────────────────────
+
+
+def test_die_mahnung_nennt_den_paragrafen_zum_vergehen() -> None:
+    """Der Unterschied zwischen einer Notiz und einem Schreiben des Verbandes.
+
+    Der Prüflauf schreibt "Kein Leiter Ordnungsdienst angegeben." — richtig,
+    aber das ist die Sprache der Prüfung. Im Brief steht der Paragraf.
+    """
+    schreiben = dienst.vorgang_entwurf(
+        "mahnung",
+        _anlass(regel="order_manager_missing", verein="SV Loschwitz", betroffener=""),
+        EINSTELLUNGEN,
+        date(2026, 9, 15),
+    )
+
+    assert "kein Leiter Ordnungsdienst" in schreiben.text
+    assert "§ 53" in schreiben.text
+    assert "Sportgericht" in schreiben.text  # der Folgesatz
+
+
+def test_die_einzelheiten_des_befundes_stehen_im_satz() -> None:
+    schreiben = dienst.vorgang_entwurf(
+        "mahnung",
+        _anlass(
+            regel="confirmation_late",
+            verein="SV Loschwitz",
+            einzelheiten={"signed_at": "22:35", "deadline": "20:14"},
+        ),
+        EINSTELLUNGEN,
+        date(2026, 9, 15),
+    )
+
+    assert "erst am 22:35" in schreiben.text
+    assert "(20:14)" in schreiben.text
+
+
+def test_ohne_einzelheiten_bleibt_kein_angefangener_satz_stehen() -> None:
+    """Dieselbe Regel, nur ohne Zeitstempel — und ohne "erst am " ins Leere."""
+    schreiben = dienst.vorgang_entwurf(
+        "mahnung",
+        _anlass(regel="confirmation_late", verein="SV Loschwitz"),
+        EINSTELLUNGEN,
+        date(2026, 9, 15),
+    )
+
+    assert "erst am" not in schreiben.text
+    assert "durch SV Loschwitz und damit nach Ablauf der Frist bestätigt." in schreiben.text
+
+
+def test_eine_regel_ohne_vorlage_behaelt_den_text_des_befundes() -> None:
+    """Kein Schreiben ohne Sachverhalt — lieber der Satz der Prüfung."""
+    schreiben = dienst.vorgang_entwurf(
+        "mahnung", _anlass(regel="gibt_es_nicht"), EINSTELLUNGEN, date(2026, 9, 15)
+    )
+
+    assert "Feldverweis in Minute 71." in schreiben.text
+
+
+def test_der_sportgerichtsantrag_nimmt_denselben_satz() -> None:
+    schreiben = dienst.vorgang_entwurf(
+        "sportgericht",
+        _anlass(regel="order_manager_is_player", betroffener="Max Müller"),
+        EINSTELLUNGEN,
+        date(2026, 9, 15),
+    )
+
+    assert "Max Müller gleichzeitig als Leiter Ordnungsdienst" in schreiben.text
+    # Ein Antrag ist keine Mahnung: der Folgesatz gehört nicht hinein.
+    assert "weiterer Verstoß dieser Mannschaft" not in schreiben.text
