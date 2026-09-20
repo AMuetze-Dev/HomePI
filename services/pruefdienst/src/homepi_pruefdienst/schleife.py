@@ -114,12 +114,26 @@ class Prueflauf:
             )
         return aus
 
+    def _mannschaften_von(self, staffel: dict[str, Any]) -> list[dict[str, Any]]:
+        """Die Meldung dieser Staffel -- für § 68 die halbe Miete.
+
+        Geht es schief, wird trotzdem geprüft: der Übersetzer erschließt die
+        höheren Mannschaften dann aus den Namen. Schlechter als die gepflegte
+        Liste, aber besser als gar keine Wartefristprüfung.
+        """
+        try:
+            return list(self._gateway.mannschaften(str(staffel["id"])))
+        except Exception:
+            logger.exception("Die Mannschaften zu %s liessen sich nicht lesen", staffel["name"])
+            return []
+
     def _pruefung_zu(
         self,
         zeile: dienst.Spielzeile,
         staffel: dict[str, Any],
         auskunft: GatewayAuskunft | None,
         abgeschaltet: set[str],
+        mannschaften: list[dict[str, Any]],
     ) -> tuple[list[dict[str, object]], list[dict[str, object]], str]:
         """Den Bericht holen, prüfen — und sagen, was er enthielt.
 
@@ -135,20 +149,20 @@ class Prueflauf:
         if isinstance(self._leser, BeispielLeser):
             return self._leser.befunde_zu(zeile), [], "Meisterschaft"
 
+        if not zeile.gespielt:
+            # Das Spiel läuft erst noch: es gibt keinen Bericht, und ihn zu
+            # öffnen kostet eine Minute Warten auf eine Seite, die leer bleibt.
+            # Am Spieltag ist das der Normalfall und keine Warnung.
+            logger.info("Spiel %s ist noch nicht gespielt", zeile.dfbnet_id)
+            return [], [], ""
+
         bericht = self._leser.bericht(zeile.dfbnet_id)
         if bericht is None:
-            if not zeile.gespielt:
-                # Das Spiel läuft erst noch. Dass es dazu keinen Bericht gibt,
-                # ist der Normalfall am Spieltag und keine Warnung -- sonst
-                # stünden in der Warteschlange jede Woche so viele Warnungen,
-                # wie am Wochenende Spiele angesetzt sind.
-                logger.info("Spiel %s ist noch nicht gespielt", zeile.dfbnet_id)
-                return [], [], ""
             return regeln.nicht_gelesen("der Prüfdienst hat ihn nicht bekommen"), [], ""
 
         befunde = regeln.befunde_aus(bericht, abgeschaltet) + katalog.befunde_aus(
             bericht,
-            katalog.staffelangabe(staffel),
+            katalog.staffelangabe(staffel, mannschaften),
             auskunft=auskunft,
             abgeschaltet=abgeschaltet,
         )
@@ -215,6 +229,8 @@ class Prueflauf:
                 logger.error("Staffel %s wurde nicht geprueft: %s", name, fehler)
                 continue
 
+            mannschaften = self._mannschaften_von(staffel)
+
             if zeilen:
                 self._gateway.fortschritt(
                     kennung, zeile=f"{name}: {len(zeilen)} Spielbericht(e) im Zeitraum"
@@ -223,7 +239,7 @@ class Prueflauf:
             ausbeute = dienst.Ausbeute()
             for nummer, zeile in enumerate(zeilen):
                 gefunden, karten, wettbewerb = self._pruefung_zu(
-                    zeile, staffel, auskunft, abgeschaltet
+                    zeile, staffel, auskunft, abgeschaltet, mannschaften
                 )
                 ausbeute.aufnehmen(zeile, gefunden, karten, wettbewerb)
                 # Je Bericht eine Meldung: ein Lauf ueber achtzig Berichte

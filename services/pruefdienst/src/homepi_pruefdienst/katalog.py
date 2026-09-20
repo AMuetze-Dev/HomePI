@@ -262,18 +262,37 @@ def _ganzzahl(wert: object) -> int:
         return 0
 
 
-def staffelangabe(staffel: dict[str, object]) -> Staffelangabe:
-    """Aus der Staffel des Artefakts das, was die Regeln lesen.
+def hoehere_aus(mannschaften: Collection[dict[str, object]]) -> tuple[str, ...]:
+    """Welche Mannschaften in dieser Staffel als hoeherklassig gelten.
 
-    `hoehere_mannschaften` bleibt leer: das Artefakt führt sie je Mannschaft
-    und nicht je Staffel. Der Übersetzer erschließt sie dann aus den Namen --
-    "SV Loschwitz" steht über "SV Loschwitz 2". Das ist die Rückfallebene der
-    alten Anwendung und nicht das Ende der Arbeit; die gepflegte Liste kennt
+    Das Artefakt fuehrt sie je Mannschaft ("SV Loschwitz 2" steht unter
+    "SV Loschwitz"); die Regeln fragen nach der Staffel. Die Vereinigung ist
+    genau das: die Mannschaften, die ueber einer der gemeldeten stehen.
+
+    Der Uebersetzer erschliesst sie sonst aus den Namen. Das ist die
+    Rueckfallebene und nicht das Ende der Arbeit: eine gepflegte Liste kennt
     Spielgemeinschaften, die aus einem Namen nicht abzulesen sind.
     """
+    gefunden: list[str] = []
+    for m in mannschaften:
+        hoehere = m.get("hoehere")
+        if not isinstance(hoehere, list | tuple):
+            continue
+        for name in hoehere:
+            text = str(name).strip()
+            if text and text not in gefunden:
+                gefunden.append(text)
+    return tuple(gefunden)
+
+
+def staffelangabe(
+    staffel: dict[str, object], mannschaften: Collection[dict[str, object]] = ()
+) -> Staffelangabe:
+    """Aus der Staffel des Artefakts das, was die Regeln lesen."""
     return Staffelangabe(
         name=str(staffel.get("name") or ""),
         altersklasse=str(staffel.get("altersklasse") or ""),
         saison=str(staffel.get("saison") or ""),
         spieltage=_ganzzahl(staffel.get("spieltage")),
+        hoehere_mannschaften=hoehere_aus(mannschaften),
     )

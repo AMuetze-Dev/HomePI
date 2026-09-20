@@ -214,3 +214,47 @@ class TestStaffelangabe:
 
     def test_eine_leere_staffel_faellt_nicht_um(self) -> None:
         assert katalog.staffelangabe({}).spieltage == 0
+
+
+class TestHoehereMannschaften:
+    """Welche Mannschaften in dieser Staffel als höherklassig gelten.
+
+    Das Artefakt führt sie je Mannschaft, die Regeln fragen nach der Staffel.
+    Ohne die Liste erschließt der Übersetzer sie aus den Namen — das kennt
+    keine Spielgemeinschaften.
+    """
+
+    def test_die_vereinigung_aller_eintraege(self) -> None:
+        gefunden = katalog.hoehere_aus(
+            [
+                {"name": "SV Loschwitz 2", "hoehere": ["SV Loschwitz"]},
+                {"name": "SG Gittersee", "hoehere": ["SpG Gittersee/Coschütz"]},
+            ]
+        )
+
+        assert gefunden == ("SV Loschwitz", "SpG Gittersee/Coschütz")
+
+    def test_dieselbe_steht_nur_einmal_da(self) -> None:
+        gefunden = katalog.hoehere_aus(
+            [
+                {"hoehere": ["SV Loschwitz"]},
+                {"hoehere": ["SV Loschwitz", " SV Loschwitz "]},
+            ]
+        )
+
+        assert gefunden == ("SV Loschwitz",)
+
+    def test_ohne_eintraege_bleibt_es_leer(self) -> None:
+        assert katalog.hoehere_aus([{"name": "SV Loschwitz"}]) == ()
+        assert katalog.hoehere_aus([]) == ()
+
+    def test_unsinn_faellt_nicht_um(self) -> None:
+        assert katalog.hoehere_aus([{"hoehere": None}, {"hoehere": "SV Loschwitz"}]) == ()
+
+    def test_die_staffelangabe_nimmt_sie_mit(self) -> None:
+        angabe = katalog.staffelangabe(
+            {"name": "Stadtliga C", "altersklasse": "maenner"},
+            [{"hoehere": ["SV Loschwitz"]}],
+        )
+
+        assert angabe.hoehere_mannschaften == ("SV Loschwitz",)

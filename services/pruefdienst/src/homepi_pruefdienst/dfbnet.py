@@ -74,7 +74,16 @@ def _hat_verlauf(html: str) -> bool:
     return bool(bericht.confirmations or bericht.cards or bericht.goals)
 
 
-def _html_mit(seite: Any, hat_inhalt: Callable[[str], bool], grenze_ms: int = 20_000) -> str:
+#: Wie lange auf den Inhalt einer Seite gewartet wird.
+#:
+#: Zwanzig Sekunden waren zu knapp. Am 20.09.2026 war DFBnet fuer ein paar
+#: Minuten zaeh, und ein ganzer Lauf meldete "Spielbericht nicht gelesen" --
+#: 24 Warnungen fuer 24 Berichte, die es alle gab. Die alte Anwendung wartete
+#: an dieser Stelle 45 Sekunden.
+INHALT_MS = 45_000
+
+
+def _html_mit(seite: Any, hat_inhalt: Callable[[str], bool], grenze_ms: int = INHALT_MS) -> str:
     """Den Seiteninhalt holen, sobald er den gesuchten Inhalt traegt.
 
     Auf ein Element zu warten reicht bei dieser Anwendung nicht: das Geruest
@@ -109,6 +118,10 @@ class DfbnetLeser:
         #: Sie stehen in der Meisterschaftsliste und nirgends sonst; wer die
         #: Meldung holt, kommt ohnehin dort vorbei.
         self.spieltage = 0
+        #: Einsaetze je (Mannschaft, Spieler) -- einmal je Lauf geholt.
+        #: Achtzig Spielberichte mit je vierunddreissig Spielern waeren sonst
+        #: zweitausendsiebenhundert Abrufe fuer ein paar hundert Personen.
+        self._einsaetze: dict[tuple[str, str], dict[str, Any]] = {}
 
     # ── Anmelden ──────────────────────────────────────────────────────────
 
@@ -387,6 +400,13 @@ class DfbnetLeser:
             # finden ihre Spieler nicht mehr.
             info_html = _html_mit(popup, _hat_paarung)
             if not info_html:
+                # Einmal neu laden. Eine Seite, die haengengeblieben ist, kommt
+                # so zurueck -- und ein zaeher Nachmittag bei DFBnet darf nicht
+                # aussehen wie ein Bericht, den es nicht gibt.
+                logger.info("Bericht %s: die Infoseite kam nicht, ich lade sie neu", kennung)
+                popup.reload(wait_until="domcontentloaded")
+                info_html = _html_mit(popup, _hat_paarung)
+            if not info_html:
                 logger.warning("Bericht %s: die Infoseite blieb leer", kennung)
                 return None
 
@@ -492,8 +512,47 @@ class DfbnetLeser:
                 continue
             eintrag = aufstellung.mannschaft_aus_api(mannschaft, aufstellung.json_lesen(roh))
             if eintrag is not None:
+                self._einsaetze_nachtragen(seite, str(nummer), eintrag)
                 gefunden.append(eintrag)
         return gefunden
+
+    def _einsaetze_nachtragen(self, seite: Any, mannschaft: str, eintrag: dict[str, Any]) -> None:
+        """Zu jedem Spieler die Einsaetze dieser Saison.
+
+        Ein eigener Abruf je Person -- die Schnittstelle kennt keine
+        Sammelauskunft. Das ist der teuerste Teil eines Prueflaufs, deshalb
+        der Zwischenspeicher: dieselbe Person taucht an jedem Spieltag wieder
+        auf, und die Antwort ist immer der aktuelle Saisonstand.
+
+        Kommt nichts, bleibt die Historie **leer** und nicht "null Einsaetze".
+        Das eine heisst "weiss ich nicht", das andere "hat nicht gespielt" --
+        und die Stammspielerregel schwiege im zweiten Fall, als haette sie
+        geprueft.
+        """
+        for abschnitt in eintrag.get("sections", []):
+            for spieler in abschnitt.get("players", []):
+                if spieler.get("is_official"):
+                    continue
+                kennung = str(spieler.get("player_id") or "")
+                if not kennung:
+                    continue
+                schluessel = (mannschaft, kennung)
+                if schluessel not in self._einsaetze:
+                    roh = self._holen(
+                        seite,
+                        aufstellung.ADRESSE_EINSAETZE.format(
+                            mannschaft=mannschaft, spieler=kennung
+                        ),
+                        versuche=2,
+                    )
+                    self._einsaetze[schluessel] = (
+                        aufstellung.einsaetze_aus_api(aufstellung.json_lesen(roh))
+                        if roh is not None
+                        else aufstellung.OHNE_EINSAETZE
+                    )
+                historie = self._einsaetze[schluessel]
+                if historie:
+                    spieler["season_appearances"] = historie
 
     def _holen(self, seite: Any, adresse: str, versuche: int = 3) -> bytes | None:
         """Die Schnittstelle fragen -- und es noch einmal versuchen.

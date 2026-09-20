@@ -136,6 +136,16 @@ class Gateway:
             json={"staffel_id": staffel_id, "spiele": spiele},
         )
 
+    def mannschaften(self, staffel_id: str) -> list[dict[str, Any]]:
+        """Die Meldung einer Staffel, wie sie im Artefakt steht.
+
+        Mit den hoeherklassigen Mannschaften, die der Staffelleiter gepflegt
+        oder bestaetigt hat -- daran haengt Paragraf 68.
+        """
+        return self._json(  # type: ignore[no-any-return]
+            "GET", f"/staffelpilot/staffeln/{staffel_id}/mannschaften"
+        )
+
     def mannschaften_setzen(
         self, staffel_id: str, mannschaften: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:

@@ -313,3 +313,74 @@ class TestMannschaft:
 
         assert eintrag is not None
         assert eintrag["club_logo_id"] == ""
+
+
+class TestEinsaetze:
+    """Die Einsätze einer Saison — daran hängt § 68.
+
+    Wartefrist nach einem Spiel oben, Stammspielergrenze: beides rechnet über
+    die Saison, und im Spielbericht steht davon nichts.
+    """
+
+    def antwort(self) -> dict[str, object]:
+        return {
+            "overallPlayedMinutesNormalized": 180,
+            "appearances": [
+                {
+                    "matchId": "633203001",
+                    "kickoff": "2026-08-30T09:00:00Z",
+                    "homeTeamName": "SV Loschwitz",
+                    "awayTeamName": "SG Gittersee",
+                    "homeTeamClubLogoUrl": "https://www.dfbnet.org/logo?id=4711",
+                    "awayTeamClubLogoUrl": "",
+                    "divisionName": "Kreisliga C",
+                    "competitionTypeName": "Meisterschaft",
+                    "playedMinutesNormalized": 90,
+                    "matchDay": 3,
+                },
+                {
+                    "matchId": "633203002",
+                    "kickoff": "2026-09-06T15:00:00Z",
+                    "homeTeamName": "SV Loschwitz 2",
+                    "awayTeamName": "SV Pillnitz",
+                    "divisionName": "1.Kreisklasse",
+                    "competitionTypeName": "Meisterschaft",
+                    "playedMinutesNormalized": 90,
+                    "matchDay": 3,
+                },
+            ],
+        }
+
+    def test_die_zahl_der_einsaetze(self) -> None:
+        gelesen = aufstellung.einsaetze_aus_api(self.antwort())
+
+        assert gelesen["count"] == 2
+        assert gelesen["minutes"] == 180
+
+    def test_jeder_einsatz_traegt_sein_spiel(self) -> None:
+        """Ohne die Spielkennung zählt das Spiel, das gerade geprüft wird,
+        sich selbst mit."""
+        erster = aufstellung.einsaetze_aus_api(self.antwort())["matches"][0]
+
+        assert erster["match_id"] == "633203001"
+        assert erster["home_team"] == "SV Loschwitz"
+        assert erster["division"] == "Kreisliga C"
+        assert erster["competition"] == "Meisterschaft"
+        assert erster["minutes"] == 90
+        assert erster["match_day"] == 3
+
+    def test_das_vereinswappen_kommt_als_kennung(self) -> None:
+        """Zwei Schreibweisen desselben Vereins sind aus den Namen nicht zu
+        erkennen — die Kennung des Wappens schon."""
+        erster = aufstellung.einsaetze_aus_api(self.antwort())["matches"][0]
+
+        assert erster["home_team_logo_id"] == "4711"
+        assert erster["away_team_logo_id"] == ""
+
+    def test_eine_leere_antwort_faellt_nicht_um(self) -> None:
+        assert aufstellung.einsaetze_aus_api({}) == {"count": 0, "minutes": 0, "matches": []}
+
+    def test_ohne_einsaetze_steht_nichts_am_spieler(self) -> None:
+        """Nicht `count: 0`: das hieße „hat diese Saison nicht gespielt", und
+        die Stammspielerregel schwiege, als hätte sie geprüft."""
+        assert aufstellung.OHNE_EINSAETZE == {}

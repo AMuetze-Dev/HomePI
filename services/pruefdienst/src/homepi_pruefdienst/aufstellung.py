@@ -214,3 +214,52 @@ def mannschaft_aus_api(mannschaft: dict[str, Any], lineup: dict[str, Any]) -> di
         "club_logo_id": vereinswappen_aus_url(mannschaft.get("clubLogoUrl", "") or ""),
         "sections": abschnitte_aus(lineup),
     }
+
+
+#: Die Einsaetze eines Spielers in dieser Saison.
+ADRESSE_EINSAETZE = (
+    "https://www.dfbnet.org/sbo-mobile/v2/oauth/team/{mannschaft}"
+    "/player/{spieler}/appearance-statistic"
+)
+
+
+def einsaetze_aus_api(antwort: dict[str, Any]) -> dict[str, Any]:
+    """Die Einsatzstatistik in unsere Felder.
+
+    Daran haengt Paragraf 68: die Wartefrist nach einem Spiel oben, und die
+    Stammspielergrenze. Beides rechnet ueber die Saison, und im Spielbericht
+    steht davon nichts.
+
+    Uebernommen aus `_enrich_with_appearances` der alten Anwendung. Wie schon
+    bei der Aufstellung wird **nicht umgedeutet, nur uebernommen** -- was ein
+    Einsatz bedeutet, steht in der Regel, die ihn liest.
+    """
+    einsaetze = antwort.get("appearances") or []
+    return {
+        "count": len(einsaetze),
+        "minutes": antwort.get("overallPlayedMinutesNormalized", 0),
+        "matches": [
+            {
+                "match_id": e.get("matchId", ""),
+                "kickoff": e.get("kickoff", ""),
+                "home_team": e.get("homeTeamName", ""),
+                "away_team": e.get("awayTeamName", ""),
+                "home_team_logo_id": vereinswappen_aus_url(e.get("homeTeamClubLogoUrl", "") or ""),
+                "away_team_logo_id": vereinswappen_aus_url(e.get("awayTeamClubLogoUrl", "") or ""),
+                "division": e.get("divisionName", ""),
+                "competition": e.get("competitionTypeName", ""),
+                "minutes": e.get("playedMinutesNormalized", 0),
+                "match_day": e.get("matchDay"),
+            }
+            for e in einsaetze
+        ],
+    }
+
+
+#: Was an einem Spieler steht, von dem wir die Einsaetze nicht kennen.
+#:
+#: Nicht `count: 0`, sondern gar nichts: eine 0 hiesse "hat diese Saison nicht
+#: gespielt", und die Stammspielerregel schwiege daraufhin, als haette sie
+#: geprueft. Der Uebersetzer laesst die Historie dann leer, und die Regeln
+#: sagen selbst, dass sie nichts wissen.
+OHNE_EINSAETZE: dict[str, Any] = {}
