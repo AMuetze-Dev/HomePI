@@ -150,7 +150,8 @@ passieren, weil ein Container gestartet wurde.
 | Einsätze in höheren Mannschaften (Stammspieler, § 68) | **fehlt**. `Auskunft` schweigt dazu, und die Regeln sagen es |
 | Ein Bericht, der nicht kam | wird eine **Warnung am Spiel**, keine leere Liste. Eine leere Liste sieht in der Warteschlange aus wie „geprüft und sauber" |
 | Meldung einer Staffel holen (Initialisierung) | gebaut: Spielplanbearbeitung, „Eigene Staffeln", Staffel öffnen, Reiter „Mannschaften", Tabelle lesen (`meldung.py`, 100 %). **Nicht gegen das echte DFBnet geprüft, und von dieser Seite gibt es keine Aufnahme** — die Tests beschreiben den Aufbau, den die alte Anwendung vorfand. Misslingt es, kommt eine leere Liste, und die überschreibt im Artefakt nichts |
-| Eintragen in DFBnet (Prüferfreigabe, Fallanlage) | **fehlt**. Mit `PRUEFDIENST_LESER=dfbnet` bleibt Vorgemerktes stehen, statt still auf „fertig" zu springen |
+| Prüferfreigabe in DFBnet | **gebaut** (`freigabe.py`, wörtlich übernommen; die Selektoren sind dort am 30.08.2026 live geprüft). **Noch nie scharf gelaufen** — beide Schalter standen bisher auf aus |
+| Fallanlage (Sportgericht) | **fehlt**. Eine solche Zeile wird als Fehler abgeschlossen und bleibt sichtbar, statt still auf „fertig" zu springen |
 | Eintragen **simuliert** | mit den Beispieldaten wird jede Übertragung als erledigt gemeldet — mit dem Vermerk „Simuliert — es war kein Browser bei DFBnet" an der Zeile. Nur so lässt sich der Weg bis zum Freigeben einmal durchklicken |
 
 Was fehlt, liegt fertig in der alten Anwendung unter
@@ -174,6 +175,7 @@ src/homepi_pruefdienst/
   regelwerk/      das anpassbare Regelwerk (uebernommen, mit Vorlagen)
   auswahl.py      Namen gegen die Auswahlfelder von DFBnet (uebernommen)
   auskunft.py     der Verwarnungszaehler nach Paragraf 58
+  freigabe.py     die Prueferfreigabe in DFBnet (uebernommen)
   aufstellung.py  Aufstellung aus der DFBnet-Schnittstelle (uebernommen)
   gateway.py      HTTP zum Artefakt
   leser.py        das Protokoll, und ein Leser ohne DFBnet
