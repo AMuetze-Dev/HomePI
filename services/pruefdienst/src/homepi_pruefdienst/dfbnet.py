@@ -466,54 +466,64 @@ class DfbnetLeser:
         und eine leere Aufstellung ist fuer die Regeln *unbekannt* und kein
         Verstoss (`regeln.aufstellung_bekannt`).
         """
+        # Erst den Reiter, dann die Schnittstelle: die alte Anwendung tat es in
+        # dieser Reihenfolge, und ein 401 an dieser Stelle kostet den ganzen
+        # Kader -- also die Regeln, die etwas wert sind.
         try:
-            # Erst den Reiter, dann die Schnittstelle: die alte Anwendung tat
-            # es in dieser Reihenfolge, und ein 401 an dieser Stelle kostet den
-            # ganzen Kader -- also die Regeln, die etwas wert sind.
-            try:
-                seite.locator(".nav-tab").nth(1).click(timeout=10_000)
-                seite.wait_for_timeout(1500)
-            except Exception:
-                logger.info("Der Reiter Mannschaften liess sich nicht antippen")
-
-            antwort = seite.context.request.get(
-                aufstellung.ADRESSE_MANNSCHAFTEN.format(kennung=kennung), timeout=ZEIT_MS
-            )
-            if antwort.status != 200:
-                logger.warning(
-                    "Bericht %s: die Mannschaften kamen mit Status %s", kennung, antwort.status
-                )
-                return []
-            mannschaften = aufstellung.json_lesen(antwort.body())
+            seite.locator(".nav-tab").nth(1).click(timeout=10_000)
+            seite.wait_for_timeout(1500)
         except Exception:
-            logger.exception("Bericht %s: die Mannschaften liessen sich nicht holen", kennung)
+            logger.info("Der Reiter Mannschaften liess sich nicht antippen")
+
+        roh = self._holen(seite, aufstellung.ADRESSE_MANNSCHAFTEN.format(kennung=kennung))
+        if roh is None:
+            logger.warning("Bericht %s: die Mannschaften kamen nicht", kennung)
             return []
+        mannschaften = aufstellung.json_lesen(roh)
 
         gefunden: list[dict[str, Any]] = []
         for mannschaft in mannschaften:
             nummer = mannschaft.get("id")
             if not nummer:
                 continue
-            try:
-                antwort = seite.context.request.get(
-                    aufstellung.ADRESSE_AUFSTELLUNG.format(mannschaft=nummer), timeout=ZEIT_MS
-                )
-                if antwort.status != 200:
-                    logger.warning(
-                        "Aufstellung %s: Status %s -- diese Mannschaft bleibt leer",
-                        nummer,
-                        antwort.status,
-                    )
-                    continue
-                eintrag = aufstellung.mannschaft_aus_api(
-                    mannschaft, aufstellung.json_lesen(antwort.body())
-                )
-            except Exception:
-                logger.exception("Aufstellung %s liess sich nicht holen", nummer)
+            roh = self._holen(seite, aufstellung.ADRESSE_AUFSTELLUNG.format(mannschaft=nummer))
+            if roh is None:
+                logger.warning("Aufstellung %s kam nicht -- diese Mannschaft bleibt leer", nummer)
                 continue
+            eintrag = aufstellung.mannschaft_aus_api(mannschaft, aufstellung.json_lesen(roh))
             if eintrag is not None:
                 gefunden.append(eintrag)
         return gefunden
+
+    def _holen(self, seite: Any, adresse: str, versuche: int = 3) -> bytes | None:
+        """Die Schnittstelle fragen -- und es noch einmal versuchen.
+
+        Beim Lauf vom 20.09.2026 riss genau eine Verbindung ab
+        (`ECONNRESET`). Ergebnis: ein Kader fehlte, fuenf Karten fanden ihren
+        Spieler nicht, und die Regel meldete fuenfmal "Karte laesst sich
+        niemandem zuordnen". Ein Schluckauf im Netz darf nicht so aussehen wie
+        ein Spielbericht ohne Aufstellung.
+
+        Drei Versuche, dazwischen kurz warten. Danach `None` -- und der
+        Aufrufer sagt es.
+        """
+        for versuch in range(1, versuche + 1):
+            try:
+                antwort = seite.context.request.get(adresse, timeout=ZEIT_MS)
+                if antwort.status == 200:
+                    return bytes(antwort.body())
+                logger.warning("%s antwortete mit %s", adresse[-40:], antwort.status)
+            except Exception:
+                logger.warning(
+                    "%s liess sich nicht holen (Versuch %d von %d)",
+                    adresse[-40:],
+                    versuch,
+                    versuche,
+                    exc_info=versuch == versuche,
+                )
+            if versuch < versuche:
+                seite.wait_for_timeout(1000 * versuch)
+        return None
 
     def mannschaften(self, staffel: Staffelkennung, verband: str = "") -> list[dict[str, object]]:
         """Die Meldung einer Staffel: Meisterschaft, Staffel, Reiter, Tabelle.

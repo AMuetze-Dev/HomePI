@@ -152,6 +152,11 @@ class Prueflauf:
             auskunft=auskunft,
             abgeschaltet=abgeschaltet,
         )
+        if not regeln.aufstellung_bekannt(bericht.home_squad):
+            # Ohne Kader schweigen Spielrecht, Spielerfoto und Ordnungsdienst.
+            # Ein Spiel, das nur deshalb sauber aussieht, ist die
+            # gefährlichste Zeile in der Warteschlange.
+            befunde += regeln.ohne_aufstellung()
         return befunde, regeln.karten_aus(bericht), bericht.meta.competition
 
     def _anmelden(self, kennung: str) -> None:

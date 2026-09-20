@@ -86,6 +86,7 @@ _TITEL = {
     "release_late": "Freigabe des Schiedsrichters zu spät",
     "rule_error": "Eine Regel ist gescheitert",
     "bericht_ungelesen": "Spielbericht nicht gelesen",
+    "aufstellung_fehlt": "Aufstellung nicht geholt",
 }
 
 
@@ -210,6 +211,7 @@ def saisonbeginn(match_date: str) -> _dt.date | None:
 #: Vorkommnis wird gelesen und entschieden, eine verspaetete
 #: Schiedsrichterfreigabe geht den Verein nichts an.
 _WEG = {
+    "aufstellung_fehlt": "kein",
     "bericht_ungelesen": "kein",
     "confirmation_comment": "kein",
     "confirmation_late": "mahnung",
@@ -231,6 +233,7 @@ _WEG = {
 #: und eine fehlende Bestaetigung ist vor der Frist eine Warnung und danach
 #: kritisch.
 _SCHWERE_IM_KATALOG = {
+    "aufstellung_fehlt": "warnung",
     "bericht_ungelesen": "warnung",
     "confirmation_comment": "warnung",
     "confirmation_late": "kritisch",
@@ -281,6 +284,28 @@ def befunde_aus(report: MatchReport, abgeschaltet: Collection[str] = ()) -> list
     """
     aus = set(abgeschaltet)
     return [als_befund(v) for v in pruefe(report) if v.rule not in aus]
+
+
+def ohne_aufstellung() -> list[dict[str, object]]:
+    """Der Bericht ist da, die Aufstellung nicht.
+
+    Dann schweigen alle Regeln, die etwas wert sind: Spielrecht, Spielerfoto,
+    Ordnungsdienst, Altersklasse. Ein Spiel, das nur deshalb sauber aussieht,
+    ist die gefaehrlichste Zeile in der Warteschlange.
+    """
+    return [
+        {
+            "regel": "aufstellung_fehlt",
+            "schwere": "warnung",
+            "titel": titel_zu("aufstellung_fehlt"),
+            "text": (
+                "Die Aufstellung liess sich nicht holen. Spielrecht, Spielerfoto und "
+                "Ordnungsdienst wurden für dieses Spiel nicht geprüft."
+            ),
+            "person": "",
+            "mannschaft": "",
+        }
+    ]
 
 
 def nicht_gelesen(grund: str) -> list[dict[str, object]]:

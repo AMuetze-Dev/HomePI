@@ -764,6 +764,46 @@ class TestBefundeImLauf:
         assert "confirmation_missing" in gefunden
         assert "spielfuehrer_fehlt" in gefunden
 
+    def test_ohne_aufstellung_wird_die_luecke_gemeldet(self) -> None:
+        """Ein Spiel, das nur deshalb sauber aussieht, weil der Kader fehlte,
+        ist die gefährlichste Zeile in der Warteschlange."""
+        bericht = MatchReport(
+            meta=MatchMeta(
+                match_id="M-1",
+                home_team="SG Gittersee",
+                away_team="SV Fortschritt",
+                match_date=(HEUTE - dt.timedelta(days=1)).strftime("%d.%m.%Y"),
+            )
+        )
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+        leser = DemoLeser({"Stadtliga C": [zeile("M-1")]}, berichte_je_spiel={"M-1": bericht})
+
+        lauf(gateway, leser).runde()
+
+        _, spiele = gateway.importe[0]
+        assert "aufstellung_fehlt" in {b["regel"] for b in spiele[0]["befunde"]}
+
+    def test_mit_aufstellung_nicht(self) -> None:
+        bericht = MatchReport(
+            meta=MatchMeta(
+                match_id="M-1",
+                home_team="SG Gittersee",
+                away_team="SV Fortschritt",
+                match_date=(HEUTE - dt.timedelta(days=1)).strftime("%d.%m.%Y"),
+            ),
+            home_squad=TeamSquad(
+                team_name="SG Gittersee",
+                starting_eleven=[Player(name="Müller, Max", pass_number="P1")],
+            ),
+        )
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+        leser = DemoLeser({"Stadtliga C": [zeile("M-1")]}, berichte_je_spiel={"M-1": bericht})
+
+        lauf(gateway, leser).runde()
+
+        _, spiele = gateway.importe[0]
+        assert "aufstellung_fehlt" not in {b["regel"] for b in spiele[0]["befunde"]}
+
     def test_ein_spiel_das_noch_laeuft_ist_keine_warnung(self) -> None:
         """Am Spieltag stehen die Spiele des Nachmittags schon in der Liste,
         ihr Bericht aber noch nicht. Eine Warnung je angesetztem Spiel waere
@@ -807,5 +847,11 @@ class TestBefundeImLauf:
         _, spiele = gateway.importe[0]
         regelnamen = [b["regel"] for b in spiele[0]["befunde"]]
         # Keine Bestaetigung im Bericht, also meldet die Regel sie an -- und
-        # "bericht_ungelesen" steht gerade nicht dabei.
-        assert regelnamen == ["confirmation_missing", "confirmation_missing"]
+        # "bericht_ungelesen" steht gerade nicht dabei. Die fehlende
+        # Aufstellung wird eigens gemeldet: ohne sie schweigen die Regeln, die
+        # etwas wert sind.
+        assert regelnamen == [
+            "confirmation_missing",
+            "confirmation_missing",
+            "aufstellung_fehlt",
+        ]
