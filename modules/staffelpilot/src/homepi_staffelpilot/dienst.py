@@ -280,13 +280,19 @@ class Einstellungen:
     #: trotzdem und faellt auf das unsichtbare Fenster zurueck, mit einer
     #: Zeile im Protokoll.
     browser_sichtbar: bool = False
+    #: Der Satz unter jeder Mahnung, wenn ein eigener gewuenscht ist.
+    #:
+    #: Leer heisst: der mitgelieferte aus `vordrucke/texte.yaml`. Leer und
+    #: nicht eine Kopie davon -- sonst haelt die erste Installation den
+    #: damaligen Wortlaut fest, und eine spaetere Korrektur kaeme nie an.
+    folgesatz: str = ""
 
 
 #: Die Zahlen mit ihren Grenzen. Unten schaerfer als noetig: ein
 #: Pruefzeitraum von null Tagen liefert stumm eine leere Liste, und man sucht
 #: den Fehler dann im Prueflauf statt in den Einstellungen.
 _ZAHLEN = {"pruefzeitraum_tage": (1, 365), "frist_tage": (1, 90)}
-_TEXTE = ("staffelleiter", "verband", "absender")
+_TEXTE = ("staffelleiter", "verband", "absender", "folgesatz")
 _WAHRHEITEN = ("uebertragung_pausiert", "browser_sichtbar")
 
 #: Was als "ja" gilt. Geschrieben wird immer "true"; gelesen wird grosszuegig,
@@ -474,6 +480,9 @@ class Anlass:
     #: Was in die Platzhalter des Satzes geht. Was hier fehlt, laesst den
     #: Satzteil verschwinden, statt eine Luecke zu hinterlassen.
     einzelheiten: Mapping[str, str] = field(default_factory=dict)
+    #: Die Saetze aus der Regeluebersicht, falls dort welche stehen. Ohne sie
+    #: gelten die mitgelieferten.
+    vorlage: texte.Vorlage | None = None
 
 
 def _tag(datum: date) -> str:
@@ -523,6 +532,7 @@ def vorgang_entwurf(
             "gast": anlass.gast,
             "datum": _tag(anlass.spieldatum),
         },
+        anlass.vorlage,
     )
     # Kennt die Vorlage die Regel nicht, bleibt es beim Text des Befundes. Der
     # sagt, was war -- nur eben so, wie die Pruefung es formuliert, und nicht,
@@ -538,7 +548,7 @@ def vorgang_entwurf(
         betreff = f"Mahnung {partie} am {_tag(anlass.spieldatum)}"
         # Der Satz, der eine Mahnung zur Mahnung macht. Ohne ihn waere sie
         # eine Notiz, und ein spaeterer Sportgerichtsantrag beruft sich auf ihn.
-        folge = texte.folgesatz()
+        folge = texte.folgesatz(einstellungen.folgesatz)
         text = (
             "Sehr geehrte Damen und Herren,\n\n"
             "bei der Prüfung des Spielberichts wurde Folgendes festgestellt:\n\n"

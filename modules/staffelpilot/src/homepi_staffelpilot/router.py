@@ -17,9 +17,10 @@ from fastapi import APIRouter, Query, Response, status
 from homepi_core.auth import Rolle, erfordert
 from homepi_core.deps import DbSitzung
 
-from . import mahnung, speicher
+from . import mahnung, speicher, texte
 from .dienst import (
     BefundSicht,
+    Einstellungen,
     NochOffeneBefunde,
     SpielSicht,
     auswerten,
@@ -34,7 +35,7 @@ from .dienst import (
     sortiert,
     zusammenfassen,
 )
-from .modelle import Befund, Mannschaft, Regel, Spielbericht, Staffel, Vorgang
+from .modelle import Befund, Mannschaft, Regel, Regeltext, Spielbericht, Staffel, Vorgang
 from .schemas import (
     Abschluss,
     AuftragAnfordern,
@@ -55,9 +56,9 @@ from .schemas import (
     MannschaftenSetzen,
     Pause,
     Posten,
+    RegelAendern,
     RegelAusgabe,
     RegelkatalogSetzen,
-    RegelUmschalten,
     SpielAusgabe,
     SpielZeile,
     StaffelAendern,
@@ -404,10 +405,17 @@ async def karten(
     ]
 
 
+def _einstellungen(werte: Einstellungen) -> EinstellungenAusgabe:
+    """Die Einstellungen, und dazu der mitgelieferte Folgesatz.
+
+    Als Platzhalter und nicht als Inhalt -- siehe `_regel`.
+    """
+    return EinstellungenAusgabe(**asdict(werte), vorgabe_folgesatz=texte.folgesatz())
+
+
 @router.get("/einstellungen", summary="Einstellungen dieser Installation")
 async def einstellungen(sitzung: DbSitzung) -> EinstellungenAusgabe:
-    werte = await speicher.einstellungen(sitzung)
-    return EinstellungenAusgabe(**asdict(werte))
+    return _einstellungen(await speicher.einstellungen(sitzung))
 
 
 @router.put("/einstellungen", summary="Einstellungen ändern")
@@ -415,8 +423,7 @@ async def einstellungen_setzen(
     daten: EinstellungenSetzen, sitzung: DbSitzung
 ) -> EinstellungenAusgabe:
     """Nur die mitgeschickten Felder. Ausgelassene bleiben stehen."""
-    werte = await speicher.einstellungen_setzen(sitzung, daten)
-    return EinstellungenAusgabe(**asdict(werte))
+    return _einstellungen(await speicher.einstellungen_setzen(sitzung, daten))
 
 
 # ── Mannschaften einer Staffel ────────────────────────────────────────────
@@ -591,13 +598,29 @@ async def vorgang_anlegen(
 # ── Regelkatalog ──────────────────────────────────────────────────────────
 
 
-def _regel(r: Regel) -> RegelAusgabe:
-    return RegelAusgabe.model_validate(r)
+def _regel(r: Regel, eigener: Regeltext | None = None) -> RegelAusgabe:
+    """Der Katalogeintrag, und dazu, was ohne eigene Saetze gilt.
+
+    Die Vorgabe wird **mitgeschickt und nicht eingesetzt**: die Oberflaeche
+    zeigt sie als Platzhalter, und das leere Feld bleibt leer. Wuerde sie
+    hineingeschrieben, haette der erste Klick auf Speichern den heutigen
+    Wortlaut eingefroren -- samt Paragraf, samt spaeterer Korrektur.
+    """
+    vorgabe = texte.vorlage_fuer(r.schluessel)
+    return RegelAusgabe.model_validate(r).model_copy(
+        update={
+            "sachverhalt": eigener.sachverhalt if eigener else "",
+            "hinweis": eigener.hinweis if eigener else "",
+            "vorgabe_sachverhalt": vorgabe.sachverhalt,
+            "vorgabe_hinweis": vorgabe.hinweis,
+        }
+    )
 
 
 @router.get("/regeln", summary="Was geprüft wird")
 async def regeln(sitzung: DbSitzung) -> list[RegelAusgabe]:
-    return [_regel(r) for r in await speicher.regeln(sitzung)]
+    eigene = await speicher.regeltexte(sitzung)
+    return [_regel(r, eigene.get(r.schluessel)) for r in await speicher.regeln(sitzung)]
 
 
 @router.put("/regeln", summary="Den Regelkatalog einspielen")
@@ -609,20 +632,26 @@ async def regelkatalog_setzen(daten: RegelkatalogSetzen, sitzung: DbSitzung) -> 
     übrigen bleiben stehen: `aktiv` gehört dem Staffelleiter, nicht dem
     Katalog.
     """
-    return [_regel(r) for r in await speicher.regelkatalog_setzen(sitzung, daten.regeln)]
+    katalog = await speicher.regelkatalog_setzen(sitzung, daten.regeln)
+    eigene = await speicher.regeltexte(sitzung)
+    return [_regel(r, eigene.get(r.schluessel)) for r in katalog]
 
 
-@router.patch("/regeln/{regel_id}", summary="Eine Regel an- oder abschalten")
-async def regel_umschalten(
-    regel_id: uuid.UUID, daten: RegelUmschalten, sitzung: DbSitzung
+@router.patch("/regeln/{regel_id}", summary="Eine Regel umschalten oder umformulieren")
+async def regel_aendern(
+    regel_id: uuid.UUID, daten: RegelAendern, sitzung: DbSitzung
 ) -> RegelAusgabe:
-    """Die eine Entscheidung, die dem Staffelleiter gehört.
+    """Was an einer Regel dem Staffelleiter gehört: der Schalter und die Sätze.
 
     Geprüft wird trotzdem im Prüfdienst -- der liest hier nach, was er melden
     soll. Dass eine abgeschaltete Regel keine Befunde mehr erzeugt, passiert
     dort und nicht hier.
+
+    Die Sätze dagegen wirken hier: sie stehen im nächsten Schreiben, das aus
+    einem Befund dieser Regel entsteht. **Schon abgeschickte Schreiben ändern
+    sich nicht** -- ihr Text liegt am Vorgang und nicht an dieser Zeile.
     """
-    return _regel(await speicher.regel_umschalten(sitzung, regel_id, daten.aktiv))
+    return _regel(*await speicher.regel_aendern(sitzung, regel_id, daten))
 
 
 # ── Aufträge: Prüflauf und Initialisierung ────────────────────────────────

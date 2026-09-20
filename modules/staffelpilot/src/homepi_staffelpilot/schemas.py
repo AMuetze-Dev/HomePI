@@ -337,6 +337,9 @@ class EinstellungenAusgabe(BaseModel):
     frist_tage: int
     uebertragung_pausiert: bool
     browser_sichtbar: bool
+    folgesatz: str
+    #: Was ohne eigenen gilt. Die Oberflaeche zeigt es als Platzhalter.
+    vorgabe_folgesatz: str = ""
 
 
 class EinstellungenSetzen(BaseModel):
@@ -355,8 +358,10 @@ class EinstellungenSetzen(BaseModel):
     uebertragung_pausiert: bool | None = None
     #: Beim Pruefen zusehen. Siehe `dienst.Einstellungen.browser_sichtbar`.
     browser_sichtbar: bool | None = None
+    #: Der Satz unter jeder Mahnung. Leer heisst: der mitgelieferte.
+    folgesatz: Annotated[str, Field(max_length=2000)] | None = None
 
-    @field_validator("staffelleiter", "verband", "absender", mode="before")
+    @field_validator("staffelleiter", "verband", "absender", "folgesatz", mode="before")
     @classmethod
     def _trimmen(cls, wert: object) -> object:
         return _getrimmt(wert)
@@ -527,10 +532,25 @@ class RegelAusgabe(BaseModel):
     schwere: Schwere
     weg: Weg
     aktiv: bool
+    #: Die Saetze fuer das Schreiben. Leer heisst: die mitgelieferten.
+    sachverhalt: str = ""
+    hinweis: str = ""
+    #: Was dann gilt. Die Oberflaeche zeigt es als Platzhalter an, damit
+    #: sichtbar ist, was ein leeres Feld bedeutet.
+    vorgabe_sachverhalt: str = ""
+    vorgabe_hinweis: str = ""
 
 
-class RegelUmschalten(BaseModel):
-    aktiv: bool
+class RegelAendern(BaseModel):
+    """Was am Katalogeintrag dem Staffelleiter gehoert.
+
+    Alles einzeln und alles freiwillig: ein Umschalten soll die Saetze nicht
+    mitschreiben, und ein Satz nicht den Schalter.
+    """
+
+    aktiv: bool | None = None
+    sachverhalt: Annotated[str, Field(max_length=2000)] | None = None
+    hinweis: Annotated[str, Field(max_length=2000)] | None = None
 
 
 class MailEntwurf(BaseModel):

@@ -59,6 +59,12 @@ export interface Regel {
   schwere: Schwere;
   weg: Weg;
   aktiv: boolean;
+  /** Eigener Satz fuers Schreiben. Leer heisst: der mitgelieferte gilt. */
+  sachverhalt: string;
+  hinweis: string;
+  /** Der mitgelieferte. Steht im Feld als Platzhalter, nicht als Inhalt. */
+  vorgabe_sachverhalt: string;
+  vorgabe_hinweis: string;
 }
 
 // `faellig` faellt weg: der einzelne Bericht wird geoeffnet, weil jemand ihn
@@ -92,6 +98,10 @@ export interface Einstellungen {
   uebertragung_pausiert: boolean;
   /** Ob der Prüfdienst sein Browserfenster zeigt. Frisch: aus. */
   browser_sichtbar: boolean;
+  /** Der Satz unter jeder Mahnung. Leer heisst: der mitgelieferte gilt. */
+  folgesatz: string;
+  /** Der mitgelieferte. Platzhalter, nicht Inhalt. */
+  vorgabe_folgesatz: string;
 }
 
 /** Eine Zeile der Auswertung. */
@@ -432,6 +442,19 @@ export function ladeRegeln(signal?: AbortSignal): Promise<Regel[]> {
 /** Der Schalter gehört dem Staffelleiter; geprüft wird trotzdem im Prüfdienst. */
 export function schalteRegel(id: string, aktiv: boolean): Promise<Regel> {
   return anfrage<Regel>(`/regeln/${id}`, mitKoerper("PATCH", { aktiv }));
+}
+
+/**
+ * Die Sätze, die später im Schreiben stehen.
+ *
+ * Leer heisst: der mitgelieferte Satz gilt — und eine spätere Korrektur am
+ * Paragrafen kommt an. Deshalb wird die Vorgabe nie ins Feld geschrieben.
+ */
+export function formuliereRegel(
+  id: string,
+  saetze: { sachverhalt?: string; hinweis?: string },
+): Promise<Regel> {
+  return anfrage<Regel>(`/regeln/${id}`, mitKoerper("PATCH", saetze));
 }
 
 // ── Eine Staffel ändern ──────────────────────────────────────────────────

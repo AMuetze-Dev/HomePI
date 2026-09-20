@@ -266,6 +266,9 @@ class Regel(Base, ZeitstempelMixin):
     nicht. Was es haelt, ist die eine Entscheidung, die dem Staffelleiter
     gehoert -- `aktiv`. Ein erneutes Einspielen des Katalogs laesst sie
     stehen, sonst waere jedes Abschalten bis zum naechsten Start haltbar.
+
+    Die Saetze fuer das Schreiben stehen in `Regeltext` und nicht hier: sie
+    duerfen nicht mit einer Regel verschwinden.
     """
 
     __tablename__ = "staffelpilot_regeln"
@@ -278,6 +281,31 @@ class Regel(Base, ZeitstempelMixin):
     schwere: Mapped[str] = mapped_column(String(20), nullable=False, default="hinweis")
     weg: Mapped[str] = mapped_column(String(20), nullable=False, default="kein")
     aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class Regeltext(Base, ZeitstempelMixin):
+    """Die Saetze, die aus einem Befund ein Schreiben machen.
+
+    **Eine eigene Tabelle und keine Spalten an `Regel`.** Der Katalog wird als
+    Ganzes eingespielt: was der Prueflauf nicht meldet, verschwindet. Ein Lauf
+    mit einer halben Regelliste -- eine eigene Regeldatei mit einem
+    Tippfehler genuegt -- loeschte damit Saetze, an denen jemand eine
+    Viertelstunde gesessen hat. Diese Zeilen stehen daneben und ueberleben
+    das.
+
+    Leer heisst immer: der mitgelieferte Satz aus `vordrucke/texte.yaml` gilt.
+    Eine Kopie der Vorgabe waere schlimmer als nichts -- sie hielte den
+    heutigen Wortlaut fest, samt Paragraf, und eine spaetere Korrektur kaeme
+    nie an.
+    """
+
+    __tablename__ = "staffelpilot_regeltexte"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    #: Die technische Kennung der Regel, wie sie am Befund steht.
+    schluessel: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    sachverhalt: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    hinweis: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
 
 class Auftrag(Base, ZeitstempelMixin):

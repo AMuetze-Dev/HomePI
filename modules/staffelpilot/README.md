@@ -220,6 +220,22 @@ statt als "erst am " mit einer Luecke dahinter stehen zu bleiben. Kennt die
 Datei eine Regel nicht, bleibt es beim Text des Prueflaufs -- der sagt, was
 war, nur in der Sprache der Pruefung statt in der des Verbandes.
 
+Aendern laesst sich das in der Regeluebersicht: je Regel ein Sachverhalt und
+ein Hinweis, dazu der Folgesatz in den Einstellungen. **Leer heisst dabei: der
+mitgelieferte Satz gilt.** Die Vorgabe steht im Feld als Platzhalter und wird
+nicht hineingeschrieben -- sonst hielte der erste Klick auf Speichern den
+heutigen Wortlaut fest, samt Paragraf, und eine spaetere Korrektur kaeme nie
+an.
+
+Die eigenen Saetze stehen in `staffelpilot_regeltexte` und nicht an der Regel:
+der Katalog wird als Ganzes eingespielt, und was der Prueflauf einmal nicht
+meldet, verschwindet. Eine eigene Regeldatei mit einem Tippfehler genuegt --
+und mit der Regel waeren die Saetze weg, an denen jemand eine Viertelstunde
+gesessen hat.
+
+Ein schon erstellter Entwurf aendert sich nicht mehr, wenn die Saetze spaeter
+geaendert werden: sein Text liegt am Vorgang.
+
 `GET /vorgaenge/{id}/mail` gibt Betreff, Text und die Adresse des Formulars --
 alles, was in ein Mailfenster gehoert. **Abgeschickt wird hier nichts**, und
 es gibt auch keinen Weg dorthin: der Empfaenger ist ein Vorschlag, und

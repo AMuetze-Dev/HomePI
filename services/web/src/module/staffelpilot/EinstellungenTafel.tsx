@@ -129,6 +129,22 @@ export function EinstellungenTafel() {
           </span>
         </label>
 
+        <label className={stil.textfeldEtikett}>
+          Folgesatz unter jeder Mahnung
+          <textarea
+            className={stil.satzfeld}
+            rows={3}
+            value={werte.folgesatz}
+            placeholder={werte.vorgabe_folgesatz}
+            onChange={(e) => aendern("folgesatz", e.target.value)}
+          />
+        </label>
+        <p className={stil.vorgangHinweis}>
+          Er macht aus der Mahnung eine Mahnung — ein späterer Antrag ans
+          Sportgericht beruft sich auf ihn. Leer lassen heißt: der
+          mitgelieferte Satz gilt, und eine spätere Korrektur daran kommt an.
+        </p>
+
         {fehler && (
           <Hinweis ton="fehler" dringend>
             {fehler}

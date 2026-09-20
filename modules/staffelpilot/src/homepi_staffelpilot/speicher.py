@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from . import dienst
+from . import dienst, texte
 from .dienst import (
     AuftragUnbekannt,
     BefundUnbekannt,
@@ -31,6 +31,7 @@ from .modelle import (
     Karte,
     Mannschaft,
     Regel,
+    Regeltext,
     Spielbericht,
     Staffel,
     Uebertragung,
@@ -43,6 +44,7 @@ from .schemas import (
     Fortschritt,
     ImportAuftrag,
     MannschaftEingang,
+    RegelAendern,
     RegelEingang,
     StaffelAendern,
     StaffelAnlegen,
@@ -497,6 +499,8 @@ async def vorgang_anlegen(
     bericht = await spiel(sitzung, gefunden.spiel_id)
     staffel_dazu = await staffel(sitzung, bericht.staffel_id)
     werte = await einstellungen(sitzung)
+    # Die Saetze koennen in der Regeluebersicht ueberschrieben sein.
+    eigener = await regeltext_zu(sitzung, gefunden.regel)
 
     anlass = dienst.Anlass(
         staffel=staffel_dazu.name,
@@ -512,6 +516,9 @@ async def vorgang_anlegen(
         grund=daten.grund or gefunden.titel,
         regel=gefunden.regel,
         einzelheiten=gefunden.einzelheiten or {},
+        vorlage=texte.eigene(gefunden.regel, eigener.sachverhalt, eigener.hinweis)
+        if eigener is not None
+        else None,
     )
     schreiben = dienst.vorgang_entwurf(art, anlass, werte, dt.date.today())
 
@@ -597,6 +604,10 @@ async def regelkatalog_setzen(sitzung: AsyncSession, eingang: list[RegelEingang]
 
     `aktiv` gehoert dem Staffelleiter. Wer den Katalog neu einspielt, meldet
     was es gibt -- nicht, was jemand davon sehen will.
+
+    Die Saetze fuer das Schreiben stehen in einer eigenen Tabelle und bleiben
+    hier unberuehrt: sie sollen eine Regel ueberleben, die ein Lauf einmal
+    nicht gemeldet hat.
     """
     vorher = {r.schluessel: r.aktiv for r in await regeln(sitzung)}
     gemeldet = {r.schluessel for r in eingang}
@@ -615,11 +626,48 @@ async def regelkatalog_setzen(sitzung: AsyncSession, eingang: list[RegelEingang]
     return await regeln(sitzung)
 
 
-async def regel_umschalten(sitzung: AsyncSession, regel_id: uuid.UUID, aktiv: bool) -> Regel:
+async def regel_aendern(
+    sitzung: AsyncSession, regel_id: uuid.UUID, daten: RegelAendern
+) -> tuple[Regel, Regeltext | None]:
+    """Schalter und Saetze -- jedes fuer sich.
+
+    Was nicht mitgeschickt wurde, bleibt, wie es war. Sonst loeschte ein
+    Umschalten die Saetze, die jemand vorher geschrieben hat.
+    """
     gefunden = await regel(sitzung, regel_id)
-    gefunden.aktiv = aktiv
+    if daten.aktiv is not None:
+        gefunden.aktiv = daten.aktiv
+
+    text = await regeltext_zu(sitzung, gefunden.schluessel)
+    if daten.sachverhalt is not None or daten.hinweis is not None:
+        if text is None:
+            text = Regeltext(schluessel=gefunden.schluessel)
+            sitzung.add(text)
+        if daten.sachverhalt is not None:
+            text.sachverhalt = daten.sachverhalt.strip()
+        if daten.hinweis is not None:
+            text.hinweis = daten.hinweis.strip()
     await sitzung.flush()
-    return gefunden
+    return gefunden, text
+
+
+async def regeltext_zu(sitzung: AsyncSession, schluessel: str) -> Regeltext | None:
+    """Die eigenen Saetze zu einer Regel -- oder keine.
+
+    Keine ist der Normalfall: dann gelten die mitgelieferten.
+    """
+    ergebnis = await sitzung.execute(select(Regeltext).where(Regeltext.schluessel == schluessel))
+    return ergebnis.scalars().first()
+
+
+async def regeltexte(sitzung: AsyncSession) -> dict[str, Regeltext]:
+    """Alle eigenen Saetze auf einmal.
+
+    Fuer die Liste: vierzig Regeln einzeln nachzuschlagen waeren vierzig
+    Abfragen, und das faellt erst auf dem Pi auf.
+    """
+    ergebnis = await sitzung.execute(select(Regeltext))
+    return {t.schluessel: t for t in ergebnis.scalars()}
 
 
 # ── Alle Befunde auf einmal ───────────────────────────────────────────────

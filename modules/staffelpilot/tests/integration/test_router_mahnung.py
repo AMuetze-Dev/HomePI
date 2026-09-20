@@ -201,9 +201,86 @@ class TestDerSatzZumVergehen:
         assert "erst am" not in entwurf["text"]
         assert "nach Ablauf der Frist bestätigt" in entwurf["text"]
 
-    async def test_eine_regel_ohne_vorlage_behaelt_den_befundtext(self, client: AsyncClient) -> None:
+    async def test_eine_regel_ohne_vorlage_behaelt_den_befundtext(
+        self, client: AsyncClient
+    ) -> None:
         vorgang_id, _ = await vorgang_mit_befund(client, regel="dfbnet_warning")
 
         entwurf = (await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mail")).json()
 
         assert "Die Heimmannschaft hat nicht bestätigt." in entwurf["text"]
+
+
+class TestEigeneSaetze:
+    """Was in der Regeluebersicht steht, steht im naechsten Schreiben."""
+
+    async def _katalog(self, client: AsyncClient, schluessel: str) -> str:
+        katalog = (
+            await client.put(
+                "/staffelpilot/regeln",
+                json={
+                    "regeln": [
+                        {
+                            "schluessel": schluessel,
+                            "name": "Bestaetigung zu spaet",
+                            "schwere": "kritisch",
+                            "weg": "mahnung",
+                        }
+                    ]
+                },
+            )
+        ).json()
+        return str(katalog[0]["id"])
+
+    async def test_der_eigene_satz_steht_im_entwurf(self, client: AsyncClient) -> None:
+        regel_id = await self._katalog(client, "confirmation_late")
+        await client.patch(
+            f"/staffelpilot/regeln/{regel_id}",
+            json={"sachverhalt": "hat {verein} verschlafen[, naemlich bis {signed_at}]."},
+        )
+
+        vorgang_id, _ = await vorgang_mit_befund(
+            client, regel="confirmation_late", einzelheiten={"signed_at": "22:35"}
+        )
+        entwurf = (await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mail")).json()
+
+        assert "hat SV Loschwitz verschlafen, naemlich bis 22:35." in entwurf["text"]
+
+    async def test_nur_der_sachverhalt_geaendert_laesst_den_paragrafen_stehen(
+        self, client: AsyncClient
+    ) -> None:
+        """Feld fuer Feld und nicht als Ganzes -- sonst verliert man den
+        Paragrafen, weil man einen Satz umformuliert hat."""
+        regel_id = await self._katalog(client, "order_manager_missing")
+        await client.patch(
+            f"/staffelpilot/regeln/{regel_id}", json={"sachverhalt": "fehlte der Ordnungsdienst."}
+        )
+
+        vorgang_id, _ = await vorgang_mit_befund(client, regel="order_manager_missing")
+        entwurf = (await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mail")).json()
+
+        assert "fehlte der Ordnungsdienst." in entwurf["text"]
+        assert "\u00a7 53" in entwurf["text"]
+
+    async def test_ein_eigener_folgesatz_gilt(self, client: AsyncClient) -> None:
+        await client.put("/staffelpilot/einstellungen", json={"folgesatz": "Beim naechsten Mal."})
+
+        vorgang_id, _ = await vorgang_mit_befund(client, regel="order_manager_missing")
+        entwurf = (await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mail")).json()
+
+        assert "Beim naechsten Mal." in entwurf["text"]
+        assert "Erfolgt nach dieser schriftlichen Ermahnung" not in entwurf["text"]
+
+    async def test_ein_spaeter_geaenderter_satz_aendert_den_entwurf_nicht(
+        self, client: AsyncClient
+    ) -> None:
+        """Ein Schreiben, das jemand schon gelesen hat, aendert sich nicht
+        hinter seinem Ruecken."""
+        regel_id = await self._katalog(client, "order_manager_missing")
+        vorgang_id, _ = await vorgang_mit_befund(client, regel="order_manager_missing")
+        vorher = (await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mail")).json()["text"]
+
+        await client.patch(f"/staffelpilot/regeln/{regel_id}", json={"sachverhalt": "ganz anders."})
+        nachher = (await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mail")).json()["text"]
+
+        assert nachher == vorher

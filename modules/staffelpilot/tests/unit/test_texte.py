@@ -93,6 +93,38 @@ def test_der_folgesatz_macht_die_mahnung_zur_mahnung() -> None:
     assert "Sportgericht" in texte.folgesatz()
 
 
+def test_ein_eigener_folgesatz_geht_vor() -> None:
+    assert texte.folgesatz("Beim nächsten Mal.") == "Beim nächsten Mal."
+
+
+# ── Eigene Sätze ────────────────────────────────────────────
+
+
+def test_ein_eigener_satz_ersetzt_nur_sich_selbst() -> None:
+    """Wer den Sachverhalt umformuliert, soll den Paragrafen behalten."""
+    eigene = texte.eigene("order_manager_missing", "fehlte der Ordnungsdienst.", "")
+
+    assert eigene.sachverhalt == "fehlte der Ordnungsdienst."
+    assert "§ 53" in eigene.hinweis
+
+
+def test_ohne_eigene_saetze_gelten_die_mitgelieferten() -> None:
+    assert texte.eigene("order_manager_missing", "", "") == texte.vorlage_fuer(
+        "order_manager_missing"
+    )
+
+
+def test_eine_uebergebene_vorlage_schlaegt_die_datei() -> None:
+    bausteine = texte.bausteine_fuer(
+        "order_manager_missing",
+        {"verein": "SV Loschwitz"},
+        texte.Vorlage(sachverhalt="fehlte bei {verein} der Ordnungsdienst."),
+    )
+
+    assert bausteine.sachverhalt == "fehlte bei SV Loschwitz der Ordnungsdienst."
+    assert bausteine.hinweis == ""
+
+
 # ── Wenn die Datei fehlt oder kaputt ist ────────────────────────────────
 
 

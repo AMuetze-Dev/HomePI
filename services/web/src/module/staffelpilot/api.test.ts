@@ -44,6 +44,7 @@ const staffel: Staffel = {
   altersklasse: "maenner",
   spielklasse: "3.Kreisliga (C)",
   saison: "26/27",
+  spieltage: 0,
   aktiv: true,
 };
 

@@ -33,6 +33,23 @@ _PLATZHALTER = re.compile(r"\{(\w+)\}")
 
 
 @dataclass(frozen=True)
+class Vorlage:
+    """Die Saetze zu einer Regel, ungefuellt.
+
+    Getrennt von `Bausteine`, weil die beiden verschiedenen Leuten gehoeren:
+    eine Vorlage aendert der Staffelleiter, Bausteine entstehen daraus fuer ein
+    einzelnes Schreiben. Wer das verwechselt, speichert einen Satz mit dem
+    Namen eines Vereins darin.
+    """
+
+    sachverhalt: str = ""
+    hinweis: str = ""
+
+    def __bool__(self) -> bool:
+        return bool(self.sachverhalt or self.hinweis)
+
+
+@dataclass(frozen=True)
 class Bausteine:
     """Was zu einer Regel im Schreiben steht.
 
@@ -65,26 +82,56 @@ def _vorlagen() -> dict[str, object]:
     return geladen if isinstance(geladen, dict) else {}
 
 
-def folgesatz() -> str:
+def folgesatz(eigener: str = "") -> str:
     """Der Satz, der eine Mahnung zur Mahnung macht.
 
     Ohne ihn wäre sie eine Notiz; ein späterer Sportgerichtsantrag beruft sich
-    auf ihn.
+    auf ihn. Steht in den Einstellungen ein eigener, gilt der.
     """
-    return str(_vorlagen().get("folgesatz") or "").strip()
+    return eigener.strip() or str(_vorlagen().get("folgesatz") or "").strip()
 
 
-def bausteine_fuer(regel: str, werte: dict[str, str]) -> Bausteine:
-    """Sachverhalt und Hinweis zu einer Regel, mit eingesetzten Werten."""
+def vorlage_fuer(regel: str) -> Vorlage:
+    """Die mitgelieferten Saetze zu einer Regel.
+
+    Leer, wenn die Datei diese Regel nicht kennt -- dann bleibt es beim Text
+    des Befundes.
+    """
     regeln = _vorlagen().get("regeln")
     if not isinstance(regeln, dict):
-        return Bausteine()
+        return Vorlage()
     eintrag = regeln.get(regel)
     if not isinstance(eintrag, dict):
-        return Bausteine()
+        return Vorlage()
+    return Vorlage(
+        sachverhalt=str(eintrag.get("sachverhalt") or "").strip(),
+        hinweis=str(eintrag.get("hinweis") or "").strip(),
+    )
+
+
+def eigene(regel: str, sachverhalt: str, hinweis: str) -> Vorlage:
+    """Was der Staffelleiter geschrieben hat, sonst das Mitgelieferte.
+
+    Feld fuer Feld und nicht als Ganzes: wer nur den Sachverhalt umformuliert,
+    soll den Paragrafen im Hinweis behalten, statt ihn zu verlieren.
+    """
+    vorgabe = vorlage_fuer(regel)
+    return Vorlage(
+        sachverhalt=sachverhalt.strip() or vorgabe.sachverhalt,
+        hinweis=hinweis.strip() or vorgabe.hinweis,
+    )
+
+
+def bausteine_fuer(regel: str, werte: dict[str, str], vorlage: Vorlage | None = None) -> Bausteine:
+    """Sachverhalt und Hinweis zu einer Regel, mit eingesetzten Werten.
+
+    `vorlage` kommt aus der Regeluebersicht, wenn dort etwas steht. Ohne sie
+    gelten die mitgelieferten Saetze.
+    """
+    genommen = vorlage if vorlage is not None else vorlage_fuer(regel)
     return Bausteine(
-        sachverhalt=fuellen(str(eintrag.get("sachverhalt") or ""), werte),
-        hinweis=fuellen(str(eintrag.get("hinweis") or ""), werte),
+        sachverhalt=fuellen(genommen.sachverhalt, werte),
+        hinweis=fuellen(genommen.hinweis, werte),
     )
 
 

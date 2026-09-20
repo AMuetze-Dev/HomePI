@@ -14,6 +14,7 @@ function staffel(rest: Partial<api.Staffel> = {}): api.Staffel {
     altersklasse: "maenner",
     spielklasse: "3.Kreisliga (C)",
     saison: "26/27",
+  spieltage: 0,
     aktiv: true,
     ...rest,
   };
@@ -110,6 +111,9 @@ beforeEach(() => {
     pruefzeitraum_tage: 30,
     frist_tage: 14,
     uebertragung_pausiert: true,
+    browser_sichtbar: false,
+    folgesatz: "",
+    vorgabe_folgesatz: "",
   });
   vi.spyOn(api, "ladeVorgaenge").mockResolvedValue([]);
   vi.spyOn(api, "ladeMannschaften").mockResolvedValue([]);

@@ -15,6 +15,10 @@ function regel(rest: Partial<api.Regel> = {}): api.Regel {
     schwere: "kritisch",
     weg: "sportgericht",
     aktiv: true,
+    sachverhalt: "",
+    hinweis: "",
+    vorgabe_sachverhalt: "",
+    vorgabe_hinweis: "",
     ...rest,
   };
 }
@@ -95,5 +99,76 @@ describe("Regelkatalog", () => {
     render(<RegelnTafel />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("kein Zugriff");
+  });
+});
+
+describe("Die Sätze fürs Schreiben", () => {
+  const mitSatz = (rest: Partial<api.Regel> = {}) =>
+    regel({
+      weg: "mahnung",
+      vorgabe_sachverhalt: "wurde durch {verein} nicht bestätigt.",
+      vorgabe_hinweis: "Ich weise auf § 53 hin.",
+      ...rest,
+    });
+
+  it("bietet sie nur an, wo überhaupt ein Schreiben entsteht", async () => {
+    // Bei "kein" wäre es ein Feld, das nie irgendwo auftaucht.
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz({ weg: "kein" })]);
+    render(<RegelnTafel />);
+
+    await screen.findByText("Feldverweis auf Dauer");
+    expect(screen.queryByText("Text fürs Schreiben")).not.toBeInTheDocument();
+  });
+
+  it("zeigt den mitgelieferten Satz als Platzhalter und nicht als Inhalt", async () => {
+    // Wäre er Inhalt, hätte der erste Klick auf Speichern den heutigen
+    // Wortlaut eingefroren - samt Paragraf, samt späterer Korrektur.
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz()]);
+    render(<RegelnTafel />);
+
+    const feld = await screen.findByLabelText("Sachverhalt");
+    expect(feld).toHaveValue("");
+    expect(feld).toHaveAttribute("placeholder", "wurde durch {verein} nicht bestätigt.");
+  });
+
+  it("schickt beide Felder und übernimmt die Antwort", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz()]);
+    const speichern = vi
+      .spyOn(api, "formuliereRegel")
+      .mockResolvedValue(mitSatz({ sachverhalt: "war anders." }));
+    render(<RegelnTafel />);
+
+    await userEvent.type(await screen.findByLabelText("Sachverhalt"), "war anders.");
+    await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(speichern).toHaveBeenCalledWith("r1", {
+        sachverhalt: "war anders.",
+        hinweis: "",
+      }),
+    );
+    expect(await screen.findByText("eigener")).toBeInTheDocument();
+  });
+
+  it("behält die Eingabe, wenn das Speichern scheitert", async () => {
+    // Sonst ist die Formulierung weg und der Fehler bleibt unerklärt.
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz()]);
+    vi.spyOn(api, "formuliereRegel").mockRejectedValue(new ApiError("zu lang", 422));
+    render(<RegelnTafel />);
+
+    const feld = await screen.findByLabelText("Sachverhalt");
+    await userEvent.type(feld, "war anders.");
+    await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("zu lang");
+    expect(feld).toHaveValue("war anders.");
+  });
+
+  it("lässt nicht speichern, solange nichts geändert ist", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz()]);
+    render(<RegelnTafel />);
+
+    await screen.findByLabelText("Sachverhalt");
+    expect(screen.getByRole("button", { name: "Speichern" })).toBeDisabled();
   });
 });

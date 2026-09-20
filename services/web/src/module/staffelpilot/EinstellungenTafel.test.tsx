@@ -15,6 +15,8 @@ function werte(rest: Partial<api.Einstellungen> = {}): api.Einstellungen {
     frist_tage: 14,
     uebertragung_pausiert: true,
     browser_sichtbar: false,
+    folgesatz: "",
+    vorgabe_folgesatz: "Erfolgt ein weiterer Verstoss, so wird ein Antrag gestellt.",
     ...rest,
   };
 }
@@ -35,6 +37,19 @@ afterEach(() => {
 });
 
 describe("Einstellungen", () => {
+  it("zeigt den mitgelieferten Folgesatz als Platzhalter und nicht als Inhalt", async () => {
+    // Als Inhalt hätte das erste Speichern den heutigen Wortlaut eingefroren.
+    mitWerten();
+    render(<EinstellungenTafel />);
+
+    const feld = await screen.findByLabelText(/Folgesatz/);
+    expect(feld).toHaveValue("");
+    expect(feld).toHaveAttribute(
+      "placeholder",
+      "Erfolgt ein weiterer Verstoss, so wird ein Antrag gestellt.",
+    );
+  });
+
   it("zeigt, was gespeichert ist", async () => {
     mitWerten();
     render(<EinstellungenTafel />);

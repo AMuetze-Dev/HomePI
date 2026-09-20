@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { Etikett, Hinweis, Karte, Leerzustand, Platzhalter } from "../../ui";
-import { type Regel, ladeRegeln, schalteRegel } from "./api";
+import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import { type Regel, formuliereRegel, ladeRegeln, schalteRegel } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
 
 function meldung(fehler: unknown): string {
@@ -30,8 +30,9 @@ const WEG_WORT = {
  * Was der Prüfdienst prüft — und was davon hier ankommen soll.
  *
  * Der Katalog kommt von außen; dieses Artefakt kennt die Spielordnung nicht.
- * Was ihm gehört, ist der Schalter: eine abgeschaltete Regel meldet nichts
- * mehr. Geprüft wird das im Prüfdienst, der hier nachliest.
+ * Was ihm gehört, sind der Schalter und die beiden Sätze: eine abgeschaltete
+ * Regel meldet nichts mehr, und wo ein eigener Satz steht, steht er später im
+ * Schreiben an den Verein. Geprüft wird im Prüfdienst, der hier nachliest.
  */
 export function RegelnTafel() {
   const [regeln, setRegeln] = useState<Regel[] | null>(null);
@@ -47,11 +48,14 @@ export function RegelnTafel() {
     return () => controller.abort();
   }, []);
 
+  function ersetzen(danach: Regel) {
+    setRegeln((alt) => alt?.map((r) => (r.id === danach.id ? danach : r)) ?? alt);
+  }
+
   async function umschalten(regel: Regel) {
     setFehler("");
     try {
-      const danach = await schalteRegel(regel.id, !regel.aktiv);
-      setRegeln((alt) => alt?.map((r) => (r.id === danach.id ? danach : r)) ?? alt);
+      ersetzen(await schalteRegel(regel.id, !regel.aktiv));
     } catch (f) {
       setFehler(meldung(f));
     }
@@ -113,10 +117,116 @@ export function RegelnTafel() {
                   Abgeschaltet — der Prüfdienst meldet dazu nichts mehr.
                 </p>
               )}
+              {r.weg !== "kein" && <Saetze regel={r} onGespeichert={ersetzen} />}
             </Karte>
           </li>
         ))}
       </ul>
     </>
+  );
+}
+
+/**
+ * Die beiden Sätze, die aus einem Befund ein Schreiben machen.
+ *
+ * Nur bei Regeln, aus denen überhaupt eines entsteht — bei den übrigen wäre es
+ * ein Feld, das nie irgendwo auftaucht.
+ *
+ * **Leer heißt: der mitgelieferte Satz gilt.** Er steht als Platzhalter im
+ * Feld und wird nicht hineingeschrieben: sonst hielte der erste Klick auf
+ * Speichern den heutigen Wortlaut fest, samt Paragraf — und eine spätere
+ * Korrektur käme nie an.
+ */
+function Saetze({
+  regel,
+  onGespeichert,
+}: {
+  regel: Regel;
+  onGespeichert: (r: Regel) => void;
+}) {
+  const [sachverhalt, setSachverhalt] = useState(regel.sachverhalt);
+  const [hinweis, setHinweis] = useState(regel.hinweis);
+  const [laeuft, setLaeuft] = useState(false);
+  const [fehler, setFehler] = useState("");
+
+  const geaendert = sachverhalt !== regel.sachverhalt || hinweis !== regel.hinweis;
+
+  async function speichern() {
+    setLaeuft(true);
+    setFehler("");
+    try {
+      onGespeichert(await formuliereRegel(regel.id, { sachverhalt, hinweis }));
+    } catch (f) {
+      setFehler(f instanceof Error ? f.message : "Unbekannter Fehler");
+    } finally {
+      setLaeuft(false);
+    }
+  }
+
+  return (
+    <details className={stil.saetze}>
+      <summary className={stil.saetzeKopf}>
+        Text fürs Schreiben
+        {(regel.sachverhalt || regel.hinweis) && <Etikett>eigener</Etikett>}
+      </summary>
+
+      <p className={stil.vorgangHinweis}>
+        Der Sachverhalt folgt auf „Im Spiel … am … ". Platzhalter in
+        geschweiften Klammern werden eingesetzt ({"{person}"}, {"{verein}"}); was in
+        eckigen Klammern steht, fällt weg, wenn sein Wert fehlt. Leer lassen
+        heißt: der mitgelieferte Satz gilt.
+      </p>
+
+      <label className={stil.textfeldEtikett}>
+        Sachverhalt
+        <textarea
+          className={stil.satzfeld}
+          rows={3}
+          value={sachverhalt}
+          placeholder={regel.vorgabe_sachverhalt}
+          onChange={(e) => setSachverhalt(e.target.value)}
+        />
+      </label>
+
+      <label className={stil.textfeldEtikett}>
+        Hinweis
+        <textarea
+          className={stil.satzfeld}
+          rows={4}
+          value={hinweis}
+          placeholder={regel.vorgabe_hinweis}
+          onChange={(e) => setHinweis(e.target.value)}
+        />
+      </label>
+
+      {fehler && (
+        <Hinweis ton="fehler" dringend>
+          {fehler}
+        </Hinweis>
+      )}
+
+      <div className={stil.knoepfe}>
+        <Knopf groesse="sm" onClick={() => void speichern()} disabled={!geaendert || laeuft}>
+          {laeuft ? "Speichert" : "Speichern"}
+        </Knopf>
+        {geaendert && (
+          <Knopf
+            groesse="sm"
+            auspraegung="sekundaer"
+            onClick={() => {
+              setSachverhalt(regel.sachverhalt);
+              setHinweis(regel.hinweis);
+            }}
+          >
+            Verwerfen
+          </Knopf>
+        )}
+      </div>
+
+      <p className={stil.vorgangHinweis}>
+        Gilt ab dem nächsten Schreiben. Schon erstellte Entwürfe ändern sich
+        nicht — ihr Text liegt am Vorgang.
+      </p>
+    </details>
   );
 }

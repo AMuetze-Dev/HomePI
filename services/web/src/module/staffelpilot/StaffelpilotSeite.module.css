@@ -530,3 +530,45 @@
 .dateiknopf:hover {
   border-color: var(--farbe-akzent);
 }
+
+/* ── Die Saetze je Regel ─────────────────────────────────────────────── */
+
+.saetze {
+  margin-top: var(--raum-3);
+  border-top: 1px solid var(--farbe-rand);
+  padding-top: var(--raum-2);
+}
+
+.saetzeKopf {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.saetzeKopf:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+  border-radius: var(--rundung-sm);
+}
+
+/* Proportionalschrift und nicht wie .textfeld monospace: hier stehen Saetze,
+   die spaeter in einem Brief stehen, und keine Spalten. */
+.satzfeld {
+  width: 100%;
+  padding: var(--raum-2);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+  resize: vertical;
+}
+
+.satzfeld:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 1px;
+}

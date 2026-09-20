@@ -154,3 +154,100 @@ class TestRegelkatalog:
     async def test_die_regeln_stehen_vor_der_spiel_route(self, client: AsyncClient) -> None:
         """Waere es umgekehrt, versuchte FastAPI 'regeln' als UUID zu lesen."""
         assert (await client.get("/staffelpilot/regeln")).status_code == 200
+
+
+class TestDieSaetze:
+    """Die Saetze fuer das Schreiben gehoeren dem Staffelleiter.
+
+    Sie stehen spaeter in einem Brief an einen Verein. Was hier schiefgeht,
+    faellt deshalb nicht in einem Log auf, sondern im Briefkasten.
+    """
+
+    async def _angelegt(self, client: AsyncClient, schluessel: str = "confirmation_late") -> str:
+        katalog = (
+            await client.put("/staffelpilot/regeln", json={"regeln": [regel(schluessel)]})
+        ).json()
+        return str(katalog[0]["id"])
+
+    async def test_am_anfang_stehen_sie_leer_und_die_vorgabe_daneben(
+        self, client: AsyncClient
+    ) -> None:
+        """Leer und nicht vorgefuellt: sonst friert der erste Blick auf die
+        Liste den heutigen Wortlaut ein, samt Paragraf."""
+        katalog = (
+            await client.put(
+                "/staffelpilot/regeln", json={"regeln": [regel("order_manager_missing")]}
+            )
+        ).json()
+
+        assert katalog[0]["sachverhalt"] == ""
+        assert "kein Leiter Ordnungsdienst" in katalog[0]["vorgabe_sachverhalt"]
+        assert "\u00a7 53" in katalog[0]["vorgabe_hinweis"]
+
+    async def test_eine_unbekannte_regel_hat_keine_vorgabe(self, client: AsyncClient) -> None:
+        katalog = (
+            await client.put("/staffelpilot/regeln", json={"regeln": [regel("ganz_eigene")]})
+        ).json()
+
+        assert katalog[0]["vorgabe_sachverhalt"] == ""
+
+    async def test_ein_eigener_satz_bleibt_stehen(self, client: AsyncClient) -> None:
+        regel_id = await self._angelegt(client)
+
+        antwort = await client.patch(
+            f"/staffelpilot/regeln/{regel_id}", json={"sachverhalt": "war etwas anderes."}
+        )
+
+        assert antwort.json()["sachverhalt"] == "war etwas anderes."
+        assert (await client.get("/staffelpilot/regeln")).json()[0]["sachverhalt"] == (
+            "war etwas anderes."
+        )
+
+    async def test_umschalten_loescht_die_saetze_nicht(self, client: AsyncClient) -> None:
+        """Zwei Knoepfe, eine Zeile -- und der eine darf den anderen nicht
+        ueberschreiben."""
+        regel_id = await self._angelegt(client)
+        await client.patch(f"/staffelpilot/regeln/{regel_id}", json={"sachverhalt": "eigener Satz"})
+
+        antwort = await client.patch(f"/staffelpilot/regeln/{regel_id}", json={"aktiv": False})
+
+        assert antwort.json()["sachverhalt"] == "eigener Satz"
+        assert antwort.json()["aktiv"] is False
+
+    async def test_die_saetze_loeschen_den_schalter_nicht(self, client: AsyncClient) -> None:
+        regel_id = await self._angelegt(client)
+        await client.patch(f"/staffelpilot/regeln/{regel_id}", json={"aktiv": False})
+
+        antwort = await client.patch(f"/staffelpilot/regeln/{regel_id}", json={"hinweis": "x"})
+
+        assert antwort.json()["aktiv"] is False
+
+    async def test_ein_neuer_katalog_laesst_sie_stehen(self, client: AsyncClient) -> None:
+        """Ein Update spielt den Katalog neu ein. Was jemand formuliert hat,
+        ist damit nicht gemeint."""
+        regel_id = await self._angelegt(client)
+        await client.patch(f"/staffelpilot/regeln/{regel_id}", json={"sachverhalt": "meiner"})
+
+        wieder = (
+            await client.put(
+                "/staffelpilot/regeln", json={"regeln": [regel("confirmation_late", name="Neu")]}
+            )
+        ).json()
+
+        assert wieder[0]["sachverhalt"] == "meiner"
+        assert wieder[0]["name"] == "Neu"
+
+    async def test_sie_ueberleben_auch_ein_verschwinden_und_wiederkommen(
+        self, client: AsyncClient
+    ) -> None:
+        """Ein Prueflauf mit einer halben Regelliste soll keine Arbeit
+        loeschen."""
+        regel_id = await self._angelegt(client)
+        await client.patch(f"/staffelpilot/regeln/{regel_id}", json={"sachverhalt": "meiner"})
+        await client.put("/staffelpilot/regeln", json={"regeln": []})
+
+        wieder = (
+            await client.put("/staffelpilot/regeln", json={"regeln": [regel("confirmation_late")]})
+        ).json()
+
+        assert wieder[0]["sachverhalt"] == "meiner"
