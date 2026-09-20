@@ -106,6 +106,13 @@ class Prueflauf:
 
         bericht = self._leser.bericht(zeile.dfbnet_id)
         if bericht is None:
+            if not zeile.gespielt:
+                # Das Spiel läuft erst noch. Dass es dazu keinen Bericht gibt,
+                # ist der Normalfall am Spieltag und keine Warnung -- sonst
+                # stünden in der Warteschlange jede Woche so viele Warnungen,
+                # wie am Wochenende Spiele angesetzt sind.
+                logger.info("Spiel %s ist noch nicht gespielt", zeile.dfbnet_id)
+                return [], [], ""
             return regeln.nicht_gelesen("der Prüfdienst hat ihn nicht bekommen"), [], ""
 
         befunde = regeln.befunde_aus(bericht) + katalog.befunde_aus(
@@ -178,7 +185,11 @@ class Prueflauf:
                     fortschritt=dienst.fortschritt_im_schritt(
                         i, len(staffeln), nummer + 1, len(zeilen)
                     ),
-                    zeile=(f"{nummer + 1}/{len(zeilen)} gelesen: {zeile.heim} gegen {zeile.gast}"),
+                    zeile=(
+                        f"{nummer + 1}/{len(zeilen)} "
+                        f"{'gelesen' if zeile.gespielt else 'noch nicht gespielt'}: "
+                        f"{zeile.heim} gegen {zeile.gast}"
+                    ),
                 )
 
             if ausbeute.uebersprungen:

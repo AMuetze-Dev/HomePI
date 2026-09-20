@@ -38,6 +38,17 @@ class Spielzeile:
     status: str = ""
 
     @property
+    def gespielt(self) -> bool:
+        """Ob das Spiel schon stattgefunden hat.
+
+        Am Ergebnis und nicht am Datum: ein Spiel von heute Vormittag hat
+        abends einen fertigen Bericht, eines von heute Abend noch keinen. Das
+        Datum kann beides nicht unterscheiden, die Ergebnisspalte schon --
+        sie bleibt leer, bis der Schiedsrichter freigibt.
+        """
+        return any(z.isdigit() for z in self.ergebnis)
+
+    @property
     def brauchbar(self) -> bool:
         """Ohne Datum und ohne Paarung ist die Zeile kein Spiel.
 

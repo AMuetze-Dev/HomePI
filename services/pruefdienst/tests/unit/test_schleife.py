@@ -638,6 +638,30 @@ class TestBefundeImLauf:
         assert "confirmation_missing" in gefunden
         assert "spielfuehrer_fehlt" in gefunden
 
+    def test_ein_spiel_das_noch_laeuft_ist_keine_warnung(self) -> None:
+        """Am Spieltag stehen die Spiele des Nachmittags schon in der Liste,
+        ihr Bericht aber noch nicht. Eine Warnung je angesetztem Spiel waere
+        jede Woche so viel Rauschen, wie am Wochenende gespielt wird."""
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+        # Kein Ergebnis: das Spiel hat noch nicht stattgefunden.
+        leser = DemoLeser({"Stadtliga C": [zeile("M-1", ergebnis="")]})
+
+        lauf(gateway, leser).runde()
+
+        _, spiele = gateway.importe[0]
+        assert spiele[0]["befunde"] == []
+
+    def test_ein_gespieltes_ohne_bericht_schon(self) -> None:
+        """Dort ist das Schweigen gefaehrlich: der Bericht ist da, nur
+        gelesen hat ihn niemand."""
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+        leser = DemoLeser({"Stadtliga C": [zeile("M-1", ergebnis="2 : 1")]})
+
+        lauf(gateway, leser).runde()
+
+        _, spiele = gateway.importe[0]
+        assert [b["regel"] for b in spiele[0]["befunde"]] == ["bericht_ungelesen"]
+
     def test_ein_bericht_wird_durch_die_regeln_geschickt(self) -> None:
         bericht = MatchReport(
             meta=MatchMeta(
