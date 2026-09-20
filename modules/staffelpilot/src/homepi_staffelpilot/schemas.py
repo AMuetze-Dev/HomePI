@@ -307,6 +307,7 @@ class EinstellungenAusgabe(BaseModel):
     pruefzeitraum_tage: int
     frist_tage: int
     uebertragung_pausiert: bool
+    browser_sichtbar: bool
 
 
 class EinstellungenSetzen(BaseModel):
@@ -323,6 +324,8 @@ class EinstellungenSetzen(BaseModel):
     pruefzeitraum_tage: Annotated[int, Field(ge=1, le=365)] | None = None
     frist_tage: Annotated[int, Field(ge=1, le=90)] | None = None
     uebertragung_pausiert: bool | None = None
+    #: Beim Pruefen zusehen. Siehe `dienst.Einstellungen.browser_sichtbar`.
+    browser_sichtbar: bool | None = None
 
     @field_validator("staffelleiter", "verband", "absender", mode="before")
     @classmethod

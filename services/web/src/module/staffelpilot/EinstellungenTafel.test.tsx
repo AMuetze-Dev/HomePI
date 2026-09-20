@@ -14,6 +14,7 @@ function werte(rest: Partial<api.Einstellungen> = {}): api.Einstellungen {
     pruefzeitraum_tage: 30,
     frist_tage: 14,
     uebertragung_pausiert: true,
+    browser_sichtbar: false,
     ...rest,
   };
 }
@@ -123,5 +124,48 @@ describe("Einstellungen", () => {
     render(<EinstellungenTafel />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("kein Zugriff");
+  });
+
+  describe("Beim Prüfen zusehen", () => {
+    it("ist aus, solange niemand ihn einschaltet", async () => {
+      mitWerten();
+      render(<EinstellungenTafel />);
+
+      const schalter = await screen.findByRole("checkbox", { name: /zusehen/i });
+      expect(schalter).not.toBeChecked();
+    });
+
+    it("zeigt an, wenn er an ist", async () => {
+      mitWerten({ browser_sichtbar: true });
+      render(<EinstellungenTafel />);
+
+      expect(await screen.findByRole("checkbox", { name: /zusehen/i })).toBeChecked();
+    });
+
+    it("schickt die Änderung mit", async () => {
+      mitWerten();
+      const speichern = vi
+        .spyOn(api, "speichereEinstellungen")
+        .mockResolvedValue(werte({ browser_sichtbar: true }));
+      render(<EinstellungenTafel />);
+
+      await userEvent.click(await screen.findByRole("checkbox", { name: /zusehen/i }));
+      await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+      await waitFor(() =>
+        expect(speichern).toHaveBeenCalledWith(
+          expect.objectContaining({ browser_sichtbar: true }),
+        ),
+      );
+    });
+
+    it("sagt, dass im Container nichts zu sehen ist", async () => {
+      // Sonst legt jemand den Schalter um, sieht nichts und sucht den Fehler
+      // im Prüflauf.
+      mitWerten();
+      render(<EinstellungenTafel />);
+
+      expect(await screen.findByText(/kein(en)? Bildschirm/i)).toBeInTheDocument();
+    });
   });
 });

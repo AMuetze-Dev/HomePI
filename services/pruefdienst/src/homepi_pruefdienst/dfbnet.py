@@ -98,7 +98,10 @@ class DfbnetLeser:
     """Ein Browser, der sich anmeldet und die Trefferliste ausliest."""
 
     def __init__(self, sichtbar: bool = False) -> None:
-        self._sichtbar = sichtbar
+        #: Ob das Fenster zu sehen sein soll. Oeffentlich, weil der Schalter
+        #: in den Einstellungen steht: die Schleife setzt ihn vor dem
+        #: Anmelden, und er gilt fuer den naechsten Browser.
+        self.sichtbar = sichtbar
         self._playwright: Any = None
         self._browser: Any = None
         self._seite: Any = None
@@ -116,7 +119,7 @@ class DfbnetLeser:
         from playwright.sync_api import sync_playwright
 
         self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(headless=not self._sichtbar)
+        self._browser = self._starten()
         kontext = self._browser.new_context(viewport={"width": 1400, "height": 900})
         self._seite = kontext.new_page()
         self._seite.set_default_timeout(ZEIT_MS)
@@ -137,6 +140,29 @@ class DfbnetLeser:
             state="visible", timeout=ZEIT_MS
         )
         logger.info("Bei DFBnet angemeldet als %s", benutzer)
+
+    def _starten(self) -> Any:
+        """Den Browser starten -- sichtbar, wenn es gewuenscht ist und geht.
+
+        Im Container gibt es keinen Bildschirm. Dort waere ein sichtbares
+        Fenster kein Wunsch, sondern ein Abbruch: Chromium startet nicht, und
+        der Prueflauf scheitert an einer Einstellung, die mit dem Pruefen
+        nichts zu tun hat. Deshalb der Rueckfall -- mit einer Zeile im
+        Protokoll, damit niemand raetselt, warum nichts zu sehen ist.
+        """
+        if not self.sichtbar:
+            return self._playwright.chromium.launch(headless=True)
+        try:
+            browser = self._playwright.chromium.launch(headless=False)
+            logger.info("Der Browser ist sichtbar -- so steht es in den Einstellungen")
+            return browser
+        except Exception:
+            logger.warning(
+                "Ein sichtbares Fenster liess sich nicht oeffnen (kein Bildschirm?). "
+                "Es wird unsichtbar geprueft.",
+                exc_info=True,
+            )
+            return self._playwright.chromium.launch(headless=True)
 
     def _zustimmung_wegklicken(self) -> None:
         """Die Einwilligung ablehnen, wo sie ablehnbar ist.

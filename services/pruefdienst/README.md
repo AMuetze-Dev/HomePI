@@ -95,8 +95,22 @@ ein Staffelleiter wirklich hat.
 
 ## Zusehen
 
-Im Container gibt es keinen Bildschirm. Wer dem Prüflauf bei der Arbeit
-zusehen will, lässt ihn auf dem eigenen Rechner laufen:
+**Der Schalter steht in den Einstellungen**: *Beim Prüfen zusehen*. Ab Werk
+aus — ein Fenster, das sich von selbst öffnet und durch DFBnet klickt, ist
+beim Zusehen schön und bei der Arbeit im Weg: es nimmt den Vordergrund und
+fängt Tastendrücke ab.
+
+Gelesen wird er **vor jedem Anmelden**, nicht beim Start des Dienstes: wer ihn
+umlegt, sieht den nächsten Lauf. Im Container gibt es keinen Bildschirm; dort
+fällt der Dienst auf das unsichtbare Fenster zurück und schreibt das ins
+Protokoll, statt an einer Einstellung zu scheitern, die mit dem Prüfen nichts
+zu tun hat.
+
+`PRUEFDIENST_BROWSER_SICHTBAR` ist nur noch die Vorgabe für den ersten Lauf,
+bevor jemand den Schalter angefasst hat.
+
+Wer dem Prüflauf auf dem eigenen Rechner zusehen will — mit den Regeln und
+Zugangsdaten der Entwicklungsumgebung:
 
 ```bash
 make pruefdienst-zusehen            # Beispieldaten, kein Browser

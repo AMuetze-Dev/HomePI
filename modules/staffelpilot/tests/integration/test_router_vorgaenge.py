@@ -45,6 +45,28 @@ class TestEinstellungen:
         assert werte["pruefzeitraum_tage"] == 30
         assert werte["staffelleiter"] == ""
 
+    async def test_beim_pruefen_zusehen_ist_aus(self, client: AsyncClient) -> None:
+        """Ein Fenster, das sich von selbst öffnet und durch DFBnet klickt,
+        nimmt den Vordergrund und fängt Tastendrücke ab. Wer zusehen will,
+        schaltet es ein."""
+        werte = (await client.get("/staffelpilot/einstellungen")).json()
+
+        assert werte["browser_sichtbar"] is False
+
+    async def test_und_laesst_sich_einschalten(self, client: AsyncClient) -> None:
+        antwort = await client.put("/staffelpilot/einstellungen", json={"browser_sichtbar": True})
+
+        assert antwort.status_code == 200
+        assert antwort.json()["browser_sichtbar"] is True
+        assert (await client.get("/staffelpilot/einstellungen")).json()["browser_sichtbar"] is True
+
+    async def test_und_wieder_aus(self, client: AsyncClient) -> None:
+        await client.put("/staffelpilot/einstellungen", json={"browser_sichtbar": True})
+
+        await client.put("/staffelpilot/einstellungen", json={"browser_sichtbar": False})
+
+        assert (await client.get("/staffelpilot/einstellungen")).json()["browser_sichtbar"] is False
+
     async def test_setzen_und_wiederlesen(self, client: AsyncClient) -> None:
         await client.put(
             "/staffelpilot/einstellungen",

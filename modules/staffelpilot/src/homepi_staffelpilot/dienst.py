@@ -265,6 +265,17 @@ class Einstellungen:
     #: weil jemand die Software zum ersten Mal gestartet hat. Wer sie will,
     #: schaltet sie ein -- einmal, bewusst.
     uebertragung_pausiert: bool = True
+    #: Ob der Pruefdienst seinen Browser zeigen soll, statt ihn zu verstecken.
+    #:
+    #: **Aus.** Ein Fenster, das sich von selbst oeffnet und durch DFBnet
+    #: klickt, ist beim Zusehen schoen und bei der Arbeit im Weg: es nimmt den
+    #: Vordergrund und faengt Tastendruecke ab. Wer zusehen will, schaltet es
+    #: ein -- und wieder aus.
+    #:
+    #: Im Container gibt es keinen Bildschirm. Der Dienst versucht es dann
+    #: trotzdem und faellt auf das unsichtbare Fenster zurueck, mit einer
+    #: Zeile im Protokoll.
+    browser_sichtbar: bool = False
 
 
 #: Die Zahlen mit ihren Grenzen. Unten schaerfer als noetig: ein
@@ -272,7 +283,7 @@ class Einstellungen:
 #: den Fehler dann im Prueflauf statt in den Einstellungen.
 _ZAHLEN = {"pruefzeitraum_tage": (1, 365), "frist_tage": (1, 90)}
 _TEXTE = ("staffelleiter", "verband", "absender")
-_WAHRHEITEN = ("uebertragung_pausiert",)
+_WAHRHEITEN = ("uebertragung_pausiert", "browser_sichtbar")
 
 #: Was als "ja" gilt. Geschrieben wird immer "true"; gelesen wird grosszuegig,
 #: weil eine Zeile auch einmal von Hand in der Datenbank landet.

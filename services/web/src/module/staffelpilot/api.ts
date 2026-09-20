@@ -90,6 +90,8 @@ export interface Einstellungen {
   frist_tage: number;
   /** Ob der DFBnet-Dienst gerade etwas eintragen darf. Frisch: pausiert. */
   uebertragung_pausiert: boolean;
+  /** Ob der Prüfdienst sein Browserfenster zeigt. Frisch: aus. */
+  browser_sichtbar: boolean;
 }
 
 /** Eine Zeile der Auswertung. */

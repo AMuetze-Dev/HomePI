@@ -11,8 +11,9 @@ function meldung(fehler: unknown): string {
 /**
  * Was in jedem Schreiben steht und wie lange eine Frist läuft.
  *
- * Eine Seite mit fünf Feldern und einem Knopf: sie wird einmal im Jahr
- * angefasst. Alles, was sie aufwendiger macht, zahlt sich nie zurück.
+ * Eine Seite mit fünf Feldern, einem Schalter und einem Knopf: sie wird
+ * einmal im Jahr angefasst. Alles, was sie aufwendiger macht, zahlt sich nie
+ * zurück.
  */
 export function EinstellungenTafel() {
   const [werte, setWerte] = useState<Einstellungen | null>(null);
@@ -109,6 +110,24 @@ export function EinstellungenTafel() {
           value={String(werte.frist_tage)}
           onChange={(e) => aendern("frist_tage", Number(e.target.value))}
         />
+
+        <label className={stil.schalter}>
+          <input
+            type="checkbox"
+            className={stil.schalterKasten}
+            checked={werte.browser_sichtbar}
+            onChange={(e) => aendern("browser_sichtbar", e.target.checked)}
+          />
+          <span className={stil.schalterText}>
+            <span>Beim Prüfen zusehen</span>
+            <span className={stil.wahlName}>
+              Der Prüfdienst zeigt sein Browserfenster, statt im Verborgenen zu arbeiten.
+              Zum Zusehen schön, beim Arbeiten im Weg — das Fenster nimmt den Vordergrund.
+              Läuft der Dienst im Container, wo es keinen Bildschirm gibt, prüft er weiter
+              unsichtbar und schreibt das ins Protokoll.
+            </span>
+          </span>
+        </label>
 
         {fehler && (
           <Hinweis ton="fehler" dringend>

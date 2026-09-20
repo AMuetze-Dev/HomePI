@@ -124,6 +124,13 @@ class Prueflauf:
         self._gateway.fortschritt(
             kennung, schritt="Melde mich bei DFBnet an", zeile="Hole die Zugangsdaten"
         )
+        # Vor dem Anmelden, denn dabei entsteht der Browser: der Schalter aus
+        # den Einstellungen gilt ab dem naechsten Lauf und nicht erst nach
+        # einem Neustart des Dienstes.
+        self._leser.sichtbar = bool(self._gateway.einstellungen().get("browser_sichtbar"))
+        if self._leser.sichtbar:
+            self._gateway.fortschritt(kennung, zeile="Der Browser ist sichtbar")
+
         benutzer, passwort = self._gateway.zugang()
         self._leser.anmelden(benutzer, passwort)
         self._gateway.fortschritt(kennung, zeile=f"Angemeldet als {benutzer}")

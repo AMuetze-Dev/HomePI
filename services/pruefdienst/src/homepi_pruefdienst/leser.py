@@ -34,6 +34,10 @@ class Leser(Protocol):
     #: Die Spieltage der zuletzt geholten Meldung. 0 heisst *nicht bekannt*.
     spieltage: int
 
+    #: Ob beim naechsten Anmelden zuzusehen sein soll. Der Schalter dafuer
+    #: steht in den Einstellungen des Artefakts.
+    sichtbar: bool
+
     def schliessen(self) -> None: ...
 
 
@@ -57,6 +61,7 @@ class DemoLeser:
         self.angemeldet_als = ""
         self.geschlossen = False
         self.spieltage = 0
+        self.sichtbar = False
 
     def anmelden(self, benutzer: str, passwort: str) -> None:
         # Das Passwort wird bewusst nicht gemerkt: auch ein Demo-Leser soll

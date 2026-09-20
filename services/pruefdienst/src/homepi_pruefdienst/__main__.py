@@ -50,6 +50,9 @@ def _leser() -> Leser:
         from .dfbnet import DfbnetLeser
 
         logger.info("Leser: DFBnet (echter Browser)")
+        # Die Umgebung ist nur die Vorgabe fuer den ersten Lauf. Was gilt,
+        # steht in den Einstellungen -- die Schleife setzt es vor jedem
+        # Anmelden neu.
         return DfbnetLeser(sichtbar=_ja("PRUEFDIENST_BROWSER_SICHTBAR"))
 
     logger.info("Leser: Beispieldaten — es wird nichts von DFBnet geholt")

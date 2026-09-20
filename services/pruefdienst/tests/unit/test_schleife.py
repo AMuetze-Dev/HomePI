@@ -73,6 +73,7 @@ class FalschesGateway:
         self.importe: list[tuple[str, list[dict[str, Any]]]] = []
         self.meldungen: list[tuple[str, list[dict[str, Any]]]] = []
         self.geaendert: list[tuple[str, dict[str, Any]]] = []
+        self.werte: dict[str, Any] = {"pruefzeitraum_tage": 30, "frist_tage": 14}
         self.zugang_geholt = 0
         self.uebernommen: list[str] = []
         self.gemeldet: list[tuple[str, str, str]] = []
@@ -86,7 +87,7 @@ class FalschesGateway:
         return self._staffeln
 
     def einstellungen(self) -> dict[str, Any]:
-        return {"pruefzeitraum_tage": 30, "frist_tage": 14}
+        return self.werte
 
     def zugang(self) -> tuple[str, str]:
         self.zugang_geholt += 1
@@ -160,6 +161,41 @@ class TestOhneArbeit:
         lauf(gateway).runde()
 
         assert gateway.zugang_geholt == 0
+
+
+class TestZusehen:
+    """Der Schalter aus den Einstellungen: beim Prüfen zusehen.
+
+    Er wird **vor jedem Anmelden** gelesen und nicht beim Start des Dienstes:
+    wer ihn umlegt, will den nächsten Lauf sehen und nicht den übernächsten.
+    """
+
+    def test_aus_heisst_unsichtbar(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+        leser = DemoLeser({"Stadtliga C": [zeile()]})
+
+        lauf(gateway, leser).runde()
+
+        assert leser.sichtbar is False
+
+    def test_an_heisst_sichtbar(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+        gateway.werte = {**gateway.werte, "browser_sichtbar": True}
+        leser = DemoLeser({"Stadtliga C": [zeile()]})
+
+        lauf(gateway, leser).runde()
+
+        assert leser.sichtbar is True
+
+    def test_und_es_steht_im_protokoll(self) -> None:
+        """Sonst rätselt jemand, warum plötzlich ein Fenster aufgeht."""
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "staffel_id": None})
+        gateway.werte = {**gateway.werte, "browser_sichtbar": True}
+
+        lauf(gateway, DemoLeser({"Stadtliga C": [zeile()]})).runde()
+
+        zeilen = [str(f.get("zeile", "")) for f in gateway.fortschritte]
+        assert any("sichtbar" in z for z in zeilen)
 
 
 class TestPrueflauf:

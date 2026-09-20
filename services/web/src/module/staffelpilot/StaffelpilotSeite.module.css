@@ -487,3 +487,26 @@
   font-weight: var(--gewicht-normal);
   color: var(--farbe-text-gedaempft);
 }
+
+/* Ein Schalter mit Beschriftung und Erklaerung darunter. Das Kaestchen steht
+   oben, damit es bei zwei Zeilen Erklaerung nicht in der Mitte schwebt. */
+.schalter {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--raum-2);
+  cursor: pointer;
+}
+
+.schalterKasten {
+  margin-top: 0.2em;
+  accent-color: var(--farbe-akzent);
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.schalterText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+}
