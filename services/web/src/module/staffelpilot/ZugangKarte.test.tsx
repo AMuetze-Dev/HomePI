@@ -103,4 +103,31 @@ describe("DFBnet-Zugang", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/Fernet/);
   });
+
+  it("wirft die Eingabe nicht weg, wenn die Antwort spät kommt", async () => {
+    // Der Fehler, den erst ein Oberflächentest gegen den echten Stack gefunden
+    // hat: das Formular stand schon da, die Antwort des Servers setzte den
+    // Benutzernamen auf den gespeicherten Wert zurück — bei einer frischen
+    // Installation auf leer. Wer schnell tippte, fand danach einen Knopf, der
+    // sich nicht drücken ließ.
+    let antworten: (s: api.ZugangStand) => void = () => {};
+    vi.spyOn(api, "ladeZugang").mockReturnValue(
+      new Promise<api.ZugangStand>((aufloesen) => {
+        antworten = aufloesen;
+      }),
+    );
+    render(<ZugangKarte />);
+
+    // Solange nichts da ist, gibt es auch nichts zu tippen.
+    expect(screen.queryByRole("textbox", { name: /Benutzername/ })).toBeNull();
+    expect(screen.getByRole("status", { name: /wird geladen/ })).toBeInTheDocument();
+
+    antworten({ gespeichert: false, benutzer: "", schluessel_vorhanden: true });
+
+    const feld = await screen.findByRole("textbox", { name: /Benutzername/ });
+    await userEvent.type(feld, "beispiel");
+
+    expect(feld).toHaveValue("beispiel");
+    expect(screen.getByRole("button", { name: "Zugang hinterlegen" })).toBeDisabled();
+  });
 });

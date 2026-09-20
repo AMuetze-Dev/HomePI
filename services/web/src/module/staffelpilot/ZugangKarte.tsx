@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { Feld, Hinweis, Karte, Knopf } from "../../ui";
+import { Feld, Hinweis, Karte, Knopf, Platzhalter } from "../../ui";
 import { type ZugangStand, ladeZugang, loescheZugang, speichereZugang } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
 
@@ -39,7 +39,11 @@ export function ZugangKarte() {
   }, []);
 
   async function auffrischen() {
-    setStand(await ladeZugang());
+    const frisch = await ladeZugang();
+    setStand(frisch);
+    // Den Benutzernamen **nicht** aus der Antwort übernehmen: im Feld steht,
+    // was der Staffelleiter gerade tippt. Nur nach dem Löschen wird es
+    // ausdrücklich geleert.
   }
 
   async function absenden(ereignis: React.FormEvent) {
@@ -69,6 +73,19 @@ export function ZugangKarte() {
     } catch (f) {
       setFehler(meldung(f));
     }
+  }
+
+  if (stand === null && !fehler) {
+    // Erst laden, dann tippen lassen. Vorher stand das Formular schon da, und
+    // die Antwort des Servers setzte den Benutzernamen auf den gespeicherten
+    // Wert zurück — bei einer frischen Installation also auf leer. Wer schnell
+    // war, tippte seinen Namen ins Nichts und fand danach einen Knopf, der
+    // sich nicht drücken ließ.
+    return (
+      <div role="status" aria-label="DFBnet-Zugang wird geladen">
+        <Platzhalter breite="100%" hoehe="12rem" />
+      </div>
+    );
   }
 
   return (
