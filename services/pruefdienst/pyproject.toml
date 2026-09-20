@@ -92,6 +92,9 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 # Dasselbe fuer das uebernommene Regelwerk: die deutschen Anfuehrungszeichen
 # und Gedankenstriche in den Paragrafenzitaten sind dort Absicht.
 "src/homepi_pruefdienst/regelwerk/*.py" = ["RUF001", "RUF002", "RUF003", "SIM103"]
+# Und fuer die Freigabe: uebernommen samt eingebettetem JavaScript, das
+# sich nicht umbrechen laesst, ohne den Selektor zu veraendern.
+"src/homepi_pruefdienst/freigabe.py" = ["E501", "RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -117,4 +120,11 @@ ignore_errors = true
 # Umzugs.
 [[tool.mypy.overrides]]
 module = "homepi_pruefdienst.regelwerk.*"
+ignore_errors = true
+
+# Und die Freigabe. Sie ist woertlich uebernommen und am 30.08.2026 gegen
+# einen echten Spielbericht geprueft; ihre Zusicherung ist das Zuruecklesen
+# des Status, nicht eine Typannotation an einem Playwright-Locator.
+[[tool.mypy.overrides]]
+module = "homepi_pruefdienst.freigabe"
 ignore_errors = true

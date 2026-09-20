@@ -402,27 +402,63 @@ class Prueflauf:
             )
             return False
 
-        if not isinstance(self._leser, BeispielLeser):
-            # Das Eintragen in DFBnet ist nicht portiert. Eine Zeile auf
-            # "fertig" zu setzen, ohne dass etwas passiert ist, waere die
-            # schlimmste aller Auskuenfte.
-            logger.warning(
-                "%d Übertragung(en) warten. Das Eintragen in DFBnet ist noch "
-                "nicht portiert; sie bleiben stehen.",
-                offen,
-            )
-            return False
-
-        # Mit dem Beispiel-Leser wird es **simuliert** -- und das steht an
-        # jeder Zeile. Nur so laesst sich der Weg bis zum Freigeben einmal
-        # durchklicken, ohne einen Verband anzufassen.
         gemacht = 0
         while (zeile := self._gateway.uebertragung_uebernehmen()) is not None:
+            geklappt, meldung = self._eintragen(zeile)
             self._gateway.uebertragung_abschliessen(
-                str(zeile["id"]),
-                "fertig",
-                "Simuliert — es war kein Browser bei DFBnet",
+                str(zeile["id"]), "fertig" if geklappt else "fehler", meldung[:900]
             )
             gemacht += 1
-        logger.info("%d Übertragung(en) simuliert abgeschlossen", gemacht)
+        logger.info("%d Übertragung(en) abgearbeitet", gemacht)
         return gemacht > 0
+
+    def _eintragen(self, zeile: dict[str, Any]) -> tuple[bool, str]:
+        """Eine vorgemerkte Handlung in DFBnet ausführen.
+
+        **Hier verlässt die Software das eigene Netz.** Dass sie es darf, hat
+        `_uebertragungen` schon geprüft: beide Schalter an.
+
+        Mit den Beispieldaten wird es simuliert -- und das steht an jeder
+        Zeile. Nur so lässt sich der Weg bis zum Freigeben durchklicken, ohne
+        einen Verband anzufassen.
+        """
+        aktion = str(zeile.get("aktion") or "")
+        if isinstance(self._leser, BeispielLeser):
+            return True, "Simuliert — es war kein Browser bei DFBnet"
+
+        if aktion != "prueferfreigabe":
+            # Die Fallanlage ist nicht portiert. Eine Zeile auf "fertig" zu
+            # setzen, ohne dass etwas passiert ist, wäre die schlimmste aller
+            # Auskünfte.
+            return False, f"Die Aktion {aktion!r} ist noch nicht portiert"
+
+        spiel_id = str(zeile.get("spiel_id") or zeile.get("referenz") or "")
+        if not spiel_id:
+            return False, "Zu dieser Übertragung steht kein Spiel"
+
+        try:
+            spiel = self._gateway.spiel(spiel_id)
+        except Exception as fehler:
+            logger.exception("Spiel %s liess sich nicht lesen", spiel_id)
+            return False, f"Das Spiel liess sich nicht lesen: {fehler}"
+
+        if not self._trefferliste_fuer(spiel):
+            return False, "Der Spielbericht steht nicht in der Trefferliste von DFBnet"
+
+        return self._leser.freigeben(str(spiel["dfbnet_id"]))
+
+    def _trefferliste_fuer(self, spiel: dict[str, Any]) -> bool:
+        """DFBnet auf den Spieltag dieses Berichts stellen.
+
+        Der Bericht wird über den Verweis in der Trefferliste geöffnet -- über
+        seine Adresse angesprungen bleibt er leer. Also muss die Liste her, die
+        ihn enthält: dieselbe Staffel, derselbe Tag.
+        """
+        staffeln = [s for s in self._gateway.staffeln() if str(s["id"]) == str(spiel["staffel_id"])]
+        if not staffeln:
+            logger.warning("Zur Übertragung gibt es keine Staffel mehr")
+            return False
+
+        tag = dt.date.fromisoformat(str(spiel["datum"]))
+        zeilen = self._leser.spiele(dienst.kennung_aus(staffeln[0]), tag, tag)
+        return any(z.dfbnet_id == str(spiel["dfbnet_id"]) for z in zeilen)

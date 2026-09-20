@@ -76,10 +76,21 @@ class FalschesGateway:
         self.werte: dict[str, Any] = {"pruefzeitraum_tage": 30, "frist_tage": 14}
         self.katalog: list[dict[str, Any]] = []
         self.abgeschaltet: set[str] = set()
+        self.spiele_nach_id: dict[str, dict[str, Any]] | None = {
+            "sp1": {
+                "id": "sp1",
+                "staffel_id": "s1",
+                "dfbnet_id": "M-1",
+                "datum": (HEUTE - dt.timedelta(days=1)).isoformat(),
+            }
+        }
         self.zugang_geholt = 0
         self.uebernommen: list[str] = []
         self.gemeldet: list[tuple[str, str, str]] = []
-        self._warteschlange = [{"id": f"u{i + 1}"} for i in range(offen)]
+        self._warteschlange = [
+            {"id": f"u{i + 1}", "aktion": "prueferfreigabe", "spiel_id": "sp1", "referenz": "sp1"}
+            for i in range(offen)
+        ]
 
     # Was der Prueflauf davon braucht:
     def offener_auftrag(self) -> dict[str, Any] | None:
@@ -118,6 +129,11 @@ class FalschesGateway:
     def regelkatalog_setzen(self, regeln: list[dict[str, Any]]) -> list[dict[str, Any]]:
         self.katalog = regeln
         return [{**r, "aktiv": r["schluessel"] not in self.abgeschaltet} for r in regeln]
+
+    def spiel(self, spiel_id: str) -> dict[str, Any]:
+        if self.spiele_nach_id is None:
+            raise GatewayFehler("Artefakt weg")
+        return self.spiele_nach_id[spiel_id]
 
     def uebertragung(self) -> dict[str, Any]:
         return {
@@ -539,16 +555,58 @@ class TestUebertragung:
 
         assert ergebnis is False
 
-    def test_mit_dem_echten_leser_wird_noch_nichts_gemeldet(self) -> None:
-        """Das Eintragen ist nicht portiert. Eine Zeile auf 'fertig' zu
-        setzen, ohne dass etwas passiert ist, waere die schlimmste aller
-        Auskuenfte."""
-        gateway = FalschesGateway(pausiert=False, offen=3)
+    def test_die_freigabe_wird_eingetragen(self) -> None:
+        """Hier verlässt die Software das eigene Netz — und nur hier."""
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        leser = DemoLeser({"Stadtliga C": [zeile("M-1")]})
 
-        assert lauf(gateway, DemoLeser(), darf_schreiben=True).runde() is False
-        assert gateway.gemeldet == []
+        lauf(gateway, leser, darf_schreiben=True).runde()
 
-        assert lauf(gateway, darf_schreiben=True).runde() is False
+        assert leser.freigegeben == ["M-1"]
+        assert gateway.gemeldet[0][1] == "fertig"
+
+    def test_ohne_den_bericht_in_der_trefferliste_passiert_nichts(self) -> None:
+        """Der Bericht wird über den Verweis in der Liste geöffnet. Steht er
+        nicht drin, ist die Freigabe nicht erledigt — und sagt das."""
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        leser = DemoLeser({"Stadtliga C": []})
+
+        lauf(gateway, leser, darf_schreiben=True).runde()
+
+        assert leser.freigegeben == []
+        zustand, meldung = gateway.gemeldet[0][1], gateway.gemeldet[0][2]
+        assert zustand == "fehler"
+        assert "Trefferliste" in meldung
+
+    def test_eine_andere_aktion_wird_nicht_stillschweigend_erledigt(self) -> None:
+        """Die Fallanlage ist nicht portiert. Eine Zeile auf "fertig" zu
+        setzen, ohne dass etwas passiert ist, wäre die schlimmste aller
+        Auskünfte."""
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        gateway._warteschlange[0]["aktion"] = "fallanlage"
+
+        lauf(gateway, DemoLeser(), darf_schreiben=True).runde()
+
+        assert gateway.gemeldet[0][1] == "fehler"
+        assert "portiert" in gateway.gemeldet[0][2]
+
+    def test_ohne_spiel_im_artefakt_ebenso(self) -> None:
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        gateway.spiele_nach_id = None
+
+        lauf(gateway, DemoLeser(), darf_schreiben=True).runde()
+
+        assert gateway.gemeldet[0][1] == "fehler"
+
+    def test_mit_den_beispieldaten_wird_es_simuliert(self) -> None:
+        """Und das steht an jeder Zeile: nur so lässt sich der Weg bis zum
+        Freigeben durchklicken, ohne einen Verband anzufassen."""
+        gateway = FalschesGateway(pausiert=False, offen=2)
+
+        lauf(gateway, BeispielLeser(), darf_schreiben=True).runde()
+
+        assert [m[1] for m in gateway.gemeldet] == ["fertig", "fertig"]
+        assert all("Simuliert" in m[2] for m in gateway.gemeldet)
 
 
 class TestStaffelNichtGefunden:

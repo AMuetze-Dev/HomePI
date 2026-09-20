@@ -92,6 +92,15 @@ class Gateway:
             "PATCH", f"/staffelpilot/staffeln/{staffel_id}", json=felder
         )
 
+    def spiel(self, spiel_id: str) -> dict[str, Any]:
+        """Ein Spielbericht mit seiner DFBnet-Kennung und seinem Spieltag.
+
+        Die Warteschlange merkt eine Freigabe unter der **eigenen** Kennung des
+        Artefakts vor. Um sie einzutragen, braucht der Dienst die von DFBnet --
+        und den Spieltag, um den Bericht in der Trefferliste wiederzufinden.
+        """
+        return self._json("GET", f"/staffelpilot/spiele/{spiel_id}")  # type: ignore[no-any-return]
+
     def regeln(self) -> list[dict[str, Any]]:
         """Der Regelkatalog, wie er im Artefakt steht -- mit den Schaltern."""
         return self._json("GET", "/staffelpilot/regeln")  # type: ignore[no-any-return]

@@ -38,6 +38,10 @@ class Leser(Protocol):
     #: steht in den Einstellungen des Artefakts.
     sichtbar: bool
 
+    def freigeben(self, kennung: str) -> tuple[bool, str]:
+        """Die Prueferfreigabe erteilen. (geklappt, was zu sehen war)"""
+        ...
+
     def schliessen(self) -> None: ...
 
 
@@ -62,6 +66,7 @@ class DemoLeser:
         self.geschlossen = False
         self.spieltage = 0
         self.sichtbar = False
+        self.freigegeben: list[str] = []
 
     def anmelden(self, benutzer: str, passwort: str) -> None:
         # Das Passwort wird bewusst nicht gemerkt: auch ein Demo-Leser soll
@@ -87,6 +92,15 @@ class DemoLeser:
 
     def mannschaften(self, staffel: Staffelkennung, verband: str = "") -> list[dict[str, object]]:
         return self._mannschaften.get(staffel.name, [])
+
+    def freigeben(self, kennung: str) -> tuple[bool, str]:
+        """Der Demo-Leser traegt nichts ein und sagt das auch.
+
+        Kein stiller Erfolg: eine Uebertragung, die als erledigt gilt, ohne
+        dass jemand bei DFBnet war, ist die schlimmste aller Auskuenfte.
+        """
+        self.freigegeben.append(kennung)
+        return True, "Simuliert — es war kein Browser bei DFBnet"
 
     def schliessen(self) -> None:
         self.geschlossen = True

@@ -22,7 +22,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from . import aufstellung, auswahl, dienst, meldung
+from . import aufstellung, auswahl, dienst, freigabe, meldung
 from .bericht import MatchReport, MatchReportExtractor
 from .dienst import Spielzeile, Staffelkennung, StaffelNichtGefunden
 
@@ -370,21 +370,8 @@ class DfbnetLeser:
         am Spiel; er darf es nicht als "geprueft und sauber" durchgehen
         lassen.
         """
-        seite = self._seite
-        if seite is None:
-            raise RuntimeError("Erst anmelden, dann lesen")
-
-        verweis = seite.locator(f"a[href*='{kennung}']").first
-        if verweis.count() == 0:
-            logger.warning("Bericht %s: der Verweis steht nicht in der Trefferliste", kennung)
-            return None
-
-        try:
-            with seite.expect_popup(timeout=ZEIT_MS) as fenster:
-                verweis.click()
-            popup = fenster.value
-        except Exception:
-            logger.exception("Bericht %s: das Fenster ging nicht auf", kennung)
+        popup = self._bericht_fenster(kennung)
+        if popup is None:
             return None
 
         try:
@@ -444,6 +431,62 @@ class DfbnetLeser:
         except Exception:
             logger.exception("Bericht %s liess sich nicht lesen", kennung)
             return None
+        finally:
+            try:
+                popup.close()
+            except Exception:
+                logger.exception("Das Berichtsfenster liess sich nicht schliessen")
+
+    def _bericht_fenster(self, kennung: str) -> Any:
+        """Den Bericht als eigenes Fenster oeffnen, ueber die Trefferliste.
+
+        **Nicht ueber die Adresse.** Direkt angesprungen laedt DFBnet eine
+        Seite, die aussieht wie der Bericht, aber leer bleibt: keine
+        Ereignisse, keine Bestaetigungen, und die Schnittstelle antwortet 401.
+
+        `None`, wenn das Fenster nicht aufging -- der Aufrufer sagt dann, was
+        das fuer ihn heisst.
+        """
+        seite = self._seite
+        if seite is None:
+            raise RuntimeError("Erst anmelden, dann lesen")
+
+        verweis = seite.locator(f"a[href*='{kennung}']").first
+        if verweis.count() == 0:
+            logger.warning("Bericht %s: der Verweis steht nicht in der Trefferliste", kennung)
+            return None
+
+        try:
+            with seite.expect_popup(timeout=ZEIT_MS) as fenster:
+                verweis.click()
+            return fenster.value
+        except Exception:
+            logger.exception("Bericht %s: das Fenster ging nicht auf", kennung)
+            return None
+
+    def freigeben(self, kennung: str) -> tuple[bool, str]:
+        """Die Prueferfreigabe fuer einen Bericht erteilen.
+
+        **Die einzige Handlung dieses Dienstes, die DFBnet sieht.** Sie
+        passiert nur, wenn beide Schalter an sind -- der in der Oberflaeche und
+        der in der Umgebung; darueber wacht die Schleife.
+
+        Zurueck kommt, ob es geklappt hat, und was dabei zu sehen war. Der
+        Status wird aus einer neu geladenen Seite zurueckgelesen: ein Klick,
+        der keine Ausnahme wirft, ist kein Beweis.
+        """
+        popup = self._bericht_fenster(kennung)
+        if popup is None:
+            return False, "Der Bericht liess sich nicht oeffnen"
+        try:
+            ergebnis = freigabe.pruferfreigabe(popup, kennung)
+            return ergebnis.erfolg, ergebnis.meldung
+        except freigabe.FreigabeFehler as fehler:
+            logger.warning("Freigabe %s: %s", kennung, fehler)
+            return False, str(fehler)
+        except Exception as fehler:
+            logger.exception("Freigabe %s ist gescheitert", kennung)
+            return False, f"{type(fehler).__name__}: {fehler}"
         finally:
             try:
                 popup.close()
