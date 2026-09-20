@@ -23,6 +23,11 @@ export function App() {
               <Route path="/" element={<Start />} />
               <Route path="/anmelden" element={<Anmeldeseite />} />
               <Route path="/modul/:id" element={<ModulSeite />} />
+              {/* Bereiche sind echte Adressen: verlinkbar, mit dem
+                  Zurück-Knopf erreichbar, und ein Neuladen landet dort,
+                  wo man war. Die Modulkomponente bleibt dabei montiert,
+                  der Wechsel kostet keinen Abruf. */}
+              <Route path="/modul/:id/:unterseite" element={<ModulSeite />} />
               <Route path="*" element={<Start />} />
             </Routes>
           </Passwortwechseltor>

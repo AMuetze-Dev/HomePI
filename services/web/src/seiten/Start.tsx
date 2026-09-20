@@ -1,41 +1,25 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { fetchModule, type ModulEintrag } from "../api/client";
+import type { ModulEintrag } from "../api/client";
 import { Anmeldeformular } from "../anmeldung/Anmeldeformular";
 import { useAnmeldung } from "../anmeldung/kontext";
 import { SystemStatus } from "../components/SystemStatus";
-import { Etikett, Karte, Leerzustand, Platzhalter, Seitenkopf, Statuspunkt } from "../ui";
+import { useModule } from "../module/useModule";
+import {
+  Etikett,
+  Inhaltsbreite,
+  Karte,
+  Leerzustand,
+  Platzhalter,
+  Seitenkopf,
+  Statuspunkt,
+} from "../ui";
 import stil from "./Start.module.css";
 
-type Zustand =
-  | { phase: "laedt" }
-  | { phase: "fertig"; module: ModulEintrag[] }
-  | { phase: "fehler"; nachricht: string };
-
 export function Start() {
-  const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
-  const { zustand: anmeldung, benutzer } = useAnmeldung();
-  // Nicht das ganze Objekt: es ist bei jedem Abruf neu, die Kennung nicht.
-  const benutzerId = benutzer?.id ?? null;
-
-  useEffect(() => {
-    // Erst fragen, wenn feststeht, wer fragt. Sonst holt die Seite das
-    // Manifest zweimal - einmal anonym, einmal angemeldet.
-    if (anmeldung === "laedt") return undefined;
-
-    const controller = new AbortController();
-
-    fetchModule(controller.signal)
-      .then((module) => setZustand({ phase: "fertig", module }))
-      .catch((fehler: unknown) => {
-        if (controller.signal.aborted) return;
-        const nachricht = fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-        setZustand({ phase: "fehler", nachricht });
-      });
-
-    return () => controller.abort();
-  }, [anmeldung, benutzerId]);
+  // Dieselbe Liste, die auch die Navigationsleiste zeigt - einmal geholt.
+  const zustand = useModule();
+  const { zustand: anmeldung } = useAnmeldung();
 
   // Solange das Manifest unterwegs ist, steht noch nicht fest, ob diese Seite
   // eine Übersicht wird oder ein Anmeldeformular. Deshalb hier nur ein
@@ -43,10 +27,12 @@ export function Start() {
   // später vom Anmeldeformular abgelöst wird, ist schlechter als gar keine.
   if (anmeldung === "laedt" || zustand.phase === "laedt") {
     return (
-      <div className={stil.laden} role="status" aria-label="Wird geladen">
-        <Platzhalter breite="12rem" hoehe="2rem" />
-        <Ladegitter />
-      </div>
+      <Inhaltsbreite breite="weit">
+        <div className={stil.laden} role="status" aria-label="Wird geladen">
+          <Platzhalter breite="12rem" hoehe="2rem" />
+          <Ladegitter />
+        </div>
+      </Inhaltsbreite>
     );
   }
 
@@ -57,11 +43,15 @@ export function Start() {
     zustand.phase === "fertig" &&
     zustand.module.length === 0
   ) {
-    return <Anmeldeformular />;
+    return (
+      <Inhaltsbreite breite="text">
+        <Anmeldeformular />
+      </Inhaltsbreite>
+    );
   }
 
   return (
-    <>
+    <Inhaltsbreite breite="weit">
       <Seitenkopf
         titel="Übersicht"
         beschreibung="Alle Dienste dieser Installation an einem Ort. Es steht hier nur, wofür du berechtigt bist."
@@ -89,7 +79,7 @@ export function Start() {
 
         {zustand.phase === "fertig" && <Kacheln module={zustand.module} />}
       </section>
-    </>
+    </Inhaltsbreite>
   );
 }
 

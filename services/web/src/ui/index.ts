@@ -2,6 +2,7 @@
 export { Etikett } from "./Etikett";
 export { Feld } from "./Feld";
 export { Hinweis } from "./Hinweis";
+export { Inhaltsbreite } from "./Inhaltsbreite";
 export { Karte } from "./Karte";
 export { Knopf } from "./Knopf";
 export { Leerzustand } from "./Leerzustand";

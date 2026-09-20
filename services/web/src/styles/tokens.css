@@ -141,9 +141,33 @@
     0 1px 2px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 35%)),
     0 12px 32px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 35%));
 
-  --breite-inhalt: 68rem;
-  --breite-text: 40rem;
+  /* ------------------------------------------------------------- Breiten
+   * Eine Skala, keine einzelne Zahl. Vorher gab es nur --breite-inhalt, und
+   * damit bekam jede Ansicht dieselbe Spalte: die Geraeteliste mit drei
+   * Eintraegen genauso wie eine Spielprueftabelle. Auf einem breiten Monitor
+   * war ueber die Haelfte Rand.
+   *
+   * Welche Breite gilt, entscheidet jetzt das Modul (src/module/typen.ts),
+   * nicht die Huelle. Die Huelle stellt nur die Stufen bereit.
+   */
+  --breite-text: 40rem; /* Fliesstext, Formulare - eine Spalte zum Lesen */
+  --breite-inhalt: 68rem; /* Voreinstellung: Karten, mittlere Listen */
+  --breite-weit: 100rem; /* dichte Listen, mehrspaltige Raster */
+  /* "voll" bekommt gar keine Begrenzung - nur den Seitenrand. */
+
+  --raum-rand: var(--raum-6); /* Seitenrand des Inhalts */
+  --breite-navigation: 15rem;
   --hoehe-kopf: 3.5rem;
+
+  /* ------------------------------------------------------------- Ebenen
+   * Eine Leiter statt geratener Zahlen. Wer irgendwo z-index: 9999 schreibt,
+   * hat die Leiter nicht gefunden - nicht ein neues Problem geloest.
+   */
+  --ebene-grund: 0;
+  --ebene-klebend: 20;
+  --ebene-navigation: 30;
+  --ebene-schleier: 40;
+  --ebene-sprung: 60;
 
   /* --------------------------------------------------------------- Bewegung
    * Kurz und ohne Nachschwingen. Über 250 ms wirkt träge, mit Überschwingen

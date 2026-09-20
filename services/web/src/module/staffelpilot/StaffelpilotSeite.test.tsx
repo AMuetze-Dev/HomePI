@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../api/client";
@@ -14,7 +15,7 @@ function staffel(rest: Partial<api.Staffel> = {}): api.Staffel {
     altersklasse: "maenner",
     spielklasse: "3.Kreisliga (C)",
     saison: "26/27",
-  spieltage: 0,
+    spieltage: 0,
     aktiv: true,
     ...rest,
   };
@@ -82,10 +83,20 @@ function uebersicht(rest: Partial<api.Zusammenfassung> = {}): api.Zusammenfassun
   };
 }
 
-/** Die Startfläche ist die Übersicht. Wer die Warteschlange prüfen will,
- *  geht in die Spielprüfung - im Test wie im Betrieb. */
-async function zurSpielpruefung() {
-  await userEvent.click(await screen.findByRole("tab", { name: "Spielprüfung" }));
+/**
+ * Rendert das Modul in einem bestimmten Bereich.
+ *
+ * Die Bereiche sind Adressen, keine Zustaende im Modul mehr - welcher gilt,
+ * kommt von aussen. Der MemoryRouter ist noetig, weil das Modul fuer den
+ * Sprung zwischen Bereichen navigiert (etwa vom leeren Zustand zu den
+ * Staffeln).
+ */
+function zeige(unterseite = "uebersicht") {
+  return render(
+    <MemoryRouter initialEntries={[`/modul/staffelpilot/${unterseite}`]}>
+      <StaffelpilotSeite unterseite={unterseite} />
+    </MemoryRouter>,
+  );
 }
 
 function mitDaten(
@@ -167,7 +178,7 @@ describe("StaffelPilot — die vier Zustände", () => {
     vi.spyOn(api, "ladeWarteschlange").mockReturnValue(new Promise(() => {}));
     vi.spyOn(api, "ladeZusammenfassung").mockReturnValue(new Promise(() => {}));
 
-    render(<StaffelpilotSeite />);
+    zeige();
 
     expect(screen.getByRole("status", { name: /geladen/i })).toBeInTheDocument();
   });
@@ -179,7 +190,7 @@ describe("StaffelPilot — die vier Zustände", () => {
     vi.spyOn(api, "ladeWarteschlange").mockResolvedValue([]);
     vi.spyOn(api, "ladeZusammenfassung").mockResolvedValue(uebersicht());
 
-    render(<StaffelpilotSeite />);
+    zeige();
 
     expect(await screen.findByText("Die Datenbank antwortet nicht")).toBeInTheDocument();
   });
@@ -199,7 +210,7 @@ describe("StaffelPilot — die vier Zustände", () => {
       }),
     );
 
-    render(<StaffelpilotSeite />);
+    zeige();
 
     expect(await screen.findByText(/keine aktive staffel/i)).toBeInTheDocument();
     expect(
@@ -210,8 +221,7 @@ describe("StaffelPilot — die vier Zustände", () => {
   it("und auch in der Spielprüfung", async () => {
     mitDaten([], [], uebersicht({ staffeln_aktiv: 0 }));
 
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
 
     expect(await screen.findByText(/noch keine staffel angelegt/i)).toBeInTheDocument();
   });
@@ -219,8 +229,7 @@ describe("StaffelPilot — die vier Zustände", () => {
   it("sagt mit Staffel, aber ohne Spiele, woher die Berichte kommen", async () => {
     mitDaten([staffel()], []);
 
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
 
     expect(await screen.findByText(/keine spielberichte/i)).toBeInTheDocument();
     expect(screen.getByText(/POST \/staffelpilot\/import/)).toBeInTheDocument();
@@ -229,8 +238,7 @@ describe("StaffelPilot — die vier Zustände", () => {
   it("zeigt gefüllt die Paarung und die Zähler", async () => {
     mitDaten();
 
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
 
     expect(await screen.findByText("SG Gittersee – SV Fortschritt")).toBeInTheDocument();
     expect(screen.getByText("1 kritisch")).toBeInTheDocument();
@@ -239,7 +247,7 @@ describe("StaffelPilot — die vier Zustände", () => {
   it("zeigt die Zähler auf der Übersicht", async () => {
     mitDaten();
 
-    render(<StaffelpilotSeite />);
+    zeige();
 
     const ueberblick = await screen.findByRole("list", { name: "Überblick" });
     expect(within(ueberblick).getByText("zu prüfen")).toBeInTheDocument();
@@ -249,8 +257,7 @@ describe("StaffelPilot — die vier Zustände", () => {
 describe("Ein Spielbericht", () => {
   it("klappt auf und zeigt seine Befunde", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     const kopf = await screen.findByRole("button", {
       name: /SG Gittersee – SV Fortschritt/,
     });
@@ -263,8 +270,7 @@ describe("Ein Spielbericht", () => {
 
   it("klappt beim zweiten Klick wieder zu", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     const kopf = await screen.findByRole("button", { name: /SG Gittersee/ });
     await userEvent.click(kopf);
     await screen.findByText("Feldverweis auf Dauer");
@@ -279,8 +285,7 @@ describe("Ein Spielbericht", () => {
   it("sagt, dass nichts zu tun ist, wenn der Bericht sauber ist", async () => {
     mitDaten([staffel()], [zeile({ offene_befunde: 0, kritische_befunde: 0 })]);
     vi.spyOn(api, "ladeSpiel").mockResolvedValue(spiel({ befunde: [] }));
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
 
     await userEvent.click(await screen.findByRole("button", { name: /SG Gittersee/ }));
 
@@ -291,8 +296,7 @@ describe("Ein Spielbericht", () => {
 describe("Einen Befund entscheiden", () => {
   it("nimmt ihn zur Kenntnis", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByRole("button", { name: /SG Gittersee/ }));
 
     await userEvent.click(
@@ -304,8 +308,7 @@ describe("Einen Befund entscheiden", () => {
 
   it("fragt beim Verwerfen erst nach dem Grund", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByRole("button", { name: /SG Gittersee/ }));
 
     await userEvent.click(await screen.findByRole("button", { name: "Kein Verstoß" }));
@@ -316,8 +319,7 @@ describe("Einen Befund entscheiden", () => {
 
   it("schickt den Grund mit", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByRole("button", { name: /SG Gittersee/ }));
     await userEvent.click(await screen.findByRole("button", { name: "Kein Verstoß" }));
 
@@ -339,8 +341,7 @@ describe("Einen Befund entscheiden", () => {
     vi.spyOn(api, "entscheide").mockRejectedValue(
       new ApiError("Zum Verwerfen eines Befundes gehört eine Begründung", 422),
     );
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByRole("button", { name: /SG Gittersee/ }));
     await userEvent.click(await screen.findByRole("button", { name: "Kein Verstoß" }));
     const feld = screen.getByRole("textbox", { name: /warum/i });
@@ -361,8 +362,7 @@ describe("Einen Befund entscheiden", () => {
         befunde: [befund({ entscheidung: "verworfen", grund: "war spielberechtigt" })],
       }),
     );
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
 
     await userEvent.click(await screen.findByRole("button", { name: /SG Gittersee/ }));
 
@@ -373,8 +373,7 @@ describe("Einen Befund entscheiden", () => {
 describe("Abhaken", () => {
   it("hakt ab", async () => {
     mitDaten([staffel()], [zeile({ offene_befunde: 0, kritische_befunde: 0 })]);
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByRole("button", { name: /SG Gittersee/ }));
 
     await userEvent.click(await screen.findByRole("button", { name: "Abhaken" }));
@@ -387,8 +386,7 @@ describe("Abhaken", () => {
     vi.spyOn(api, "hakeAb").mockRejectedValue(
       new ApiError("1 Befund braucht noch eine Entscheidung", 409),
     );
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByRole("button", { name: /SG Gittersee/ }));
 
     await userEvent.click(await screen.findByRole("button", { name: "Abhaken" }));
@@ -408,8 +406,7 @@ describe("Abhaken", () => {
       [staffel()],
       [zeile({ abgehakt: true, offene_befunde: 0, kritische_befunde: 0 })],
     );
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByRole("button", { name: /SG Gittersee/ }));
 
     await userEvent.click(await screen.findByRole("button", { name: "Haken entfernen" }));
@@ -421,8 +418,7 @@ describe("Abhaken", () => {
 describe("Staffeln", () => {
   it("legt eine an und leert das Formular", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await userEvent.click(await screen.findByRole("tab", { name: "Staffeln" }));
+    zeige("staffeln");
     await screen.findByRole("heading", { name: "Staffel anlegen" });
 
     await userEvent.type(
@@ -452,8 +448,7 @@ describe("Staffeln", () => {
     vi.spyOn(api, "legeStaffelAn").mockRejectedValue(
       new ApiError("Eine Staffel namens 'Stadtliga C' gibt es bereits", 409),
     );
-    render(<StaffelpilotSeite />);
-    await userEvent.click(await screen.findByRole("tab", { name: "Staffeln" }));
+    zeige("staffeln");
     await screen.findByRole("heading", { name: "Staffel anlegen" });
     await userEvent.type(screen.getByRole("textbox", { name: "Name" }), "Stadtliga C");
     await userEvent.type(
@@ -471,8 +466,7 @@ describe("Staffeln", () => {
 
   it("bietet den Filter erst ab zwei Staffeln an", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await screen.findByText("SG Gittersee – SV Fortschritt");
 
     expect(screen.queryByRole("combobox", { name: "Staffel" })).not.toBeInTheDocument();
@@ -480,8 +474,7 @@ describe("Staffeln", () => {
 
   it("filtert nach Staffel", async () => {
     mitDaten([staffel(), staffel({ id: "s2", name: "Ü35 1. Stadtklasse" })]);
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     const filter = await screen.findByRole("combobox", { name: "Staffel" });
 
     await userEvent.selectOptions(filter, "s2");
@@ -496,55 +489,31 @@ describe("Staffeln", () => {
   });
 });
 
-describe("Die Reiter", () => {
-  it("fangen bei der Übersicht an", async () => {
-    // Die Fläche, die man morgens aufmacht - wie in der alten Seitenleiste.
+describe("Die Bereiche", () => {
+  it("zeigen ohne Bereich in der Adresse die Übersicht", async () => {
+    // Die Fläche, die man morgens aufmacht. Welcher Bereich das ist, sagt
+    // die Reihenfolge im Register - hier wird nur geprüft, dass das Modul
+    // ohne Angabe nicht leer bleibt.
     mitDaten();
-    render(<StaffelpilotSeite />);
+    render(
+      <MemoryRouter>
+        <StaffelpilotSeite />
+      </MemoryRouter>,
+    );
 
     expect(await screen.findByRole("list", { name: "Überblick" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Übersicht" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-  });
-
-  it("tragen die Punkte der alten Seitenleiste", async () => {
-    mitDaten();
-    render(<StaffelpilotSeite />);
-    await screen.findByRole("list", { name: "Überblick" });
-
-    const namen = screen.getAllByRole("tab").map((k) => k.textContent);
-
-    expect(namen).toEqual([
-      "Übersicht",
-      "Spielprüfung",
-      "Prüflauf",
-      "Ergebnisse",
-      "Staffeln",
-      "Vorgänge",
-      "Regeln",
-      "Einstellungen",
-      "DFBnet-Zugang",
-    ]);
   });
 
   it("führen zu den Vorgängen", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await screen.findByRole("list", { name: "Überblick" });
-
-    await userEvent.click(screen.getByRole("tab", { name: "Vorgänge" }));
+    zeige("vorgaenge");
 
     expect(await screen.findByText("Keine Vorgänge")).toBeInTheDocument();
   });
 
   it("führen zu den Einstellungen", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await screen.findByRole("list", { name: "Überblick" });
-
-    await userEvent.click(screen.getByRole("tab", { name: "Einstellungen" }));
+    zeige("einstellungen");
 
     expect(await screen.findByLabelText(/Staffelleiter/)).toBeInTheDocument();
   });
@@ -553,10 +522,7 @@ describe("Die Reiter", () => {
     // Eine Staffel wird einmal im Jahr eingerichtet, und dazu gehört, wer
     // darin spielt. Zwei Flächen dafür wären ein Weg zu viel.
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await screen.findByRole("list", { name: "Überblick" });
-
-    await userEvent.click(screen.getByRole("tab", { name: "Staffeln" }));
+    zeige("staffeln");
     await userEvent.click(await screen.findByRole("button", { name: /Stadtliga C/ }));
 
     expect(
@@ -570,8 +536,7 @@ describe("Aus einem Befund einen Entwurf machen", () => {
     // Die meisten Befunde sind Hinweise. Fuer sie einen Knopf anzubieten
     // hiesse, Arbeit vorzuschlagen, die es nicht gibt.
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
 
     await screen.findByText("Feldverweis auf Dauer");
@@ -583,8 +548,7 @@ describe("Aus einem Befund einen Entwurf machen", () => {
     vi.spyOn(api, "ladeSpiel").mockResolvedValue(
       spiel({ befunde: [befund({ weg: "mahnung" })] }),
     );
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
 
     expect(
@@ -611,8 +575,7 @@ describe("Aus einem Befund einen Entwurf machen", () => {
       text: "",
       versandt_am: null,
     });
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
 
     await userEvent.click(
@@ -627,8 +590,7 @@ describe("Aus einem Befund einen Entwurf machen", () => {
     vi.spyOn(api, "ladeSpiel").mockResolvedValue(
       spiel({ befunde: [befund({ weg: "mahnung", vorgang_id: "v1" })] }),
     );
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
 
     expect(await screen.findByText(/Entwurf angelegt/)).toBeInTheDocument();
@@ -640,8 +602,7 @@ describe("Nur fällige", () => {
   it("fragt die Warteschlange gefiltert ab", async () => {
     // Der haeufigste Handgriff am Montag: was ist seit dem Wochenende faellig.
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await screen.findByText("SG Gittersee – SV Fortschritt");
 
     await userEvent.click(screen.getByRole("button", { name: "Nur fällige" }));
@@ -657,8 +618,7 @@ describe("Nur fällige", () => {
 
   it("markiert ein Spiel außerhalb des Prüfzeitraums", async () => {
     mitDaten([staffel()], [zeile({ faellig: false })]);
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
 
     expect(await screen.findByText("außerhalb des Prüfzeitraums")).toBeInTheDocument();
   });
@@ -667,8 +627,7 @@ describe("Nur fällige", () => {
     // Zwei Etiketten fuer denselben Umstand sind eines zu viel: abgehakt
     // heisst erledigt, und dann ist der Zeitraum keine Auskunft mehr.
     mitDaten([staffel()], [zeile({ faellig: false, abgehakt: true })]);
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
 
     const liste = await screen.findByRole("list", { name: "Spielberichte" });
     expect(within(liste).getByText("abgehakt")).toBeInTheDocument();
@@ -679,10 +638,7 @@ describe("Nur fällige", () => {
 
   it("führt zu den Regeln", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await screen.findByRole("list", { name: "Überblick" });
-
-    await userEvent.click(screen.getByRole("tab", { name: "Regeln" }));
+    zeige("regeln");
 
     expect(await screen.findByText("Kein Regelkatalog")).toBeInTheDocument();
   });
@@ -694,8 +650,7 @@ describe("Eine Entscheidung zurücknehmen", () => {
     vi.spyOn(api, "ladeSpiel").mockResolvedValue(
       spiel({ befunde: [befund({ entscheidung: "kenntnis" })] }),
     );
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
 
     expect(
@@ -705,8 +660,7 @@ describe("Eine Entscheidung zurücknehmen", () => {
 
   it("bietet es am offenen Befund nicht an", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
 
     await screen.findByText("Feldverweis auf Dauer");
@@ -721,8 +675,7 @@ describe("Eine Entscheidung zurücknehmen", () => {
       spiel({ befunde: [befund({ entscheidung: "verworfen", grund: "kein Verstoß" })] }),
     );
     const zurueck = vi.spyOn(api, "nimmEntscheidungZurueck").mockResolvedValue(befund());
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
 
     await userEvent.click(await screen.findByRole("button", { name: "Zurücknehmen" }));
@@ -740,8 +693,7 @@ describe("Eine Entscheidung zurücknehmen", () => {
     vi.spyOn(api, "nimmEntscheidungZurueck").mockRejectedValue(
       new ApiError("Zu diesem Befund ist ein Schreiben versandt.", 409),
     );
-    render(<StaffelpilotSeite />);
-    await zurSpielpruefung();
+    zeige("spiele");
     await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
 
     await userEvent.click(await screen.findByRole("button", { name: "Zurücknehmen" }));
@@ -750,23 +702,17 @@ describe("Eine Entscheidung zurücknehmen", () => {
   });
 });
 
-describe("Die neuen Reiter", () => {
+describe("Die später ergänzten Bereiche", () => {
   it("führen zu den Ergebnissen", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await screen.findByRole("list", { name: "Überblick" });
-
-    await userEvent.click(screen.getByRole("tab", { name: "Ergebnisse" }));
+    zeige("ergebnisse");
 
     expect(await screen.findByRole("list", { name: "Bilanz" })).toBeInTheDocument();
   });
 
   it("führen zum DFBnet-Zugang", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await screen.findByRole("list", { name: "Überblick" });
-
-    await userEvent.click(screen.getByRole("tab", { name: "DFBnet-Zugang" }));
+    zeige("zugang");
 
     expect(
       await screen.findByRole("heading", { name: "DFBnet-Zugang" }),
@@ -775,10 +721,7 @@ describe("Die neuen Reiter", () => {
 
   it("führen zum Prüflauf", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await screen.findByRole("list", { name: "Überblick" });
-
-    await userEvent.click(screen.getByRole("tab", { name: "Prüflauf" }));
+    zeige("prueflauf");
 
     expect(
       await screen.findByRole("button", { name: "Prüflauf anfordern" }),
@@ -787,10 +730,7 @@ describe("Die neuen Reiter", () => {
 
   it("halten die Einstellungen frei vom Zugang", async () => {
     mitDaten();
-    render(<StaffelpilotSeite />);
-    await screen.findByRole("list", { name: "Überblick" });
-
-    await userEvent.click(screen.getByRole("tab", { name: "Einstellungen" }));
+    zeige("einstellungen");
 
     await screen.findByLabelText(/Staffelleiter/);
     expect(

@@ -1,4 +1,17 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * Die Navigationsleiste - Artefakte und, beim geöffneten, dessen Bereiche.
+ *
+ * Ohne diese beiden Helfer wird jeder Verweis mehrdeutig: Seit die Leiste
+ * dauerhaft danebensteht, heißt "Verwaltung" sowohl die Kachel auf der
+ * Startseite als auch der Eintrag in der Leiste. Playwright bricht solche
+ * Treffer streng ab - zu Recht, denn welcher gemeint ist, weiß der Test
+ * sonst selbst nicht.
+ */
+function artefakt(page: Page, name: string | RegExp) {
+  return page.getByRole("navigation", { name: "Artefakte" }).getByRole("link", { name });
+}
 
 /**
  * Der Weg, den eine frische Installation nimmt.
@@ -82,7 +95,7 @@ test.describe("Der Weg einer frischen Installation", () => {
 
   test("ein neues Konto braucht nur einen Namen", async ({ page }) => {
     await anmelden(page, VERWALTERIN.name, VERWALTERIN.passwort);
-    await page.getByRole("link", { name: /Verwaltung/ }).click();
+    await artefakt(page, /Verwaltung/).click();
 
     await page.getByLabel("Benutzername").fill(NEULING.name);
     await page.getByLabel("Anzeigename").fill(NEULING.anzeige);
@@ -99,7 +112,7 @@ test.describe("Der Weg einer frischen Installation", () => {
 
   test("sie gibt dem Konto ein Recht", async ({ page }) => {
     await anmelden(page, VERWALTERIN.name, VERWALTERIN.passwort);
-    await page.getByRole("link", { name: /Verwaltung/ }).click();
+    await artefakt(page, /Verwaltung/).click();
 
     await page
       .getByRole("button", { name: new RegExp(`Rechte von ${NEULING.name}`) })
@@ -162,7 +175,7 @@ test.describe("Der Weg einer frischen Installation", () => {
   test("mit dem eigenen Passwort kommt er an sein Artefakt", async ({ page }) => {
     await anmelden(page, NEULING.name, NEULING.eigenes);
 
-    await page.getByRole("link", { name: /Geräte/ }).click();
+    await artefakt(page, /Geräte/).click();
 
     await expect(page.getByRole("heading", { name: "Geräte" })).toBeVisible();
   });

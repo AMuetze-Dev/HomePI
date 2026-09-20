@@ -1,0 +1,35 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
+.text,
+.normal,
+.weit,
+.voll {
+  width: 100%;
+  /* Ohne das drueckt eine breite Tabelle die Spalte auf und schiebt die
+     Navigationsleiste aus dem Bild. */
+  min-width: 0;
+}
+
+/* Zentriert, nicht linksbündig: Bei einer schmalen Spalte auf einem breiten
+   Monitor säße der Text sonst an der Leiste geklebt, während rechts ein
+   halber Meter leer bliebe. */
+.text,
+.normal,
+.weit {
+  margin-inline: auto;
+}
+
+.text {
+  max-width: var(--breite-text);
+}
+
+.normal {
+  max-width: var(--breite-inhalt);
+}
+
+.weit {
+  max-width: var(--breite-weit);
+}
+
+/* "voll" bekommt gar keine Begrenzung - nur den Seitenrand der Hülle. */

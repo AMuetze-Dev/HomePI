@@ -25,7 +25,8 @@ steht.
 src/styles/tokens.css   alle Werte - Farben, Typo, Maße, Bewegung
 src/styles/basis.css    Reset und Elementgrundlagen
 src/ui/                 Bausteine (Knopf, Karte, Feld, Etikett, …)
-src/huelle/             Rahmen: Kopfzeile, Inhaltsspalte, Themenwechsel
+src/huelle/             Rahmen: Navigationsleiste, Kopfzeile, Themenwechsel
+src/module/register.ts  was jedes Artefakt an Platz und Bereichen anmeldet
 src/seiten/             Ansichten
 ```
 
@@ -46,16 +47,16 @@ Die Namen beschreiben die **Rolle**, nicht den Wert: `--farbe-text-leise` statt
 `--grau-500`. Dadurch ist der Dunkelmodus eine Frage der Werte, nicht der
 Komponenten.
 
-| Token | Verwendung |
-|---|---|
-| `--farbe-grund` | Seitenhintergrund |
-| `--farbe-flaeche` | Karten, Eingabefelder |
-| `--farbe-flaeche-gedaempft` | Zeilen beim Zeigen, deaktivierte Felder |
-| `--farbe-rand` / `--farbe-rand-stark` | Trennlinien, Ränder beim Zeigen |
-| `--farbe-text` / `-gedaempft` / `-leise` | drei Stufen, mehr braucht es nicht |
-| `--farbe-aktion` | Primärknopf, Markenzeichen |
-| `--farbe-fokus` | Fokusring — die einzige gesättigte Farbe im Grundzustand |
-| `--signal-gut` / `-warnung` / `-fehler` | Zustände, je mit `-flaeche` |
+| Token                                    | Verwendung                                               |
+| ---------------------------------------- | -------------------------------------------------------- |
+| `--farbe-grund`                          | Seitenhintergrund                                        |
+| `--farbe-flaeche`                        | Karten, Eingabefelder                                    |
+| `--farbe-flaeche-gedaempft`              | Zeilen beim Zeigen, deaktivierte Felder                  |
+| `--farbe-rand` / `--farbe-rand-stark`    | Trennlinien, Ränder beim Zeigen                          |
+| `--farbe-text` / `-gedaempft` / `-leise` | drei Stufen, mehr braucht es nicht                       |
+| `--farbe-aktion`                         | Primärknopf, Markenzeichen                               |
+| `--farbe-fokus`                          | Fokusring — die einzige gesättigte Farbe im Grundzustand |
+| `--signal-gut` / `-warnung` / `-fehler`  | Zustände, je mit `-flaeche`                              |
 
 Hell und Dunkel stehen über `light-dark()` in **einer** Deklaration:
 
@@ -77,13 +78,13 @@ Kein Webfont. Der Systemstapel rendert auf jeder Plattform nativ optimiert,
 lädt in null Millisekunden und braucht keine Verbindung nach außen — auf einem
 Pi ohne Internetzwang die richtige Wahl.
 
-| Token | Größe | Verwendung |
-|---|---|---|
-| `--text-xs` | 12 px | Etiketten, Pfade, Versionen |
-| `--text-sm` | 13 px | Sekundärtext, Tabellen |
-| `--text-md` | 14 px | **Basisgröße der Oberfläche** |
-| `--text-lg` | 16 px | Abschnittsüberschriften |
-| `--text-2xl` | 24 px | Seitentitel |
+| Token        | Größe | Verwendung                    |
+| ------------ | ----- | ----------------------------- |
+| `--text-xs`  | 12 px | Etiketten, Pfade, Versionen   |
+| `--text-sm`  | 13 px | Sekundärtext, Tabellen        |
+| `--text-md`  | 14 px | **Basisgröße der Oberfläche** |
+| `--text-lg`  | 16 px | Abschnittsüberschriften       |
+| `--text-2xl` | 24 px | Seitentitel                   |
 
 Negative Laufweite (`--laufweite-eng`, `--laufweite-enger`) erst ab
 Überschriftengröße — im Fließtext macht sie die Zeile schlechter lesbar, nicht
@@ -104,28 +105,29 @@ Produkt ist ein Vielfaches davon.
 Rundungen: `--rundung-sm` 6 px (Etiketten), `--rundung-md` 8 px (Knöpfe,
 Felder), `--rundung-lg` 12 px (Karten).
 
-| Dauer | Wofür |
-|---|---|
-| `--dauer-sofort` 80 ms | Druckpunkt beim Klick |
+| Dauer                    | Wofür                      |
+| ------------------------ | -------------------------- |
+| `--dauer-sofort` 80 ms   | Druckpunkt beim Klick      |
 | `--dauer-schnell` 140 ms | Zeigen, Fokus, Farbwechsel |
-| `--dauer-normal` 220 ms | Eintritt von Inhalten |
+| `--dauer-normal` 220 ms  | Eintritt von Inhalten      |
 
 Zwei Verläufe: `--verlauf` für Zustandswechsel, `--verlauf-eintritt` für
 erscheinende Elemente. Beide ohne Überschwingen.
 
 ## Bausteine
 
-| Komponente | Zweck |
-|---|---|
-| `Knopf` | drei Ausprägungen: `primaer`, `sekundaer`, `leise` |
-| `Karte` | abgegrenzte Fläche; `blank` für Inhalte mit eigenem Innenabstand |
-| `Feld` | Eingabe mit verbundener Beschriftung |
-| `Etikett` | kompakter Zustand oder Kennung; `mono` für Technisches |
-| `Statuspunkt` | reine Dekoration, Bedeutung steht im Text daneben |
-| `Hinweis` | Meldung mit `role="alert"` oder `role="status"` |
-| `Leerzustand` | Erstzustand mit Erklärung, was als Nächstes zu tun ist |
-| `Platzhalter` | Skelett während des Ladens |
-| `Seitenkopf` | Titel, Beschreibung, Zurück-Verweis |
+| Komponente      | Zweck                                                            |
+| --------------- | ---------------------------------------------------------------- |
+| `Knopf`         | drei Ausprägungen: `primaer`, `sekundaer`, `leise`               |
+| `Karte`         | abgegrenzte Fläche; `blank` für Inhalte mit eigenem Innenabstand |
+| `Feld`          | Eingabe mit verbundener Beschriftung                             |
+| `Etikett`       | kompakter Zustand oder Kennung; `mono` für Technisches           |
+| `Statuspunkt`   | reine Dekoration, Bedeutung steht im Text daneben                |
+| `Hinweis`       | Meldung mit `role="alert"` oder `role="status"`                  |
+| `Leerzustand`   | Erstzustand mit Erklärung, was als Nächstes zu tun ist           |
+| `Platzhalter`   | Skelett während des Ladens                                       |
+| `Seitenkopf`    | Titel, Beschreibung, Zurück-Verweis                              |
+| `Inhaltsbreite` | begrenzt eine Ansicht auf die angemeldete Stufe                  |
 
 **Es gibt genau drei Knopf-Ausprägungen, und das ist Absicht.** Sobald eine
 vierte dazukommt, hat die Seite eine Hierarchie zu viel und keine ist mehr klar.
@@ -134,14 +136,96 @@ Deaktiviert heißt gedämpft, nicht durchscheinend: bloße Transparenz macht aus
 einem dunklen Primärknopf einen schweren grauen Block, der mehr Aufmerksamkeit
 zieht als der aktive daneben.
 
+## Aufbau der Oberfläche
+
+Links eine Navigationsleiste über die volle Höhe, rechts der Inhalt. Die
+Leiste trägt **beide** Ebenen: oben die Artefakte, und eingerückt darunter die
+Bereiche des gerade geöffneten.
+
+Eine zweite Leiste für die Bereiche — wie in manchen Editoren — wäre die
+naheliegende Alternative gewesen. Sie kostet dauerhaft rund 200 px, und zwar
+ausgerechnet bei den Artefakten, die Breite brauchen: Ein Artefakt mit neun
+Bereichen ist meist auch eins mit breiten Tabellen.
+
+Ein Artefakt ohne Bereiche hat schlicht keine zweite Ebene. Kein leerer
+Platzhalter, keine Leiste, die aussieht, als fehle etwas — der Platz gehört
+dann dem Inhalt. **Derselbe Stil, unterschiedlicher Umfang.**
+
+### Die Breite meldet das Artefakt an, nicht die Hülle
+
+Vorher gab es genau ein `--breite-inhalt` von 68 rem für alles. Das ging so
+lange gut, wie es ein Artefakt gab. Bei dreien ist es falsch: Eine Geräteliste
+mit drei Einträgen braucht keine 1088 px, eine Spielprüftabelle hätte gern
+mehr, und auf einem 2560-px-Monitor war über die Hälfte Rand.
+
+Jetzt meldet jedes Artefakt seinen Bedarf in `src/module/register.ts` an:
+
+| Stufe    | Maß         | Wofür                                       |
+| -------- | ----------- | ------------------------------------------- |
+| `text`   | 40 rem      | Formulare, Fließtext, Einstellungen         |
+| `normal` | 68 rem      | **Voreinstellung.** Karten, mittlere Listen |
+| `weit`   | 100 rem     | dichte Listen, mehrspaltige Raster          |
+| `voll`   | ohne Grenze | Tabellen, Pläne, Übersichten                |
+
+Vier Stufen, mehr nicht. Eine fünfte wäre schon eine, bei der niemand mehr
+sagen könnte, wann man sie nimmt.
+
+**Auch ein einzelner Bereich darf abweichen.** Das ist kein Feinschliff,
+sondern ein Fehler, den man sofort sieht: Bei StaffelPilot braucht die
+Spielprüfung jeden Millimeter, während das Formular „Staffel anlegen" bei
+voller Breite Eingabefelder von 1400 px bekäme — quer über den Monitor, mit
+dem Namensfeld links und der Beschriftung außer Sichtweite.
+
+```ts
+{
+  id: "staffelpilot",
+  breite: "voll",                                  // Grundmaß des Artefakts
+  unterseiten: [
+    { id: "spiele", wort: "Spielprüfung" },        // erbt "voll"
+    { id: "zugang", wort: "DFBnet-Zugang",
+      breite: "text" },                            // weicht ab
+  ],
+}
+```
+
+Die Suche geht von genau nach grob: Bereich, dann Artefakt, dann
+Voreinstellung. Ein Bereich muss also nur etwas sagen, wenn er abweicht.
+
+### Bereiche sind Adressen, keine Zustände
+
+`/modul/staffelpilot/spiele` ist eine echte Adresse. Das ist keine
+Förmlichkeit:
+
+- Ein Bereich lässt sich verlinken und als Lesezeichen ablegen.
+- Der Zurück-Knopf führt zum vorigen Bereich statt aus dem Artefakt heraus.
+- Ein Neuladen landet dort, wo man war — und nicht wieder auf der ersten von
+  neun Flächen.
+
+Der frühere Einwand dagegen lautete, ein Seitenwechsel bedeute einen neuen
+Ladevorgang samt verlorener Stelle in der Liste. Das verwechselt Unterseite
+mit Neuladen: **Die Modulkomponente bleibt über allen Bereichen montiert**,
+ihre Daten bleiben stehen, der Wechsel kostet keinen Abruf. In `ModulSeite`
+steht deshalb ausdrücklich _kein_ `key` am Inhalt — ein wechselnder `key`
+montierte neu und brächte genau den Nachteil zurück.
+
 ## Verhalten auf schmalen Geräten
 
-Zwei Umbruchpunkte, mehr braucht es nicht:
+Drei Umbruchpunkte, mehr braucht es nicht:
 
-| Breite | Was passiert |
-|---|---|
-| < 40 rem | Tabellenzeilen werden zu Karten, Seitenränder schrumpfen |
-| < 34 rem | Formularzeile wird zum Stapel |
+| Breite   | Was passiert                                                    |
+| -------- | --------------------------------------------------------------- |
+| < 60 rem | Navigationsleiste wird zur Schublade, Bereiche zur Reiterleiste |
+| < 40 rem | Tabellenzeilen werden zu Karten, Seitenränder schrumpfen        |
+| < 34 rem | Formularzeile wird zum Stapel                                   |
+
+Zur Schublade: Auf einem Telefon ist eine dauerhaft sichtbare Navigation
+schlicht der halbe Bildschirm. Die Bereiche wandern dort über den Inhalt, als
+waagerecht scrollende Leiste — sonst wäre der Wechsel zwischen zwei Bereichen
+zwei Antipper statt einem, und das bei der häufigsten Bewegung im Artefakt.
+
+Ab 60 rem verschwindet diese Leiste wieder: Dann steht die Navigation
+daneben und trägt dieselben Bereiche. Zweimal dieselbe Navigation wäre eine zu
+viel — und die Frage, welche von beiden gerade gilt.
 
 Die Tabelle **scrollt nicht horizontal**. Das würde ausgerechnet die
 Schaltflächen am rechten Rand verstecken — also genau das, wofür man die
@@ -187,6 +271,14 @@ Kein Zusatz, sondern Teil der Qualität:
 eine Farbe.
 
 **Dichter oder luftiger:** die `--raum-*`-Skala skalieren. Alle Abstände folgen.
+
+**Ein Artefakt bekommt mehr oder weniger Platz:** eine Zeile in
+`src/module/register.ts`. Keine Ansicht kennt ihre eigene Breite — sonst
+stünde die Entscheidung an so vielen Stellen, wie es Ansichten gibt.
+
+**Ein Bereich kommt dazu:** ebenfalls dort, in `unterseiten`. Navigation,
+Adresse und Markierung entstehen daraus von selbst; das Artefakt bekommt nur
+noch mitgeteilt, welcher Bereich gerade dran ist.
 
 **Andere Rundung:** `--rundung-*`. Kanten statt Rundungen bekommt man mit `0`.
 

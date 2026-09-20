@@ -1,8 +1,10 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
 .laden {
   display: flex;
   flex-direction: column;
   gap: var(--raum-4);
-  max-width: var(--breite-inhalt);
 }
 
 .inhalt {
@@ -20,5 +22,64 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* ── Bereiche auf schmalen Geräten ──────────────────────────────────── */
+
+/* Waagerecht scrollbar statt umbrechend: Auf einem Telefon brechen neun
+   Wörter sonst in drei Zeilen um, und der Inhalt darunter rutscht bei jedem
+   Wechsel hoch und runter. */
+.bereichsleiste {
+  display: flex;
+  gap: var(--raum-1);
+  margin-bottom: var(--raum-5);
+  padding-bottom: var(--raum-1);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--farbe-rand);
+  scrollbar-width: none;
+}
+
+.bereichsleiste::-webkit-scrollbar {
+  display: none;
+}
+
+.bereich,
+.bereichAktiv {
+  flex: 0 0 auto;
+  padding: var(--raum-2) var(--raum-3);
+  border-bottom: 2px solid transparent;
+  border-radius: var(--rundung-sm) var(--rundung-sm) 0 0;
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+  /* Ein Bereichswechsel ist die häufigste Bewegung im Modul. Was man
+     hundertmal am Tag tut, darf nicht animiert sein - es fühlt sich sonst
+     zäh an. Nur die Farbe blendet, die Markierung springt. */
+  transition: color var(--dauer-schnell) var(--verlauf);
+}
+
+.bereich:hover {
+  color: var(--farbe-text);
+}
+
+/* Aktiv ist halbfett UND unterstrichen. Wäre nur die Farbe anders, bliebe
+   der Unterschied bei jeder zweiten Sehschwäche unsichtbar. */
+.bereichAktiv {
+  color: var(--farbe-text);
+  font-weight: var(--gewicht-halbfett);
+  border-bottom-color: var(--farbe-aktion);
+}
+
+.bereich:focus-visible,
+.bereichAktiv:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+/* Ab hier steht die Navigationsleiste fest und trägt die Bereiche bereits.
+   Zweimal dieselbe Navigation wäre eine zu viel. */
+@media (width >= 60rem) {
+  .bereichsleiste {
+    display: none;
   }
 }

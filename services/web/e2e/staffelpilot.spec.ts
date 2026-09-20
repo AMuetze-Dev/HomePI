@@ -1,4 +1,30 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * Die Navigationsleiste - Artefakte und, beim geöffneten, dessen Bereiche.
+ *
+ * Ohne diese beiden Helfer wird jeder Verweis mehrdeutig: Seit die Leiste
+ * dauerhaft danebensteht, heißt "Verwaltung" sowohl die Kachel auf der
+ * Startseite als auch der Eintrag in der Leiste. Playwright bricht solche
+ * Treffer streng ab - zu Recht, denn welcher gemeint ist, weiß der Test
+ * sonst selbst nicht.
+ */
+function artefakt(page: Page, name: string | RegExp) {
+  return page.getByRole("navigation", { name: "Artefakte" }).getByRole("link", { name });
+}
+
+/**
+ * Ein Bereich innerhalb des geöffneten Artefakts.
+ *
+ * Eigene Liste statt der ganzen Leiste, weil "Übersicht" zweimal vorkommt:
+ * einmal als Startseite ganz oben, einmal als erste Fläche von
+ * StaffelPilot. Die Liste trägt dafür einen eigenen Namen.
+ */
+function bereich(page: Page, name: string) {
+  return page
+    .getByRole("list", { name: /^Bereiche von/ })
+    .getByRole("link", { name, exact: true });
+}
 
 /**
  * Der Weg eines Staffelleiters — von der leeren Installation bis zur
@@ -55,7 +81,7 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
 
     await expect(page.getByRole("link", { name: "StaffelPilot" })).toHaveCount(0);
 
-    await page.getByRole("link", { name: /Verwaltung/ }).click();
+    await artefakt(page, /Verwaltung/).click();
     await page
       .getByRole("button", { name: new RegExp(`Rechte von ${VERWALTER.name}`) })
       .click();
@@ -75,7 +101,7 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
     // Das war die verwirrende Auskunft: fertig, null geprüft, null Befunde -
     // und der Grund stand nirgends.
     await zuStaffelpilot(page);
-    await page.getByRole("tab", { name: "Prüflauf" }).click();
+    await bereich(page, "Prüflauf").click();
     await page.getByRole("button", { name: "Prüflauf anfordern" }).click();
 
     const verlauf = page.getByRole("list", { name: "Bisherige Läufe" });
@@ -87,7 +113,7 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
 
   test("sie legt eine Staffel an", async ({ page }) => {
     await zuStaffelpilot(page);
-    await page.getByRole("tab", { name: "Staffeln" }).click();
+    await bereich(page, "Staffeln").click();
 
     await page.getByRole("textbox", { name: "Name" }).fill(STAFFEL);
     await page.getByRole("textbox", { name: "Spielklasse" }).fill("3.Kreisliga (C)");
@@ -101,7 +127,7 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
 
   test("der DFBnet-Zugang lässt sich hinterlegen", async ({ page }) => {
     await zuStaffelpilot(page);
-    await page.getByRole("tab", { name: "DFBnet-Zugang" }).click();
+    await bereich(page, "DFBnet-Zugang").click();
 
     await page.getByLabel(/DFBnet-Benutzername/).fill("beispiel");
     await page.getByLabel(/DFBnet-Passwort/).fill("nur-ein-platzhalter");
@@ -112,14 +138,14 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
 
   test("Saisondaten holen bringt die Mannschaften", async ({ page }) => {
     await zuStaffelpilot(page);
-    await page.getByRole("tab", { name: "Prüflauf" }).click();
+    await bereich(page, "Prüflauf").click();
     await page.getByRole("button", { name: "Saisondaten holen" }).click();
 
     await expect(
       page.getByRole("list", { name: "Bisherige Läufe" }).getByText(/Mannschaften/),
     ).toBeVisible({ timeout: DIENST_WARTET });
 
-    await page.getByRole("tab", { name: "Staffeln" }).click();
+    await bereich(page, "Staffeln").click();
     await page.getByRole("button", { name: new RegExp(STAFFEL) }).click();
 
     const mannschaften = page.getByRole("list", { name: "Mannschaften" });
@@ -131,20 +157,20 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
 
   test("ein Prüflauf bringt Spielberichte", async ({ page }) => {
     await zuStaffelpilot(page);
-    await page.getByRole("tab", { name: "Prüflauf" }).click();
+    await bereich(page, "Prüflauf").click();
     await page.getByRole("button", { name: "Prüflauf anfordern" }).click();
 
     await expect(
       page.getByRole("list", { name: "Bisherige Läufe" }).getByText(/geprüft/),
     ).toBeVisible({ timeout: DIENST_WARTET });
 
-    await page.getByRole("tab", { name: "Spielprüfung" }).click();
+    await bereich(page, "Spielprüfung").click();
     await expect(page.getByRole("list", { name: "Spielberichte" })).toBeVisible();
   });
 
   test("ein Befund lässt sich nicht übergehen", async ({ page }) => {
     await zuStaffelpilot(page);
-    await page.getByRole("tab", { name: "Spielprüfung" }).click();
+    await bereich(page, "Spielprüfung").click();
 
     await ersterBerichtMitBefunden(page);
     await page.getByRole("button", { name: "Abhaken" }).click();
@@ -154,7 +180,7 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
 
   test("entschieden und abgehakt", async ({ page }) => {
     await zuStaffelpilot(page);
-    await page.getByRole("tab", { name: "Spielprüfung" }).click();
+    await bereich(page, "Spielprüfung").click();
     await ersterBerichtMitBefunden(page);
 
     // Alle offenen Befunde zur Kenntnis nehmen.
@@ -173,7 +199,7 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
 
   test("das Abhaken merkt die Freigabe vor", async ({ page }) => {
     await zuStaffelpilot(page);
-    await page.getByRole("tab", { name: "Prüflauf" }).click();
+    await bereich(page, "Prüflauf").click();
 
     const zahlen = page.getByRole("list", { name: "Übertragung" });
     await expect(zahlen.getByText("vorgemerkt")).toBeVisible();
@@ -185,7 +211,7 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
     // simuliert erledigt. Genau das ist der Teil, der sich hier nicht echt
     // prüfen lässt, und er sagt es selbst.
     await zuStaffelpilot(page);
-    await page.getByRole("tab", { name: "Prüflauf" }).click();
+    await bereich(page, "Prüflauf").click();
 
     await page.getByRole("button", { name: "Übertragung freigeben" }).click();
 
@@ -199,7 +225,7 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
 
   test("die Ergebnisse zählen mit", async ({ page }) => {
     await zuStaffelpilot(page);
-    await page.getByRole("tab", { name: "Ergebnisse" }).click();
+    await bereich(page, "Ergebnisse").click();
 
     const bilanz = page.getByRole("list", { name: "Bilanz" });
     await expect(bilanz.getByText("Spiele")).toBeVisible();
@@ -221,8 +247,8 @@ async function anmelden(page: import("@playwright/test").Page): Promise<void> {
 
 async function zuStaffelpilot(page: import("@playwright/test").Page): Promise<void> {
   await anmelden(page);
-  await page.getByRole("link", { name: "StaffelPilot" }).click();
-  await expect(page.getByRole("tab", { name: "Übersicht" })).toBeVisible();
+  await artefakt(page, "StaffelPilot").click();
+  await expect(bereich(page, "Übersicht")).toBeVisible();
 }
 
 /** Klappt den ersten Bericht auf, der noch offene Befunde hat. */

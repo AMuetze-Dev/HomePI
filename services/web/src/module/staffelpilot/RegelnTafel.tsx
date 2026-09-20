@@ -171,10 +171,9 @@ function Saetze({
       </summary>
 
       <p className={stil.vorgangHinweis}>
-        Der Sachverhalt folgt auf „Im Spiel … am … ". Platzhalter in
-        geschweiften Klammern werden eingesetzt ({"{person}"}, {"{verein}"}); was in
-        eckigen Klammern steht, fällt weg, wenn sein Wert fehlt. Leer lassen
-        heißt: der mitgelieferte Satz gilt.
+        Der Sachverhalt folgt auf „Im Spiel … am … ". Platzhalter in geschweiften Klammern
+        werden eingesetzt ({"{person}"}, {"{verein}"}); was in eckigen Klammern steht,
+        fällt weg, wenn sein Wert fehlt. Leer lassen heißt: der mitgelieferte Satz gilt.
       </p>
 
       <label className={stil.textfeldEtikett}>
@@ -206,7 +205,11 @@ function Saetze({
       )}
 
       <div className={stil.knoepfe}>
-        <Knopf groesse="sm" onClick={() => void speichern()} disabled={!geaendert || laeuft}>
+        <Knopf
+          groesse="sm"
+          onClick={() => void speichern()}
+          disabled={!geaendert || laeuft}
+        >
           {laeuft ? "Speichert" : "Speichern"}
         </Knopf>
         {geaendert && (
@@ -224,8 +227,8 @@ function Saetze({
       </div>
 
       <p className={stil.vorgangHinweis}>
-        Gilt ab dem nächsten Schreiben. Schon erstellte Entwürfe ändern sich
-        nicht — ihr Text liegt am Vorgang.
+        Gilt ab dem nächsten Schreiben. Schon erstellte Entwürfe ändern sich nicht — ihr
+        Text liegt am Vorgang.
       </p>
     </details>
   );

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
 import {
@@ -30,30 +31,10 @@ import { UebersichtTafel } from "./UebersichtTafel";
 import { ZugangKarte } from "./ZugangKarte";
 import { RegelnTafel } from "./RegelnTafel";
 import { VorgaengeTafel } from "./VorgaengeTafel";
+import type { ModulProps } from "../typen";
 import stil from "./StaffelpilotSeite.module.css";
 
 type Daten = { staffeln: Staffel[]; spiele: SpielZeile[]; uebersicht: Zusammenfassung };
-
-/**
- * Vier Flaechen, und die erste ist die taegliche Arbeit.
- *
- * Reiter und keine Unterseiten: ein Staffelleiter springt zwischen Befund und
- * Entwurf hin und her, und jeder Seitenwechsel waere ein neuer Ladevorgang
- * samt verlorener Stelle in der Liste.
- */
-const REITER = [
-  ["uebersicht", "Übersicht"],
-  ["spiele", "Spielprüfung"],
-  ["prueflauf", "Prüflauf"],
-  ["ergebnisse", "Ergebnisse"],
-  ["staffeln", "Staffeln"],
-  ["vorgaenge", "Vorgänge"],
-  ["regeln", "Regeln"],
-  ["einstellungen", "Einstellungen"],
-  ["zugang", "DFBnet-Zugang"],
-] as const;
-
-type ReiterId = (typeof REITER)[number][0];
 
 type Zustand =
   | { phase: "laedt" }
@@ -76,8 +57,26 @@ function meldung(fehler: unknown): string {
   return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
 }
 
-export function StaffelpilotSeite() {
-  const [reiter, setReiter] = useState<ReiterId>("uebersicht");
+/**
+ * Neun Bereiche - und keiner davon eine eigene Seite im alten Sinn.
+ *
+ * Welche Bereiche es gibt, steht in `src/module/register.ts`; die Huelle
+ * navigiert sie. Hierher kommt nur noch, welcher gerade dran ist.
+ *
+ * Wichtig dabei: Diese Komponente bleibt ueber allen Bereichen montiert.
+ * Staffeln, Spielliste und Zusammenfassung werden einmal geladen und
+ * ueberstehen jeden Wechsel - ein Staffelleiter springt zwischen Befund
+ * und Entwurf hin und her, und ein Ladebalken bei jedem Sprung waere
+ * genau das, was diese Ansicht unbrauchbar machte.
+ */
+export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
+  const navigate = useNavigate();
+  // Gibt bewusst nichts zurueck: navigate() liefert ein Promise, und das in
+  // einem onClick landen zu lassen heisst, einen Fehlschlag stillschweigend
+  // zu verlieren.
+  const gehe = (ziel: string): void => {
+    void navigate(`/modul/staffelpilot/${ziel}`);
+  };
   const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
   const [staffelFilter, setStaffelFilter] = useState<string>("");
   // Der haeufigste Handgriff am Montag: was ist seit dem Wochenende faellig.
@@ -147,23 +146,6 @@ export function StaffelpilotSeite() {
     return geklappt;
   }
 
-  const leiste = (
-    <div className={stil.reiter} role="tablist" aria-label="Bereiche">
-      {REITER.map(([id, wort]) => (
-        <button
-          key={id}
-          type="button"
-          role="tab"
-          aria-selected={reiter === id}
-          className={reiter === id ? stil.reiterAktiv : stil.reiterKnopf}
-          onClick={() => setReiter(id)}
-        >
-          {wort}
-        </button>
-      ))}
-    </div>
-  );
-
   if (zustand.phase === "laedt") {
     return (
       <div className={stil.laden} role="status" aria-label="Spielberichte werden geladen">
@@ -183,37 +165,21 @@ export function StaffelpilotSeite() {
 
   const { staffeln, spiele } = zustand.daten;
 
-  if (reiter === "uebersicht") {
-    return (
-      <>
-        {leiste}
-        <UebersichtTafel onWechsel={(ziel) => setReiter(ziel as ReiterId)} />
-      </>
-    );
+  if (unterseite === "uebersicht") {
+    return <UebersichtTafel onWechsel={gehe} />;
   }
 
-  if (reiter === "einstellungen") {
-    return (
-      <>
-        {leiste}
-        <EinstellungenTafel />
-      </>
-    );
+  if (unterseite === "einstellungen") {
+    return <EinstellungenTafel />;
   }
 
-  if (reiter === "zugang") {
-    return (
-      <>
-        {leiste}
-        <ZugangKarte />
-      </>
-    );
+  if (unterseite === "zugang") {
+    return <ZugangKarte />;
   }
 
-  if (reiter === "staffeln") {
+  if (unterseite === "staffeln") {
     return (
       <>
-        {leiste}
         {aktionsfehler && (
           <Hinweis ton="fehler" dringend>
             {aktionsfehler}
@@ -229,49 +195,29 @@ export function StaffelpilotSeite() {
     );
   }
 
-  if (reiter === "ergebnisse") {
+  if (unterseite === "ergebnisse") {
+    return <ErgebnisseTafel staffeln={staffeln} />;
+  }
+
+  if (unterseite === "prueflauf") {
     return (
-      <>
-        {leiste}
-        <ErgebnisseTafel staffeln={staffeln} />
-      </>
+      <PrueflaufTafel
+        staffeln={staffeln}
+        onFertig={() => void laden(staffelFilter, nurFaellig)}
+      />
     );
   }
 
-  if (reiter === "prueflauf") {
-    return (
-      <>
-        {leiste}
-        <PrueflaufTafel
-          staffeln={staffeln}
-          onFertig={() => void laden(staffelFilter, nurFaellig)}
-        />
-      </>
-    );
+  if (unterseite === "regeln") {
+    return <RegelnTafel />;
   }
 
-  if (reiter === "regeln") {
-    return (
-      <>
-        {leiste}
-        <RegelnTafel />
-      </>
-    );
-  }
-
-  if (reiter === "vorgaenge") {
-    return (
-      <>
-        {leiste}
-        <VorgaengeTafel />
-      </>
-    );
+  if (unterseite === "vorgaenge") {
+    return <VorgaengeTafel />;
   }
 
   return (
     <>
-      {leiste}
-
       {aktionsfehler && (
         <Hinweis ton="fehler" dringend>
           {aktionsfehler}
@@ -281,7 +227,7 @@ export function StaffelpilotSeite() {
       {staffeln.length === 0 ? (
         <Leerzustand
           titel="Noch keine Staffel angelegt"
-          aktion={<Knopf onClick={() => setReiter("staffeln")}>Staffeln verwalten</Knopf>}
+          aktion={<Knopf onClick={() => gehe("staffeln")}>Staffeln verwalten</Knopf>}
         >
           Eine Staffel ist der Ort, an dem Spielberichte ankommen. Leg die erste an — Name
           und Spielklasse genau so, wie sie in DFBnet heißen.

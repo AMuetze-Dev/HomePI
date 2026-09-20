@@ -1,15 +1,102 @@
-.huelle {
-  display: flex;
-  flex-direction: column;
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md).
+
+   Mobil zuerst: Stapel als Grundregel, Leiste ab genug Breite. Andersherum
+   müsste die Ausnahme das Feste der Leiste wieder aufheben - und dafür
+   bräuchte sie dieselbe Spezifität. */
+
+.huelle,
+.huelleSchlicht {
   min-height: 100dvh;
 }
 
-/* --- Kopfzeile --- */
+/* ── Navigationsleiste ──────────────────────────────────────────────── */
+
+/* Auf schmalen Geraeten eine Schublade: eine dauerhaft sichtbare Navigation
+   waere hier der halbe Bildschirm. */
+.leiste,
+.leisteOffen {
+  position: fixed;
+  inset-block: 0;
+  left: 0;
+  z-index: var(--ebene-navigation);
+  display: flex;
+  flex-direction: column;
+  width: min(var(--breite-navigation), 82vw);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--farbe-flaeche);
+  border-right: 1px solid var(--farbe-rand);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition:
+    transform var(--dauer-normal) var(--verlauf),
+    visibility var(--dauer-normal) var(--verlauf);
+}
+
+.leisteOffen {
+  transform: none;
+  visibility: visible;
+  box-shadow: var(--schatten-lg);
+}
+
+.leistenkopf {
+  display: flex;
+  align-items: center;
+  height: var(--hoehe-kopf);
+  padding-inline: var(--raum-5);
+  flex: 0 0 auto;
+}
+
+.leistenfuss {
+  margin: auto 0 0;
+  padding: var(--raum-6) var(--raum-5) var(--raum-5);
+  font-size: var(--text-xs);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-leise);
+  text-wrap: pretty;
+}
+
+.schleier {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ebene-schleier);
+  /* Ein Knopf, weil er anklickbar ist - aber ohne jedes Knopf-Aussehen. */
+  padding: 0;
+  border: 0;
+  cursor: default;
+  background: color-mix(in srgb, var(--neutral-950) 40%, transparent);
+  animation: schleierEin var(--dauer-schnell) var(--verlauf);
+}
+
+@keyframes schleierEin {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ── Inhaltsspalte ──────────────────────────────────────────────────── */
+
+.spalte {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  /* min-width: 0 verhindert, dass eine breite Tabelle das Raster aufdrueckt
+     und die Leiste aus dem Bild schiebt. */
+  min-width: 0;
+}
+
 .kopf {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--ebene-klebend);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-4);
   height: var(--hoehe-kopf);
+  flex: 0 0 auto;
+  padding-inline: var(--raum-rand);
   border-bottom: 1px solid var(--farbe-rand);
   /* Leicht durchscheinend: der Inhalt darunter bleibt spuerbar, ohne dass
      die Kopfzeile ihre Ruhe verliert. */
@@ -17,16 +104,50 @@
   backdrop-filter: saturate(180%) blur(12px);
 }
 
-.kopfinhalt {
+.schubladenknopf {
+  display: grid;
+  place-items: center;
+  /* 44 px Trefferflaeche - darunter wird das Ziel auf einem Telefon zur
+     Gluecksache. */
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-left: calc(var(--raum-2) * -1);
+  border: 0;
+  border-radius: var(--rundung-md);
+  background: none;
+  color: var(--farbe-text-gedaempft);
+  cursor: pointer;
+  transition: color var(--dauer-schnell) var(--verlauf);
+}
+
+.schubladenknopf svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.schubladenknopf:hover {
+  color: var(--farbe-text);
+}
+
+.schubladenknopf:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+.werkzeuge {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--raum-4);
-  height: 100%;
-  max-width: var(--breite-inhalt);
-  margin-inline: auto;
-  padding-inline: var(--raum-6);
+  gap: var(--raum-2);
+  margin-left: auto;
 }
+
+.inhalt {
+  flex: 1;
+  min-width: 0;
+  padding: var(--raum-8) var(--raum-rand) var(--raum-16);
+}
+
+/* ── Marke ──────────────────────────────────────────────────────────── */
 
 .marke {
   display: inline-flex;
@@ -51,57 +172,60 @@
   letter-spacing: 0;
 }
 
-.werkzeuge {
-  display: flex;
-  align-items: center;
-  gap: var(--raum-2);
-}
+/* ── Ab Tablet: Leiste steht fest, Schublade entfällt ───────────────── */
 
-/* --- Inhalt --- */
-.inhalt {
-  flex: 1;
-  width: 100%;
-  max-width: var(--breite-inhalt);
-  margin-inline: auto;
-  padding: var(--raum-10) var(--raum-6) var(--raum-16);
-}
+@media (width >= 60rem) {
+  .huelle {
+    display: grid;
+    grid-template-columns: var(--breite-navigation) minmax(0, 1fr);
+  }
 
-/* --- Fusszeile --- */
-.fuss {
-  border-top: 1px solid var(--farbe-rand);
-}
+  .leiste,
+  .leisteOffen {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    width: auto;
+    transform: none;
+    visibility: visible;
+    box-shadow: none;
+  }
 
-.fussinhalt {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--raum-3);
-  max-width: var(--breite-inhalt);
-  margin-inline: auto;
-  padding: var(--raum-5) var(--raum-6);
-  font-size: var(--text-sm);
-  color: var(--farbe-text-leise);
+  .schubladenknopf,
+  .schleier {
+    display: none;
+  }
+
+  .kopf {
+    /* Ohne Schubladenknopf steht links nichts mehr - die Werkzeuge
+       rutschen ohnehin per margin-left: auto nach rechts. */
+    justify-content: flex-end;
+  }
+
+  .inhalt {
+    padding-top: var(--raum-10);
+  }
 }
 
 /* Auf schmalen Geraeten zaehlt jeder Millimeter Randbreite. */
 @media (width < 40rem) {
-  .kopfinhalt,
-  .fussinhalt {
-    padding-inline: var(--raum-4);
+  .huelle,
+  .huelleSchlicht {
+    --raum-rand: var(--raum-4);
   }
 
   .inhalt {
-    padding: var(--raum-8) var(--raum-4) var(--raum-12);
+    padding-block: var(--raum-6) var(--raum-12);
   }
 }
 
-/* Sprung zum Inhalt - nur bei Tastaturfokus sichtbar. */
+/* ── Sprung zum Inhalt - nur bei Tastaturfokus sichtbar ─────────────── */
+
 .sprung {
-  position: absolute;
+  position: fixed;
   left: var(--raum-4);
   top: var(--raum-2);
-  z-index: 20;
+  z-index: var(--ebene-sprung);
   padding: var(--raum-2) var(--raum-3);
   border-radius: var(--rundung-md);
   background: var(--farbe-aktion);

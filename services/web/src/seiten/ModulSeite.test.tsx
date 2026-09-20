@@ -106,7 +106,9 @@ describe("Modulseite", () => {
     // Kein Alarm, sondern ein Leerzustand: ein aufgerufener Pfad, den es
     // nicht gibt, ist kein Fehler des Systems.
     expect(await screen.findByText(/Kein Modul mit der Kennung/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Übersicht/ })).toBeInTheDocument();
+    // Einen Zurück-Verweis gibt es hier nicht mehr: Die Navigationsleiste
+    // steht dauerhaft daneben und führt zur Übersicht wie zu jedem anderen
+    // Artefakt. Ein zweiter Weg an derselben Stelle wäre einer zu viel.
   });
 
   it("bietet abgemeldet die Anmeldung an, statt 'gibt es nicht' zu behaupten", async () => {

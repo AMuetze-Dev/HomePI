@@ -140,9 +140,9 @@ export function EinstellungenTafel() {
           />
         </label>
         <p className={stil.vorgangHinweis}>
-          Er macht aus der Mahnung eine Mahnung — ein späterer Antrag ans
-          Sportgericht beruft sich auf ihn. Leer lassen heißt: der
-          mitgelieferte Satz gilt, und eine spätere Korrektur daran kommt an.
+          Er macht aus der Mahnung eine Mahnung — ein späterer Antrag ans Sportgericht
+          beruft sich auf ihn. Leer lassen heißt: der mitgelieferte Satz gilt, und eine
+          spätere Korrektur daran kommt an.
         </p>
 
         {fehler && (
