@@ -43,6 +43,11 @@ else
     echo "    Passwort-Login bleibt AN. Key hinterlegen, dann Skript erneut laufen lassen."
 fi
 
+# Alle Regeln unten nennen ${LAN_CIDR} und gelten damit nur fuer IPv4.
+# Das ist Absicht und nur deshalb vertretbar, weil weiter unten die globalen
+# IPv6-Adressen abgeschaltet werden. Wer das wieder einschaltet, muss hier
+# IPv6-Regeln ergaenzen - sonst ist der Pi ueber seinen Namen unerreichbar,
+# waehrend er ueber die IP tadellos antwortet.
 echo "==> Firewall (UFW) - alles nur aus ${LAN_CIDR}"
 ufw --force reset >/dev/null
 ufw default deny incoming
@@ -62,14 +67,33 @@ ufw --force enable
 echo "==> Swap aus (16 GB RAM, spart SSD-Schreibzyklen)"
 systemctl disable --now dphys-swapfile 2>/dev/null || true
 
-echo "==> journald begrenzen"
+echo "==> journald: dauerhaft und begrenzt"
 install -d -m 755 /etc/systemd/journald.conf.d
+
+# Raspberry Pi OS liefert /usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf
+# mit Storage=volatile aus - das Protokoll liegt dann nur im Arbeitsspeicher
+# und ist nach jedem Neustart weg.
+#
+# Der Dateiname MUSS derselbe sein. Drop-ins werden alphabetisch gelesen und
+# die ZULETZT gelesene gewinnt; eine Datei "00-dauerhaft.conf" verliert also
+# gegen "40-rpi-...". Nur bei gleichem Namen hat /etc Vorrang vor /usr/lib.
+#
+# Das ist kein theoretischer Punkt: Genau dieser Fehler hat dazu gefuehrt,
+# dass nach einem Ausfall der vorherige Startvorgang nicht mehr nachlesbar
+# war - und damit die Ursache unauffindbar.
+cat > /etc/systemd/journald.conf.d/40-rpi-volatile-storage.conf <<'EOF'
+[Journal]
+Storage=persistent
+EOF
+
 cat > /etc/systemd/journald.conf.d/99-size.conf <<'EOF'
 [Journal]
 SystemMaxUse=200M
 SystemMaxFileSize=50M
 EOF
+install -d -m 2755 -g systemd-journal /var/log/journal
 systemctl restart systemd-journald
+journalctl --flush >/dev/null 2>&1 || true
 
 echo "==> sysctl"
 cat > /etc/sysctl.d/99-homelab.conf <<'EOF'
@@ -79,6 +103,47 @@ net.core.somaxconn=1024
 fs.inotify.max_user_watches=524288
 EOF
 sysctl --system >/dev/null
+
+echo "==> keine globalen IPv6-Adressen"
+# Die UFW-Regeln oben gelten ausschliesslich fuer ${LAN_CIDR}, also fuer IPv4.
+# ip6tables steht dabei auf policy DROP. Hat der Pi globale IPv6-Adressen,
+# verwirft er jede IPv6-Verbindung stillschweigend - und weil die Fritz!Box
+# AAAA-Eintraege fuer den Rechnernamen veroeffentlicht und Browser IPv6
+# bevorzugen, ist er ueber seinen NAMEN nicht erreichbar, ueber die IP aber
+# sofort. Ein Fehlerbild, das man lange fuer einen Dienstausfall haelt.
+#
+# Zwei Wege fuehren zu globalen Adressen, und beide muessen zu:
+#   * Router Advertisements -> accept_ra/autoconf (hier)
+#   * DHCPv6 ueber NetworkManager -> ipv6.method (weiter unten)
+#
+# "all" und "default" gelten nur fuer NEU angelegte Schnittstellen; die
+# vorhandenen muessen ausdruecklich genannt werden.
+#
+# Link-local (fe80::) und ::1 bleiben erhalten.
+cat > /etc/sysctl.d/99-kein-globales-ipv6.conf <<'EOF'
+net.ipv6.conf.all.accept_ra = 0
+net.ipv6.conf.default.accept_ra = 0
+net.ipv6.conf.all.autoconf = 0
+net.ipv6.conf.default.autoconf = 0
+EOF
+for iface in $(ls /sys/class/net | grep -E '^(eth|wlan|en|wl)'); do
+    printf 'net.ipv6.conf.%s.accept_ra = 0\nnet.ipv6.conf.%s.autoconf = 0\n' \
+        "$iface" "$iface" >> /etc/sysctl.d/99-kein-globales-ipv6.conf
+done
+sysctl -q --load=/etc/sysctl.d/99-kein-globales-ipv6.conf
+
+# DHCPv6 laeuft an accept_ra vorbei - deshalb zusaetzlich am Profil.
+for conn in $(nmcli -g NAME connection show 2>/dev/null); do
+    case "$(nmcli -g connection.type connection show "$conn" 2>/dev/null)" in
+        802-3-ethernet|802-11-wireless)
+            nmcli connection modify "$conn" ipv6.method link-local 2>/dev/null || true
+            ;;
+    esac
+done
+for iface in $(ls /sys/class/net | grep -E '^(eth|wlan|en|wl)'); do
+    nmcli device reapply "$iface" >/dev/null 2>&1 || true
+    ip -6 addr flush dev "$iface" scope global 2>/dev/null || true
+done
 
 echo "==> fstrim wöchentlich"
 systemctl enable --now fstrim.timer
