@@ -188,6 +188,31 @@ anhaeufen, zaehlte Paragraf 58 nach dem dritten Prueflauf die dreifache Zahl.
 Artefakt weiss; die Schwellen stehen in den Regeldateien des Staffelleiters
 (`30_karten.py`), und der Zaehler selbst im Pruefdienst (`auskunft.py`).
 
+### Erfundene Spiele
+
+Der Pruefdienst kann statt DFBnet eine Attrappe lesen, die zu jeder Staffel
+Spiele erfindet (`PRUEFDIENST_LESER=demo`). Zum Durchklicken ist sie
+unverzichtbar. Zwischen echten Spielen ist sie ein Spiel, aus dem eine Mahnung
+an einen Verein entstehen kann, den niemand geprueft hat -- genau das ist am
+20.09.2026 passiert: drei erfundene Spiele standen zwischen achtundzwanzig
+aus DFBnet.
+
+Darum huetet dieses Artefakt seine Liste selbst. Ein Import mit Kennungen, die
+mit `DEMO-` anfangen, wird **abgewiesen** (409), solange in den Einstellungen
+nicht ausdruecklich "Beispieldaten annehmen" steht. Der ganze Lauf, nicht das
+einzelne Spiel: ein halb eingespielter Lauf sieht hinterher aus wie einer, bei
+dem nichts war.
+
+Der Praefix steht damit in zwei Diensten -- in `leser.BeispielLeser` des
+Pruefdienstes und als `dienst.BEISPIEL_PRAEFIX` hier. Das ist Absicht: wer die
+scharfen Daten huetet, darf sich nicht darauf verlassen, dass der andere
+Dienst ehrlich bleibt. Ein Test haelt die Zeichenkette fest.
+
+`GET /beispieldaten` sagt, wie viele noch stecken, `DELETE /beispieldaten`
+raeumt sie weg -- nur sie, die Bedingung steht auf der Kennung und nicht auf
+einem Zeitraum. In der Oberflaeche erscheint der Knopf dafuer **nur, wenn es
+welche gibt**.
+
 ### Die Mahnung
 
 Der Vordruck des Verbandes ("Mahnungsformular Bagatellsachen") liegt im Paket

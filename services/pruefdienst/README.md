@@ -71,6 +71,15 @@ Die Beispieldaten sagen, dass sie welche sind: jede Spielkennung fängt mit
 `DEMO-` an, und in jedem Befundtext steht „(Beispieldaten)". Wer das in der
 Oberfläche sieht, weiß, dass niemand bei DFBnet war.
 
+**Und sie kommen nicht in die scharfe Liste.** Das Artefakt weist einen Lauf
+mit solchen Kennungen ab (409), solange dort nicht ausdrücklich
+„Beispieldaten annehmen“ steht. Zum Durchklicken braucht es also beides:
+diesen Leser und den Schalter in den Einstellungen. Wer den Schalter
+vergisst, sieht einen abgebrochenen Lauf mit einem Satz, der sagt, welcher
+fehlt — und keine erfundenen Spiele zwischen echten. Der Grund steht im
+README des Artefakts: am 20.09.2026 standen drei davon zwischen
+achtundzwanzig echten.
+
 ## Der erste echte Lauf
 
 Am 19.09.2026 lief der Dienst zum ersten Mal gegen das echte DFBnet: eine

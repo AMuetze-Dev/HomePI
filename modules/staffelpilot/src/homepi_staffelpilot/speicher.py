@@ -161,6 +161,10 @@ async def einspielen(sitzung: AsyncSession, auftrag: ImportAuftrag) -> tuple[int
     ist das, was den zweiten Prueflauf ertraeglich macht.
     """
     await staffel(sitzung, auftrag.staffel_id)
+    # Vor dem ersten Schreiben und nicht je Spiel: ein halb eingespielter Lauf
+    # waere schlimmer als ein abgewiesener.
+    werte = await einstellungen(sitzung)
+    dienst.beispieldaten_pruefen([s.dfbnet_id for s in auftrag.spiele], werte.beispieldaten)
     angelegt = aktualisiert = befunde_gesamt = 0
 
     for eingang in auftrag.spiele:
@@ -585,6 +589,37 @@ async def vorgaenge_zu_befunden(
 
 
 # ── Regelkatalog ──────────────────────────────────────────────────────────
+
+
+async def beispieldaten_zaehlen(sitzung: AsyncSession) -> int:
+    """Wie viele erfundene Spiele noch in den Listen stehen."""
+    ergebnis = await sitzung.execute(
+        select(func.count())
+        .select_from(Spielbericht)
+        .where(Spielbericht.dfbnet_id.startswith(dienst.BEISPIEL_PRAEFIX))
+    )
+    return int(ergebnis.scalar_one())
+
+
+async def beispieldaten_loeschen(sitzung: AsyncSession) -> int:
+    """Alle erfundenen Spiele weg, mit allem, was an ihnen haengt.
+
+    Befunde und Karten gehen am Fremdschluessel mit. Vorgaenge haengen am
+    Befund und damit ebenso -- ein Schreiben zu einem Spiel, das es nie gab,
+    soll nicht als Waise zurueckbleiben.
+
+    Nur die erfundenen: die Bedingung steht auf dem Praefix und nicht auf
+    einem Zeitraum. Ein `DELETE` ohne `WHERE` an dieser Stelle waere die
+    Saison.
+    """
+    # Erst zaehlen, dann loeschen: `rowcount` ist je nach Treiber nicht
+    # zugesichert, und die Zahl steht hinterher in der Oberflaeche.
+    gefunden = await beispieldaten_zaehlen(sitzung)
+    await sitzung.execute(
+        delete(Spielbericht).where(Spielbericht.dfbnet_id.startswith(dienst.BEISPIEL_PRAEFIX))
+    )
+    await sitzung.flush()
+    return gefunden
 
 
 async def regeln(sitzung: AsyncSession) -> list[Regel]:

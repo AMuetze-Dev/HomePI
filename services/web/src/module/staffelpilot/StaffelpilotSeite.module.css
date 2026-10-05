@@ -11,13 +11,25 @@
 
 .kennzahlen {
   display: grid;
-  /* Vier nebeneinander, wo Platz ist; auf 375 px zwei. Kein Media Query --
-     die Spaltenzahl folgt dem Platz, nicht einer geratenen Geraetebreite. */
-  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  /* Zwei oder vier -- nie drei.
+     Vorher stand hier auto-fit mit minmax(7rem, 1fr), und das ist bei genau
+     vier Kacheln die eine Stelle, an der auto-fit schadet: zwischen etwa 420
+     und 650 px passen drei nebeneinander, und die vierte steht allein in der
+     zweiten Reihe. Das ist das Erste, was man morgens sieht, und es sieht
+     nach einem Fehler aus.
+     Eine gerade Zahl geht immer auf. Der Umbruch liegt dort, wo die Huelle
+     ohnehin auf Seitennavigation umstellt. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--raum-3);
   margin: 0 0 var(--raum-5);
   padding: 0;
   list-style: none;
+}
+
+@media (width >= 64rem) {
+  .kennzahlen {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .kennzahl {

@@ -322,6 +322,17 @@ class Zusammenfassung(BaseModel):
 # ── Einstellungen ─────────────────────────────────────────────────────────
 
 
+class Beispieldatenstand(BaseModel):
+    """Wie viele erfundene Spiele in den Listen stehen -- oder weg sind.
+
+    Zwei Felder und kein gemeinsames: "noch da" und "gerade entfernt" sind
+    verschiedene Aussagen, und eine Null bedeutet in beiden etwas anderes.
+    """
+
+    anzahl: int = 0
+    entfernt: int = 0
+
+
 class EinstellungenAusgabe(BaseModel):
     """Was fuer die ganze Installation gilt.
 
@@ -337,6 +348,7 @@ class EinstellungenAusgabe(BaseModel):
     frist_tage: int
     uebertragung_pausiert: bool
     browser_sichtbar: bool
+    beispieldaten: bool
     folgesatz: str
     #: Was ohne eigenen gilt. Die Oberflaeche zeigt es als Platzhalter.
     vorgabe_folgesatz: str = ""
@@ -358,6 +370,8 @@ class EinstellungenSetzen(BaseModel):
     uebertragung_pausiert: bool | None = None
     #: Beim Pruefen zusehen. Siehe `dienst.Einstellungen.browser_sichtbar`.
     browser_sichtbar: bool | None = None
+    #: Erfundene Spiele annehmen. Siehe `dienst.Einstellungen.beispieldaten`.
+    beispieldaten: bool | None = None
     #: Der Satz unter jeder Mahnung. Leer heisst: der mitgelieferte.
     folgesatz: Annotated[str, Field(max_length=2000)] | None = None
 

@@ -83,6 +83,20 @@ class NochOffeneBefunde(ServiceError):
     title = "Es sind noch Befunde offen"
 
 
+class BeispieldatenNichtErlaubt(ServiceError):
+    """Ein Lauf wollte erfundene Spiele einspielen, und das war nicht gewollt.
+
+    **Laut und nicht stillschweigend uebergangen.** Ein Prueflauf, der die
+    Haelfte seiner Spiele verliert, sieht hinterher aus wie einer, bei dem
+    nichts war -- und das ist die gefaehrlichste Zeile in der Warteschlange.
+    Lieber ein abgebrochener Lauf mit einem Satz, der sagt, welcher Schalter
+    fehlt.
+    """
+
+    status = 409
+    title = "Beispieldaten sind nicht erlaubt"
+
+
 class GrundFehlt(ServiceError):
     status = 422
     title = "Begruendung fehlt"
@@ -280,6 +294,13 @@ class Einstellungen:
     #: trotzdem und faellt auf das unsichtbare Fenster zurueck, mit einer
     #: Zeile im Protokoll.
     browser_sichtbar: bool = False
+    #: Ob erfundene Spiele in die Listen duerfen.
+    #:
+    #: **Aus.** Der Pruefdienst bringt eine Attrappe mit, die zu jeder Staffel
+    #: Spiele erfindet -- gut zum Durchklicken, verheerend zwischen echten
+    #: Spielen. Ein Spiel, das niemand bei DFBnet gesehen hat, darf nicht in
+    #: einer Liste stehen, aus der Mahnungen entstehen.
+    beispieldaten: bool = False
     #: Der Satz unter jeder Mahnung, wenn ein eigener gewuenscht ist.
     #:
     #: Leer heisst: der mitgelieferte aus `vordrucke/texte.yaml`. Leer und
@@ -293,7 +314,7 @@ class Einstellungen:
 #: den Fehler dann im Prueflauf statt in den Einstellungen.
 _ZAHLEN = {"pruefzeitraum_tage": (1, 365), "frist_tage": (1, 90)}
 _TEXTE = ("staffelleiter", "verband", "absender", "folgesatz")
-_WAHRHEITEN = ("uebertragung_pausiert", "browser_sichtbar")
+_WAHRHEITEN = ("uebertragung_pausiert", "browser_sichtbar", "beispieldaten")
 
 #: Was als "ja" gilt. Geschrieben wird immer "true"; gelesen wird grosszuegig,
 #: weil eine Zeile auch einmal von Hand in der Datenbank landet.
@@ -483,6 +504,44 @@ class Anlass:
     #: Die Saetze aus der Regeluebersicht, falls dort welche stehen. Ohne sie
     #: gelten die mitgelieferten.
     vorlage: texte.Vorlage | None = None
+
+
+#: Woran ein erfundenes Spiel zu erkennen ist.
+#:
+#: Der Pruefdienst setzt diesen Praefix in `leser.BeispielLeser` -- eine
+#: Attrappe, die sich selbst benennt. Dieselbe Zeichenkette steht damit in
+#: zwei Diensten, und das ist Absicht: dieses Artefakt huetet die scharfen
+#: Daten und darf sich dafuer nicht darauf verlassen, dass der andere Dienst
+#: ehrlich ist. Aendert der Praefix dort, faellt es hier auf -- ein
+#: Beispielspiel kommt durch, und der Test dazu wird rot.
+BEISPIEL_PRAEFIX = "DEMO-"
+
+
+def ist_beispiel(dfbnet_id: str) -> bool:
+    """Ein erfundenes Spiel, das nie bei DFBnet stand."""
+    return dfbnet_id.startswith(BEISPIEL_PRAEFIX)
+
+
+def beispieldaten_pruefen(kennungen: Iterable[str], erlaubt: bool) -> None:
+    """Wirft, wenn erfundene Spiele in eine scharfe Ansicht wollten.
+
+    Der Schalter steht in den Einstellungen und ist **aus**. Wer durchklicken
+    will, schaltet ihn ein -- einmal, bewusst. So kann ein Prueflauf, der
+    versehentlich mit der Attrappe als Leser laeuft, die Liste echter Spiele
+    nicht mehr verunreinigen.
+    """
+    if erlaubt:
+        return
+    erfunden = sorted({k for k in kennungen if ist_beispiel(k)})
+    if not erfunden:
+        return
+    raise BeispieldatenNichtErlaubt(
+        f"{len(erfunden)} erfundene Spiele ({', '.join(erfunden[:3])}"
+        f"{' …' if len(erfunden) > 3 else ''}) wurden abgewiesen. "
+        "Der Prüfdienst läuft mit der Attrappe als Leser. Entweder ihn auf "
+        "DFBnet umstellen oder in den Einstellungen „Beispieldaten annehmen“ "
+        "einschalten."
+    )
 
 
 def _tag(datum: date) -> str:

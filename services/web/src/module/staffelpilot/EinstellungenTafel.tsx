@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 
 import { Feld, Hinweis, Karte, Knopf, Platzhalter } from "../../ui";
-import { type Einstellungen, ladeEinstellungen, speichereEinstellungen } from "./api";
+import {
+  type Beispieldatenstand,
+  type Einstellungen,
+  entferneBeispieldaten,
+  ladeBeispieldaten,
+  ladeEinstellungen,
+  speichereEinstellungen,
+} from "./api";
 import stil from "./StaffelpilotSeite.module.css";
 
 function meldung(fehler: unknown): string {
@@ -129,6 +136,11 @@ export function EinstellungenTafel() {
           </span>
         </label>
 
+        <Beispieldaten
+          an={werte.beispieldaten}
+          onSchalten={(an) => aendern("beispieldaten", an)}
+        />
+
         <label className={stil.textfeldEtikett}>
           Folgesatz unter jeder Mahnung
           <textarea
@@ -157,5 +169,94 @@ export function EinstellungenTafel() {
         </Knopf>
       </form>
     </Karte>
+  );
+}
+
+/**
+ * Der Schalter für erfundene Spiele — und der Besen dahinter.
+ *
+ * Der Anlass war echt: drei Spiele der Attrappe standen zwischen
+ * einunddreißig Spielen aus DFBnet, weil der Prüfdienst mit der Attrappe als
+ * Leser lief. Aus einer solchen Liste entstehen Mahnungen.
+ *
+ * Darum stehen hier zwei Dinge zusammen: der Schalter, der sie künftig
+ * abweist, und die Zahl derer, die schon drin sind. Die Zahl zeigt sich **nur
+ * wenn es welche gibt** — eine dauerhafte Null wäre eine Zeile, die jeden Tag
+ * mitliest und nie etwas sagt.
+ */
+function Beispieldaten({
+  an,
+  onSchalten,
+}: {
+  an: boolean;
+  onSchalten: (an: boolean) => void;
+}) {
+  const [stand, setStand] = useState<Beispieldatenstand | null>(null);
+  const [laeuft, setLaeuft] = useState(false);
+  const [fehler, setFehler] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    ladeBeispieldaten(controller.signal)
+      .then(setStand)
+      .catch(() => {
+        // Eine Zugabe. Ohne sie bleibt der Schalter, und der ist die
+        // Hauptsache.
+      });
+    return () => controller.abort();
+  }, []);
+
+  async function aufraeumen() {
+    setLaeuft(true);
+    setFehler("");
+    try {
+      await entferneBeispieldaten();
+      setStand({ anzahl: 0, entfernt: 0 });
+    } catch (f) {
+      setFehler(f instanceof Error ? f.message : "Unbekannter Fehler");
+    } finally {
+      setLaeuft(false);
+    }
+  }
+
+  return (
+    <>
+      <label className={stil.schalter}>
+        <input
+          type="checkbox"
+          className={stil.schalterKasten}
+          checked={an}
+          onChange={(e) => onSchalten(e.target.checked)}
+        />
+        <span className={stil.schalterText}>
+          <span>Beispieldaten annehmen</span>
+          <span className={stil.wahlName}>
+            Der Prüfdienst kann zu jeder Staffel Spiele erfinden, statt DFBnet zu
+            lesen — zum Durchklicken. Ausgeschaltet weist das Programm einen
+            solchen Lauf ganz ab, statt die erfundenen Spiele zwischen die echten
+            zu lassen. Aus dieser Liste entstehen Mahnungen.
+          </span>
+        </span>
+      </label>
+
+      {stand !== null && stand.anzahl > 0 && (
+        <Hinweis ton="warnung">
+          In den Listen stehen {stand.anzahl} erfundene{" "}
+          {stand.anzahl === 1 ? "Spiel" : "Spiele"}. Echte Spiele bleiben beim
+          Entfernen stehen.
+          <div className={stil.knoepfe}>
+            <Knopf groesse="sm" onClick={() => void aufraeumen()} disabled={laeuft}>
+              {laeuft ? "Entfernt …" : "Beispieldaten entfernen"}
+            </Knopf>
+          </div>
+        </Hinweis>
+      )}
+
+      {fehler && (
+        <Hinweis ton="fehler" dringend>
+          {fehler}
+        </Hinweis>
+      )}
+    </>
   );
 }

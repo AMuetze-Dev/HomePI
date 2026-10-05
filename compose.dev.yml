@@ -44,6 +44,12 @@ services:
   # Voreingestellt ist der Demo-Leser: er klopft nirgends an. Wer wirklich
   # nach DFBnet will, setzt PRUEFDIENST_LESER=dfbnet - und traegt vorher in
   # der Oberflaeche unter "DFBnet-Zugang" Zugangsdaten ein.
+  #
+  # Seine erfundenen Spiele kommen **nicht** mehr zwischen echte: das
+  # Artefakt weist einen Lauf mit DEMO-Kennungen ab, solange in den
+  # Einstellungen "Beispieldaten annehmen" aus steht. Dann steht hier ein
+  # 409 im Protokoll und nicht ein erfundenes Spiel in der Warteschlange.
+  # Zum Durchklicken also beides: diesen Leser und den Schalter.
   pruefdienst:
     build:
       context: .

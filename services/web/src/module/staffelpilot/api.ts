@@ -98,6 +98,8 @@ export interface Einstellungen {
   uebertragung_pausiert: boolean;
   /** Ob der Prüfdienst sein Browserfenster zeigt. Frisch: aus. */
   browser_sichtbar: boolean;
+  /** Ob erfundene Spiele in die Listen dürfen. Frisch: aus. */
+  beispieldaten: boolean;
   /** Der Satz unter jeder Mahnung. Leer heisst: der mitgelieferte gilt. */
   folgesatz: string;
   /** Der mitgelieferte. Platzhalter, nicht Inhalt. */
@@ -337,6 +339,26 @@ export function hakeAb(spielId: string): Promise<Spiel> {
 
 export function loeseHaken(spielId: string): Promise<Spiel> {
   return anfrage<Spiel>(`/spiele/${spielId}/haken`, { method: "DELETE" });
+}
+
+/** Wie viele erfundene Spiele noch in den Listen stehen — oder weg sind. */
+export interface Beispieldatenstand {
+  anzahl: number;
+  entfernt: number;
+}
+
+export function ladeBeispieldaten(signal?: AbortSignal): Promise<Beispieldatenstand> {
+  return anfrage<Beispieldatenstand>("/beispieldaten", {}, signal);
+}
+
+/**
+ * Alles weg, was mit der Attrappe hereingekommen ist.
+ *
+ * Echte Spiele bleiben: die Bedingung steht auf der Kennung, die der
+ * Prüfdienst seinen erfundenen Spielen gibt.
+ */
+export function entferneBeispieldaten(): Promise<Beispieldatenstand> {
+  return anfrage<Beispieldatenstand>("/beispieldaten", { method: "DELETE" });
 }
 
 // ── Einstellungen ────────────────────────────────────────────────────────

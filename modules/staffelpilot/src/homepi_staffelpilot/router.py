@@ -44,6 +44,7 @@ from .schemas import (
     Auswertung,
     BefundAusgabe,
     BefundZeile,
+    Beispieldatenstand,
     EinstellungenAusgabe,
     EinstellungenSetzen,
     EntscheidungSetzen,
@@ -259,6 +260,27 @@ async def einspielen(auftrag: ImportAuftrag, sitzung: DbSitzung) -> ImportErgebn
     """
     angelegt, aktualisiert, befunde = await speicher.einspielen(sitzung, auftrag)
     return ImportErgebnis(angelegt=angelegt, aktualisiert=aktualisiert, befunde=befunde)
+
+
+@router.get("/beispieldaten", summary="Stecken erfundene Spiele in den Listen?")
+async def beispieldaten(sitzung: DbSitzung) -> Beispieldatenstand:
+    return Beispieldatenstand(anzahl=await speicher.beispieldaten_zaehlen(sitzung))
+
+
+@router.delete(
+    "/beispieldaten",
+    summary="Erfundene Spiele entfernen",
+    # Löschen ist Verwaltersache. `NUR_VERWALTER` steht weiter unten bei den
+    # Zugangsrouten — hier daher ausgeschrieben.
+    dependencies=[erfordert("staffelpilot", Rolle.VERWALTER)],
+)
+async def beispieldaten_loeschen(sitzung: DbSitzung) -> Beispieldatenstand:
+    """Alles weg, was mit der Attrappe hereingekommen ist.
+
+    Echte Spiele bleiben: die Bedingung steht auf der Kennung, die der
+    Prüfdienst seinen erfundenen Spielen gibt.
+    """
+    return Beispieldatenstand(entfernt=await speicher.beispieldaten_loeschen(sitzung))
 
 
 # ── Ein Spielbericht ──────────────────────────────────────────────────────
