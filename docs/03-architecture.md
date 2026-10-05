@@ -94,17 +94,35 @@ startest. Im Router trägst du nur den DNS-Server ein.
 Das Problem: Let's Encrypt stellt keine Zertifikate für `.local`, `.home.arpa` oder
 IP-Adressen aus, und HTTP-01 geht nicht ohne Portfreigabe.
 
-**Empfohlener Weg — DNS-01-Challenge mit eigener Domain:**
+**Der Weg — DNS-01-Challenge.** Welcher DNS-Anbieter es ist, steht in
+`ACME_DNS_PROVIDER`; der Rest bleibt gleich. Zwei erprobte Varianten:
 
-1. Beliebige günstige Domain, DNS bei **Cloudflare** (oder Hetzner/deSEC/Netcup — Traefik
-   unterstützt rund 100 Provider).
-2. Wildcard-A-Record: `*.home.example.com → 192.168.1.50`. Eine private IP im öffentlichen
-   DNS ist zulässig und üblich.
-3. API-Token mit Recht `Zone:DNS:Edit` für genau diese Zone → `CF_DNS_API_TOKEN`.
-4. Traefik holt ein Wildcard-Zertifikat für `*.home.example.com`.
+| | DuckDNS | eigene Domain bei Cloudflare |
+|---|---|---|
+| Kosten | keine | rund 10 Euro im Jahr |
+| Name | `<name>.duckdns.org` | frei wählbar |
+| Token | von der DuckDNS-Startseite → `DUCKDNS_TOKEN` | Recht `Zone:DNS:Edit` → `CF_DNS_API_TOKEN` |
+| Mehrere TXT-Einträge | **nein** (siehe unten) | ja |
 
-Ergebnis: grünes Schloss auf jedem Gerät, **keine einzige Portfreigabe im Router**, kein
-Zertifikat manuell verteilen. Die Domain kostet rund 10 Euro im Jahr und spart viel Ärger.
+In beiden Fällen zeigt der Eintrag auf die **private** IP des Pi. Das ist im
+öffentlichen DNS zulässig und üblich, und es bedeutet: keine einzige
+Portfreigabe im Router.
+
+**Nur das Wildcard, nicht die nackte Domain.** Für `${DOMAIN}` *und*
+`*.${DOMAIN}` verlangt Let's Encrypt zwei TXT-Einträge unter demselben Namen
+`_acme-challenge.${DOMAIN}`. DuckDNS hält je Domain nur einen — der zweite
+überschreibt den ersten, und die Ausstellung scheitert mit einer Meldung, die
+nach einem Netzproblem aussieht. Gebraucht wird die nackte Domain ohnehin
+nicht: Alle Router liegen auf `app.`, `api.`, `traefik.`, `logs.` und
+`status.`.
+
+**Fritz!Box-Falle.** Der DNS-Rebind-Schutz blockiert öffentliche Namen, die auf
+private Adressen zeigen — die Auflösung im LAN liefert dann schlicht nichts.
+Unter *Heimnetz → Netzwerk → Netzwerkeinstellungen* den Namen als Ausnahme
+eintragen. Das kostet sonst einen Abend.
+
+Ergebnis: grünes Schloss auf jedem Gerät, keine Portfreigabe, kein Zertifikat
+manuell verteilen.
 
 Die Alternative — eigene CA mit `mkcert` — bedeutet, dass du das Root-CA auf jedem Handy,
 Tablet, Laptop und in einigen Apps einzeln installierst. Bei aktuellem Android und iOS ist

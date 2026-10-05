@@ -189,9 +189,11 @@ docker logs traefik 2>&1 | grep -i acme
 
 | Meldung | Ursache |
 |---|---|
-| `invalid credentials` / `403` | Cloudflare-Token falsch oder ohne `Zone:DNS:Edit` auf diese Zone |
-| `timeout waiting for DNS record` | Propagation dauert; bei Cloudflare normalerweise unter 60 s. Länger heißt: falsche Zone. |
-| `too many certificates already issued` | Let's Encrypt Rate Limit (5 pro Domain pro Woche). Zum Testen `--certificatesresolvers.cloudflare.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory` setzen. |
+| `invalid credentials` / `403` | Token falsch. Bei Cloudflare fehlt meist `Zone:DNS:Edit` auf genau diese Zone; bei DuckDNS stimmt `DUCKDNS_TOKEN` oder der Name in `DOMAIN` nicht. |
+| `timeout waiting for DNS record` | Propagation dauert. Normalerweise unter 60 s. Länger heißt: falsche Zone, oder bei DuckDNS ein Name, der dem Token nicht gehört. |
+| `too many certificates already issued` | Let's Encrypt Rate Limit (5 pro Domain pro Woche). Zum Testen `--certificatesresolvers.dns.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory` setzen. |
+| Ausstellung scheitert bei zwei Namen | Der Anbieter hält nur einen TXT-Eintrag je Domain (DuckDNS). Nur das Wildcard beantragen, nicht zusätzlich die nackte Domain. |
+| Name löst im LAN gar nicht auf | Fritz!Box-DNS-Rebind-Schutz. Den Namen unter *Heimnetz → Netzwerk → Netzwerkeinstellungen* als Ausnahme eintragen. |
 
 Die Datei `${DATA_ROOT}/traefik/letsencrypt/acme.json` muss `chmod 600` sein, sonst
 verweigert Traefik den Start.

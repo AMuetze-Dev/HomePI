@@ -28,9 +28,20 @@ services:
       - --entrypoints.web.http.redirections.entrypoint.permanent=true
 
       - --entrypoints.websecure.address=:443
-      - --entrypoints.websecure.http.tls.certresolver=cloudflare
-      - --entrypoints.websecure.http.tls.domains[0].main=${DOMAIN}
-      - --entrypoints.websecure.http.tls.domains[0].sans=*.${DOMAIN}
+      - --entrypoints.websecure.http.tls.certresolver=dns
+      # NUR das Wildcard, nicht zusaetzlich die nackte Domain.
+      #
+      # Fuer "${DOMAIN}" und "*.${DOMAIN}" verlangt Let's Encrypt ZWEI
+      # TXT-Eintraege unter demselben Namen _acme-challenge.${DOMAIN}.
+      # DuckDNS kann je Domain nur einen halten - der zweite ueberschreibt
+      # den ersten, und die Ausstellung scheitert mit einer Meldung, die
+      # nach einem Netzproblem aussieht.
+      #
+      # Gebraucht wird die nackte Domain ohnehin nicht: Es gibt Router fuer
+      # app., api., traefik., logs. und status., alle unter dem Wildcard.
+      # Wer sie doch braucht (und einen Anbieter mit mehreren TXT-Eintraegen
+      # nutzt), ergaenzt hier ".sans=${DOMAIN}".
+      - --entrypoints.websecure.http.tls.domains[0].main=*.${DOMAIN}
       - --entrypoints.websecure.http.middlewares=secure-headers@file
 
       - --providers.docker=true
@@ -39,15 +50,23 @@ services:
       - --providers.file.directory=/etc/traefik/dynamic
       - --providers.file.watch=true
 
-      - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL}
-      - --certificatesresolvers.cloudflare.acme.storage=/letsencrypt/acme.json
-      - --certificatesresolvers.cloudflare.acme.dnschallenge=true
-      - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+      # Der Resolver heisst "dns" und nicht nach seinem Anbieter: Welcher es
+      # ist, steht in ACME_DNS_PROVIDER. Haette er den Anbieternamen, muesste
+      # man beim Wechsel auch jeden Router anfassen.
+      - --certificatesresolvers.dns.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.dns.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.dns.acme.dnschallenge=true
+      - --certificatesresolvers.dns.acme.dnschallenge.provider=${ACME_DNS_PROVIDER}
       # NICHT Pi-hole als Resolver: sonst Henne-Ei bei Zertifikatserneuerung
-      - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,9.9.9.9:53
+      - --certificatesresolvers.dns.acme.dnschallenge.resolvers=1.1.1.1:53,9.9.9.9:53
     environment:
       TZ: ${TZ}
-      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
+      # Beide Anbieter nebeneinander. Die Bibliothek in Traefik liest nur die
+      # Variablen des gewaehlten Anbieters; die andere bleibt leer und stoert
+      # nicht. So kostet ein Wechsel eine Zeile in der .env statt einer
+      # Aenderung an dieser Datei.
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:-}
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:-}
     extra_hosts:
       # damit Traefik das host-genetzte Home Assistant auf :8123 erreicht
       - "host.docker.internal:host-gateway"
