@@ -126,6 +126,29 @@
   border-radius: var(--rundung-sm);
 }
 
+/* Ab Tabletbreite nebeneinander statt untereinander.
+   Vorher stand die Paarung oben und Datum samt Befunden darunter -- zwei
+   Zeilen, waehrend rechts die halbe Breite leer blieb. Bei achtundzwanzig
+   Spielen sind das gut zwei Bildschirme nur aus Umbruch.
+   Nebeneinander entsteht ausserdem eine Spalte: Datum unter Datum, Etikett
+   unter Etikett. Eine Liste, die man herunterscannt, braucht Kanten -- sonst
+   liest man jede Zeile einzeln. */
+@media (width >= 48rem) {
+  .kopf {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--raum-4);
+  }
+
+  /* Die Meta-Seite schrumpft nicht und wandert nicht: sie steht rechts und
+     bleibt dort, auch wenn die Paarung lang ist und umbricht. */
+  .kopf > .zeile {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+  }
+}
+
 .paarung {
   font-size: var(--text-lg);
   font-weight: var(--gewicht-mittel);
