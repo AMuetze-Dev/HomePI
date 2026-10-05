@@ -15,7 +15,12 @@ services:
       traefik.http.routers.web.entrypoints: "websecure"
       traefik.http.services.web.loadbalancer.server.port: "80"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      # 127.0.0.1 und nicht "localhost": Im Container loest der Name zuerst
+      # auf ::1 auf, nginx horcht aber nur auf 0.0.0.0:80. Das busybox-wget
+      # probiert keine zweite Adresse - es meldet "Connection refused", und
+      # der Container gilt dauerhaft als krank, obwohl er tadellos
+      # ausliefert.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 30s
       timeout: 3s
       retries: 3

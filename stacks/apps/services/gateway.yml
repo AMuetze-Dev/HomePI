@@ -34,7 +34,12 @@ services:
         - CMD
         - python
         - -c
-        - import urllib.request;urllib.request.urlopen('http://localhost:8000/health')
+        # 127.0.0.1 und nicht "localhost". Uvicorn horcht auf 0.0.0.0:8000,
+        # also nur IPv4; "localhost" zeigt im Container zuerst auf ::1.
+        # urllib probiert zwar die zweite Adresse - aber eine Pruefung, die
+        # vom Rueckfallverhalten des Namensauflösers abhaengt, faellt beim
+        # naechsten Basis-Image um. Beim web-Dienst ist genau das passiert.
+        - import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')
       interval: 30s
       timeout: 5s
       retries: 3
