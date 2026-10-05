@@ -11,10 +11,10 @@ nur Zertifikatswarnungen erzeugen.
 make dev
 ```
 
-| | Adresse |
-|---|---|
-| Frontend | http://localhost:5173 |
-| API | http://localhost:18000 (`/docs` für Swagger) |
+|          | Adresse                                                      |
+| -------- | ------------------------------------------------------------ |
+| Frontend | http://localhost:5173                                        |
+| API      | http://localhost:18000 (`/docs` für Swagger)                 |
 | Postgres | localhost:15432, `app` / `app`, Datenbanken `app` und `test` |
 
 **Warum diese Ports:** 3000, 5432 und 8000 sind auf diesem Rechner schon belegt.
@@ -47,7 +47,7 @@ uv run homepi benutzer liste
 ```
 
 Weitere Rechte — etwa `geraete` — vergibst du danach in der Oberfläche unter
-*Verwaltung* oder mit `homepi benutzer recht aaron geraete verwalter`.
+_Verwaltung_ oder mit `homepi benutzer recht aaron geraete verwalter`.
 
 `make dev-reset` wirft die Datenbank weg — danach ist auch das Konto weg.
 
@@ -57,14 +57,14 @@ Das Passwort wird abgefragt, nie als Argument übergeben; in einem Skript geht
 
 ## Was lokal anders ist als auf dem Pi
 
-| | lokal | Pi |
-|---|---|---|
-| Plattform | amd64, nativ | arm64 |
-| Reverse Proxy | Vite-Proxy `/api` | Traefik mit TLS |
-| Zertifikate | keine, alles HTTP | Wildcard von Let's Encrypt |
-| Schema | `DB_SCHEMA_ANLEGEN=true` beim Start | `false`, Migration |
-| Logformat | lesbarer Text | JSON |
-| Worker | 1, mit `--reload` | 1, ohne Reload |
+|               | lokal                               | Pi                         |
+| ------------- | ----------------------------------- | -------------------------- |
+| Plattform     | amd64, nativ                        | arm64                      |
+| Reverse Proxy | Vite-Proxy `/api`                   | Traefik mit TLS            |
+| Zertifikate   | keine, alles HTTP                   | Wildcard von Let's Encrypt |
+| Schema        | `DB_SCHEMA_ANLEGEN=true` beim Start | `false`, Migration         |
+| Logformat     | lesbarer Text                       | JSON                       |
+| Worker        | 1, mit `--reload`                   | 1, ohne Reload             |
 
 Der Vite-Proxy leitet `/api/...` an das Gateway weiter. Dadurch spricht der
 Browser nur mit einer Adresse und es gibt lokal **kein CORS** — dieselbe Rolle,
@@ -219,12 +219,12 @@ frische Installation mit eigener Datenbank:
 
 Vier Arten, bewusst getrennt:
 
-| | wo | wann |
-|---|---|---|
-| Unit | `tests/unit/` | bei jeder Änderung, Millisekunden |
-| Integration | `tests/integration/`, Marker `integration` | mit laufender Datenbank |
-| Rauchtest | `tests/smoke/`, Marker `smoke` | gegen eine laufende Instanz |
-| Oberfläche | `services/web/e2e/` | gegen eine eigene, frische Umgebung |
+|             | wo                                         | wann                                |
+| ----------- | ------------------------------------------ | ----------------------------------- |
+| Unit        | `tests/unit/`                              | bei jeder Änderung, Millisekunden   |
+| Integration | `tests/integration/`, Marker `integration` | mit laufender Datenbank             |
+| Rauchtest   | `tests/smoke/`, Marker `smoke`             | gegen eine laufende Instanz         |
+| Oberfläche  | `services/web/e2e/`                        | gegen eine eigene, frische Umgebung |
 
 Die Oberflächentests melden sich an wie ein Mensch: Ersteinrichtung mit Token,
 Konto anlegen, Startpasswort weitergeben, erstes Anmelden, erzwungener

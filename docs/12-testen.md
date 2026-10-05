@@ -10,13 +10,13 @@ nichtssagende.
 
 ## Fünf Ebenen
 
-| Ebene | Wo | Marker | Beweist | Dauer |
-|---|---|---|---|---|
-| Unit | `modules/<name>/tests/unit/` | — | die Entscheidungen in `dienst.py` | Millisekunden |
-| Integration | `modules/<name>/tests/integration/` | `integration` | Router und `speicher.py` gegen echtes Postgres | Sekunden |
-| Komponente | `services/web/src/module/<name>/*.test.tsx` | — | jede Ansicht für sich, Backend ersetzt | Millisekunden |
-| Rauchtest | `services/gateway/tests/smoke/` | `smoke` | eine **laufende** Instanz antwortet | Sekunden |
-| Oberfläche | `services/web/e2e/` | — | der Weg durch die Anwendung, echter Browser | Minuten |
+| Ebene       | Wo                                          | Marker        | Beweist                                        | Dauer         |
+| ----------- | ------------------------------------------- | ------------- | ---------------------------------------------- | ------------- |
+| Unit        | `modules/<name>/tests/unit/`                | —             | die Entscheidungen in `dienst.py`              | Millisekunden |
+| Integration | `modules/<name>/tests/integration/`         | `integration` | Router und `speicher.py` gegen echtes Postgres | Sekunden      |
+| Komponente  | `services/web/src/module/<name>/*.test.tsx` | —             | jede Ansicht für sich, Backend ersetzt         | Millisekunden |
+| Rauchtest   | `services/gateway/tests/smoke/`             | `smoke`       | eine **laufende** Instanz antwortet            | Sekunden      |
+| Oberfläche  | `services/web/e2e/`                         | —             | der Weg durch die Anwendung, echter Browser    | Minuten       |
 
 Die ersten drei gehören dem Artefakt und wachsen mit ihm. Die beiden letzten
 gehören der Installation: sie liegen **einmal** beim Gateway beziehungsweise
@@ -76,7 +76,7 @@ HOMEPI_TEST_DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/test' \
 Arbeitsdatenbank gesetzt sein, ohne dass ein Testlauf sie trifft.
 
 **Zweitens: nicht dieselbe wie beim letzten Mal.** Die geprüfte Datenbank ist
-nur die *Vorlage*. Beim Start legt das pytest-Plugin daneben eine eigene an
+nur die _Vorlage_. Beim Start legt das pytest-Plugin daneben eine eigene an
 und stellt die Umgebung darauf um; am Ende wird sie weggeworfen und die
 vorherige wieder eingestellt. Im Kopf des Laufs steht, welche es ist:
 
@@ -132,7 +132,9 @@ fünf Punkte fallen sonst erst im Betrieb auf, und dann als fehlende Kachel:
 CSS-Klassen:
 
 ```tsx
-expect(await screen.findByRole("heading", { name: "Messwerte" })).toBeInTheDocument();
+expect(
+  await screen.findByRole("heading", { name: "Messwerte" }),
+).toBeInTheDocument();
 ```
 
 **Oberflächentests** (`services/web/e2e/`) prüfen den Weg, den ein Mensch

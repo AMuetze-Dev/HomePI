@@ -10,13 +10,13 @@ develop     ────●───────●────────●�
 feature/*         ●───●   ●────●                  eine Aufgabe, ein Branch
 ```
 
-| Branch | Rolle | Wer merged hinein |
-|---|---|---|
-| `develop` | Integration. Standardziel für Feature-Branches. **Baut zurzeit auch die Images für den Pi.** | `feature/*`, per PR |
-| `main` | Release. Ruht, solange nichts veröffentlicht wird. | nur `develop`, per PR |
-| `feature/<thema>` | eine Aufgabe | — |
-| `fix/<thema>` | Fehlerbehebung | — |
-| `chore/<thema>` | Abhängigkeiten, CI, Aufräumarbeiten | — |
+| Branch            | Rolle                                                                                        | Wer merged hinein     |
+| ----------------- | -------------------------------------------------------------------------------------------- | --------------------- |
+| `develop`         | Integration. Standardziel für Feature-Branches. **Baut zurzeit auch die Images für den Pi.** | `feature/*`, per PR   |
+| `main`            | Release. Ruht, solange nichts veröffentlicht wird.                                           | nur `develop`, per PR |
+| `feature/<thema>` | eine Aufgabe                                                                                 | —                     |
+| `fix/<thema>`     | Fehlerbehebung                                                                               | —                     |
+| `chore/<thema>`   | Abhängigkeiten, CI, Aufräumarbeiten                                                          | —                     |
 
 **Solange nichts veröffentlicht wird, ist `develop` der Zweig, der auf dem Pi
 läuft.** Ein Push dorthin baut die arm64-Images und legt sie als
@@ -105,11 +105,11 @@ keine einzige Fallunterscheidung, `evaluate()` kein einziges `await`.
 
 ### Testarten
 
-| Ort | Was | Wann |
-|---|---|---|
-| `services/api/tests/unit/` | Logik, Endpunkte mit ersetzten Abhängigkeiten | bei jeder Änderung |
+| Ort                               | Was                                                       | Wann                               |
+| --------------------------------- | --------------------------------------------------------- | ---------------------------------- |
+| `services/api/tests/unit/`        | Logik, Endpunkte mit ersetzten Abhängigkeiten             | bei jeder Änderung                 |
 | `services/api/tests/integration/` | echtes Postgres — markiert mit `@pytest.mark.integration` | `make test-api-full` und in der CI |
-| `services/web/src/**/*.test.tsx` | Komponenten aus Nutzersicht (Rollen, Texte) | bei jeder Änderung |
+| `services/web/src/**/*.test.tsx`  | Komponenten aus Nutzersicht (Rollen, Texte)               | bei jeder Änderung                 |
 
 Integrationstests laufen **nicht** automatisch mit:
 
@@ -136,14 +136,14 @@ Drei Workflows, jeder mit einer klaren Aufgabe:
 Zuerst ermittelt ein `changes`-Job per Pfadfilter, was überhaupt betroffen ist. Eine
 Änderung an `docs/` startet keinen einzigen Test.
 
-| Job | Prüft |
-|---|---|
-| `infra` | shellcheck, keine CRLF, alle fünf Compose-Dateien validieren, keine echten Werte in `.env.example` |
-| `api` | ruff format, ruff check, mypy strict, pytest **inklusive Integration** gegen einen Postgres-Service, Coverage ≥ 85 % |
-| `web` | prettier, eslint, `tsc -b`, vitest mit Schwellen aus `vite.config.ts`, Produktionsbuild |
-| `docker` | beide Images für amd64 bauen — fängt Dockerfile-Fehler in ~1 Minute statt im arm64-Build |
-| `secrets` | gitleaks über die gesamte Historie |
-| `ci` | fasst alles zu **einem** Status zusammen |
+| Job       | Prüft                                                                                                                |
+| --------- | -------------------------------------------------------------------------------------------------------------------- |
+| `infra`   | shellcheck, keine CRLF, alle fünf Compose-Dateien validieren, keine echten Werte in `.env.example`                   |
+| `api`     | ruff format, ruff check, mypy strict, pytest **inklusive Integration** gegen einen Postgres-Service, Coverage ≥ 85 % |
+| `web`     | prettier, eslint, `tsc -b`, vitest mit Schwellen aus `vite.config.ts`, Produktionsbuild                              |
+| `docker`  | beide Images für amd64 bauen — fängt Dockerfile-Fehler in ~1 Minute statt im arm64-Build                             |
+| `secrets` | gitleaks über die gesamte Historie                                                                                   |
+| `ci`      | fasst alles zu **einem** Status zusammen                                                                             |
 
 Der `ci`-Job existiert wegen einer Eigenheit des Branch-Schutzes: Ein übersprungener Job
 zählt dort als Erfolg. Ohne diese Zusammenfassung würde ein Pfadfilter, der `api`

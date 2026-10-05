@@ -9,12 +9,12 @@ Frontend-Container bekommt, wie teuer wird das auf einem Pi?
 
 Gemessen an typischen Ruhewerten im Betrieb, nicht an Peak:
 
-| | RAM | Bemerkung |
-|---|---|---|
-| FastAPI-Container, 1 uvicorn-Worker | 150–250 MB | **der teure Teil** |
-| jeder zusätzliche uvicorn-Worker | ~120 MB | bringt bei I/O-Last nichts |
-| nginx:alpine mit statischen Dateien | 10–15 MB | vernachlässigbar |
-| das JS-Bundle im Browser | 0 MB auf dem Pi | läuft beim Betrachter |
+|                                     | RAM             | Bemerkung                  |
+| ----------------------------------- | --------------- | -------------------------- |
+| FastAPI-Container, 1 uvicorn-Worker | 150–250 MB      | **der teure Teil**         |
+| jeder zusätzliche uvicorn-Worker    | ~120 MB         | bringt bei I/O-Last nichts |
+| nginx:alpine mit statischen Dateien | 10–15 MB        | vernachlässigbar           |
+| das JS-Bundle im Browser            | 0 MB auf dem Pi | läuft beim Betrachter      |
 
 Daraus folgt etwas, das der ersten Intuition widerspricht: **das Frontend ist
 nicht das Problem.** Zehn nginx-Container wären 150 MB. Zehn FastAPI-Container
@@ -57,13 +57,13 @@ nennt es in `GET /module`. Zehn Artefakte: **ein Prozess, rund 250 MB.**
 
 Ehrlich aufgeschrieben, damit die Entscheidung überprüfbar bleibt:
 
-| | Modul | eigener Service |
-|---|---|---|
-| Speicher bei 10 Artefakten | ~250 MB | ~2 GB |
-| Absturz | reißt alles mit | betrifft nur sich |
-| unverträgliche Abhängigkeiten | blockieren alle | egal |
-| Deploy | Gateway neu starten | unabhängig |
-| CPU-lastige Arbeit | blockiert andere | isoliert |
+|                               | Modul               | eigener Service   |
+| ----------------------------- | ------------------- | ----------------- |
+| Speicher bei 10 Artefakten    | ~250 MB             | ~2 GB             |
+| Absturz                       | reißt alles mit     | betrifft nur sich |
+| unverträgliche Abhängigkeiten | blockieren alle     | egal              |
+| Deploy                        | Gateway neu starten | unabhängig        |
+| CPU-lastige Arbeit            | blockiert andere    | isoliert          |
 
 `homepi new <name>` legt deshalb standardmäßig ein Modul an. Ein Artefakt, das
 rechenintensiv ist, eine exotische Abhängigkeit hat oder wirklich unabhängig

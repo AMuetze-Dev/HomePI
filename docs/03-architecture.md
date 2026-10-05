@@ -64,7 +64,7 @@ nur `network_mode: host`. Konsequenzen, die du einplanen musst:
 http:
   use_x_forwarded_for: true
   trusted_proxies:
-    - 172.18.0.0/16     # das edge-Subnetz: docker network inspect edge
+    - 172.18.0.0/16 # das edge-Subnetz: docker network inspect edge
     - 127.0.0.1
 ```
 
@@ -97,18 +97,18 @@ IP-Adressen aus, und HTTP-01 geht nicht ohne Portfreigabe.
 **Der Weg — DNS-01-Challenge.** Welcher DNS-Anbieter es ist, steht in
 `ACME_DNS_PROVIDER`; der Rest bleibt gleich. Zwei erprobte Varianten:
 
-| | DuckDNS | eigene Domain bei Cloudflare |
-|---|---|---|
-| Kosten | keine | rund 10 Euro im Jahr |
-| Name | `<name>.duckdns.org` | frei wählbar |
-| Token | von der DuckDNS-Startseite → `DUCKDNS_TOKEN` | Recht `Zone:DNS:Edit` → `CF_DNS_API_TOKEN` |
-| Mehrere TXT-Einträge | **nein** (siehe unten) | ja |
+|                      | DuckDNS                                      | eigene Domain bei Cloudflare               |
+| -------------------- | -------------------------------------------- | ------------------------------------------ |
+| Kosten               | keine                                        | rund 10 Euro im Jahr                       |
+| Name                 | `<name>.duckdns.org`                         | frei wählbar                               |
+| Token                | von der DuckDNS-Startseite → `DUCKDNS_TOKEN` | Recht `Zone:DNS:Edit` → `CF_DNS_API_TOKEN` |
+| Mehrere TXT-Einträge | **nein** (siehe unten)                       | ja                                         |
 
 In beiden Fällen zeigt der Eintrag auf die **private** IP des Pi. Das ist im
 öffentlichen DNS zulässig und üblich, und es bedeutet: keine einzige
 Portfreigabe im Router.
 
-**Nur das Wildcard, nicht die nackte Domain.** Für `${DOMAIN}` *und*
+**Nur das Wildcard, nicht die nackte Domain.** Für `${DOMAIN}` _und_
 `*.${DOMAIN}` verlangt Let's Encrypt zwei TXT-Einträge unter demselben Namen
 `_acme-challenge.${DOMAIN}`. DuckDNS hält je Domain nur einen — der zweite
 überschreibt den ersten, und die Ausstellung scheitert mit einer Meldung, die
@@ -118,7 +118,7 @@ nicht: Alle Router liegen auf `app.`, `api.`, `traefik.`, `logs.` und
 
 **Fritz!Box-Falle.** Der DNS-Rebind-Schutz blockiert öffentliche Namen, die auf
 private Adressen zeigen — die Auflösung im LAN liefert dann schlicht nichts.
-Unter *Heimnetz → Netzwerk → Netzwerkeinstellungen* den Namen als Ausnahme
+Unter _Heimnetz → Netzwerk → Netzwerkeinstellungen_ den Namen als Ausnahme
 eintragen. Das kostet sonst einen Abend.
 
 Ergebnis: grünes Schloss auf jedem Gerät, keine Portfreigabe, kein Zertifikat
@@ -150,14 +150,14 @@ obendrein `py-eureka-client` als Fremdkörper, weil Eureka ein Spring-Cloud-Konz
 Was du stattdessen nimmst:
 
 - **Service Discovery:** Docker-DNS (Container-Name).
-- **Routing / L7-Gateway:** Traefik, per Docker-Labels. Das *ist* die Discovery-Ebene —
+- **Routing / L7-Gateway:** Traefik, per Docker-Labels. Das _ist_ die Discovery-Ebene —
   Traefik beobachtet den Docker-Socket und konfiguriert sich selbst, wenn Container kommen
   und gehen. Genau die Funktion, die du von Eureka plus Spring Cloud Gateway erwartest.
 - **Konfiguration:** `.env` plus Compose. Kein Config-Server nötig.
 
 Eureka lohnt sich ab mehreren Hosts, Autoscaling oder echten Spring-Cloud-Services. Dann
 ist allerdings k3s mit Kubernetes-Services die naheliegendere Antwort. Ein auskommentierter
-Eureka-Block liegt trotzdem in `apps/docker-compose.yml`: Wenn du Spring Cloud *lernen*
+Eureka-Block liegt trotzdem in `apps/docker-compose.yml`: Wenn du Spring Cloud _lernen_
 willst, ist das ein völlig legitimer Grund, und dann ist es ein Einzeiler zum Aktivieren.
 
 ## Postgres oder MongoDB: nimm Postgres
@@ -214,10 +214,10 @@ Entwicklungsmaschine.
 
 ## Was bewusst nicht drin ist
 
-| Weggelassen | Warum |
-|---|---|
-| Portainer | Compose-Dateien im Git sind die Quelle der Wahrheit. Eine GUI, die daran vorbei ändert, macht den Zustand undurchschaubar. Für reines Anschauen reicht Dozzle. |
-| Watchtower (Auto-Update) | Bei Postgres und Home Assistant sind automatische Major-Updates ein Weg, ein funktionierendes System nachts kaputtzumachen. Updates laufen manuell nach Backup, siehe Runbook. |
-| Nginx Proxy Manager | Klickbar, aber die Konfiguration liegt dann in einer SQLite-Datei statt im Git. Traefik-Labels stehen neben dem Service, den sie routen. |
-| k3s | Ein Node, ein Admin. Der Mehraufwand zahlt sich erst bei mehreren Hosts aus. |
-| Unbound als rekursiver Resolver | Kannst du später ergänzen; Quad9 als Upstream ist für den Anfang ausreichend und weniger fehleranfällig. |
+| Weggelassen                     | Warum                                                                                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Portainer                       | Compose-Dateien im Git sind die Quelle der Wahrheit. Eine GUI, die daran vorbei ändert, macht den Zustand undurchschaubar. Für reines Anschauen reicht Dozzle.                 |
+| Watchtower (Auto-Update)        | Bei Postgres und Home Assistant sind automatische Major-Updates ein Weg, ein funktionierendes System nachts kaputtzumachen. Updates laufen manuell nach Backup, siehe Runbook. |
+| Nginx Proxy Manager             | Klickbar, aber die Konfiguration liegt dann in einer SQLite-Datei statt im Git. Traefik-Labels stehen neben dem Service, den sie routen.                                       |
+| k3s                             | Ein Node, ein Admin. Der Mehraufwand zahlt sich erst bei mehreren Hosts aus.                                                                                                   |
+| Unbound als rekursiver Resolver | Kannst du später ergänzen; Quad9 als Upstream ist für den Anfang ausreichend und weniger fehleranfällig.                                                                       |

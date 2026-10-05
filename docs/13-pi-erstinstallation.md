@@ -11,14 +11,14 @@ mit Ursache und Lehre — damit der nächste Aufbau beim ersten Mal sitzt.
 
 ## Ausgangslage
 
-| | |
-|---|---|
-| Rechner | Raspberry Pi 5, 16 GB, M.2-HAT |
-| SSD | Intenso 500 GB (MAXIO MAP1202, DRAM-less) |
-| System | Raspberry Pi OS **Trixie arm64 Lite** |
-| Vorhanden | SD-Karte mit laufendem Pi OS **Desktop**, externe USB-Festplatte |
-| Nicht vorhanden | Tastatur, Bildschirm, Netzwerkkabel, USB-Adapter für die SSD |
-| Netz | WLAN, 2,4 GHz, schwach |
+|                 |                                                                  |
+| --------------- | ---------------------------------------------------------------- |
+| Rechner         | Raspberry Pi 5, 16 GB, M.2-HAT                                   |
+| SSD             | Intenso 500 GB (MAXIO MAP1202, DRAM-less)                        |
+| System          | Raspberry Pi OS **Trixie arm64 Lite**                            |
+| Vorhanden       | SD-Karte mit laufendem Pi OS **Desktop**, externe USB-Festplatte |
+| Nicht vorhanden | Tastatur, Bildschirm, Netzwerkkabel, USB-Adapter für die SSD     |
+| Netz            | WLAN, 2,4 GHz, schwach                                           |
 
 **Begriffe, die gleich vorkommen:**
 
@@ -100,6 +100,7 @@ auf die SSD geschrieben wird, sieht bis zum ersten Boot nach Erfolg aus.
 
 > ⚠️ Der nächste Befehl überschreibt ein ganzes Laufwerk. Steht bei `of=` das
 > falsche Gerät, sind die Daten dort weg. Vorher kontrollieren:
+>
 > ```bash
 > lsblk -o NAME,SIZE,MODEL,TRAN /dev/nvme0n1
 > findmnt -no SOURCE /            # darf NICHT nvme sein

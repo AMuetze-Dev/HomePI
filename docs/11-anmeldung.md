@@ -36,10 +36,10 @@ lässt sich einzeln entziehen.
 
 Zwei Regeln binden auch ihn:
 
-| | |
-|---|---|
+|                                              |                                                                                               |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Niemand nimmt sich **selbst** die Verwaltung | Er könnte es nicht zurücknehmen und säße vor einer Oberfläche, die ihn nicht mehr hineinlässt |
-| Der **letzte** Verwalter bleibt | Sonst kann diese Installation niemand mehr verwalten |
+| Der **letzte** Verwalter bleibt              | Sonst kann diese Installation niemand mehr verwalten                                          |
 
 Über die Oberfläche greift immer die erste: der letzte Verwalter ist
 zwangsläufig der Aufrufer selbst. Die Zählung ist die Sicherung für den Weg
@@ -48,10 +48,10 @@ zwangsläufig der Aufrufer selbst. Die Zählung ist die Sicherung für den Weg
 Drei Rollen, aufsteigend. Absichtlich nicht mehr: jede weitere Stufe macht die
 Frage „darf der das?" schwerer zu beantworten, nicht leichter.
 
-| Rolle | gedacht für |
-|---|---|
-| `leser` | ansehen |
-| `nutzer` | die alltägliche Arbeit |
+| Rolle       | gedacht für                             |
+| ----------- | --------------------------------------- |
+| `leser`     | ansehen                                 |
+| `nutzer`    | die alltägliche Arbeit                  |
 | `verwalter` | einrichten, löschen, Grundeinstellungen |
 
 Eine höhere Rolle deckt die niedrigeren ab.
@@ -72,11 +72,11 @@ modul = Modul(
 )
 ```
 
-| `Zugang` | Router | im Manifest sichtbar für |
-|---|---|---|
-| `OEFFENTLICH` | frei erreichbar | jeden |
-| `GESCHUETZT` *(Voreinstellung)* | Prüfung am ganzen Router | wer ein Recht hat |
-| `SELBST` | keine pauschale Prüfung | wer ein Recht hat |
+| `Zugang`                        | Router                   | im Manifest sichtbar für |
+| ------------------------------- | ------------------------ | ------------------------ |
+| `OEFFENTLICH`                   | frei erreichbar          | jeden                    |
+| `GESCHUETZT` _(Voreinstellung)_ | Prüfung am ganzen Router | wer ein Recht hat        |
+| `SELBST`                        | keine pauschale Prüfung  | wer ein Recht hat        |
 
 **Die Voreinstellung ist die strengste.** Wer beim Bauen eines Artefakts nicht
 über Zugriff nachdenkt, bekommt ein verschlossenes Artefakt und kein offenes.
@@ -138,12 +138,12 @@ Bei **jedem** Aufruf, beide Bedingungen:
 1. Es gibt noch keinen Verwalter.
 2. Das vorgelegte Token stimmt.
 
-| Fall | Antwort |
-|---|---|
-| noch kein Verwalter, Token stimmt | 200, Konto angelegt und angemeldet |
-| noch kein Verwalter, Token falsch | 401 — die Einrichtung bleibt offen |
-| Verwalter vorhanden | 409, auch mit gültigem Token |
-| letzter Verwalter gesperrt | 409 — eine Sperre öffnet die Tür nicht wieder |
+| Fall                              | Antwort                                       |
+| --------------------------------- | --------------------------------------------- |
+| noch kein Verwalter, Token stimmt | 200, Konto angelegt und angemeldet            |
+| noch kein Verwalter, Token falsch | 401 — die Einrichtung bleibt offen            |
+| Verwalter vorhanden               | 409, auch mit gültigem Token                  |
+| letzter Verwalter gesperrt        | 409 — eine Sperre öffnet die Tür nicht wieder |
 
 **Dass die Oberfläche die Maske nicht anzeigt, ist keine Sicherung.** Wer
 `/einrichtung` von Hand eintippt oder direkt gegen die API spricht, landet
@@ -164,7 +164,7 @@ Zweitschlüssel, der nie ungültig wird.
 ## Konten anlegen
 
 **Es gibt keinen Registrierungs-Endpunkt.** Wer ein Konto braucht, bekommt es
-von einem Verwalter — in der Oberfläche unter *Verwaltung* oder auf der
+von einem Verwalter — in der Oberfläche unter _Verwaltung_ oder auf der
 Kommandozeile.
 
 ```bash
@@ -206,12 +206,12 @@ Standardpasswort ist nach dem ersten Aushang kein Passwort mehr.
 **Der Benutzer ersetzt es beim ersten Anmelden.** Bis dahin kommt sein Konto an
 **kein** Artefakt — auch nicht an eines, für das er längst ein Recht hat:
 
-| | |
-|---|---|
-| `POST /auth/anmelden` | geht, Antwort enthält `passwort_wechseln: true` |
-| `GET /auth/ich`, `/auth/abmelden`, `/auth/passwort` | gehen |
-| `GET /<artefakt>/…` | **403** |
-| `GET /module` | so viel wie für einen Besucher |
+|                                                     |                                                 |
+| --------------------------------------------------- | ----------------------------------------------- |
+| `POST /auth/anmelden`                               | geht, Antwort enthält `passwort_wechseln: true` |
+| `GET /auth/ich`, `/auth/abmelden`, `/auth/passwort` | gehen                                           |
+| `GET /<artefakt>/…`                                 | **403**                                         |
+| `GET /module`                                       | so viel wie für einen Besucher                  |
 
 Die Prüfung sitzt in `hole_benutzer` — also an der Stelle, über die **jedes**
 Artefakt seinen Benutzer bekommt, auch ein selbstprüfendes. Die Maske im
@@ -230,10 +230,10 @@ darüber beim nächsten Anmelden des Benutzers.
 
 Die Regel steht nicht nur in der Oberfläche, sondern im Vertrag:
 
-| | |
-|---|---|
-| `POST /verwaltung/benutzer` | kennt kein Feld `passwort`; wer eines mitschickt, bekommt **422** |
-| `PUT /verwaltung/benutzer/<id>/passwort` | nimmt **keinen Körper**; die Antwort enthält das erzeugte |
+|                                          |                                                                   |
+| ---------------------------------------- | ----------------------------------------------------------------- |
+| `POST /verwaltung/benutzer`              | kennt kein Feld `passwort`; wer eines mitschickt, bekommt **422** |
+| `PUT /verwaltung/benutzer/<id>/passwort` | nimmt **keinen Körper**; die Antwort enthält das erzeugte         |
 
 Abgelehnt statt still verworfen, und das ist der Unterschied, auf den es
 ankommt: still verworfen gäbe der Verwalter ein Passwort weiter, das nie
@@ -282,19 +282,19 @@ printf '%s' "$PW" | homepi benutzer anlegen rauchtest --passwort-stdin
 Auf dem Pi läuft dasselbe im Gateway-Container:
 
 ```bash
-docker compose exec -w /app/services/gateway gateway \
-  uv run homepi benutzer anlegen aaron --artefakt staffelpilot --rolle verwalter
+docker compose exec gateway \
+  homepi benutzer anlegen aaron --artefakt staffelpilot --rolle verwalter
 ```
 
 ## Wie es technisch funktioniert
 
-| | |
-|---|---|
-| Passwörter | Argon2id, 64 MB, t=2, p=1 — rund 100 ms auf einem Pi 5 |
-| Sitzungstoken | 256 Bit aus `secrets` |
-| in der Datenbank | **nur** der SHA-256 des Tokens |
-| Cookie | `httponly`, `SameSite=Lax`, `secure` in Produktion |
-| Dauer | 14 Tage, Verlängerung erst im letzten Tag |
+|                  |                                                        |
+| ---------------- | ------------------------------------------------------ |
+| Passwörter       | Argon2id, 64 MB, t=2, p=1 — rund 100 ms auf einem Pi 5 |
+| Sitzungstoken    | 256 Bit aus `secrets`                                  |
+| in der Datenbank | **nur** der SHA-256 des Tokens                         |
+| Cookie           | `httponly`, `SameSite=Lax`, `secure` in Produktion     |
+| Dauer            | 14 Tage, Verlängerung erst im letzten Tag              |
 
 Ein Datenbankabzug enthält damit keine lebenden Sitzungen. Ein XSS-Fund im
 Frontend liefert kein Token (`httponly`). Kein bcrypt: dessen 72-Byte-Grenze
@@ -318,15 +318,15 @@ Ein Passwortwechsel meldet alle **anderen** Geräte ab. Wer sein Passwort
 
 ## Was das Gateway nach außen preisgibt
 
-| Endpunkt | ohne Anmeldung |
-|---|---|
-| `GET /health` | Zustand, keine Namen |
-| `GET /info` | Version, Umgebung, **Anzahl** der Module — keine Namen |
-| `GET /module` | nur die öffentlichen Artefakte, nie ein 401 |
-| `GET /openapi.json` | in Produktion abgeschaltet |
-| `GET /auth/einrichtung` | ein Ja oder Nein, sonst nichts |
-| `POST /auth/einrichtung` | 409, sobald es einen Verwalter gibt |
-| `GET /<artefakt>/…` | 401 ohne Anmeldung, 403 ohne Recht |
+| Endpunkt                 | ohne Anmeldung                                         |
+| ------------------------ | ------------------------------------------------------ |
+| `GET /health`            | Zustand, keine Namen                                   |
+| `GET /info`              | Version, Umgebung, **Anzahl** der Module — keine Namen |
+| `GET /module`            | nur die öffentlichen Artefakte, nie ein 401            |
+| `GET /openapi.json`      | in Produktion abgeschaltet                             |
+| `GET /auth/einrichtung`  | ein Ja oder Nein, sonst nichts                         |
+| `POST /auth/einrichtung` | 409, sobald es einen Verwalter gibt                    |
+| `GET /<artefakt>/…`      | 401 ohne Anmeldung, 403 ohne Recht                     |
 
 `/module` antwortet bewusst auch anonym mit 200. Ein Besucher der öffentlichen
 Seite soll die Seite sehen, für die er gekommen ist, und keinen 401.

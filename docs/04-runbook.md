@@ -20,10 +20,10 @@ ein Schema ändert man mit einer Migration, nicht beim Start. Beim allerersten
 Mal gibt es aber noch nichts zu migrieren:
 
 ```bash
-APPS="docker compose -f stacks/apps/docker-compose.yml"
+APPS="docker compose -f stacks/apps/docker-compose.yml --env-file .env"
 
-$APPS exec -w /app/services/gateway gateway uv run homepi schema anlegen --trocken
-$APPS exec -w /app/services/gateway gateway uv run homepi schema anlegen
+$APPS exec gateway homepi schema anlegen --trocken
+$APPS exec gateway homepi schema anlegen
 ```
 
 Erst der Trockenlauf, dann der Ernstfall — so steht vorher auf dem Schirm, was
@@ -52,12 +52,12 @@ jede Abfrage auf die betroffene Tabelle scheitert.
 Nachsehen, was da ist:
 
 ```bash
-$APPS exec -w /app/services/gateway gateway uv run homepi schema zeigen
+$APPS exec gateway homepi schema zeigen
 ```
 
 **2. Das erste Konto.** Zwei Wege, beide gleichwertig.
 
-*Über die Website.* Solange es keinen Verwalter gibt, zeigt sie die
+_Über die Website._ Solange es keinen Verwalter gibt, zeigt sie die
 Einrichtungsmaske. Sie verlangt das Einrichtungstoken, das beim Start im Log
 steht:
 
@@ -69,12 +69,12 @@ Lesen kann das nur, wer Zugriff auf die Maschine hat — genau das ist die
 Absicht. Ohne diese Bedingung würde derjenige die Installation übernehmen, der
 als Erster an die frische Adresse kommt.
 
-*Über die Kommandozeile.* Tut dasselbe; danach schließt sich die Maske von
+_Über die Kommandozeile._ Tut dasselbe; danach schließt sich die Maske von
 selbst.
 
 ```bash
-$APPS exec -w /app/services/gateway gateway \
-  uv run homepi benutzer anlegen aaron --artefakt verwaltung --rolle verwalter
+$APPS exec gateway \
+  homepi benutzer anlegen aaron --artefakt verwaltung --rolle verwalter
 ```
 
 Das Passwort wird abgefragt — nie als Argument, sonst stünde es in der
@@ -82,15 +82,15 @@ Shell-Historie und in der Prozessliste.
 
 Das Recht `verwaltung` ist das, was sonst „Administrator" heißt: damit lassen
 sich weitere Konten anlegen und Rechte vergeben — in der Oberfläche unter
-*Verwaltung*. Alles Weitere gibt sich der erste Verwalter dort selbst.
+_Verwaltung_. Alles Weitere gibt sich der erste Verwalter dort selbst.
 
 Prüfen:
 
 ```bash
-$APPS exec -w /app/services/gateway gateway uv run homepi benutzer liste
+$APPS exec gateway homepi benutzer liste
 ```
 
-Weitere Konten legt der Verwalter in der Oberfläche unter *Verwaltung* an —
+Weitere Konten legt der Verwalter in der Oberfläche unter _Verwaltung_ an —
 dort genügt ein Name, das Startpasswort erzeugt der Dienst. Der Benutzer
 ersetzt es beim ersten Anmelden und kommt bis dahin an kein Artefakt.
 
@@ -187,13 +187,13 @@ Probier das **einmal**, bevor du es brauchst. Ein ungetestetes Backup ist eine V
 docker logs traefik 2>&1 | grep -i acme
 ```
 
-| Meldung | Ursache |
-|---|---|
-| `invalid credentials` / `403` | Token falsch. Bei Cloudflare fehlt meist `Zone:DNS:Edit` auf genau diese Zone; bei DuckDNS stimmt `DUCKDNS_TOKEN` oder der Name in `DOMAIN` nicht. |
-| `timeout waiting for DNS record` | Propagation dauert. Normalerweise unter 60 s. Länger heißt: falsche Zone, oder bei DuckDNS ein Name, der dem Token nicht gehört. |
+| Meldung                                | Ursache                                                                                                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `invalid credentials` / `403`          | Token falsch. Bei Cloudflare fehlt meist `Zone:DNS:Edit` auf genau diese Zone; bei DuckDNS stimmt `DUCKDNS_TOKEN` oder der Name in `DOMAIN` nicht.                       |
+| `timeout waiting for DNS record`       | Propagation dauert. Normalerweise unter 60 s. Länger heißt: falsche Zone, oder bei DuckDNS ein Name, der dem Token nicht gehört.                                         |
 | `too many certificates already issued` | Let's Encrypt Rate Limit (5 pro Domain pro Woche). Zum Testen `--certificatesresolvers.dns.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory` setzen. |
-| Ausstellung scheitert bei zwei Namen | Der Anbieter hält nur einen TXT-Eintrag je Domain (DuckDNS). Nur das Wildcard beantragen, nicht zusätzlich die nackte Domain. |
-| Name löst im LAN gar nicht auf | Fritz!Box-DNS-Rebind-Schutz. Den Namen unter *Heimnetz → Netzwerk → Netzwerkeinstellungen* als Ausnahme eintragen. |
+| Ausstellung scheitert bei zwei Namen   | Der Anbieter hält nur einen TXT-Eintrag je Domain (DuckDNS). Nur das Wildcard beantragen, nicht zusätzlich die nackte Domain.                                            |
+| Name löst im LAN gar nicht auf         | Fritz!Box-DNS-Rebind-Schutz. Den Namen unter _Heimnetz → Netzwerk → Netzwerkeinstellungen_ als Ausnahme eintragen.                                                       |
 
 Die Datei `${DATA_ROOT}/traefik/letsencrypt/acme.json` muss `chmod 600` sein, sonst
 verweigert Traefik den Start.
@@ -226,7 +226,7 @@ Absender-IP geht verloren. In `/etc/docker/daemon.json` ergänzen und Docker neu
 ### Nichts löst mehr auf, nachdem der Router auf Pi-hole zeigt
 
 Notausgang: `http://PI_IP:8080/admin`. Wenn auch das nicht geht, im Router den DNS
-vorübergehend auf `9.9.9.9` zurückstellen — deshalb steht DHCP bewusst *nicht* im Pi-hole.
+vorübergehend auf `9.9.9.9` zurückstellen — deshalb steht DHCP bewusst _nicht_ im Pi-hole.
 
 ### NVMe: `I/O timeout`, Boot hängt, sporadische Abstürze
 

@@ -11,13 +11,13 @@ Artefakt am Ende sehen darf, steht in [11-anmeldung.md](11-anmeldung.md).
 homepi new messwerte --titel "Messwerte" --beschreibung "Zahlen aus dem Haus"
 ```
 
-| Option | Wirkung |
-|---|---|
-| `--modus service` | eigener Container statt Modul im Gateway |
-| `--no-web` | ohne eigene Oberfläche — die generische Ansicht reicht zunächst |
-| `--no-db` | ohne `modelle.py`, `speicher.py` und Integrationstests |
-| `--titel` | Beschriftung der Kachel (Standard: aus dem Namen) |
-| `--force` | vorhandene Dateien überschreiben |
+| Option            | Wirkung                                                         |
+| ----------------- | --------------------------------------------------------------- |
+| `--modus service` | eigener Container statt Modul im Gateway                        |
+| `--no-web`        | ohne eigene Oberfläche — die generische Ansicht reicht zunächst |
+| `--no-db`         | ohne `modelle.py`, `speicher.py` und Integrationstests          |
+| `--titel`         | Beschriftung der Kachel (Standard: aus dem Namen)               |
+| `--force`         | vorhandene Dateien überschreiben                                |
 
 Entsteht:
 
@@ -183,11 +183,11 @@ Kachel dort.
 
 ## Wenn etwas fehlt
 
-| Symptom | Ursache |
-|---|---|
-| Kachel fehlt | Entry Point falsch, oder Modul nicht als Abhängigkeit im Gateway — `uv sync` im Gateway vergessen? |
-| `status: "fehler"` im Manifest | Import wirft. Grund steht in der Kachel und im Log |
-| `422` statt Treffer | parametrisierte Route steht vor der festen |
-| `RuntimeError: keine DATABASE_URL` | Unit-Test benutzt `DbSitzung` — das gehört nach `tests/integration/` |
-| Endpunkt fehlt in generischer Ansicht | `summary=` oder Rückgabetyp fehlt |
-| Tabelle fehlt nach Neustart | in Produktion ist `DB_SCHEMA_ANLEGEN=false`; dort braucht es eine Migration |
+| Symptom                               | Ursache                                                                                            |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Kachel fehlt                          | Entry Point falsch, oder Modul nicht als Abhängigkeit im Gateway — `uv sync` im Gateway vergessen? |
+| `status: "fehler"` im Manifest        | Import wirft. Grund steht in der Kachel und im Log                                                 |
+| `422` statt Treffer                   | parametrisierte Route steht vor der festen                                                         |
+| `RuntimeError: keine DATABASE_URL`    | Unit-Test benutzt `DbSitzung` — das gehört nach `tests/integration/`                               |
+| Endpunkt fehlt in generischer Ansicht | `summary=` oder Rückgabetyp fehlt                                                                  |
+| Tabelle fehlt nach Neustart           | in Produktion ist `DB_SCHEMA_ANLEGEN=false`; dort braucht es eine Migration                        |

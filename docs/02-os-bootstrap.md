@@ -29,18 +29,18 @@ make up-core
 
 ## Was `10-os-bootstrap.sh` macht und warum
 
-| Schritt | Grund |
-|---|---|
-| `apt full-upgrade` | Ausgangszustand. |
-| Pakete: `ufw fail2ban git make curl jq nvme-cli smartmontools fio rsync unattended-upgrades` | Werkzeugkasten plus NVMe-Diagnose. |
-| UFW: deny incoming, allow 22/53/80/443/8080/8123 **nur aus `$LAN_CIDR`** | HA auf 8123 wäre sonst offen für alles, was ins LAN kommt. |
-| `fail2ban` für SSH | Auch im LAN sinnvoll, falls doch mal etwas erreichbar wird. |
-| `dphys-swapfile` aus | 16 GB RAM. Swap auf SSD kostet nur Schreibzyklen. |
-| `journald` auf 200 MB begrenzt | Sonst wachsen Logs unbemerkt. |
-| `/etc/docker/daemon.json` mit `log-opts max-size=10m,max-file=3` | **Der wichtigste Punkt.** Ohne das wachsen Container-Logs unbegrenzt; HA und Traefik produzieren viel. Klassische Ursache für volle Platten nach ein paar Monaten. |
-| `fstrim.timer` aktiv | SSD-Gesundheit. |
-| `vm.swappiness=10`, `vm.overcommit_memory=1` | Letzteres verhindert Redis-Warnungen. |
-| Verzeichnis `/srv/homelab` mit Unterordnern pro Stack | Alle Volumes sind **Bind-Mounts** dorthin. Backup ist dann ein `tar` über einen Pfad, nicht eine Jagd durch `/var/lib/docker/volumes`. |
+| Schritt                                                                                      | Grund                                                                                                                                                              |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apt full-upgrade`                                                                           | Ausgangszustand.                                                                                                                                                   |
+| Pakete: `ufw fail2ban git make curl jq nvme-cli smartmontools fio rsync unattended-upgrades` | Werkzeugkasten plus NVMe-Diagnose.                                                                                                                                 |
+| UFW: deny incoming, allow 22/53/80/443/8080/8123 **nur aus `$LAN_CIDR`**                     | HA auf 8123 wäre sonst offen für alles, was ins LAN kommt.                                                                                                         |
+| `fail2ban` für SSH                                                                           | Auch im LAN sinnvoll, falls doch mal etwas erreichbar wird.                                                                                                        |
+| `dphys-swapfile` aus                                                                         | 16 GB RAM. Swap auf SSD kostet nur Schreibzyklen.                                                                                                                  |
+| `journald` auf 200 MB begrenzt                                                               | Sonst wachsen Logs unbemerkt.                                                                                                                                      |
+| `/etc/docker/daemon.json` mit `log-opts max-size=10m,max-file=3`                             | **Der wichtigste Punkt.** Ohne das wachsen Container-Logs unbegrenzt; HA und Traefik produzieren viel. Klassische Ursache für volle Platten nach ein paar Monaten. |
+| `fstrim.timer` aktiv                                                                         | SSD-Gesundheit.                                                                                                                                                    |
+| `vm.swappiness=10`, `vm.overcommit_memory=1`                                                 | Letzteres verhindert Redis-Warnungen.                                                                                                                              |
+| Verzeichnis `/srv/homelab` mit Unterordnern pro Stack                                        | Alle Volumes sind **Bind-Mounts** dorthin. Backup ist dann ein `tar` über einen Pfad, nicht eine Jagd durch `/var/lib/docker/volumes`.                             |
 
 ## Port 53: mögliche Kollision prüfen
 
