@@ -237,8 +237,19 @@ deaktivieren — in `/boot/firmware/cmdline.txt` an dieselbe Zeile anhängen:
 nvme_core.default_ps_max_latency_us=0
 ```
 
-Hilft das nicht, PCIe auf Gen 2 zurück (`dtparam=pciex1_gen=2` in `config.txt`). Bleibt es
-instabil, ist es die SSD — manche Modelle vertragen sich schlicht nicht mit dem Pi 5.
+`scripts/10-os-bootstrap.sh` trägt das inzwischen selbst ein. Ob es wirkt:
+`cat /sys/module/nvme_core/parameters/default_ps_max_latency_us` muss `0` zeigen.
+
+Gen 2 ist beim Pi 5 schon die Voreinstellung — `sudo lspci -vv | grep LnkSta` zeigt
+dann `5GT/s`. `dtparam=pciex1_gen=2` hilft nur, wenn jemand vorher auf Gen 3 gestellt
+hat. Bleibt es instabil, ist es die SSD — manche Modelle vertragen sich schlicht nicht
+mit dem Pi 5.
+
+**Woran man es erkennt, wenn die Platte stehen bleibt:** Das Journal des vorigen
+Starts (`journalctl --list-boots`) endet Stunden oder Tage vor dem Neustart — mitten
+im Satz, ohne Fehlerzeile. Laufende Container antworten weiter, alles, was neu
+gestartet oder von der Platte gelesen werden muss, hängt: SSH schließt vor dem Banner
+(`kex_exchange_identification`), Zigbee2MQTT und rpi-connect sterben.
 
 ### Platte läuft voll
 

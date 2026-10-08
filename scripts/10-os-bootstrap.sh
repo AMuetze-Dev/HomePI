@@ -150,10 +150,13 @@ sysctl -q --load=/etc/sysctl.d/99-kein-globales-ipv6.conf
 # Leerzeichen ("netplan-wlan0-Wi-Fight Club"). Die for-Schleife zerlegte den
 # Namen in zwei Woerter, beide Aufrufe scheiterten still am "|| true" - und
 # ausgerechnet das WLAN-Profil blieb, wie es war.
+#
+# Gefiltert wird nach Schnittstelle, nicht nach Typ: NetworkManager fuehrt auch
+# jedes veth-Paar von Docker als Profil vom Typ 802-3-ethernet.
 while IFS= read -r conn; do
     [ -n "$conn" ] || continue
-    case "$(nmcli -g connection.type connection show "$conn" 2>/dev/null)" in
-        802-3-ethernet|802-11-wireless)
+    case "$(nmcli -g connection.interface-name connection show "$conn" 2>/dev/null)" in
+        eth*|en*|wl*)
             nmcli connection modify "$conn" ipv6.method link-local 2>/dev/null || true
             ;;
     esac
@@ -162,6 +165,26 @@ for iface in $(netz_schnittstellen); do
     nmcli device reapply "$iface" >/dev/null 2>&1 || true
     ip -6 addr flush dev "$iface" scope global 2>/dev/null || true
 done
+
+echo "==> NVMe: kein Tiefschlaf (APST aus)"
+# Die SSD (Intenso, MAXIO MAP1202, ohne DRAM) bietet Schlafzustaende mit bis
+# zu 45 ms Aufwachzeit an, der Kernel erlaubt per Voreinstellung 100 ms - sie
+# darf also hinein. Aus einem davon kam sie offenbar nicht zurueck: Am
+# 6. Oktober endete das Journal mitten in einem Strom von Meldungen im
+# Sekundentakt, ohne eine einzige Fehlerzeile. Laufende Container lebten
+# weiter, alles Neue - SSH-Anmeldung, Zigbee2MQTT - blieb haengen. So sieht
+# eine Platte aus, die nicht mehr antwortet; die Fehlermeldung darueber kann
+# sie naturgemaess nicht mehr schreiben. SMART zeigte danach keinen Fehler.
+#
+# Kostet rund 3 W Leerlauf gegen 0,05 W - fuer einen Server, der laufen soll,
+# kein Abwaegen. Wirksam erst nach einem Neustart.
+CMDLINE=/boot/firmware/cmdline.txt
+if [[ -f "$CMDLINE" ]] && ! grep -q "nvme_core.default_ps_max_latency_us=" "$CMDLINE"; then
+    cp "$CMDLINE" "${CMDLINE}.vor-apst"
+    # cmdline.txt ist EINE Zeile - anhaengen, nie eine zweite beginnen.
+    sed -i '1 s/$/ nvme_core.default_ps_max_latency_us=0/' "$CMDLINE"
+    echo "    eingetragen - wirkt nach dem naechsten Neustart."
+fi
 
 echo "==> fstrim wöchentlich"
 systemctl enable --now fstrim.timer

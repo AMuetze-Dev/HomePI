@@ -6,7 +6,11 @@ name: core
 
 services:
   traefik:
-    image: traefik:v3.3
+    # Mindestens v3.6. Docker 29 nimmt keine API-Version unter 1.40 mehr an,
+    # und Traefik bis v3.5 fragt mit 1.24 an, statt auszuhandeln. Er laeuft
+    # dann scheinbar gesund (healthy, Port offen), findet aber keinen einzigen
+    # Container - jede Adresse antwortet mit 404.
+    image: traefik:v3.6
     container_name: traefik
     restart: unless-stopped
     security_opt:
