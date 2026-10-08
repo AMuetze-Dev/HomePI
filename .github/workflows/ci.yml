@@ -353,8 +353,25 @@ jobs:
       # Reise eine eigene, frische Umgebung mit und raeumt danach ab; die
       # Entwicklungsumgebung fuer die Rauchtests unten bleibt davon getrennt
       # (eigenes Compose-Projekt, eigene Ports).
+      #
+      # Bei einem Fehlschlag gehen die entscheidenden Zeilen zusaetzlich als
+      # Annotation heraus. Der Testbericht liegt zwar als Artefakt bereit und
+      # das Protokoll steht im Lauf - an beides kommt aber nur heran, wer
+      # angemeldet ist und Rechte am Repository hat. Die Annotation steht in
+      # der Zusammenfassung des Laufs und in der API.
       - name: Oberflaechentests
-        run: make e2e
+        run: |
+          set -o pipefail
+          if make e2e 2>&1 | tee e2e.log; then
+            exit 0
+          fi
+          grep -aE '^\s+[0-9]+\) |Error:|Timed out|expect\(|✘|gescheitert' e2e.log \
+            | tail -20 \
+            | while IFS= read -r zeile; do
+                # Annotationen sind einzeilig; %0A ist der Umbruch darin.
+                printf '::error::%s\n' "${zeile//$'\r'/}"
+              done
+          exit 1
 
       - name: Entwicklungsumgebung hochfahren
         run: docker compose -f compose.dev.yml up -d --build --wait --wait-timeout 300
