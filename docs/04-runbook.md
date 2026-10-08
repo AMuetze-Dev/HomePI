@@ -268,6 +268,23 @@ im Satz, ohne Fehlerzeile. Laufende Container antworten weiter, alles, was neu
 gestartet oder von der Platte gelesen werden muss, hängt: SSH schließt vor dem Banner
 (`kex_exchange_identification`), Zigbee2MQTT und rpi-connect sterben.
 
+### WLAN-Treiber meldet sich jede Sekunde
+
+Im Journal zweimal pro Sekunde `brcmf_cfg80211_scan: Scanning suppressed: status (4)`
+und `wlan0: CTRL-EVENT-SCAN-FAILED ret=-11`. Der Treiber `brcmfmac` ist ausgestiegen —
+hier genau 24 Stunden nach dem Start — und kommt ohne Neustart nicht zurück.
+
+Hängt der Pi am Kabel, das WLAN ganz abschalten — in `/boot/firmware/config.txt` unter
+`[all]`, dann neu starten:
+
+```
+dtoverlay=disable-wifi
+```
+
+Bewusst nicht in `scripts/10-os-bootstrap.sh`: Ein Pi, der nur per WLAN angebunden ist,
+wäre danach nicht mehr erreichbar. Und erst prüfen, dass `eth0` die Standardroute hat
+(`ip -4 route show default`) — sonst sägt man den Ast ab, auf dem die SSH-Sitzung sitzt.
+
 ### Platte läuft voll
 
 ```bash
