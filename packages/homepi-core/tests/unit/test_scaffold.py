@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -122,6 +123,38 @@ class TestModul:
                 if datei.is_file():
                     inhalt = datei.read_text(encoding="utf-8")
                     assert "{{" not in inhalt, f"unersetzter Platzhalter in {datei.name}"
+
+    def test_erzeugter_code_besteht_ruff(self, repo: Path) -> None:
+        """Ein neues Artefakt muss die CI vom ersten Commit an bestehen.
+
+        Die Vorlage der conftest.py hatte einen unbenutzten Import und eine
+        falsche Importreihenfolge - jedes neue Artefakt fiel damit in
+        `ruff check` durch, bevor jemand eine Zeile geschrieben hatte.
+        """
+        scaffold.ausfuehren(_args("messwerte"))
+        artefakt = repo / "modules" / "messwerte"
+
+        for befehl in (["check", "."], ["format", "--check", "."]):
+            ergebnis = subprocess.run(
+                [sys.executable, "-m", "ruff", *befehl],
+                cwd=artefakt,
+                capture_output=True,
+                text=True,
+            )
+            assert ergebnis.returncode == 0, ergebnis.stdout + ergebnis.stderr
+
+    def test_oberflaeche_nutzt_die_gemeinsame_schnittstelle(self, repo: Path) -> None:
+        """Keine eigene fetch-Hülle.
+
+        Die siebte Kopie - die in der Vorlage - vergass das Sitzungscookie,
+        und jedes neue Artefakt bekam auf jede Anfrage 401.
+        """
+        scaffold.ausfuehren(_args("messwerte"))
+        api = repo / "services" / "web" / "src" / "module" / "messwerte" / "api.ts"
+        inhalt = api.read_text(encoding="utf-8")
+
+        assert 'schnittstelle("/messwerte")' in inhalt
+        assert "fetch(" not in inhalt
 
     def test_entry_point_traegt_die_kennung(self, repo: Path) -> None:
         # Ohne diese Zeile findet das Gateway das Modul nicht - die Kachel
@@ -306,6 +339,14 @@ class TestService:
 
 
 # --------------------------------------------------------------------- Namen
+
+
+def test_vergebene_namen_werden_abgelehnt(repo: Path) -> None:
+    """Sonst entstuende ein Artefakt, das das Gateway beim Start ablehnt."""
+    with pytest.raises(CliFehler, match="vergeben"):
+        scaffold.ausfuehren(_args("auth"))
+
+    assert not (repo / "modules" / "auth").exists()
 
 
 @pytest.mark.parametrize("name", ["Messwerte", "1mess", "mess_werte", "mess werte", "-x"])

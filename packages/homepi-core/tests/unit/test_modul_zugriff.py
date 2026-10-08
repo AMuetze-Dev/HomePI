@@ -75,7 +75,7 @@ def _modul(kennung: str, zugang: Zugang, mindestrolle: Rolle = Rolle.LESER) -> M
 def _dienst(umgebung: Umgebung = Umgebung.ENTWICKLUNG) -> FastAPI:
     register = register_aus(
         [
-            _modul("info", Zugang.OEFFENTLICH),
+            _modul("aushang", Zugang.OEFFENTLICH),
             _modul("geraete", Zugang.GESCHUETZT),
             _modul("kasse", Zugang.GESCHUETZT, mindestrolle=Rolle.VERWALTER),
             _modul("verein", Zugang.SELBST),
@@ -129,7 +129,7 @@ class TestZugriffAufDenRouter:
     ) -> None:
         als(None)
 
-        assert (await client.get("/info/")).json() == {"modul": "info"}
+        assert (await client.get("/aushang/")).json() == {"modul": "aushang"}
 
     async def test_geschuetztes_artefakt_weist_anonyme_ab(
         self, client: AsyncClient, als: Anmelden
@@ -196,21 +196,21 @@ class TestGefiltertesManifest:
         antwort = await client.get("/module")
 
         assert antwort.status_code == 200
-        assert _ids(antwort.json()) == {"info"}
+        assert _ids(antwort.json()) == {"aushang"}
 
     async def test_ein_benutzer_sieht_nur_seine_artefakte(
         self, client: AsyncClient, als: Anmelden
     ) -> None:
         als(_benutzer(verein=Rolle.LESER))
 
-        assert _ids((await client.get("/module")).json()) == {"info", "verein"}
+        assert _ids((await client.get("/module")).json()) == {"aushang", "verein"}
 
     async def test_eine_zu_niedrige_rolle_blendet_das_artefakt_aus(
         self, client: AsyncClient, als: Anmelden
     ) -> None:
         als(_benutzer(kasse=Rolle.NUTZER))
 
-        assert _ids((await client.get("/module")).json()) == {"info"}
+        assert _ids((await client.get("/module")).json()) == {"aushang"}
 
     async def test_das_manifest_verlangt_keine_anmeldung(
         self, client: AsyncClient, als: Anmelden
@@ -254,7 +254,7 @@ class TestPasswortwechsel:
     async def test_das_oeffentliche_bleibt_offen(
         self, client: AsyncClient, mit_wechsel: Benutzer
     ) -> None:
-        assert (await client.get("/info/")).json() == {"modul": "info"}
+        assert (await client.get("/aushang/")).json() == {"modul": "aushang"}
 
     async def test_das_manifest_zeigt_nur_oeffentliches(
         self, client: AsyncClient, mit_wechsel: Benutzer
@@ -262,7 +262,7 @@ class TestPasswortwechsel:
         antwort = await client.get("/module")
 
         assert antwort.status_code == 200
-        assert _ids(antwort.json()) == {"info"}
+        assert _ids(antwort.json()) == {"aushang"}
 
 
 # --- Das OpenAPI-Schema ----------------------------------------------------

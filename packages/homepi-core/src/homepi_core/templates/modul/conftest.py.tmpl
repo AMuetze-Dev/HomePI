@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncIterator
 
 import pytest
-from homepi_core.testing.datenbank import datenbank_fuer_tests
 from homepi_core import Base, Modul, ServiceSettings, create_service, register_aus
 from homepi_core.auth import Rolle
 from homepi_core.auth import speicher as auth_speicher
+from homepi_core.testing.datenbank import datenbank_fuer_tests
 from httpx import ASGITransport, AsyncClient
 
 from homepi_{{modul}} import modul as artefakt

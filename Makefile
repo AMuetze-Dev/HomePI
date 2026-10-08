@@ -121,6 +121,11 @@ WEB    := services/web
 # wieder weg - damit sieht kein Lauf, was der vorige hinterlassen hat.
 TESTDB := postgresql+asyncpg://app:app@127.0.0.1:15432/test
 
+# Alle Python-Projekte. Artefakte per Glob, wie in der CI: Ein neues unter
+# modules/ wird damit ab dem ersten Commit lokal mitgeprueft. Mit fester
+# Liste blieb es unbemerkt draussen - die CI pruefte es, make test nicht.
+PY_PROJEKTE := packages/homepi-core $(patsubst %/pyproject.toml,%,$(sort $(wildcard modules/*/pyproject.toml))) services/gateway services/pruefdienst
+
 ## test: alles pruefen, was die CI auch prueft
 test: test-infra test-python test-web
 
@@ -134,11 +139,11 @@ test-infra: render verify lint-ci
 
 ## test-python: Format, Lint, Typen und Tests aller drei Python-Projekte
 test-python:
-	@for p in packages/homepi-core modules/geraete modules/staffelpilot modules/verwaltung services/gateway services/pruefdienst; do 		echo "=== $$p"; 		( cd $$p 		  && uv run ruff format --check . 		  && uv run ruff check . 		  && uv run mypy 		  && HOMEPI_TEST_DATABASE_URL=$(TESTDB) uv run pytest -m 'not smoke' --cov --cov-report=term ) 		|| exit 1; 	done
+	@for p in $(PY_PROJEKTE); do 		echo "=== $$p"; 		( cd $$p 		  && uv run ruff format --check . 		  && uv run ruff check . 		  && uv run mypy 		  && HOMEPI_TEST_DATABASE_URL=$(TESTDB) uv run pytest -m 'not smoke' --cov --cov-report=term ) 		|| exit 1; 	done
 
 ## test-web: Format, Lint, Typen und Tests des Frontends
 test-web:
-	cd $(WEB) && npx prettier --check src e2e *.ts *.js
+	cd $(WEB) && npx prettier --check src e2e pruefungen *.ts *.js
 	cd $(WEB) && npx eslint .
 	cd $(WEB) && npm run typecheck
 	cd $(WEB) && npm run test:coverage
@@ -172,12 +177,12 @@ test-modul:
 
 ## fmt: Quellcode formatieren und automatisch behebbare Funde beheben
 fmt:
-	@for p in packages/homepi-core modules/geraete modules/staffelpilot modules/verwaltung services/gateway services/pruefdienst; do 		( cd $$p && uv run ruff format . && uv run ruff check --fix . ); 	done
+	@for p in $(PY_PROJEKTE); do 		( cd $$p && uv run ruff format . && uv run ruff check --fix . ); 	done
 	cd $(WEB) && npm run format && npm run lint:fix
 
 ## install: Entwicklungsabhaengigkeiten aller Projekte einrichten
 install:
-	@for p in packages/homepi-core modules/geraete modules/staffelpilot modules/verwaltung services/gateway services/pruefdienst; do 		echo "=== $$p"; ( cd $$p && uv sync --all-extras ) || exit 1; 	done
+	@for p in $(PY_PROJEKTE); do 		echo "=== $$p"; ( cd $$p && uv sync --all-extras ) || exit 1; 	done
 	cd $(WEB) && npm ci
 
 # ---------------------------------------------------------------- Entwicklung (lokal)

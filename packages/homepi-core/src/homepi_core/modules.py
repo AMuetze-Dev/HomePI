@@ -57,6 +57,26 @@ AUSWAHL_VARIABLE = "HOMEPI_MODULE"
 #: Die Kennung landet in URLs, im Traefik-Pfad und im Frontend-Router.
 ID_MUSTER = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 
+#: Kennungen, die schon jemand anderem gehoeren.
+#:
+#: Die ersten sind Pfade des Gateways selbst. Ein Artefakt "auth" haengte
+#: seine Pfade neben die Anmeldung - die gleichnamigen verdeckt, die uebrigen
+#: unter dem Anschein, zu ihr zu gehoeren. Die letzten waeren als Paket
+#: ``homepi_<kennung>`` das Grundgeruest oder ein Dienst.
+VERGEBEN = frozenset(
+    {
+        "auth",
+        "health",
+        "info",
+        "module",
+        "docs",
+        "redoc",
+        "core",
+        "gateway",
+        "pruefdienst",
+    }
+)
+
 
 class Zugang(StrEnum):
     """Wer ein Artefakt sehen und benutzen darf.
@@ -106,6 +126,11 @@ class Modul:
     mindestrolle: Rolle = Rolle.LESER
 
     def __post_init__(self) -> None:
+        if self.id in VERGEBEN:
+            raise ValueError(
+                f"Die Kennung '{self.id}' ist vergeben - sie gehört dem Gateway "
+                f"oder einem seiner Pakete. Nicht erlaubt: {', '.join(sorted(VERGEBEN))}."
+            )
         if not ID_MUSTER.match(self.id):
             raise ValueError(
                 f"'{self.id}' ist keine gültige Modulkennung. Erlaubt sind "

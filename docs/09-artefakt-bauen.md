@@ -39,6 +39,12 @@ services/web/src/module/messwerte/
   api.ts  MesswerteSeite.tsx  MesswerteSeite.module.css  MesswerteSeite.test.tsx
 ```
 
+Die Kennung ist Kleinbuchstaben, Ziffern, Bindestriche. Vergeben sind die
+Pfade des Gateways und die Namen seiner Pakete — `auth`, `health`, `info`,
+`module`, `docs`, `redoc`, `core`, `gateway`, `pruefdienst`. Ein Artefakt
+`auth` hinge seine Pfade neben die Anmeldung; `homepi new` und das Gateway
+lehnen sie ab (`VERGEBEN` in `homepi_core/modules.py`).
+
 Automatisch mit eingetragen:
 
 - `services/gateway/pyproject.toml` → Abhängigkeit und `tool.uv.sources`
@@ -114,8 +120,9 @@ eigene. Alles dazu in [12-testen.md](12-testen.md).
 
 ### Oberfläche
 
-`api.ts` erweitern, dann die Seite. Bausteine aus `src/ui`, Werte aus
-`src/styles/tokens.css`. Details: [08-design.md](08-design.md).
+`api.ts` erweitern, dann die Seite. `api.ts` benutzt `schnittstelle()` aus
+`src/api/schnittstelle.ts` und schreibt kein eigenes `fetch`. Bausteine aus
+`src/ui`, Werte aus `src/styles/tokens.css`. Details: [08-design.md](08-design.md).
 
 Braucht das Artefakt keine eigene Oberfläche, `--no-web` benutzen — die
 generische Ansicht liest die Endpunkte aus dem Schema und ist damit immer

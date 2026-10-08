@@ -54,6 +54,18 @@ def test_unbrauchbare_kennung_wird_abgelehnt(kennung: str) -> None:
         Modul(id=kennung, titel="X", router=APIRouter())
 
 
+@pytest.mark.parametrize("kennung", ["auth", "health", "info", "module", "docs", "core"])
+def test_kennung_des_gateways_wird_abgelehnt(kennung: str) -> None:
+    """Unter /auth haengt die Anmeldung, unter /module das Manifest.
+
+    Ein Artefakt mit derselben Kennung haengte seine Pfade daneben - die
+    gleichnamigen verdeckt, die uebrigen unter dem Anschein, zur Anmeldung zu
+    gehoeren. Und "core" hiesse als Paket homepi_core: das Grundgeruest selbst.
+    """
+    with pytest.raises(ValueError, match="vergeben"):
+        Modul(id=kennung, titel="X", router=APIRouter())
+
+
 def test_modul_ohne_titel_wird_abgelehnt() -> None:
     with pytest.raises(ValueError, match="Titel"):
         Modul(id="x", titel="   ", router=APIRouter())
@@ -92,7 +104,7 @@ def test_manifest_nennt_den_zugang() -> None:
 
 class TestSichtbarkeit:
     def test_oeffentliches_sieht_auch_wer_nicht_angemeldet_ist(self) -> None:
-        assert _modul("info", zugang=Zugang.OEFFENTLICH).sichtbar_fuer(None)
+        assert _modul("aushang", zugang=Zugang.OEFFENTLICH).sichtbar_fuer(None)
 
     def test_geschuetztes_sieht_ohne_anmeldung_niemand(self) -> None:
         assert not _modul("geraete", zugang=Zugang.GESCHUETZT).sichtbar_fuer(None)
@@ -156,9 +168,9 @@ def test_defektes_modul_steht_im_manifest() -> None:
 
 
 def test_braucht_anmeldung_sobald_ein_artefakt_verschlossen_ist() -> None:
-    offen = register_aus([_modul("info", zugang=Zugang.OEFFENTLICH)])
+    offen = register_aus([_modul("aushang", zugang=Zugang.OEFFENTLICH)])
     gemischt = register_aus(
-        [_modul("info", zugang=Zugang.OEFFENTLICH), _modul("geraete", zugang=Zugang.GESCHUETZT)]
+        [_modul("aushang", zugang=Zugang.OEFFENTLICH), _modul("geraete", zugang=Zugang.GESCHUETZT)]
     )
 
     assert not offen.braucht_anmeldung
@@ -170,7 +182,7 @@ class TestGefiltertesManifest:
     def register(self) -> Modulregister:
         register = register_aus(
             [
-                _modul("info", "Info", zugang=Zugang.OEFFENTLICH),
+                _modul("aushang", "Aushang", zugang=Zugang.OEFFENTLICH),
                 _modul("geraete", "Geräte", zugang=Zugang.GESCHUETZT),
                 _modul("staffelpilot", "StaffelPilot", zugang=Zugang.GESCHUETZT),
             ]
@@ -182,7 +194,7 @@ class TestGefiltertesManifest:
         return {str(e["id"]) for e in eintraege}
 
     def test_ohne_anmeldung_nur_das_oeffentliche(self, register: Modulregister) -> None:
-        assert self._ids(register.manifest_fuer(None)) == {"info"}
+        assert self._ids(register.manifest_fuer(None)) == {"aushang"}
 
     def test_ein_staffelleiter_sieht_die_geraete_im_haus_nicht(
         self, register: Modulregister
@@ -192,7 +204,7 @@ class TestGefiltertesManifest:
         als graue Kachel."""
         sichtbar = self._ids(register.manifest_fuer({"staffelpilot": Rolle.VERWALTER}))
 
-        assert sichtbar == {"info", "staffelpilot"}
+        assert sichtbar == {"aushang", "staffelpilot"}
 
     def test_wer_alles_darf_sieht_alles(self, register: Modulregister) -> None:
         sichtbar = self._ids(
@@ -201,12 +213,12 @@ class TestGefiltertesManifest:
             )
         )
 
-        assert sichtbar == {"info", "geraete", "staffelpilot", "kaputt"}
+        assert sichtbar == {"aushang", "geraete", "staffelpilot", "kaputt"}
 
     def test_auch_gefiltert_bleibt_es_alphabetisch(self, register: Modulregister) -> None:
         eintraege = register.manifest_fuer({"geraete": Rolle.LESER})
 
-        assert [e["titel"] for e in eintraege] == ["Geräte", "Info"]
+        assert [e["titel"] for e in eintraege] == ["Aushang", "Geräte"]
 
 
 # --- Entdeckung ------------------------------------------------------------

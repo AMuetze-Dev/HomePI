@@ -1,6 +1,13 @@
-import { ApiError } from "../../api/client";
+import { schnittstelle } from "../../api/schnittstelle";
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+/**
+ * Zugriff auf das eigene Backend.
+ *
+ * Sitzungscookie, JSON und Fehlermeldungen aus problem+json erledigt
+ * `schnittstelle` - für jedes Artefakt gleich. Hier stehen nur Pfade und
+ * Typen. Eine eigene fetch-Hülle zu schreiben ist die falsche Datei.
+ */
+const { anfrage, sende } = schnittstelle("/{{service}}");
 
 /** TODO: an die Schemas des Backends anpassen. */
 export interface Eintrag {
@@ -12,52 +19,14 @@ export interface NeuerEintrag {
   name: string;
 }
 
-/** Fehlerformat des Backends (RFC 9457). */
-interface Problem {
-  title?: string;
-  detail?: string;
-}
-
-async function anfrage<T>(
-  pfad: string,
-  init: RequestInit = {},
-  signal?: AbortSignal,
-): Promise<T> {
-  const antwort = await fetch(`${BASE_URL}/{{service}}${pfad}`, {
-    ...init,
-    signal: signal ?? null,
-    headers: { Accept: "application/json", ...init.headers },
-  });
-
-  if (!antwort.ok) {
-    // Das Backend schickt bei jedem Fehler problem+json. Die Meldung daraus
-    // ist für den Benutzer brauchbar - "HTTP 409" wäre es nicht.
-    let meldung = `Fehler ${antwort.status}`;
-    try {
-      const problem = (await antwort.json()) as Problem;
-      meldung = problem.detail ?? problem.title ?? meldung;
-    } catch {
-      /* Antwort ohne JSON-Körper - dann bleibt es beim Statuscode */
-    }
-    throw new ApiError(meldung, antwort.status);
-  }
-
-  if (antwort.status === 204) return undefined as T;
-  return (await antwort.json()) as T;
-}
-
 export function ladeEintraege(signal?: AbortSignal): Promise<Eintrag[]> {
   return anfrage<Eintrag[]>("/", {}, signal);
 }
 
 export function legeEintragAn(daten: NeuerEintrag): Promise<Eintrag> {
-  return anfrage<Eintrag>("/", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(daten),
-  });
+  return sende<Eintrag>("POST", "/", daten);
 }
 
 export function entferneEintrag(id: string): Promise<void> {
-  return anfrage<void>(`/${id}`, { method: "DELETE" });
+  return sende<void>("DELETE", `/${encodeURIComponent(id)}`);
 }

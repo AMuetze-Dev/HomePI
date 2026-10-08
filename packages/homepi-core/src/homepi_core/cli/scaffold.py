@@ -21,6 +21,7 @@ import re
 from importlib import resources
 from pathlib import Path
 
+from ..modules import VERGEBEN
 from .project import Projekt, projekt_ermitteln
 from .shell import CliFehler, erfolg, hinweis, schritt, warnung
 
@@ -87,6 +88,12 @@ def ausfuehren(args: argparse.Namespace) -> int:
             f"'{name}' ist keine gültige Kennung. Erlaubt sind Kleinbuchstaben, "
             "Ziffern und Bindestriche, beginnend mit einem Buchstaben - die "
             "Kennung landet in URLs, Image-Namen und Python-Modulen."
+        )
+
+    if args.modus == "modul" and name in VERGEBEN:
+        raise CliFehler(
+            f"'{name}' ist vergeben - die Kennung gehört dem Gateway oder einem "
+            f"seiner Pakete. Nicht erlaubt: {', '.join(sorted(VERGEBEN))}."
         )
 
     projekt = projekt_ermitteln(Path.cwd())
