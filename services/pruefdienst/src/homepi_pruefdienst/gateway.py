@@ -11,6 +11,24 @@ class GatewayFehler(RuntimeError):
     """Das Artefakt hat anders geantwortet als erwartet."""
 
 
+def _meldung(antwort: httpx.Response) -> str:
+    """Der Satz fuer Menschen aus einer Fehlerantwort (RFC 9457).
+
+    Ohne problem+json bleibt es bei Statuscode und Anfang des Koerpers -
+    ein Proxy davor antwortet auch mal mit HTML.
+    """
+    try:
+        problem = antwort.json()
+    except ValueError:
+        problem = None
+    if isinstance(problem, dict):
+        for schluessel in ("detail", "title"):
+            wert = problem.get(schluessel)
+            if isinstance(wert, str) and wert:
+                return wert
+    return f"{antwort.status_code} {antwort.text[:300]}"
+
+
 class Gateway:
     """Der Prüfdienst meldet sich wie jeder andere Benutzer an.
 
@@ -63,7 +81,12 @@ class Gateway:
     def _json(self, methode: str, pfad: str, **kwargs: Any) -> Any:
         antwort = self._ruf(methode, pfad, **kwargs)
         if antwort.status_code >= 400:
-            raise GatewayFehler(f"{methode} {pfad}: {antwort.status_code} {antwort.text[:300]}")
+            # Die Meldung geht als Grund eines gescheiterten Auftrags an die
+            # Oberflaeche. Dort gehoert der Satz aus problem+json hin, nicht
+            # die rohe Antwort; der Aufruf selbst steht im Traceback.
+            fehler = GatewayFehler(_meldung(antwort))
+            fehler.add_note(f"{methode} {pfad}: {antwort.status_code}")
+            raise fehler
         return antwort.json() if antwort.content else None
 
     # ── Aufträge ──────────────────────────────────────────────────────────

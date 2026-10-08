@@ -166,8 +166,7 @@ class TestFuerDasArtefakt:
 
         assert befunde
         assert all(
-            set(b)
-            == {"regel", "schwere", "titel", "text", "person", "mannschaft", "einzelheiten"}
+            set(b) == {"regel", "schwere", "titel", "text", "person", "mannschaft", "einzelheiten"}
             for b in befunde
         )
 

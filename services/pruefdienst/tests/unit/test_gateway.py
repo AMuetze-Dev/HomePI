@@ -98,6 +98,43 @@ class TestAufrufe:
         with pytest.raises(GatewayFehler, match="läuft schon einer"):
             dienst.fortschritt("a1", zeile="x")
 
+    def test_aus_problem_json_bleibt_nur_der_satz_fuer_menschen(self) -> None:
+        """Die Meldung landet beim Staffelleiter unter "Gescheitert".
+
+        Vorher stand dort die ganze Antwort - Methode, Pfad, Statuscode und
+        das rohe JSON samt request_id. Der eine Satz, um den es ging, steckte
+        mittendrin, und auf dem Telefon schob die Zeile die Seite aus dem Bild.
+        """
+        dienst, _ = gateway(
+            httpx.Response(
+                404,
+                headers={"Content-Type": "application/problem+json"},
+                json={
+                    "type": "about:blank",
+                    "title": "Kein DFBnet-Zugang hinterlegt",
+                    "status": 404,
+                    "detail": "Es ist kein DFBnet-Zugang hinterlegt",
+                    "request_id": "3aa707d1",
+                },
+            )
+        )
+
+        with pytest.raises(GatewayFehler) as fehler:
+            dienst.zugang()
+
+        assert str(fehler.value) == "Es ist kein DFBnet-Zugang hinterlegt"
+        # Wer im Protokoll sucht, braucht trotzdem den Aufruf - der steht im
+        # Traceback, nicht in der Meldung.
+        assert "POST /staffelpilot/zugang/abholen: 404" in "".join(fehler.value.__notes__)
+
+    def test_ohne_detail_reicht_der_titel(self) -> None:
+        dienst, _ = gateway(httpx.Response(403, json={"title": "Keine Berechtigung"}))
+
+        with pytest.raises(GatewayFehler) as fehler:
+            dienst.fortschritt("a1", zeile="x")
+
+        assert str(fehler.value) == "Keine Berechtigung"
+
     def test_eine_leere_antwort_ist_keine(self) -> None:
         """204 hat keinen Koerper - `json()` daran waere ein Fehler, den
         niemand gemacht hat."""
