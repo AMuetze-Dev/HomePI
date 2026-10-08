@@ -1,12 +1,11 @@
 # Home Assistant laeuft im Host-Netz und ist deshalb kein Docker-Provider-Ziel.
 # Es wird ueber den File-Provider als externer Service eingebunden.
 #
-# Voraussetzung in HA configuration.yaml (sonst: "400: Bad Request"):
-#   http:
-#     use_x_forwarded_for: true
-#     trusted_proxies:
-#       - 172.18.0.0/16      # Subnetz von "edge": docker network inspect edge
-#       - 127.0.0.1
+# Zwei Voraussetzungen, sonst Zeitueberschreitung bzw. "400: Bad Request":
+#   * UFW laesst 172.18.10.0/24 (edge) auf 8123 zu - legt 10-os-bootstrap.sh an.
+#   * HA kennt den Proxy. Seit 2026.x NICHT mehr in configuration.yaml, sondern
+#     in .storage/http unter data.stable: use_x_forwarded_for und
+#     trusted_proxies. Wie: docs/04-runbook.md, "400: Bad Request".
 
 http:
   routers:

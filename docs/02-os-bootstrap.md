@@ -84,7 +84,8 @@ Nicht alles auf einmal. Jede Stufe verifizieren:
    `dig @$PI_IP google.com`. Erst wenn das sauber antwortet, im **Router** den DNS ändern.
 3. **`make up-data`** — Postgres. Test: `make psql`.
 4. **`make up-home`** — Home Assistant. Erst per `http://$PI_IP:8123` einrichten, dann
-   `trusted_proxies` in `configuration.yaml` setzen, HA neu starten, dann über
+   den Proxy in `.storage/http` eintragen (nicht mehr in `configuration.yaml`, siehe
+   [03-architecture.md](03-architecture.md)), HA neu starten, dann über
    `https://ha.$DOMAIN` prüfen.
 5. **`make up-apps`** — deine eigene Software. Danach einmalig das Schema
    anlegen und das erste Konto (siehe [04-runbook.md](04-runbook.md),

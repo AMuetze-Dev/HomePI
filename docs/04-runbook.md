@@ -200,10 +200,27 @@ verweigert Traefik den Start.
 
 ### `400: Bad Request` bei Home Assistant
 
-`trusted_proxies` in `configuration.yaml` fehlt oder hat das falsche Subnetz:
+HA kennt den Proxy nicht. Im HA-Log steht dann *„A request from a reverse proxy
+was received from 172.18.10.x, but your HTTP integration is not set-up for reverse
+proxies"*. Seit 2026.x hilft `configuration.yaml` hier nicht mehr — die Werte
+gehören nach `${DATA_ROOT}/homeassistant/.storage/http`, Abschnitt `data.stable`:
 
 ```bash
-docker network inspect edge --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+docker stop homeassistant
+cd /srv/homelab/homeassistant && cp .storage/http .storage/http.sicherung
+python3 -c 'import json; p=".storage/http"; d=json.load(open(p)); s=d["data"]["stable"]; s["use_x_forwarded_for"]=True; s["trusted_proxies"]=["172.18.10.0/24"]; json.dump(d, open(p,"w"), indent=2)'
+docker start homeassistant
+```
+
+Das Subnetz zeigt `docker network inspect edge --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'`.
+
+### Zeitüberschreitung bei Home Assistant über Traefik
+
+Die Firewall verwirft Traefiks Anfragen — sie kommen aus dem `edge`-Netz, nicht aus
+dem LAN. Zu sehen mit `sudo journalctl -k | grep 'UFW BLOCK.*DPT=8123'`. Abhilfe:
+
+```bash
+sudo ufw allow from 172.18.10.0/24 to any port 8123 proto tcp comment 'Traefik -> Home Assistant'
 ```
 
 ### Pi-hole startet nicht, Port 53 belegt

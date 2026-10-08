@@ -57,18 +57,23 @@ nur `network_mode: host`. Konsequenzen, die du einplanen musst:
 2. Traefik kann HA nicht per Container-DNS finden. Lösung im Repo: Traefik bekommt
    `extra_hosts: host.docker.internal:host-gateway` und einen **File-Provider**-Eintrag
    (`core/dynamic/homeassistant.yml`), der auf `http://host.docker.internal:8123` zeigt.
-3. HA muss den Proxy kennen, sonst lehnt es die Anfragen mit `400: Bad Request` ab.
-   In `configuration.yaml`:
+3. Die Firewall muss Traefik durchlassen. Seine Anfragen kommen aus dem
+   `edge`-Netz (172.18.10.0/24), nicht aus dem LAN — ohne eigene UFW-Regel laufen
+   sie in eine Zeitüberschreitung. `scripts/10-os-bootstrap.sh` legt sie an.
+4. HA muss den Proxy kennen, sonst lehnt es die Anfragen mit `400: Bad Request` ab.
+   **Seit 2026.x steht das nicht mehr in `configuration.yaml`.** HA hat den
+   `http:`-Block einmalig nach `.storage/http` übernommen und ignoriert ihn danach;
+   wer ihn nachträglich einträgt, bekommt nur einen Reparaturhinweis. Die Werte
+   gehören in `data.stable` dieser Datei — bei **angehaltenem** HA, sonst
+   überschreibt es sie beim Beenden:
 
-```yaml
-http:
-  use_x_forwarded_for: true
-  trusted_proxies:
-    - 172.18.0.0/16 # das edge-Subnetz: docker network inspect edge
-    - 127.0.0.1
+```json
+"use_x_forwarded_for": true,
+"trusted_proxies": ["172.18.10.0/24"]
 ```
 
-Das ist der Fehler, an dem praktisch jeder einmal hängt.
+Das ist der Fehler, an dem praktisch jeder einmal hängt — und die Anleitungen im
+Netz zeigen fast alle noch den YAML-Weg.
 
 ## Pi-hole: der 80/443-Konflikt
 

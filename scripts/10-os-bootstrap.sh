@@ -60,6 +60,10 @@ ufw allow from "${LAN_CIDR}" to any port 8080  proto tcp comment 'Pi-hole Notaus
 ufw allow from "${LAN_CIDR}" to any port 8123  proto tcp comment 'Home Assistant'
 ufw allow from "${LAN_CIDR}" to any port 1883  proto tcp comment 'MQTT'
 ufw allow from "${LAN_CIDR}" to any port 8099  proto tcp comment 'Zigbee2MQTT'
+# Home Assistant laeuft im Host-Netz. Traefik erreicht es ueber die Docker-
+# Bruecke, also aus dem edge-Netz (30-create-networks.sh) und NICHT aus dem
+# LAN - ohne diese Regel endet https://ha.<DOMAIN> in einer Zeitueberschreitung.
+ufw allow from 172.18.10.0/24 to any port 8123 proto tcp comment 'Traefik -> Home Assistant'
 ufw --force enable
 # Hinweis: UFW und Dockers eigene iptables-Regeln greifen unabhaengig voneinander.
 # Published Ports umgehen UFW. Deshalb sind hier alle Ports ausser 53/80/443

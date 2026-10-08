@@ -21,5 +21,6 @@ create edge --driver bridge --subnet 172.18.10.0/24
 create data --driver bridge --subnet 172.18.20.0/24
 
 echo
-echo "Wichtig fuer Home Assistant: trusted_proxies auf das edge-Subnetz setzen:"
+echo "Wichtig fuer Home Assistant: trusted_proxies auf das edge-Subnetz setzen"
+echo "(seit HA 2026.x in .storage/http, nicht in configuration.yaml - docs/04-runbook.md):"
 docker network inspect edge --format '{{range .IPAM.Config}}  - {{.Subnet}}{{end}}'
