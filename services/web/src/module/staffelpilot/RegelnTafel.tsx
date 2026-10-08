@@ -171,7 +171,7 @@ function Saetze({
       </summary>
 
       <p className={stil.vorgangHinweis}>
-        Der Sachverhalt folgt auf „Im Spiel … am … ". Platzhalter in geschweiften Klammern
+        Der Sachverhalt folgt auf „Im Spiel … am … “. Platzhalter in geschweiften Klammern
         werden eingesetzt ({"{person}"}, {"{verein}"}); was in eckigen Klammern steht,
         fällt weg, wenn sein Wert fehlt. Leer lassen heißt: der mitgelieferte Satz gilt.
       </p>

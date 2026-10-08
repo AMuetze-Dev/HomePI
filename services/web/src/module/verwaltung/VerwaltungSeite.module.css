@@ -35,7 +35,7 @@
 }
 
 .warnung {
-  color: var(--farbe-warnung, #b8860b);
+  color: var(--signal-warnung);
 }
 
 .kennzahlname {

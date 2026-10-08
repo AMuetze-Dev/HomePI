@@ -30,8 +30,8 @@ const ENTSCHEIDUNG_WORT = {
 /**
  * Jeder Befund einzeln, über alle Spiele hinweg.
  *
- * Die Warteschlange beantwortet „was ist als Nächstes zu tun". Das hier ist
- * die andere Frage: „was ist in dieser Saison alles aufgelaufen" — beim
+ * Die Warteschlange beantwortet „was ist als Nächstes zu tun“. Das hier ist
+ * die andere Frage: „was ist in dieser Saison alles aufgelaufen“ — beim
  * Jahresbericht, oder wenn ein Verein anruft und wissen will, wie oft.
  */
 export function BefundeListe({ staffelId }: { staffelId?: string | undefined }) {

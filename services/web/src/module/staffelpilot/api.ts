@@ -1,6 +1,6 @@
-import { ApiError } from "../../api/client";
+import { schnittstelle } from "../../api/schnittstelle";
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const API = schnittstelle("/staffelpilot");
 
 export type Schwere = "kritisch" | "warnung" | "hinweis";
 export type Entscheidung = "offen" | "kenntnis" | "verworfen";
@@ -249,42 +249,7 @@ export interface NeueStaffel {
   spieltage?: number;
 }
 
-/** Fehlerformat des Backends (RFC 9457). */
-interface Problem {
-  title?: string;
-  detail?: string;
-}
-
-async function anfrage<T>(
-  pfad: string,
-  init: RequestInit = {},
-  signal?: AbortSignal,
-): Promise<T> {
-  const antwort = await fetch(`${BASE_URL}/staffelpilot${pfad}`, {
-    ...init,
-    signal: signal ?? null,
-    // Das Artefakt ist geschuetzt. Ohne das Sitzungscookie antwortet das
-    // Gateway mit 401, egal was hier steht.
-    credentials: "include",
-    headers: { Accept: "application/json", ...init.headers },
-  });
-
-  if (!antwort.ok) {
-    // Das Backend schickt bei jedem Fehler problem+json. Die Meldung daraus
-    // ist fuer den Staffelleiter brauchbar - "HTTP 409" waere es nicht.
-    let meldung = `Fehler ${antwort.status}`;
-    try {
-      const problem = (await antwort.json()) as Problem;
-      meldung = problem.detail ?? problem.title ?? meldung;
-    } catch {
-      /* Antwort ohne JSON-Koerper - dann bleibt es beim Statuscode */
-    }
-    throw new ApiError(meldung, antwort.status);
-  }
-
-  if (antwort.status === 204) return undefined as T;
-  return (await antwort.json()) as T;
-}
+const { anfrage } = API;
 
 function mitKoerper(methode: string, daten: unknown): RequestInit {
   return {
@@ -422,7 +387,7 @@ export function ladeMailentwurf(id: string, signal?: AbortSignal): Promise<Maile
  * den Viewer des Browsers, und beides kann die Seite nicht besser.
  */
 export function mahnungAdresse(id: string): string {
-  return `${BASE_URL}/staffelpilot/vorgaenge/${id}/mahnung.pdf`;
+  return API.adresse(`/vorgaenge/${id}/mahnung.pdf`);
 }
 
 /** Erzeugt den Entwurf aus der Vorlage - und verschickt ihn nicht. */

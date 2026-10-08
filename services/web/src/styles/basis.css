@@ -38,6 +38,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
   font-variant-numeric: tabular-nums;
   text-rendering: optimizeLegibility;
+
+  /* Ein Wort, das nicht in die Zeile passt, wird umbrochen statt die Seite
+   * zu verbreitern. Gemeint sind Zeichenketten ohne Leerzeichen: Pfade,
+   * Kennungen, eine Fehlermeldung mit JSON darin. Eine solche Meldung im
+   * Prüflauf schob auf dem Telefon die ganze Seite auf 641 px.
+   *
+   * Hier und nicht im Modul-CSS: jedes Artefakt erbt es, auch das nächste. */
+  overflow-wrap: break-word;
 }
 
 h1,
@@ -90,6 +98,20 @@ button {
   cursor: pointer;
 }
 
+/* Kästchen und Optionsfelder bleiben die des Systems - sie bringen
+ * Tastaturbedienung und Screenreader-Ansage mit, die ein nachgebautes
+ * Element erst wieder lernen müsste. Nur Farbe und Größe kommen von hier,
+ * damit sie in jedem Artefakt gleich aussehen: Bisher hatte eines 16 px mit
+ * Akzent, ein anderes 13 px in Systemblau. */
+input[type="checkbox"],
+input[type="radio"] {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--farbe-aktion);
+  cursor: pointer;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -116,7 +138,7 @@ samp {
 }
 
 ::selection {
-  background: light-dark(rgb(59 110 224 / 16%), rgb(106 147 240 / 28%));
+  background: var(--farbe-auswahl);
 }
 
 /* Wer Bewegung abbestellt hat, bekommt keine. Das ist keine Kür: für

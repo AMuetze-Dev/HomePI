@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import {
+  Etikett,
+  Feld,
+  Hinweis,
+  Karte,
+  Knopf,
+  KnopfVerweis,
+  Leerzustand,
+  Platzhalter,
+} from "../../ui";
 import {
   type Mailentwurf,
   type Vorgang,
@@ -46,7 +55,7 @@ const NAECHSTE: Record<VorgangZustand, VorgangZustand[]> = {
  * Mahnungen und Anträge ans Sportgericht.
  *
  * **Hier geht nichts hinaus.** Der Text steht zum Kopieren da; abgeschickt
- * wird er im Mailprogramm, von einem Menschen. „Versandt" hält fest, was
+ * wird er im Mailprogramm, von einem Menschen. „Versandt“ hält fest, was
  * draußen passiert ist — es löst nichts aus.
  */
 export function VorgaengeTafel() {
@@ -144,7 +153,7 @@ export function VorgaengeTafel() {
       {zeilen.length === 0 ? (
         <Leerzustand titel="Keine Vorgänge">
           Ein Vorgang entsteht aus einem Befund: bei den Spielberichten auf „Mahnung
-          entwerfen" oder „Antrag entwerfen". Nur Befunde, für die der Prüflauf einen Weg
+          entwerfen" oder „Antrag entwerfen“. Nur Befunde, für die der Prüflauf einen Weg
           gemeldet hat, bekommen einen.
         </Leerzustand>
       ) : (
@@ -253,7 +262,7 @@ function VorgangInhalt({
    * und es hat auch keinen Weg dorthin. Der Empfänger steht drin, wenn einer
    * eingetragen ist — sonst wählt ihn der Staffelleiter im Mailfenster.
    *
-   * Lange Texte kürzt mancher Mailclient. Deshalb steht „Text kopieren"
+   * Lange Texte kürzt mancher Mailclient. Deshalb steht „Text kopieren“
    * daneben und nicht darunter.
    */
   function mailOeffnen() {
@@ -269,7 +278,7 @@ function VorgangInhalt({
     <div className={stil.befunde}>
       <p className={stil.vorgangHinweis}>
         Dieses Programm verschickt nichts. Formular herunterladen, E-Mail öffnen,
-        Empfänger wählen, anhängen, senden — und danach hier auf „Versandt" stellen.
+        Empfänger wählen, anhängen, senden — und danach hier auf „Versandt“ stellen.
       </p>
 
       <Feld
@@ -312,14 +321,14 @@ function VorgangInhalt({
           E-Mail öffnen
         </Knopf>
         {offen.art === "mahnung" && (
-          <a
-            className={stil.dateiknopf}
+          <KnopfVerweis
+            groesse="sm"
             href={mahnungAdresse(offen.id)}
             target="_blank"
             rel="noreferrer"
           >
             Mahnung (PDF)
-          </a>
+          </KnopfVerweis>
         )}
         {NAECHSTE[offen.zustand].map((z) => (
           <Knopf
@@ -330,7 +339,7 @@ function VorgangInhalt({
           >
             {z === "entwurf"
               ? "Zurück in den Entwurf"
-              : `Auf „${ZUSTAND_WORT[z]}" setzen`}
+              : `Auf „${ZUSTAND_WORT[z]}“ setzen`}
           </Knopf>
         ))}
         <Knopf groesse="sm" auspraegung="leise" onClick={() => void onVerwerfen()}>

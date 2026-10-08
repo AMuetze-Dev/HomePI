@@ -1,7 +1,7 @@
 import type { Rolle } from "../../api/anmeldung";
-import { ApiError } from "../../api/client";
+import { schnittstelle } from "../../api/schnittstelle";
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const API = schnittstelle("/verwaltung");
 
 export type { Rolle };
 
@@ -36,42 +36,7 @@ export interface NeuesKonto {
   anzeigename?: string;
 }
 
-/** Fehlerformat des Backends (RFC 9457). */
-interface Problem {
-  title?: string;
-  detail?: string;
-}
-
-async function anfrage<T>(
-  pfad: string,
-  init: RequestInit = {},
-  signal?: AbortSignal,
-): Promise<T> {
-  const antwort = await fetch(`${BASE_URL}/verwaltung${pfad}`, {
-    ...init,
-    signal: signal ?? null,
-    // Das Artefakt ist geschützt. Ohne das Sitzungscookie antwortet das
-    // Gateway mit 401, egal was hier steht.
-    credentials: "include",
-    headers: { Accept: "application/json", ...init.headers },
-  });
-
-  if (!antwort.ok) {
-    // Die Meldung aus problem+json ist für den Benutzer brauchbar - gerade
-    // hier: "Das geht nicht am eigenen Konto" sagt mehr als "HTTP 409".
-    let meldung = `Fehler ${antwort.status}`;
-    try {
-      const problem = (await antwort.json()) as Problem;
-      meldung = problem.detail ?? problem.title ?? meldung;
-    } catch {
-      /* Antwort ohne JSON-Körper - dann bleibt es beim Statuscode */
-    }
-    throw new ApiError(meldung, antwort.status);
-  }
-
-  if (antwort.status === 204) return undefined as T;
-  return (await antwort.json()) as T;
-}
+const { anfrage } = API;
 
 export function ladeKonten(signal?: AbortSignal): Promise<Konto[]> {
   return anfrage<Konto[]>("/benutzer", {}, signal);

@@ -367,7 +367,9 @@ Anmeldeformular auf, obwohl der Benutzer angemeldet ist.
 geprüft wird im Backend, und zwar nochmal.
 
 Jede Anfrage braucht `credentials: "include"`, sonst schickt der Browser das
-Cookie nicht mit.
+Cookie nicht mit. Das erledigt `schnittstelle()` aus `src/api/schnittstelle.ts`
+für jedes Artefakt; ein eigenes `fetch` daneben ist die Stelle, an der es
+vergessen wird — der Vorlage für neue Artefakte ist genau das passiert.
 
 ## Tests
 

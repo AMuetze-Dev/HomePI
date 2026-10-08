@@ -44,6 +44,17 @@
   font-size: var(--text-sm);
 }
 
+/* Mit dem Finger sind 30 px ein Glücksspiel - darunter verfehlt man den
+   Nachbarn. 44 px ist die Untergrenze, die Apple und das W3C (WCAG 2.5.5)
+   nennen. Nur bei grobem Zeiger: mit der Maus wären die Knöpfe klobig, und
+   die dichte Zeile einer Tabelle zerfiele. */
+@media (pointer: coarse) {
+  .md,
+  .sm {
+    min-height: 2.75rem;
+  }
+}
+
 /* --- Auspraegungen --- */
 .primaer {
   background: var(--farbe-aktion);

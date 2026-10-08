@@ -40,7 +40,7 @@ function alsMonat(wert: string): string {
 /**
  * Was in dieser Saison aufgelaufen ist — gezählt, nicht aufgelistet.
  *
- * Die Spielprüfung beantwortet „was ist als Nächstes zu tun". Das hier ist
+ * Die Spielprüfung beantwortet „was ist als Nächstes zu tun“. Das hier ist
  * die Frage am Saisonende und die, die ein Verein am Telefon stellt: wie
  * oft, wer, welche Regel, wann.
  */
@@ -139,7 +139,7 @@ export function ErgebnisseTafel({ staffeln }: { staffeln: Staffel[] }) {
           <Gruppe titel="Nach Mannschaft" posten={werte.nach_mannschaft} />
           <Gruppe titel="Im Verlauf" posten={werte.nach_monat} beschriften={alsMonat} />
 
-          {/* Die Zahlen sagen „wie oft"; wer wissen will „welche", klappt
+          {/* Die Zahlen sagen „wie oft“; wer wissen will „welche“, klappt
               die Liste auf. Beides auf einer Fläche, weil es dieselbe Frage
               in zwei Auflösungen ist. */}
           <BefundeListe staffelId={staffelId || undefined} />

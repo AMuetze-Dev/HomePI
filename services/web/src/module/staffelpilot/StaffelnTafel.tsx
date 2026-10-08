@@ -66,7 +66,7 @@ export function StaffelnTafel({
  * Eine Zahl aus dem Eingabefeld — 0 für alles, was keine ist.
  *
  * 0 heißt im Artefakt *nicht bekannt*, und genau das ist ein leeres Feld
- * auch. Aus „zwanzig" eine 20 zu raten wäre schlimmer als nichts zu wissen.
+ * auch. Aus „zwanzig“ eine 20 zu raten wäre schlimmer als nichts zu wissen.
  */
 function zahl(text: string): number {
   const wert = Number.parseInt(text, 10);

@@ -536,7 +536,7 @@ function BefundZeile({
             </div>
           ) : (
             <p className={stil.erledigt}>
-              Entwurf angelegt — steht unter „Vorgänge". Verschickt wird er dort nicht,
+              Entwurf angelegt — steht unter „Vorgänge“. Verschickt wird er dort nicht,
               sondern von Hand.
             </p>
           ))}

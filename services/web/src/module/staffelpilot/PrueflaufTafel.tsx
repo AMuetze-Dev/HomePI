@@ -57,7 +57,7 @@ function alsZeit(wert: string): string {
  * DFBnet hinaus soll.
  *
  * **Hier läuft nichts.** Ein Auftrag ist ein Datensatz; gearbeitet wird im
- * DFBnet-Dienst. Solange der nicht läuft, bleibt ein Auftrag auf „Wartet"
+ * DFBnet-Dienst. Solange der nicht läuft, bleibt ein Auftrag auf „Wartet“
  * stehen — und das steht auch so da, statt einen Fortschritt vorzutäuschen.
  */
 export function PrueflaufTafel({
@@ -148,7 +148,7 @@ export function PrueflaufTafel({
             <p className={stil.vorgangHinweis}>
               Ein Prüflauf liest die Spielberichte in DFBnet und spielt seine Befunde hier
               ein. Gearbeitet wird im Prüfdienst — solange der nicht läuft, bleibt der
-              Auftrag auf „Wartet" stehen.
+              Auftrag auf „Wartet“ stehen.
             </p>
             {staffeln.length > 1 && (
               <label className={stil.wahl}>

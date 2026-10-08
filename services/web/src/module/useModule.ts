@@ -22,7 +22,13 @@ type Zustand =
   | { phase: "fertig"; module: ModulEintrag[] }
   | { phase: "fehler"; nachricht: string };
 
-type Horcher = (z: Zustand) => void;
+/** Ein Stand und das Konto, für das er gilt. */
+interface Gesehen {
+  fuer: string | null;
+  zustand: Zustand;
+}
+
+type Horcher = (g: Gesehen) => void;
 
 let schluessel: string | null = null;
 let stand: Zustand = { phase: "laedt" };
@@ -39,7 +45,7 @@ const horcher = new Set<Horcher>();
 
 function verteile(z: Zustand) {
   stand = z;
-  for (const h of horcher) h(z);
+  for (const h of horcher) h({ fuer: schluessel, zustand: z });
 }
 
 function hole(fuer: string) {
@@ -101,29 +107,33 @@ function schluesselFuer(
 export function useModule(): Zustand {
   const { zustand: anmeldung, benutzer } = useAnmeldung();
   const fuer = schluesselFuer(anmeldung, benutzer);
-  const [zustand, setZustand] = useState<Zustand>(stand);
+  const [gesehen, setGesehen] = useState<Gesehen>({ fuer: schluessel, zustand: stand });
 
   useEffect(() => {
     // Erst fragen, wenn feststeht, wer fragt. Sonst holt die Anwendung das
     // Manifest zweimal - einmal anonym, einmal angemeldet.
     if (anmeldung === "laedt") return undefined;
 
-    horcher.add(setZustand);
+    horcher.add(setGesehen);
 
     if (schluessel !== fuer) {
-      stand = { phase: "laedt" };
-      setZustand(stand);
       hole(fuer);
+      verteile({ phase: "laedt" });
     } else {
       // Ein Abruf, der noch laeuft, wird nicht verdoppelt - dieser Horcher
       // bekommt sein Ergebnis, sobald es eintrifft.
-      setZustand(stand);
+      setGesehen({ fuer: schluessel, zustand: stand });
     }
 
     return () => {
-      horcher.delete(setZustand);
+      horcher.delete(setGesehen);
     };
   }, [anmeldung, fuer]);
 
-  return anmeldung === "laedt" ? { phase: "laedt" } : zustand;
+  // Ein Stand, der einem anderen Konto gehört, ist keiner. Zwischen dem
+  // Rendern mit dem neuen Konto und dem Effekt oben läge sonst ein
+  // Durchgang mit der Liste des vorigen - direkt nach der Anmeldung stand
+  // auf der Startseite kurz "Noch kein Artefakt angemeldet".
+  if (anmeldung === "laedt" || gesehen.fuer !== fuer) return { phase: "laedt" };
+  return gesehen.zustand;
 }

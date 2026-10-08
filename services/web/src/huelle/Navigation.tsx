@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { NavLink, useMatch } from "react-router-dom";
 
 import type { ModulEintrag } from "../api/client";
@@ -46,7 +47,9 @@ export function Navigation({ beiAuswahl }: Props) {
         className={({ isActive }) => (isActive ? stil.eintragAktiv : stil.eintrag)}
         onClick={beiAuswahl}
       >
-        <Zeichen>◆</Zeichen>
+        <Zeichen>
+          <UebersichtSymbol />
+        </Zeichen>
         Übersicht
       </NavLink>
 
@@ -148,7 +151,26 @@ function monogramm(titel: string): string {
   return (titel.trim()[0] ?? "?").toLocaleUpperCase("de");
 }
 
-function Zeichen({ children }: { children: string }) {
+/**
+ * Vier Felder - die Kacheln der Startseite im Kleinen.
+ *
+ * Vorher stand hier "◆" als Schriftzeichen. Wie groß und wie fett das
+ * erscheint, entscheidet die Systemschrift: unter Windows ein Punkt, unter
+ * macOS eine Raute, die über den Rand des Feldes ragte. Eine Zeichnung sieht
+ * überall gleich aus und übernimmt die Farbe des Feldes.
+ */
+function UebersichtSymbol() {
+  return (
+    <svg viewBox="0 0 12 12" width="10" height="10" fill="currentColor">
+      <rect x="0" y="0" width="5" height="5" rx="1" />
+      <rect x="7" y="0" width="5" height="5" rx="1" />
+      <rect x="0" y="7" width="5" height="5" rx="1" />
+      <rect x="7" y="7" width="5" height="5" rx="1" />
+    </svg>
+  );
+}
+
+function Zeichen({ children }: { children: ReactNode }) {
   return (
     <span className={stil.zeichen} aria-hidden="true">
       {children}

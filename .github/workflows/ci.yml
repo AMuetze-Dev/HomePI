@@ -263,7 +263,7 @@ jobs:
       - run: npm ci
 
       - name: Format
-        run: npx prettier --check src "./*.ts" "./*.js"
+        run: npx prettier --check src e2e pruefungen "./*.ts" "./*.js"
 
       - name: Lint
         run: npx eslint .

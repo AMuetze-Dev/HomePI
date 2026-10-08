@@ -74,6 +74,49 @@ describe("Das geteilte Manifest", () => {
     expect(holen).toHaveBeenCalledTimes(2);
   });
 
+  it("zeigt nach einem Wechsel des Kontos keinen Augenblick den alten Stand", async () => {
+    // Zwischen dem Rendern mit dem neuen Konto und dem Effekt, der neu holt,
+    // lag ein Durchgang mit der Liste des vorigen. Auf der Startseite hieß
+    // das: direkt nach der Anmeldung kurz "Noch kein Artefakt angemeldet".
+    vi.spyOn(client, "fetchModule")
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([modul("geraete")]);
+
+    const gesehen: string[] = [];
+    function Mitschrift() {
+      const zustand = useModule();
+      gesehen.push(
+        zustand.phase === "fertig"
+          ? zustand.module.map((m) => m.id).join(",") || "leer"
+          : zustand.phase,
+      );
+      return null;
+    }
+
+    const vorher = { ...TESTBENUTZER, rechte: {} };
+    const { rerender } = render(
+      <AnmeldungKontext.Provider value={anmeldung(vorher, false)}>
+        <Mitschrift />
+      </AnmeldungKontext.Provider>,
+    );
+    await waitFor(() => expect(gesehen).toContain("leer"));
+
+    gesehen.length = 0;
+    rerender(
+      <AnmeldungKontext.Provider
+        value={anmeldung(
+          { ...vorher, id: "anderes-konto", rechte: { geraete: "leser" } },
+          false,
+        )}
+      >
+        <Mitschrift />
+      </AnmeldungKontext.Provider>,
+    );
+    await waitFor(() => expect(gesehen).toContain("geraete"));
+
+    expect(gesehen).not.toContain("leer");
+  });
+
   it("holt es neu, wenn sich die Rechte ändern", async () => {
     // Ein Verwalter vergibt ein Recht; beim nächsten Abruf von /auth/ich
     // kommt der Benutzer mit neuen Rechten zurück. Das Manifest ist genau eine

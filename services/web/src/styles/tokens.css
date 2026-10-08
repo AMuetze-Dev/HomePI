@@ -67,6 +67,9 @@
   --farbe-aktion-hover: light-dark(var(--neutral-800), #ffffff);
 
   --farbe-fokus: light-dark(#3b6ee0, #6a93f0);
+  /* Markierter Text. Aus der Fokusfarbe, nur durchscheinend - beides meint
+   * "hier bist du gerade". */
+  --farbe-auswahl: light-dark(rgb(59 110 224 / 16%), rgb(106 147 240 / 28%));
 
   /* -------------------------------------------------------------- Signale
    * Entsättigt: sie sollen etwas mitteilen, nicht um Aufmerksamkeit kämpfen.

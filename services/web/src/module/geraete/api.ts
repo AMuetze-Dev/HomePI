@@ -1,6 +1,6 @@
-import { ApiError } from "../../api/client";
+import { schnittstelle } from "../../api/schnittstelle";
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const API = schnittstelle("/geraete");
 
 export type GeraetZustand = "bereit" | "wartung";
 
@@ -25,42 +25,7 @@ export interface NeuesGeraet {
   zustand?: GeraetZustand;
 }
 
-/** Fehlerformat des Backends (RFC 9457). */
-interface Problem {
-  title?: string;
-  detail?: string;
-}
-
-async function anfrage<T>(
-  pfad: string,
-  init: RequestInit = {},
-  signal?: AbortSignal,
-): Promise<T> {
-  const antwort = await fetch(`${BASE_URL}/geraete${pfad}`, {
-    ...init,
-    signal: signal ?? null,
-    // Das Artefakt ist geschuetzt. Ohne das Sitzungscookie antwortet das
-    // Gateway mit 401, egal was hier steht.
-    credentials: "include",
-    headers: { Accept: "application/json", ...init.headers },
-  });
-
-  if (!antwort.ok) {
-    // Das Backend schickt bei jedem Fehler problem+json. Die Meldung daraus
-    // ist fuer den Benutzer brauchbar - "HTTP 409" waere es nicht.
-    let meldung = `Fehler ${antwort.status}`;
-    try {
-      const problem = (await antwort.json()) as Problem;
-      meldung = problem.detail ?? problem.title ?? meldung;
-    } catch {
-      /* Antwort ohne JSON-Koerper - dann bleibt es beim Statuscode */
-    }
-    throw new ApiError(meldung, antwort.status);
-  }
-
-  if (antwort.status === 204) return undefined as T;
-  return (await antwort.json()) as T;
-}
+const { anfrage } = API;
 
 export function ladeGeraete(signal?: AbortSignal): Promise<Geraet[]> {
   return anfrage<Geraet[]>("/", {}, signal);

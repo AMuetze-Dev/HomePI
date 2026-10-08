@@ -149,9 +149,13 @@ export async function fetchEndpunkte(
   const schema: unknown = await antwort.json();
   if (!istObjekt(schema) || !istObjekt(schema.paths)) return [];
 
+  // Bis zum Schrägstrich, nicht nur der Anfang: Sonst gehörten die Pfade
+  // von "/staffelpilot" auch einem Artefakt "/staffel".
+  const eigen = (pfad: string) => pfad === modulPfad || pfad.startsWith(`${modulPfad}/`);
+
   const endpunkte: Endpunkt[] = [];
   for (const [pfad, operationen] of Object.entries(schema.paths)) {
-    if (!pfad.startsWith(modulPfad) || !istObjekt(operationen)) continue;
+    if (!eigen(pfad) || !istObjekt(operationen)) continue;
     for (const [methode, operation] of Object.entries(operationen)) {
       const op = operation as OpenApiOperation;
       endpunkte.push({

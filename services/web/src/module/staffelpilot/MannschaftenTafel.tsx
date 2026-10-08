@@ -14,7 +14,7 @@ function meldung(fehler: unknown): string {
  * DFBnet liefert das nicht mit — es wird aus dem Namenszusatz geraten. Ein
  * falscher Schluss fällt nicht laut auf: er ändert still, wessen Einsätze als
  * Stammspieler zählen, und damit prüft eine Regel leise das Falsche. Deshalb
- * steht hier ausdrücklich „geraten" oder „bestätigt", und deshalb lässt sich
+ * steht hier ausdrücklich „geraten“ oder „bestätigt“, und deshalb lässt sich
  * jede Zuordnung von Hand setzen.
  *
  * Sitzt in der Staffelkarte: eine Staffel wird einmal im Jahr eingerichtet,
@@ -80,7 +80,7 @@ export function MannschaftenListe({ staffelId }: { staffelId: string }) {
 
       {mannschaften.length === 0 ? (
         <p className={stil.vorgangHinweis}>
-          Noch keine Mannschaften gemeldet. Sie kommen mit „Saisondaten holen" aus DFBnet
+          Noch keine Mannschaften gemeldet. Sie kommen mit „Saisondaten holen“ aus DFBnet
           — oder über <code>PUT /staffelpilot/staffeln/&lt;id&gt;/mannschaften</code>.
         </p>
       ) : (

@@ -1,14 +1,29 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 
 import stil from "./Knopf.module.css";
 
 type Auspraegung = "primaer" | "sekundaer" | "leise";
 type Groesse = "sm" | "md";
 
-interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface Aussehen {
   auspraegung?: Auspraegung;
   groesse?: Groesse;
   children: ReactNode;
+}
+
+type Props = Aussehen & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">;
+
+type VerweisProps = Aussehen &
+  Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "children"> & { href: string };
+
+function klassen(
+  auspraegung: Auspraegung,
+  groesse: Groesse,
+  className: string | undefined,
+): string {
+  return [stil.knopf, stil[auspraegung], stil[groesse], className]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /**
@@ -27,13 +42,32 @@ export function Knopf({
   children,
   ...rest
 }: Props) {
-  const klassen = [stil.knopf, stil[auspraegung], stil[groesse], className]
-    .filter(Boolean)
-    .join(" ");
-
   return (
-    <button type={type} className={klassen} {...rest}>
+    <button type={type} className={klassen(auspraegung, groesse, className)} {...rest}>
       {children}
     </button>
+  );
+}
+
+/**
+ * Ein Verweis, der aussieht wie ein Knopf - etwa für ein PDF, das in den
+ * Download-Ordner oder den Viewer des Browsers geht. Beides kann die Seite
+ * nicht besser, und ein <a> sagt dem Screenreader ehrlich, dass es dorthin
+ * geht statt etwas auszulösen.
+ *
+ * Vorher baute jedes Artefakt das Aussehen mit eigenen Regeln nach - und
+ * eines griff dabei auf drei Größen zurück, die es nicht gab.
+ */
+export function KnopfVerweis({
+  auspraegung = "sekundaer",
+  groesse = "md",
+  className,
+  children,
+  ...rest
+}: VerweisProps) {
+  return (
+    <a className={klassen(auspraegung, groesse, className)} {...rest}>
+      {children}
+    </a>
   );
 }

@@ -8,40 +8,16 @@
  */
 
 import type { Benutzer } from "./anmeldung";
-import { ApiError } from "./client";
+import { schnittstelle } from "./schnittstelle";
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const AUTH = schnittstelle("/auth");
 
 export interface Einrichtungsstand {
   noetig: boolean;
 }
 
-/** Fehlerformat des Backends (RFC 9457). */
-interface Problem {
-  title?: string;
-  detail?: string;
-}
-
-async function anfrage<T>(init: RequestInit = {}, signal?: AbortSignal): Promise<T> {
-  const antwort = await fetch(`${BASE_URL}/auth/einrichtung`, {
-    ...init,
-    signal: signal ?? null,
-    credentials: "include",
-    headers: { Accept: "application/json", ...init.headers },
-  });
-
-  if (!antwort.ok) {
-    let meldung = `Fehler ${antwort.status}`;
-    try {
-      const problem = (await antwort.json()) as Problem;
-      meldung = problem.detail ?? problem.title ?? meldung;
-    } catch {
-      /* Antwort ohne JSON-Körper - dann bleibt es beim Statuscode */
-    }
-    throw new ApiError(meldung, antwort.status);
-  }
-
-  return (await antwort.json()) as T;
+function anfrage<T>(init: RequestInit = {}, signal?: AbortSignal): Promise<T> {
+  return AUTH.anfrage<T>("/einrichtung", init, signal);
 }
 
 /**

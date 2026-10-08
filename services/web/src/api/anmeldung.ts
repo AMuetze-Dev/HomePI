@@ -8,8 +8,9 @@
  */
 
 import { ApiError } from "./client";
+import { schnittstelle } from "./schnittstelle";
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const AUTH = schnittstelle("/auth");
 
 export type Rolle = "leser" | "nutzer" | "verwalter";
 
@@ -28,35 +29,7 @@ export interface Benutzer {
   passwort_wechseln: boolean;
 }
 
-/** Fehlerformat des Backends (RFC 9457). */
-interface Problem {
-  title?: string;
-  detail?: string;
-}
-
-async function anfrage<T>(pfad: string, init: RequestInit = {}): Promise<T> {
-  const antwort = await fetch(`${BASE_URL}/auth${pfad}`, {
-    ...init,
-    credentials: "include",
-    headers: { Accept: "application/json", ...init.headers },
-  });
-
-  if (!antwort.ok) {
-    // Die Meldung aus problem+json ist für den Benutzer brauchbar,
-    // "HTTP 401" wäre es nicht.
-    let meldung = `Fehler ${antwort.status}`;
-    try {
-      const problem = (await antwort.json()) as Problem;
-      meldung = problem.detail ?? problem.title ?? meldung;
-    } catch {
-      /* Antwort ohne JSON-Körper - dann bleibt es beim Statuscode */
-    }
-    throw new ApiError(meldung, antwort.status);
-  }
-
-  if (antwort.status === 204) return undefined as T;
-  return (await antwort.json()) as T;
-}
+const { anfrage } = AUTH;
 
 export function anmelden(name: string, passwort: string): Promise<Benutzer> {
   return anfrage<Benutzer>("/anmelden", {
@@ -92,7 +65,7 @@ export function aenderePasswort(altes: string, neues: string): Promise<void> {
  * nicht wie "nicht angemeldet" aussehen.
  */
 export async function holeIch(signal?: AbortSignal): Promise<Benutzer | null> {
-  const antwort = await fetch(`${BASE_URL}/auth/ich`, {
+  const antwort = await fetch(AUTH.adresse("/ich"), {
     signal: signal ?? null,
     credentials: "include",
     headers: { Accept: "application/json" },

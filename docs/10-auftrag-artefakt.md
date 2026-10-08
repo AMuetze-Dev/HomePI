@@ -222,8 +222,14 @@ make tdd-web N=<kennung>
 ```
 
 **Nur Tokens**, keine festen Werte. Jede Farbe und jeder Abstand kommt aus
-`services/web/src/styles/tokens.css`. Bausteine aus `src/ui`: `Knopf`, `Karte`,
-`Feld`, `Etikett`, `Hinweis`, `Leerzustand`, `Platzhalter`.
+`services/web/src/styles/tokens.css`. Bausteine aus `src/ui`: `Knopf`,
+`KnopfVerweis`, `Karte`, `Feld`, `Etikett`, `Hinweis`, `Leerzustand`,
+`Platzhalter`. `pruefungen/gestaltung.test.ts` lehnt unbekannte Variablen und
+feste Farbwerte ab — auch in deinem CSS.
+
+**Kein eigenes `fetch`.** `api.ts` holt sich mit `schnittstelle("/<kennung>")`
+aus `src/api/schnittstelle.ts`, was jedes Artefakt braucht: Sitzungscookie,
+JSON, Fehlermeldung aus problem+json. Darin stehen nur noch Pfade und Typen.
 
 Vier Zustände, alle Pflicht:
 

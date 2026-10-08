@@ -120,6 +120,22 @@ describe("fetchEndpunkte", () => {
     ]);
   });
 
+  it("nimmt kein Modul, dessen Name nur genauso anfängt", async () => {
+    // "/staffel" ist ein anderes Artefakt als "/staffelpilot". Ein blosser
+    // Präfixvergleich zeigte dem einen die Schnittstelle des anderen.
+    antworteMit({
+      paths: {
+        "/staffel": { get: { summary: "Eigen" } },
+        "/staffel/{id}": { get: { summary: "Eigen" } },
+        "/staffelpilot/": { get: { summary: "Fremd" } },
+      },
+    });
+
+    const endpunkte = await fetchEndpunkte("/staffel");
+
+    expect(endpunkte.map((e) => e.beschreibung)).toEqual(["Eigen", "Eigen"]);
+  });
+
   it("nimmt summary, sonst description, sonst nichts", async () => {
     antworteMit(schema);
 
