@@ -127,21 +127,38 @@ net.ipv6.conf.default.accept_ra = 0
 net.ipv6.conf.all.autoconf = 0
 net.ipv6.conf.default.autoconf = 0
 EOF
-for iface in $(ls /sys/class/net | grep -E '^(eth|wlan|en|wl)'); do
+
+# Die echten Netzschnittstellen - Kabel und Funk, ohne lo, docker0 und die
+# veth-Paare der Container. Globs statt "ls | grep": ls ist fuer Menschen
+# gemacht, nicht zum Weiterverarbeiten. "wl*" deckt wlan* mit ab.
+netz_schnittstellen() {
+    local pfad
+    for pfad in /sys/class/net/eth* /sys/class/net/en* /sys/class/net/wl*; do
+        [ -e "$pfad" ] && printf '%s\n' "${pfad##*/}"
+    done
+}
+
+for iface in $(netz_schnittstellen); do
     printf 'net.ipv6.conf.%s.accept_ra = 0\nnet.ipv6.conf.%s.autoconf = 0\n' \
         "$iface" "$iface" >> /etc/sysctl.d/99-kein-globales-ipv6.conf
 done
 sysctl -q --load=/etc/sysctl.d/99-kein-globales-ipv6.conf
 
 # DHCPv6 laeuft an accept_ra vorbei - deshalb zusaetzlich am Profil.
-for conn in $(nmcli -g NAME connection show 2>/dev/null); do
+#
+# Zeilenweise lesen, nicht "for conn in $(...)": Verbindungsnamen enthalten
+# Leerzeichen ("netplan-wlan0-Wi-Fight Club"). Die for-Schleife zerlegte den
+# Namen in zwei Woerter, beide Aufrufe scheiterten still am "|| true" - und
+# ausgerechnet das WLAN-Profil blieb, wie es war.
+while IFS= read -r conn; do
+    [ -n "$conn" ] || continue
     case "$(nmcli -g connection.type connection show "$conn" 2>/dev/null)" in
         802-3-ethernet|802-11-wireless)
             nmcli connection modify "$conn" ipv6.method link-local 2>/dev/null || true
             ;;
     esac
-done
-for iface in $(ls /sys/class/net | grep -E '^(eth|wlan|en|wl)'); do
+done < <(nmcli -g NAME connection show 2>/dev/null)
+for iface in $(netz_schnittstellen); do
     nmcli device reapply "$iface" >/dev/null 2>&1 || true
     ip -6 addr flush dev "$iface" scope global 2>/dev/null || true
 done
