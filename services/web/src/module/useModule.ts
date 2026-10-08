@@ -68,10 +68,39 @@ export function manifestVerwerfen() {
   verteile({ phase: "laedt" });
 }
 
+/**
+ * Alles, wovon das Manifest abhängt - und nichts darüber hinaus.
+ *
+ * Nur die Kennung reichte nicht: Bis zum Passwortwechsel behandelt das
+ * Backend ein Konto beim Manifest wie einen Besucher und liefert es leer.
+ * Nach dem Wechsel ist es dieselbe Kennung - und die Übersicht blieb mit dem
+ * alten, leeren Stand stehen. Dasselbe gilt, wenn ein Verwalter Rechte
+ * vergibt.
+ *
+ * Das ganze Benutzerobjekt wäre umgekehrt zu viel: Es ist bei jedem Abruf
+ * neu, und jeder Seitenwechsel holte das Manifest dann ein zweites Mal.
+ * Deshalb ein Schlüssel aus dem INHALT, mit sortierten Rechten, damit die
+ * Reihenfolge im JSON keine Rolle spielt.
+ */
+function schluesselFuer(
+  anmeldung: string,
+  benutzer: {
+    id: string;
+    passwort_wechseln?: boolean;
+    rechte: Record<string, string>;
+  } | null,
+): string {
+  if (!benutzer) return `${anmeldung}:-`;
+  const rechte = Object.entries(benutzer.rechte)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([artefakt, rolle]) => `${artefakt}=${rolle}`)
+    .join(",");
+  return `${anmeldung}:${benutzer.id}:${benutzer.passwort_wechseln ? "wechsel" : "frei"}:${rechte}`;
+}
+
 export function useModule(): Zustand {
   const { zustand: anmeldung, benutzer } = useAnmeldung();
-  // Nicht das ganze Objekt: es ist bei jedem Abruf neu, die Kennung nicht.
-  const benutzerId = benutzer?.id ?? null;
+  const fuer = schluesselFuer(anmeldung, benutzer);
   const [zustand, setZustand] = useState<Zustand>(stand);
 
   useEffect(() => {
@@ -79,7 +108,6 @@ export function useModule(): Zustand {
     // Manifest zweimal - einmal anonym, einmal angemeldet.
     if (anmeldung === "laedt") return undefined;
 
-    const fuer = `${anmeldung}:${benutzerId ?? "-"}`;
     horcher.add(setZustand);
 
     if (schluessel !== fuer) {
@@ -95,7 +123,7 @@ export function useModule(): Zustand {
     return () => {
       horcher.delete(setZustand);
     };
-  }, [anmeldung, benutzerId]);
+  }, [anmeldung, fuer]);
 
   return anmeldung === "laedt" ? { phase: "laedt" } : zustand;
 }

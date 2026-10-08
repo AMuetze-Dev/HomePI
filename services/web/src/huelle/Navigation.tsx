@@ -35,16 +35,18 @@ export function Navigation({ beiAuswahl }: Props) {
   const offenesModul = treffer?.params.id ?? "";
 
   return (
-    <nav className={stil.navigation} aria-label="Artefakte">
+    // "Hauptnavigation" und nicht "Artefakte": Die Startseite hat bereits
+    // eine Liste dieses Namens. Zwei gleichnamige Bereiche auf derselben
+    // Seite sagt ein Screenreader zweimal an, und jede Suche nach der
+    // Kachel trifft doppelt - die Oberflächentests sind daran gescheitert.
+    <nav className={stil.navigation} aria-label="Hauptnavigation">
       <NavLink
         to="/"
         end
         className={({ isActive }) => (isActive ? stil.eintragAktiv : stil.eintrag)}
         onClick={beiAuswahl}
       >
-        <span className={stil.zeichen} aria-hidden="true">
-          ◆
-        </span>
+        <Zeichen>◆</Zeichen>
         Übersicht
       </NavLink>
 
@@ -58,10 +60,11 @@ export function Navigation({ beiAuswahl }: Props) {
 
       {zustand.phase === "fertig" && zustand.module.length > 0 && (
         <>
-          <p className={stil.gruppe} id="nav-artefakte">
-            Artefakte
-          </p>
-          <ul className={stil.liste} aria-labelledby="nav-artefakte">
+          {/* Die Beschriftung ist sichtbar, benennt die Liste aber bewusst
+              NICHT - aus demselben Grund wie oben. Innerhalb der
+              Hauptnavigation ist ohnehin klar, was die Liste enthält. */}
+          <p className={stil.gruppe}>Artefakte</p>
+          <ul className={stil.liste}>
             {zustand.module.map((modul) => (
               <li key={modul.id}>
                 <Eintrag
@@ -96,9 +99,7 @@ function Eintrag({
         className={({ isActive }) => (isActive ? stil.eintragAktiv : stil.eintrag)}
         onClick={beiAuswahl}
       >
-        <span className={stil.zeichen} aria-hidden="true">
-          {modul.icon || modul.titel.slice(0, 1)}
-        </span>
+        <Zeichen>{monogramm(modul.titel)}</Zeichen>
         <span className={stil.wort}>{modul.titel}</span>
         {/* Der Punkt ist Dekoration, das Wort trägt die Bedeutung. Nur
             farbig markiert käme die Störung weder bei einem Screenreader
@@ -131,5 +132,26 @@ function Eintrag({
         </ul>
       )}
     </>
+  );
+}
+
+/**
+ * Der Anfangsbuchstabe des Titels, nicht das Feld "icon" aus dem Manifest.
+ *
+ * "icon" enthält einen Symbolnamen wie "steckdose" oder "schluessel" - für
+ * eine Symbolbibliothek gedacht, die es in dieser Oberfläche nicht gibt. Als
+ * Text in das Kästchen gesetzt, lief das Wort heraus und lag über dem Titel.
+ * Der Anfangsbuchstabe passt immer, und er ist für jedes Artefakt gleich
+ * gebaut - kein Artefakt sieht anders aus, nur weil es ein Feld befüllt hat.
+ */
+function monogramm(titel: string): string {
+  return (titel.trim()[0] ?? "?").toLocaleUpperCase("de");
+}
+
+function Zeichen({ children }: { children: string }) {
+  return (
+    <span className={stil.zeichen} aria-hidden="true">
+      {children}
+    </span>
   );
 }

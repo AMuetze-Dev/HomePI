@@ -338,27 +338,26 @@ jobs:
           done
           exit 1
 
+      # Die Oberflaechentests laufen ueber "make e2e" - und zwar genau so wie
+      # lokal, nicht nachgebaut. Dieser Job hatte den Ablauf frueher selbst
+      # aufgeschrieben und war dabei vom Makefile abgedriftet:
+      #
+      #   * EINE Umgebung fuer beide Reisen. Beide beginnen aber bei der
+      #     Ersteinrichtung; die zweite fand die Installation schon
+      #     eingerichtet vor und scheiterte an der fehlenden Maske.
+      #   * KEIN Konto fuer den Pruefdienst. Er bekam 401 und der Prueflauf
+      #     wartete auf einen Dienst, der nicht durfte.
+      #
+      # Beides stand richtig im Makefile. Zwei Fassungen desselben Ablaufs
+      # laufen auseinander - deshalb jetzt nur noch eine. "make e2e" bringt je
+      # Reise eine eigene, frische Umgebung mit und raeumt danach ab; die
+      # Entwicklungsumgebung fuer die Rauchtests unten bleibt davon getrennt
+      # (eigenes Compose-Projekt, eigene Ports).
+      - name: Oberflaechentests
+        run: make e2e
+
       - name: Entwicklungsumgebung hochfahren
         run: docker compose -f compose.dev.yml up -d --build --wait --wait-timeout 300
-
-      # Erst die Oberflaechentests: sie brauchen eine Installation ohne
-      # Verwalter, weil sie bei der Ersteinrichtung anfangen. Danach legt der
-      # Schritt darunter das Rauchtest-Konto an.
-      - name: Einrichtungstoken aus dem Log holen
-        # Es steht dort, sobald das Gateway ohne Verwalter startet - und nur
-        # wer das Log lesen kann, kommt an die Ersteinrichtung.
-        run: |
-          docker compose -f compose.dev.yml logs gateway > gateway.log
-          token=$(sed -n 's/.*Einrichtungstoken:[[:space:]]*//p' gateway.log | tail -1 | tr -d '\r')
-          test -n "$token" || { echo "::error::kein Einrichtungstoken im Log"; exit 1; }
-          echo "EINRICHTUNGSTOKEN=$token" >> "$GITHUB_ENV"
-
-      - name: Oberflaechentests
-        working-directory: services/web
-        run: npm run test:e2e
-        env:
-          E2E_URL: http://127.0.0.1:5173
-          E2E_EINRICHTUNGSTOKEN: ${{ env.EINRICHTUNGSTOKEN }}
 
       - uses: actions/upload-artifact@v4
         if: failure()

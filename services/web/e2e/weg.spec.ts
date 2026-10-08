@@ -10,7 +10,9 @@ import { expect, test, type Page } from "@playwright/test";
  * sonst selbst nicht.
  */
 function artefakt(page: Page, name: string | RegExp) {
-  return page.getByRole("navigation", { name: "Artefakte" }).getByRole("link", { name });
+  return page
+    .getByRole("navigation", { name: "Hauptnavigation" })
+    .getByRole("link", { name });
 }
 
 /**
@@ -91,6 +93,64 @@ test.describe("Der Weg einer frischen Installation", () => {
     await expect(kacheln.getByRole("link", { name: /Verwaltung/ })).toBeVisible();
     // Auf "geraete" hat sie kein Recht - das Artefakt existiert für sie nicht.
     await expect(kacheln.getByRole("link", { name: /Geräte/ })).toHaveCount(0);
+  });
+
+  test("in der Leiste liegt nichts über etwas anderem", async ({ page }) => {
+    // Auf dem Pi stand in der Leiste "steckdose" über "Geräte" und
+    // "schluessel" über "Verwaltung": Das Manifest liefert Symbolnamen, die
+    // Leiste setzte sie als Text in ein 20-px-Feld, und das Wort lief heraus.
+    // Kein Komponententest hat das gesehen - dort gibt es kein Layout, und
+    // die Testdaten hatten kein Symbol.
+    //
+    // Deshalb hier, im echten Browser mit dem echten Manifest, zwei Fragen
+    // an jeden Verweis der Leiste:
+    //   1. Überschneiden sich zwei seiner Bestandteile?
+    //   2. Ragt der Inhalt eines Bestandteils aus dessen eigenem Kasten -
+    //      ohne dass das gewollt ist? Gewollt ist es nur mit Auslassungs-
+    //      zeichen, also bei einem zu langen Namen.
+    await anmelden(page, VERWALTERIN.name, VERWALTERIN.passwort);
+
+    const verweise = page
+      .getByRole("navigation", { name: "Hauptnavigation" })
+      .getByRole("link");
+    await expect(verweise.first()).toBeVisible();
+
+    const funde = await verweise.evaluateAll((links) =>
+      links.flatMap((link) => {
+        const name = (link.textContent ?? "").trim();
+        // Bestandteile mit Fläche. Der Text für Screenreader ist absichtlich
+        // 1 × 1 px groß und gehört nicht zum Sichtbaren.
+        const teile = Array.from(link.children).filter((k) => {
+          const r = k.getBoundingClientRect();
+          return r.width > 1 && r.height > 1;
+        });
+        const ergebnis: string[] = [];
+
+        for (let i = 0; i < teile.length; i++) {
+          for (let j = i + 1; j < teile.length; j++) {
+            const a = teile[i]!.getBoundingClientRect();
+            const b = teile[j]!.getBoundingClientRect();
+            const waagerecht = a.left < b.right - 0.5 && b.left < a.right - 0.5;
+            const senkrecht = a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+            if (waagerecht && senkrecht)
+              ergebnis.push(`${name}: Teile überschneiden sich`);
+          }
+        }
+
+        for (const teil of teile) {
+          const stil = getComputedStyle(teil);
+          const laeuftUeber = teil.scrollWidth > teil.clientWidth + 1;
+          if (laeuftUeber && stil.textOverflow !== "ellipsis") {
+            ergebnis.push(
+              `${name}: "${(teil.textContent ?? "").trim()}" passt nicht hinein`,
+            );
+          }
+        }
+        return ergebnis;
+      }),
+    );
+
+    expect(funde).toEqual([]);
   });
 
   test("ein neues Konto braucht nur einen Namen", async ({ page }) => {

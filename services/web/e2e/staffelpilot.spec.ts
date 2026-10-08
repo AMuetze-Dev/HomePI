@@ -10,7 +10,9 @@ import { expect, test, type Page } from "@playwright/test";
  * sonst selbst nicht.
  */
 function artefakt(page: Page, name: string | RegExp) {
-  return page.getByRole("navigation", { name: "Artefakte" }).getByRole("link", { name });
+  return page
+    .getByRole("navigation", { name: "Hauptnavigation" })
+    .getByRole("link", { name });
 }
 
 /**
@@ -153,6 +155,25 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
     // Die Spielgemeinschaft muss als "prüfen" dastehen - dafür gibt es die
     // Ansicht.
     await expect(mannschaften.getByText("prüfen").first()).toBeVisible();
+  });
+
+  test("die Testumgebung nimmt erfundene Spiele an", async ({ page }) => {
+    // Hier gibt es kein DFBnet - der Prüfdienst erfindet seine Spiele. Seit
+    // das Artefakt seine Liste selbst hütet, weist es solche Läufe ab
+    // ("Beispieldaten sind nicht erlaubt", 409), solange niemand das
+    // ausdrücklich erlaubt. Genau das tut ein Staffelleiter, der das Programm
+    // zum Durchklicken ausprobiert - und genau das tut deshalb diese Reise.
+    // Ohne diesen Schritt wartet der nächste dreißig Sekunden auf einen Lauf,
+    // der nie ankommt.
+    await zuStaffelpilot(page);
+    await bereich(page, "Einstellungen").click();
+
+    const schalter = page.getByRole("checkbox", { name: /Beispieldaten annehmen/ });
+    await schalter.check();
+    await page.getByRole("button", { name: "Speichern" }).click();
+
+    await expect(page.getByText("Gespeichert.")).toBeVisible();
+    await expect(schalter).toBeChecked();
   });
 
   test("ein Prüflauf bringt Spielberichte", async ({ page }) => {

@@ -231,10 +231,10 @@ function Beispieldaten({
         <span className={stil.schalterText}>
           <span>Beispieldaten annehmen</span>
           <span className={stil.wahlName}>
-            Der Prüfdienst kann zu jeder Staffel Spiele erfinden, statt DFBnet zu
-            lesen — zum Durchklicken. Ausgeschaltet weist das Programm einen
-            solchen Lauf ganz ab, statt die erfundenen Spiele zwischen die echten
-            zu lassen. Aus dieser Liste entstehen Mahnungen.
+            Der Prüfdienst kann zu jeder Staffel Spiele erfinden, statt DFBnet zu lesen —
+            zum Durchklicken. Ausgeschaltet weist das Programm einen solchen Lauf ganz ab,
+            statt die erfundenen Spiele zwischen die echten zu lassen. Aus dieser Liste
+            entstehen Mahnungen.
           </span>
         </span>
       </label>
@@ -242,8 +242,8 @@ function Beispieldaten({
       {stand !== null && stand.anzahl > 0 && (
         <Hinweis ton="warnung">
           In den Listen stehen {stand.anzahl} erfundene{" "}
-          {stand.anzahl === 1 ? "Spiel" : "Spiele"}. Echte Spiele bleiben beim
-          Entfernen stehen.
+          {stand.anzahl === 1 ? "Spiel" : "Spiele"}. Echte Spiele bleiben beim Entfernen
+          stehen.
           <div className={stil.knoepfe}>
             <Knopf groesse="sm" onClick={() => void aufraeumen()} disabled={laeuft}>
               {laeuft ? "Entfernt …" : "Beispieldaten entfernen"}

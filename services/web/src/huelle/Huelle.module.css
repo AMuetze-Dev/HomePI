@@ -25,13 +25,30 @@
   width: min(var(--breite-navigation), 82vw);
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Duenn und erst beim Zeigen sichtbar. Der Standardbalken von Windows -
+     grau, breit, mit Pfeil oben - stand dauerhaft neben der Leiste, sobald
+     neun Bereiche nicht mehr in die Hoehe passten, und sah aus wie ein
+     Fehler. Gescrollt wird trotzdem wie immer; nur der Balken haelt sich
+     zurueck, bis jemand die Leiste benutzt. */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition:
+    scrollbar-color var(--dauer-schnell) var(--verlauf),
+    transform var(--dauer-normal) var(--verlauf),
+    visibility var(--dauer-normal) var(--verlauf);
   background: var(--farbe-flaeche);
   border-right: 1px solid var(--farbe-rand);
   transform: translateX(-100%);
   visibility: hidden;
-  transition:
-    transform var(--dauer-normal) var(--verlauf),
-    visibility var(--dauer-normal) var(--verlauf);
+}
+
+/* Beim Zeigen, beim Scrollen mit Tastatur oder Rad: dann soll man sehen,
+   wo man ist. */
+.leiste:hover,
+.leiste:focus-within,
+.leisteOffen:hover,
+.leisteOffen:focus-within {
+  scrollbar-color: var(--farbe-rand-stark) transparent;
 }
 
 .leisteOffen {
