@@ -287,7 +287,7 @@ wäre danach nicht mehr erreichbar. Und erst prüfen, dass `eth0` die Standardro
 
 ### Mediathek: Filme ablegen, Fernseher sieht nichts
 
-Die Dateifreigabe liegt unter `\192.168.0.95\Medien` (Benutzer `aaron`,
+Die Dateifreigabe liegt unter `\\192.168.0.95\Medien` (Benutzer `aaron`,
 Passwort einmalig mit `sudo smbpasswd -a aaron` setzen). Darunter `Filme`,
 `Serien`, `Kinderfilme`.
 
