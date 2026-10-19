@@ -2,9 +2,15 @@ name: dns
 
 services:
   pihole:
-    # Nach der ersten erfolgreichen Installation auf den konkreten Tag pinnen,
-    # z.B. pihole/pihole:2025.08.0 - "latest" macht bei Major-Upgrades Ueberraschungen.
-    image: pihole/pihole:latest
+    # Fester Tag, kein "latest": Dieser Container ist das DNS der ganzen
+    # Wohnung. Ein Major-Upgrade, das beim naechsten "docker compose pull"
+    # unangekuendigt mitkommt, legt im Zweifel das Netz lahm - und zwar so,
+    # dass die Fehlersuche selbst kein DNS mehr hat.
+    #
+    # Angelernt am 19.10.2026 mit Core v6.5 / Web v6.6.1 / FTL v6.8.
+    # Hochziehen heisst: Tag aendern, pull, up -d, danach "dig @127.0.0.1
+    # example.com" und eine geblockte Domain pruefen.
+    image: pihole/pihole:2026.10.0
     container_name: pihole
     hostname: pihole
     restart: unless-stopped
