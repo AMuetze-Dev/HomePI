@@ -20,7 +20,7 @@ help:
 # ---------------------------------------------------------------- Lifecycle
 
 ## up: alle Stacks starten (Reihenfolge beachtet Abhaengigkeiten)
-up: render up-core up-dns up-data up-home up-apps
+up: render up-core up-dns up-data up-home up-media up-apps
 
 ## up-core: Traefik, Dozzle, Uptime-Kuma
 up-core: render
@@ -37,6 +37,10 @@ up-data:
 ## up-home: Home Assistant, Mosquitto
 up-home:
 	$(DC) -f stacks/home/docker-compose.yml up -d
+
+## up-media: Jellyfin - die Mediathek im eigenen Netz
+up-media: render
+	$(DC) -f stacks/media/docker-compose.yml up -d
 
 ## up-apps: Python-Backend + React-Frontend
 up-apps:

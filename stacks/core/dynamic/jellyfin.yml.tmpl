@@ -1,0 +1,28 @@
+# Jellyfin laeuft im Host-Netz (wegen DLNA) und ist deshalb kein
+# Docker-Provider-Ziel. Es wird ueber den File-Provider als externer Service
+# eingebunden - dasselbe Muster wie bei Home Assistant.
+#
+# Voraussetzung: UFW laesst 172.18.10.0/24 (edge) auf 8096 zu. Legt
+# 10-os-bootstrap.sh an. Ohne die Regel laeuft der Aufruf in eine
+# Zeitueberschreitung, und zwar ohne Fehlermeldung - Traefik wartet nur.
+#
+# "lan-only": Die Mediathek gehoert ins eigene Netz. Sie von aussen
+# erreichbar zu machen hiesse, Filme ins Internet zu stellen - genau das,
+# was hier nicht gewollt ist.
+
+http:
+  routers:
+    jellyfin:
+      rule: "Host(`filme.${DOMAIN}`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - lan-only@file
+      service: jellyfin
+
+  services:
+    jellyfin:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://host.docker.internal:8096"

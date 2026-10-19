@@ -285,6 +285,25 @@ Bewusst nicht in `scripts/10-os-bootstrap.sh`: Ein Pi, der nur per WLAN angebund
 wäre danach nicht mehr erreichbar. Und erst prüfen, dass `eth0` die Standardroute hat
 (`ip -4 route show default`) — sonst sägt man den Ast ab, auf dem die SSH-Sitzung sitzt.
 
+### Mediathek: Filme ablegen, Fernseher sieht nichts
+
+Die Dateifreigabe liegt unter `\192.168.0.95\Medien` (Benutzer `aaron`,
+Passwort einmalig mit `sudo smbpasswd -a aaron` setzen). Darunter `Filme`,
+`Serien`, `Kinderfilme`.
+
+Findet der Samsung-Fernseher den Server nicht, liegt es fast immer an einem
+von drei Dingen:
+
+| Prüfung | Befehl |
+|---|---|
+| Läuft Jellyfin? | `curl -s localhost:8096/health` muss `Healthy` sagen |
+| Hört er im Host-Netz? | `ss -tulpn \| grep 8096` - ohne Host-Netz kein DLNA |
+| Ist DLNA an? | Jellyfin → Dashboard → Plugins → DLNA, danach Neustart |
+
+DLNA findet den Server per Multicast. Das überquert **keine** Docker-Brücke:
+Liefe Jellyfin in `edge` statt im Host-Netz, wäre er für den Fernseher
+unsichtbar - und zwar ohne jede Fehlermeldung, er taucht einfach nicht auf.
+
 ### Platte läuft voll
 
 ```bash

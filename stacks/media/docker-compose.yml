@@ -1,0 +1,55 @@
+name: media
+
+# Filme im eigenen Netz. Kein Konto, kein Abo, keine Cloud - der Grund,
+# warum hier Jellyfin steht und nicht Plex: Plex verlangt für mehrere
+# Funktionen eine Anmeldung bei plex.tv, und damit liefe ein Teil der
+# Mediathek über fremde Server.
+#
+# WARUM HOST-NETZ UND NICHT "edge"
+#
+# Ein Samsung-Fernseher hat keine Jellyfin-App im Store. Der Weg zum
+# Bildschirm führt deshalb über DLNA - und DLNA findet den Server per
+# Multicast im lokalen Netz. Multicast überquert keine Docker-Bridge; in
+# "edge" wäre der Server für den Fernseher schlicht unsichtbar.
+#
+# Dieselbe Entscheidung wie bei Home Assistant, aus demselben Grund, und
+# mit derselben Folge: Traefik erreicht den Dienst nicht über Container-DNS,
+# sondern über host.docker.internal. Die Route steht in
+# stacks/core/dynamic/jellyfin.yml.
+#
+# UMWANDELN IN ECHTZEIT KANN DIESER PI NICHT
+#
+# Dem Pi 5 fehlt ein brauchbarer Video-Encoder. Solange das Abspielgerät
+# das Format direkt versteht - bei MP4/MKV mit H.264 der Normalfall -,
+# reicht die Maschine locker. Muss Jellyfin ein 4K-Video in Echtzeit
+# umrechnen, ruckelt es, und daran ändert keine Einstellung etwas. Die
+# Lösung heißt dann: Datei im passenden Format ablegen.
+
+services:
+  jellyfin:
+    # Fester Tag, kein "latest" - dieselbe Begründung wie bei Pi-hole:
+    # Ein Major-Upgrade, das beim nächsten pull unangekündigt mitkommt,
+    # kann die Bibliothek umbauen.
+    image: jellyfin/jellyfin:12.2
+    container_name: jellyfin
+    restart: unless-stopped
+    network_mode: host
+    user: "${PUID}:${PGID}"
+    environment:
+      TZ: ${TZ}
+      # Damit Jellyfin in Einladungen und Clients die richtige Adresse
+      # nennt und nicht die Container-IP.
+      JELLYFIN_PublishedServerUrl: "https://filme.${DOMAIN}"
+    volumes:
+      - ${DATA_ROOT}/jellyfin/config:/config
+      - ${DATA_ROOT}/jellyfin/cache:/cache
+      # Nur lesen. Gelöscht und einsortiert wird über die Dateifreigabe,
+      # nicht aus der Mediathek heraus - ein verklickter Löschbefehl in
+      # einer Oberfläche, die die Tochter bedient, wäre sonst endgültig.
+      - ${MEDIEN_ROOT}:/medien:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8096/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s

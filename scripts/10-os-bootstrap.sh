@@ -64,6 +64,13 @@ ufw allow from "${LAN_CIDR}" to any port 8099  proto tcp comment 'Zigbee2MQTT'
 # Bruecke, also aus dem edge-Netz (30-create-networks.sh) und NICHT aus dem
 # LAN - ohne diese Regel endet https://ha.<DOMAIN> in einer Zeitueberschreitung.
 ufw allow from 172.18.10.0/24 to any port 8123 proto tcp comment 'Traefik -> Home Assistant'
+# Jellyfin laeuft aus demselben Grund im Host-Netz wie Home Assistant: DLNA
+# findet den Server per Multicast, und Multicast ueberquert keine
+# Docker-Bruecke. Also dieselbe Regel noch einmal, nur fuer seinen Port.
+ufw allow from 172.18.10.0/24 to any port 8096 proto tcp comment 'Traefik -> Jellyfin'
+ufw allow from "${LAN_CIDR}" to any port 8096 proto tcp comment 'Jellyfin direkt'
+# Dateifreigabe fuer die Mediathek. Filme legt man nicht per scp ab.
+ufw allow from "${LAN_CIDR}" to any port 445 proto tcp comment 'Dateifreigabe (SMB)'
 ufw --force enable
 # Hinweis: UFW und Dockers eigene iptables-Regeln greifen unabhaengig voneinander.
 # Published Ports umgehen UFW. Deshalb sind hier alle Ports ausser 53/80/443
