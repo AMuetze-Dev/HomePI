@@ -66,6 +66,8 @@ from .schemas import (
     StaffelAendern,
     StaffelAnlegen,
     StaffelAusgabe,
+    StaffelnAusDfbnet,
+    StaffelnUebernommen,
     UebertragungAbschluss,
     UebertragungAusgabe,
     UebertragungEinreihen,
@@ -676,6 +678,26 @@ def _regel(r: Regel, eigener: Regeltext | None = None) -> RegelAusgabe:
 async def regeln(sitzung: DbSitzung) -> list[RegelAusgabe]:
     eigene = await speicher.regeltexte(sitzung)
     return [_regel(r, eigene.get(r.schluessel)) for r in await speicher.regeln(sitzung)]
+
+
+@router.put(
+    "/staffeln/aus-dfbnet",
+    summary="Die eigenen Staffeln aus DFBnet uebernehmen",
+    dependencies=[erfordert("staffelpilot", Rolle.VERWALTER)],
+)
+async def staffeln_aus_dfbnet(daten: StaffelnAusDfbnet, sitzung: DbSitzung) -> StaffelnUebernommen:
+    """Was DFBnet unter „Eigene Staffeln" fuehrt, hierher.
+
+    Das ersetzt das Abschreiben von Hand -- und genau daran war die Prüfung
+    gescheitert: eine Spielklasse, die DFBnet nicht kennt, und eine
+    Altersklasse, die nicht zur Mannschaftsart passte.
+
+    Abgeglichen wird über die Kennung, dann über den Namen, dann über die
+    Spielklasse. **Gelöscht wird nichts**, und `aktiv` bleibt, wie es war: ob
+    eine Staffel mitläuft, entscheidet der Staffelleiter und nicht DFBnet.
+    """
+    angelegt, aktualisiert, namen = await speicher.staffeln_aus_dfbnet(sitzung, daten)
+    return StaffelnUebernommen(angelegt=angelegt, aktualisiert=aktualisiert, namen=namen)
 
 
 @router.put("/regeln", summary="Den Regelkatalog einspielen")

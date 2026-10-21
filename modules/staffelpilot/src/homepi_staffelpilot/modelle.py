@@ -44,6 +44,16 @@ class Staffel(Base, ZeitstempelMixin):
     # Gericht. Leer heisst: kein Fall anlegbar -- und das sagt die
     # Fallanlage, statt vor einem falschen Gericht eines zu eroeffnen.
     sportgericht: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    # Die Nummer, unter der DFBnet diese Staffel fuehrt ("633203").
+    #
+    # Das einzig Stabile an einer Staffel: die Bezeichnung traegt einen
+    # Sponsornamen und wechselt mit ihm, die Spielklasse heisst in zwei Masken
+    # verschieden. Ueber die Kennung findet ein zweiter Abgleich dieselbe
+    # Staffel wieder, statt eine zweite anzulegen.
+    #
+    # Leer bei allem, was von Hand angelegt wurde -- deshalb nicht `unique`:
+    # zwei leere waeren sonst ein Konflikt.
+    dfbnet_kennung: Mapped[str] = mapped_column(String(20), nullable=False, default="", index=True)
     aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     spiele: Mapped[list[Spielbericht]] = relationship(

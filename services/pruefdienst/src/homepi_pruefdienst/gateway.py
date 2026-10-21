@@ -135,6 +135,16 @@ class Gateway:
         """
         return self._json("GET", f"/staffelpilot/vorgaenge/{vorgang_id}")  # type: ignore[no-any-return]
 
+    def staffeln_aus_dfbnet(self, staffeln: list[dict[str, Any]]) -> dict[str, Any]:
+        """Die Liste "Eigene Staffeln" ins Artefakt.
+
+        Dort wird abgeglichen und nichts geloescht; was hier ankommt, ist die
+        Liste, wie DFBnet sie fuehrt.
+        """
+        return self._json(  # type: ignore[no-any-return]
+            "PUT", "/staffelpilot/staffeln/aus-dfbnet", json={"staffeln": staffeln}
+        )
+
     def regeln(self) -> list[dict[str, Any]]:
         """Der Regelkatalog, wie er im Artefakt steht -- mit den Schaltern."""
         return self._json("GET", "/staffelpilot/regeln")  # type: ignore[no-any-return]

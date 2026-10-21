@@ -47,6 +47,10 @@ class Leser(Protocol):
         """Einen Sportgerichtsfall anlegen und sein Aktenzeichen melden."""
         ...
 
+    def eigene_staffeln(self, saison: str, verband: str = "") -> list[dict[str, object]]:
+        """Die Staffeln, die diesem Konto gehoeren."""
+        ...
+
     def schliessen(self) -> None: ...
 
 
@@ -73,6 +77,7 @@ class DemoLeser:
         self.sichtbar = False
         self.freigegeben: list[str] = []
         self.faelle: list[fallanlage.Anlage] = []
+        self._eigene_staffeln: list[dict[str, object]] = []
 
     def anmelden(self, benutzer: str, passwort: str) -> None:
         # Das Passwort wird bewusst nicht gemerkt: auch ein Demo-Leser soll
@@ -98,6 +103,14 @@ class DemoLeser:
 
     def mannschaften(self, staffel: Staffelkennung, verband: str = "") -> list[dict[str, object]]:
         return self._mannschaften.get(staffel.name, [])
+
+    def eigene_staffeln(self, saison: str, verband: str = "") -> list[dict[str, object]]:
+        """Die Staffeln, die ihm mitgegeben wurden -- erfunden wird keine.
+
+        Eine erfundene Staffel waere schlimmer als keine: aus ihr entstuenden
+        Spiele, die es nie gab, und aus denen Mahnungen.
+        """
+        return list(self._eigene_staffeln)
 
     def freigeben(self, kennung: str) -> tuple[bool, str]:
         """Der Demo-Leser traegt nichts ein und sagt das auch.

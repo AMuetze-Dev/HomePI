@@ -232,6 +232,27 @@ Ein Kreuz wird nur gesetzt, wo der Verband einen Tatbestand vorsieht
 Zuordnung bekommt keins. Ein geratenes Kreuz behauptete etwas, das niemand
 geprueft hat.
 
+### Die eigenen Staffeln
+
+`PUT /staffeln/aus-dfbnet` uebernimmt, was DFBnet unter "Eigene Staffeln"
+fuehrt. Das ersetzt das Abschreiben von Hand -- und genau daran war die
+Pruefung gescheitert: eine Spielklasse "Stadtliga C", die DFBnet nicht kennt,
+und ein Name, der nicht in der Meisterschaftsliste steht. Ein Konto sieht
+ohnehin nur seine eigenen Staffeln; abzuschreiben war nie noetig.
+
+Abgeglichen wird **zuerst ueber die Kennung**, dann ueber Name und
+Spielklasse -- beide normalisiert und beide gegen beide (`dienst.gefaltet`).
+Ohne diese Faltung legte der erste Versuch drei Staffeln **neben** die drei
+vorhandenen: "1. Kreisklasse" traf nicht auf "1.Kreisklasse", die alten
+behielten die Spielberichte, die neuen waren leer.
+
+Zusammengefuehrt wird nur bei **genau einem** Treffer. Zwei Kandidaten heissen
+raten, und eine falsch zusammengelegte Staffel nimmt fremde Spielberichte mit.
+
+**Geloescht wird nichts**, und `aktiv` bleibt unberuehrt: was nicht in der
+Liste steht, kann aus einer frueheren Saison stammen, und ob eine Staffel
+mitlaeuft, entscheidet der Staffelleiter.
+
 ### Ein Fall beim Sportgericht
 
 `POST /vorgaenge/{id}/fallanlage` merkt einen Sportgerichtsfall vor. **Das
@@ -346,6 +367,21 @@ Es gehoert an die Staffel und nicht in die Einstellungen: wer Staffeln in zwei
 Gebieten fuehrt, hat nicht dasselbe Gericht. Leer heisst: aus dieser Staffel
 laesst sich kein Fall anlegen -- und das sagt die Route, statt vor einem
 falschen Gericht eines zu eroeffnen.
+
+**Ebenfalls seit 21.10.2026: die Kennung aus DFBnet.**
+
+```sql
+ALTER TABLE staffelpilot_staffeln
+  ADD COLUMN dfbnet_kennung VARCHAR(20) NOT NULL DEFAULT '';
+CREATE INDEX ix_staffelpilot_staffeln_dfbnet_kennung
+  ON staffelpilot_staffeln (dfbnet_kennung);
+```
+
+Sie ist das einzig Stabile an einer Staffel. Die Bezeichnung traegt einen
+Sponsornamen ("Brandible Stadtliga C"), und die Spielklasse heisst in den
+beiden Masken von DFBnet verschieden -- in der Spielplanbearbeitung
+"Kreisliga C", in der Spielberichtssuche "3.Kreisliga (C)". Leer bei allem,
+was von Hand angelegt wurde.
 
 ### Der Schlüssel für die Zugangsdaten
 

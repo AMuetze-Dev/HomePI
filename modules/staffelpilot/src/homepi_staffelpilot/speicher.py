@@ -48,6 +48,7 @@ from .schemas import (
     RegelEingang,
     StaffelAendern,
     StaffelAnlegen,
+    StaffelnAusDfbnet,
     UebertragungAbschluss,
     UebertragungEinreihen,
     VorgangAnlegen,
@@ -80,6 +81,86 @@ async def staffel_anlegen(sitzung: AsyncSession, daten: StaffelAnlegen) -> Staff
         raise StaffelVergeben(f"Eine Staffel namens '{daten.name}' gibt es bereits") from fehler
     await sitzung.refresh(neue)
     return neue
+
+
+async def staffeln_aus_dfbnet(
+    sitzung: AsyncSession, eingang: StaffelnAusDfbnet
+) -> tuple[int, int, list[str]]:
+    """Die Liste "Eigene Staffeln" uebernehmen. Gibt (angelegt, aktualisiert, Namen).
+
+    Gesucht wird **zuerst ueber die Kennung** und erst dann ueber den Namen.
+    Die Kennung ist das einzig Stabile: die Bezeichnung traegt einen
+    Sponsornamen, und wer einmal von Hand "Stadtliga C" eingetippt hat, soll
+    beim Abgleich nicht eine zweite Staffel danebengestellt bekommen, sondern
+    seine korrigiert.
+
+    **Geloescht wird nichts.** Was nicht in der Liste steht, kann aus einer
+    frueheren Saison stammen oder von Hand angelegt sein -- und eine Staffel
+    zu entfernen naehme ihre Spielberichte mit.
+
+    `aktiv` bleibt unberuehrt: ob eine Staffel mitlaeuft, entscheidet der
+    Staffelleiter und nicht DFBnet.
+    """
+    vorhanden = await staffeln(sitzung)
+    nach_kennung = {s.dfbnet_kennung: s for s in vorhanden if s.dfbnet_kennung}
+
+    def passende(wert: str) -> list[Staffel]:
+        """Staffeln, deren Name oder Spielklasse auf dasselbe hinauslaeuft."""
+        gesucht = dienst.gefaltet(wert)
+        if not gesucht:
+            return []
+        return [
+            s
+            for s in vorhanden
+            if gesucht in (dienst.gefaltet(s.name), dienst.gefaltet(s.spielklasse))
+        ]
+
+    angelegt = aktualisiert = 0
+    namen: list[str] = []
+    for zeile in eingang.staffeln:
+        ziel = nach_kennung.get(zeile.kennung)
+        if ziel is None:
+            # Name und Spielklasse, beide normalisiert und beide gegen beide:
+            # wer "1. Kreisklasse" als Namen eingetragen hat, soll seine
+            # Staffel korrigiert bekommen und keine zweite daneben.
+            #
+            # Nur bei **genau einem** Treffer. Zwei Kandidaten heissen, dass
+            # niemand sicher sagen kann, welche gemeint war -- und eine
+            # zusammengelegte Staffel, die es nicht war, nimmt die
+            # Spielberichte der falschen mit.
+            for wert in (zeile.name, zeile.spielklasse):
+                treffer = passende(wert)
+                if len(treffer) == 1:
+                    ziel = treffer[0]
+                    break
+
+        if ziel is None:
+            ziel = Staffel(
+                name=zeile.name,
+                altersklasse=zeile.altersklasse,
+                spielklasse=zeile.spielklasse,
+                saison=zeile.saison,
+                spieltage=zeile.spieltage,
+                dfbnet_kennung=zeile.kennung,
+            )
+            sitzung.add(ziel)
+            angelegt += 1
+        else:
+            ziel.name = zeile.name
+            ziel.altersklasse = zeile.altersklasse
+            ziel.spielklasse = zeile.spielklasse
+            ziel.dfbnet_kennung = zeile.kennung
+            if zeile.saison:
+                ziel.saison = zeile.saison
+            # Eine 0 heisst *nicht bekannt* und soll eine bekannte Zahl nicht
+            # ueberschreiben -- siehe `modelle.Staffel.spieltage`.
+            if zeile.spieltage:
+                ziel.spieltage = zeile.spieltage
+            aktualisiert += 1
+        namen.append(zeile.name)
+
+    await sitzung.flush()
+    return angelegt, aktualisiert, namen
 
 
 async def staffel_aendern(

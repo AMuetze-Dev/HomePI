@@ -56,7 +56,9 @@ class Prueflauf:
         logger.info("Auftrag %s (%s) übernommen", kennung, art)
 
         try:
-            if art == "initialisierung":
+            if art == "staffeln":
+                self._staffeln_holen(kennung)
+            elif art == "initialisierung":
                 self._initialisieren(kennung, auftrag.get("staffel_id"))
             else:
                 self._pruefen(kennung, auftrag.get("staffel_id"))
@@ -185,13 +187,76 @@ class Prueflauf:
         # Vor dem Anmelden, denn dabei entsteht der Browser: der Schalter aus
         # den Einstellungen gilt ab dem naechsten Lauf und nicht erst nach
         # einem Neustart des Dienstes.
-        self._leser.sichtbar = bool(self._gateway.einstellungen().get("browser_sichtbar"))
-        if self._leser.sichtbar:
-            self._gateway.fortschritt(kennung, zeile="Der Browser ist sichtbar")
+        gewuenscht = bool(self._gateway.einstellungen().get("browser_sichtbar"))
+        self._leser.sichtbar = gewuenscht
 
         benutzer, passwort = self._gateway.zugang()
         self._leser.anmelden(benutzer, passwort)
+
+        # **Nach** dem Anmelden, denn erst dabei entsteht der Browser. Vorher
+        # waere es eine Zusage, die der Lauf im Container nicht halten kann:
+        # dort gibt es keinen Bildschirm, Chromium faellt auf unsichtbar
+        # zurueck, und in der Oberflaeche stuende trotzdem "sichtbar".
+        if gewuenscht:
+            if getattr(self._leser, "sichtbar_misslungen", False):
+                self._gateway.fortschritt(
+                    kennung,
+                    zeile=(
+                        "Kein Fenster: der Dienst laeuft ohne Bildschirm (Container). "
+                        "Es wird unsichtbar geprueft."
+                    ),
+                )
+            else:
+                self._gateway.fortschritt(kennung, zeile="Der Browser ist sichtbar")
+
         self._gateway.fortschritt(kennung, zeile=f"Angemeldet als {benutzer}")
+
+    def _staffeln_holen(self, kennung: str) -> None:
+        """Die eigenen Staffeln aus DFBnet uebernehmen.
+
+        Der kuerzeste Auftrag von allen: anmelden, eine Liste lesen,
+        einspielen. Er ersetzt das Abschreiben von Hand -- und genau daran war
+        die Pruefung gescheitert, mit einer Spielklasse, die DFBnet nicht
+        kennt.
+
+        Eine leere Liste ist **kein** Erfolg. Sie hiesse, das Konto fuehre
+        keine Staffeln, und das naechste Einspielen loeschte nichts, aber der
+        Staffelleiter stuende vor einer Anzeige, die nichts sagt.
+        """
+        self._anmelden(kennung)
+        verband = str(self._gateway.einstellungen().get("verband") or "")
+
+        # Die Saison aus einer vorhandenen Staffel, sonst keine: ohne Angabe
+        # bleibt DFBnets eigene Vorauswahl stehen, und die steht auf der
+        # laufenden. Eine geratene Jahreszahl waere schlechter als keine.
+        saison = next(
+            (str(s.get("saison") or "") for s in self._gateway.staffeln() if s.get("saison")), ""
+        )
+
+        self._gateway.fortschritt(
+            kennung, schritt="Hole die eigenen Staffeln", fortschritt=40, zeile="Suche in DFBnet"
+        )
+        gefunden = self._leser.eigene_staffeln(saison, verband)
+        if not gefunden:
+            raise RuntimeError(
+                "DFBnet hat unter 'Eigene Staffeln' keine einzige geliefert. "
+                "Sieht dieses Konto wirklich eigene Staffeln, und stimmt die "
+                "Saison?"
+            )
+
+        self._gateway.fortschritt(
+            kennung,
+            fortschritt=80,
+            zeile="Gefunden: " + ", ".join(str(s.get("name") or "?") for s in gefunden),
+        )
+        antwort = self._gateway.staffeln_aus_dfbnet(gefunden)
+        angelegt = int(antwort.get("angelegt") or 0)
+        aktualisiert = int(antwort.get("aktualisiert") or 0)
+        self._gateway.abschluss(
+            kennung,
+            "fertig",
+            f"{angelegt} angelegt, {aktualisiert} aufgefrischt",
+        )
 
     def _pruefen(self, kennung: str, staffel_id: object) -> None:
         staffeln = self._staffeln(staffel_id)

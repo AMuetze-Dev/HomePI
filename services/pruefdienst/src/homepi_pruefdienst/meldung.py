@@ -87,6 +87,92 @@ def mannschaften_lesen(html: str) -> list[dict[str, object]]:
     return gefunden
 
 
+#: Wie DFBnet die Mannschaftsart nennt, und was das Artefakt daraus macht.
+#:
+#: Die laengere Form zuerst: "Herren Ü35" faengt mit "Herren" an, und wer in
+#: der falschen Reihenfolge prueft, macht aus jeder Ue35-Staffel eine
+#: Herrenstaffel -- und liest dann deren Spiele.
+_ALTERSKLASSEN: tuple[tuple[str, str], ...] = (
+    ("herren ü35", "ue35"),
+    ("herren u35", "ue35"),
+    ("ü35", "ue35"),
+    ("alte herren", "ue35"),
+    ("herren", "maenner"),
+    ("frauen", "frauen"),
+    ("a-junioren", "a_junioren"),
+    ("b-junioren", "b_junioren"),
+    ("c-junioren", "c_junioren"),
+)
+
+
+def altersklasse_aus(mannschaftsart: str) -> str:
+    """Die Altersklasse des Artefakts aus DFBnets Mannschaftsart.
+
+    Leer, wenn keine passt. Leer heisst *nicht bekannt* und nicht "Herren":
+    eine geratene Altersklasse liest beim naechsten Prueflauf die Spiele einer
+    anderen Mannschaft, und das faellt erst an einem Befund auf, der zu
+    niemandem gehoert.
+    """
+    text = (mannschaftsart or "").strip().lower()
+    for muster, klasse in _ALTERSKLASSEN:
+        if muster in text:
+            return klasse
+    return ""
+
+
+def staffeln_lesen(
+    ueberschriften: list[str], zeilen: list[list[str]], saison: str = ""
+) -> list[dict[str, object]]:
+    """Die Liste "Eigene Staffeln" in die Sprache des Artefakts.
+
+    Spalten, am 21.10.2026 in der Spielplanbearbeitung abgelesen:
+    (Aktion), Kennung, Mannschaftsart, Spielklasse, Gebiet, Bezeichnung,
+    Rd, Nr, St.
+
+    Nach den Ueberschriften und nicht nach festen Nummern -- aus demselben
+    Grund wie in `spalte_mit`.
+
+    **Die Legende wird nicht uebergeben.** Unter den Datenzeilen stehen im
+    selben `tbody` drei Zeilen, die die Symbole erklaeren ("Staffel ansehen",
+    "Rd Rundennummer", "Status"). Sie haben keinen Bearbeiten-Knopf; der
+    Aufrufer reicht nur Zeilen herein, die einen haben. Hier faellt zusaetzlich
+    alles weg, dem Kennung oder Spielklasse fehlt: eine Legendenzeile, die
+    sich doch einmal durchmogelt, waere sonst eine Staffel ohne Spiele.
+    """
+    spalten = {
+        name: spalte_mit(ueberschriften, name)
+        for name in ("Kennung", "Mannschaftsart", "Spielklasse", "Gebiet", "Bezeichnung")
+    }
+
+    def zelle(zeile: list[str], name: str) -> str:
+        nummer = spalten[name]
+        return (zeile[nummer] if 0 <= nummer < len(zeile) else "").strip()
+
+    gefunden: list[dict[str, object]] = []
+    for zeile in zeilen:
+        kennung = zelle(zeile, "Kennung")
+        spielklasse = zelle(zeile, "Spielklasse")
+        if not kennung or not spielklasse:
+            continue
+        # Eine Kennung ist eine Zahl. "Staffel ansehen" ist keine.
+        if not kennung.isdigit():
+            continue
+        bezeichnung = zelle(zeile, "Bezeichnung")
+        gefunden.append(
+            {
+                "kennung": kennung,
+                "name": bezeichnung or spielklasse,
+                "spielklasse": spielklasse,
+                "mannschaftsart": zelle(zeile, "Mannschaftsart"),
+                "altersklasse": altersklasse_aus(zelle(zeile, "Mannschaftsart")),
+                "gebiet": zelle(zeile, "Gebiet"),
+                "saison": saison,
+                "spieltage": spieltage_aus(ueberschriften, zeile),
+            }
+        )
+    return gefunden
+
+
 def spalte_mit(ueberschriften: list[str], gesucht: str) -> int:
     """Die Nummer der Spalte mit dieser Ueberschrift, oder -1.
 

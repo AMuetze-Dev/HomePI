@@ -122,6 +122,8 @@ class DfbnetLeser:
         #: Achtzig Spielberichte mit je vierunddreissig Spielern waeren sonst
         #: zweitausendsiebenhundert Abrufe fuer ein paar hundert Personen.
         self._einsaetze: dict[tuple[str, str], dict[str, Any]] = {}
+        #: Ob ein gewuenschtes Fenster nicht aufging. Siehe `_starten`.
+        self.sichtbar_misslungen = False
 
     # ── Anmelden ──────────────────────────────────────────────────────────
 
@@ -175,6 +177,11 @@ class DfbnetLeser:
                 "Es wird unsichtbar geprueft.",
                 exc_info=True,
             )
+            # Gemerkt und nicht nur protokolliert: im Containerprotokoll liest
+            # es niemand, und die Oberflaeche behauptete sonst weiter, der
+            # Browser sei sichtbar. Ein Schalter, der nichts tut und das
+            # verschweigt, ist schlimmer als einer, den es nicht gibt.
+            self.sichtbar_misslungen = True
             return self._playwright.chromium.launch(headless=True)
 
     def _zustimmung_wegklicken(self) -> None:
@@ -682,6 +689,50 @@ class DfbnetLeser:
             raise
         except Exception:
             logger.exception("Die Meldung zu %r liess sich nicht holen", staffel.name)
+            return []
+
+    def eigene_staffeln(self, saison: str, verband: str = "") -> list[dict[str, object]]:
+        """Die Staffeln, die diesem Konto gehoeren.
+
+        Dieselbe Maske wie `mannschaften`, nur ohne eine davon aufzumachen:
+        mit "Eigene Staffeln" ist die Trefferliste schon die Antwort. Ein
+        Konto sieht nur seine eigenen -- deshalb braucht es keinen Filter
+        ueber Spielklasse oder Gebiet, und deshalb gibt es hier nichts zu
+        verwechseln.
+
+        Sie ersetzt das Abschreiben von Hand. Genau daran war die Pruefung
+        gescheitert: eine Spielklasse "Stadtliga C", die DFBnet nicht kennt.
+
+        Eine leere Liste ueberschreibt im Artefakt nichts -- und der Auftrag
+        meldet, dass nichts kam, statt einen Erfolg.
+        """
+        seite = self._seite
+        if seite is None:
+            raise RuntimeError("Erst anmelden, dann lesen")
+
+        try:
+            self._zur_spielplanbearbeitung(seite)
+            self._suchmaske_fuellen(seite, saison, verband)
+            seite.locator("button:has-text('SUCHEN')").first.click(timeout=ZEIT_MS)
+            _warten_auf(seite, ["table tbody tr"])
+
+            ueberschriften = [
+                (z or "").strip() for z in seite.locator("table th").all_text_contents()
+            ]
+            zeilen: list[list[str]] = []
+            for zeile in seite.locator("table tbody tr").all():
+                # Nur Zeilen mit dem Bearbeiten-Knopf. Unter den Daten steht im
+                # selben tbody eine Legende, die die Symbole erklaert; sie
+                # saehe sonst aus wie drei weitere Staffeln.
+                if zeile.locator("button[title='Staffel bearbeiten']").count() == 0:
+                    continue
+                zeilen.append([(z or "").strip() for z in zeile.locator("td").all_text_contents()])
+
+            gefunden = meldung.staffeln_lesen(ueberschriften, zeilen, saison)
+            logger.info("Eigene Staffeln gelesen: %d", len(gefunden))
+            return gefunden
+        except Exception:
+            logger.exception("Die Liste der eigenen Staffeln liess sich nicht holen")
             return []
 
     def _zur_spielplanbearbeitung(self, seite: Any) -> None:

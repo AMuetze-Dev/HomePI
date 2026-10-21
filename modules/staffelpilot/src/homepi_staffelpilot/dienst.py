@@ -9,6 +9,7 @@ Faustregel: Entscheidungen sind rein, Seiteneffekte sind dumm.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -575,6 +576,21 @@ def beispieldaten_pruefen(kennungen: Iterable[str], erlaubt: bool) -> None:
         "DFBnet umstellen oder in den Einstellungen „Beispieldaten annehmen“ "
         "einschalten."
     )
+
+
+def gefaltet(text: str) -> str:
+    """Einen Staffelnamen auf das reduzieren, was zu vergleichen lohnt.
+
+    DFBnet schreibt dieselbe Klasse in zwei Masken verschieden: in der
+    Spielplanbearbeitung "1.Kreisklasse", in der Spielberichtssuche
+    "1. Kreisklasse". Wer das Leerzeichen mitvergleicht, legt beim Abgleich
+    eine zweite Staffel an -- und die erste behaelt die Spielberichte.
+
+    Genau das ist am 21.10.2026 passiert: drei angelegt, null aufgefrischt,
+    und danach standen sechs Staffeln da, wo drei gehoeren.
+    """
+    ohne_zeichen = re.sub(r"[^\w\s]", " ", (text or "").strip().lower())
+    return re.sub(r"\s+", " ", ohne_zeichen).strip()
 
 
 def _tag(datum: date) -> str:

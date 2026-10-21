@@ -127,7 +127,7 @@ export interface Auswertung {
   nach_monat: Posten[];
 }
 
-export type AuftragArt = "pruflauf" | "initialisierung";
+export type AuftragArt = "pruflauf" | "initialisierung" | "staffeln";
 export type AuftragZustand =
   "angefordert" | "laeuft" | "fertig" | "abgebrochen" | "gescheitert";
 

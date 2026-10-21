@@ -37,8 +37,17 @@ RUN playwright install --with-deps chromium \
 
 # Nicht als root. Der Browser laedt fremde Seiten; er soll nicht mehr duerfen
 # als noetig.
+# Der Regelordner gehoert dem Dienst, und zwar schon **im Abbild**: ein
+# benanntes Band uebernimmt beim ersten Einhaengen Inhalt und Besitzer des
+# Pfades, der im Abbild darunter liegt. Fehlt er dort, legt Docker ihn als
+# root an -- und der Dienst kann die dreissig Vorlagen der Spielordnung nicht
+# hinterlegen. Der Prueflauf scheitert dann mit "Permission denied", und das
+# ist die richtige Antwort: ohne diese Regeln saehe ein Bericht geprueft aus,
+# ohne geprueft zu sein. Besser, es kommt gar nicht erst dazu.
 RUN useradd --uid 1000 --create-home dienst \
-    && chown -R dienst:dienst /ms-playwright
+    && chown -R dienst:dienst /ms-playwright \
+    && mkdir -p /data/regeln \
+    && chown -R dienst:dienst /data
 USER dienst
 
 WORKDIR /app/services/pruefdienst

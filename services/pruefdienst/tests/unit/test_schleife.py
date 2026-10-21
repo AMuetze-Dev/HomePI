@@ -9,7 +9,7 @@ das zeigt kein Test, sondern der erste echte Lauf.
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
@@ -98,6 +98,7 @@ class FalschesGateway:
             }
         }
         self.zugang_geholt = 0
+        self.uebernommen_staffeln: list[list[dict[str, Any]]] = []
         self.uebernommen: list[str] = []
         self.gemeldet: list[tuple[str, str, str]] = []
         self._warteschlange = [
@@ -147,6 +148,10 @@ class FalschesGateway:
         if self.spiele_nach_id is None:
             raise GatewayFehler("Artefakt weg")
         return self.spiele_nach_id[spiel_id]
+
+    def staffeln_aus_dfbnet(self, staffeln: list[dict[str, Any]]) -> dict[str, Any]:
+        self.uebernommen_staffeln.append(staffeln)
+        return {"angelegt": len(staffeln), "aktualisiert": 0, "namen": []}
 
     def vorgang(self, vorgang_id: str) -> dict[str, Any]:
         if self.vorgaenge_nach_id is None:
@@ -1058,3 +1063,75 @@ class TestFallanlage:
         assert ergebnis.erfolg
         assert ergebnis.aktenzeichen == ""
         assert "Simuliert" in ergebnis.meldung
+
+
+class TestEigeneStaffeln:
+    """Der Auftrag "staffeln": anmelden, eine Liste lesen, einspielen.
+
+    Er ersetzt das Abschreiben von Hand -- und genau daran war die Pruefung
+    gescheitert: an einer Spielklasse, die DFBnet nicht kennt, und einem
+    Namen, der nicht in der Meisterschaftsliste steht.
+    """
+
+    ZEILEN: ClassVar[list[dict[str, Any]]] = [
+        {
+            "kennung": "633222",
+            "name": "1. Stadtklasse Ü35",
+            "spielklasse": "1.Kreisklasse",
+            "altersklasse": "ue35",
+            "saison": "26/27",
+            "spieltage": 18,
+        }
+    ]
+
+    def _leser(self, zeilen: list[dict[str, Any]] | None = None) -> DemoLeser:
+        leser = DemoLeser()
+        leser._eigene_staffeln = list(self.ZEILEN if zeilen is None else zeilen)
+        return leser
+
+    def test_die_liste_geht_ins_artefakt(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "staffeln"})
+
+        lauf(gateway, self._leser()).runde()
+
+        assert gateway.uebernommen_staffeln == [self.ZEILEN]
+        assert gateway.abschluesse[0][1] == "fertig"
+
+    def test_der_abschluss_sagt_wie_viele(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "staffeln"})
+
+        lauf(gateway, self._leser()).runde()
+
+        assert "1 angelegt" in gateway.abschluesse[0][2]
+
+    def test_eine_leere_liste_ist_kein_erfolg(self) -> None:
+        """Sie hiesse, das Konto fuehre keine Staffeln. Ein "fertig" darauf
+        liesse den Staffelleiter vor einer Anzeige stehen, die nichts sagt."""
+        gateway = FalschesGateway({"id": "a1", "art": "staffeln"})
+
+        lauf(gateway, self._leser([])).runde()
+
+        assert gateway.abschluesse[0][1] == "gescheitert"
+        assert gateway.uebernommen_staffeln == []
+
+    def test_die_saison_kommt_aus_einer_vorhandenen_staffel(self) -> None:
+        """Ohne Angabe bleibt DFBnets eigene Vorauswahl stehen, und die steht
+        auf der laufenden. Eine geratene Jahreszahl waere schlechter."""
+        gateway = FalschesGateway({"id": "a1", "art": "staffeln"})
+        gesehen: list[str] = []
+        leser = self._leser()
+        echt = leser.eigene_staffeln
+
+        def merken(saison: str, verband: str = "") -> list[dict[str, Any]]:
+            gesehen.append(saison)
+            return echt(saison, verband)
+
+        leser.eigene_staffeln = merken  # type: ignore[method-assign]
+        lauf(gateway, leser).runde()
+
+        assert gesehen == ["26/27"]
+
+    def test_der_demo_leser_erfindet_keine(self) -> None:
+        """Eine erfundene Staffel waere schlimmer als keine: aus ihr
+        entstuenden Spiele, die es nie gab, und daraus Mahnungen."""
+        assert DemoLeser().eigene_staffeln("26/27") == []

@@ -71,6 +71,41 @@ class StaffelAnlegen(BaseModel):
         return _getrimmt(wert)
 
 
+class StaffelAusDfbnet(BaseModel):
+    """Eine Zeile aus der Liste "Eigene Staffeln".
+
+    Sie kommt vom Pruefdienst und nicht aus einem Formular: hier wird nichts
+    getrimmt und nichts erraten, sondern uebernommen, was dort stand.
+    """
+
+    #: Die Nummer, unter der DFBnet sie fuehrt. Ohne sie waere der Abgleich
+    #: wieder der Name -- und der wechselt mit dem Sponsor.
+    kennung: Annotated[str, Field(min_length=1, max_length=20)]
+    name: NameFeld
+    spielklasse: NameFeld
+    altersklasse: Altersklasse
+    saison: Annotated[str, Field(max_length=10)] = ""
+    spieltage: Annotated[int, Field(ge=0, le=99)] = 0
+
+
+class StaffelnAusDfbnet(BaseModel):
+    """Die Liste als Ganzes.
+
+    **Nichts wird geloescht.** Was nicht in der Liste steht, kann aus einer
+    anderen Saison stammen oder von Hand angelegt sein -- und eine Staffel zu
+    entfernen hiesse, ihre Spielberichte mitzunehmen.
+    """
+
+    staffeln: list[StaffelAusDfbnet]
+
+
+class StaffelnUebernommen(BaseModel):
+    angelegt: int = 0
+    aktualisiert: int = 0
+    #: Die Namen, wie sie jetzt im Artefakt stehen -- zum Nachlesen im Auftrag.
+    namen: list[str] = Field(default_factory=list)
+
+
 class StaffelAendern(BaseModel):
     """Alles, was sich an einer Staffel aendern laesst.
 
@@ -104,6 +139,8 @@ class StaffelAusgabe(BaseModel):
     spieltage: int
     #: Das zustaendige Sportgericht, wortgleich mit der Auswahl in DFBnet.
     sportgericht: str
+    #: Die Nummer, unter der DFBnet sie fuehrt. Leer bei Handarbeit.
+    dfbnet_kennung: str = ""
     aktiv: bool
 
 
@@ -626,7 +663,7 @@ class BefundZeile(BaseModel):
 
 #: Was ein Auftrag tut. `pruflauf` prüft Spielberichte, `initialisierung`
 #: holt die Saisondaten einer Staffel aus DFBnet.
-AuftragArt = Literal["pruflauf", "initialisierung"]
+AuftragArt = Literal["pruflauf", "initialisierung", "staffeln"]
 
 #: Wo er steht. Nur vorwärts — ein beendeter Lauf wird neu angefordert, nicht
 #: fortgesetzt.

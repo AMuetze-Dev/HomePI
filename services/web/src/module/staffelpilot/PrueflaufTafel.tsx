@@ -38,7 +38,11 @@ const ZUSTAND_TON: Record<AuftragZustand, "gut" | "warnung" | "fehler" | "neutra
   gescheitert: "fehler",
 };
 
-const ART_WORT = { pruflauf: "Prüflauf", initialisierung: "Initialisierung" } as const;
+const ART_WORT = {
+  pruflauf: "Prüflauf",
+  initialisierung: "Initialisierung",
+  staffeln: "Staffeln holen",
+} as const;
 
 /** Wie oft nachgesehen wird, solange etwas unterwegs ist. */
 const TAKT_MS = 3000;
@@ -184,6 +188,16 @@ export function PrueflaufTafel({
                 }
               >
                 Saisondaten holen
+              </Knopf>
+              {/* Ohne Staffelauswahl: die Liste gilt fuer das ganze Konto.
+                  Sie ersetzt das Abschreiben von Hand -- und genau daran war
+                  die Pruefung gescheitert, an einer Spielklasse, die DFBnet
+                  nicht kennt. */}
+              <Knopf
+                auspraegung="sekundaer"
+                onClick={() => void handeln(() => fordereAuftragAn("staffeln"))}
+              >
+                Meine Staffeln aus DFBnet holen
               </Knopf>
             </div>
           </>
