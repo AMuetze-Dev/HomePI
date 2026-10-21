@@ -35,6 +35,15 @@ class Staffel(Base, ZeitstempelMixin):
     # Paragraf 68 (2) c) weg, und ohne diese Zahl laesst sie sich nicht
     # aufheben. Die Regel sagt das dann selbst, statt still weiterzurechnen.
     spieltage: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Welches Sportgericht fuer diese Staffel zustaendig ist -- **wortgleich
+    # mit der Auswahl in DFBnet**, denn genau dort wird es als Beschriftung
+    # gewaehlt ("Sportgericht Stadtverband Fussball Dresden e.V.").
+    #
+    # An der Staffel und nicht in den Einstellungen: ein Staffelleiter kann
+    # Staffeln in zwei Gebieten fuehren, und dann ist es nicht dasselbe
+    # Gericht. Leer heisst: kein Fall anlegbar -- und das sagt die
+    # Fallanlage, statt vor einem falschen Gericht eines zu eroeffnen.
+    sportgericht: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     spiele: Mapped[list[Spielbericht]] = relationship(

@@ -87,6 +87,7 @@ function StaffelKarte({
   const [spielklasse, setSpielklasse] = useState(staffel.spielklasse);
   const [saison, setSaison] = useState(staffel.saison);
   const [spieltage, setSpieltage] = useState(String(staffel.spieltage || ""));
+  const [sportgericht, setSportgericht] = useState(staffel.sportgericht);
   const [fragtNach, setFragtNach] = useState(false);
 
   return (
@@ -114,7 +115,13 @@ function StaffelKarte({
             className={stil.formular}
             onSubmit={(e) => {
               e.preventDefault();
-              void onAendern({ name, spielklasse, saison, spieltage: zahl(spieltage) });
+              void onAendern({
+                name,
+                spielklasse,
+                saison,
+                spieltage: zahl(spieltage),
+                sportgericht,
+              });
             }}
           >
             <Feld
@@ -139,6 +146,12 @@ function StaffelKarte({
               inputMode="numeric"
               value={spieltage}
               onChange={(e) => setSpieltage(e.target.value)}
+            />
+            <Feld
+              beschriftung="Sportgericht"
+              hinweis="Wortgleich mit der Auswahl in DFBnet. Leer heißt: aus dieser Staffel lässt sich kein Fall anlegen."
+              value={sportgericht}
+              onChange={(e) => setSportgericht(e.target.value)}
             />
             <div className={stil.knoepfe}>
               <Knopf type="submit" groesse="sm">

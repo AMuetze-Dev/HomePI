@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from homepi_pruefdienst import dienst, regeln
+from homepi_pruefdienst import dienst, fallanlage, regeln
 from homepi_pruefdienst.bericht import MatchMeta, MatchReport, Player, TeamSquad
 from homepi_pruefdienst.dienst import Spielzeile, Staffelkennung
 from homepi_pruefdienst.gateway import GatewayFehler
@@ -38,6 +38,8 @@ STAFFEL = {
     "altersklasse": "maenner",
     "spielklasse": "3.Kreisliga (C)",
     "saison": "26/27",
+    # Ohne Gericht liesse sich kein Fall anlegen -- siehe TestFallanlage.
+    "sportgericht": "Sportgericht Stadtverband Fußball Dresden e.V.",
     "aktiv": True,
 }
 
@@ -81,7 +83,18 @@ class FalschesGateway:
                 "id": "sp1",
                 "staffel_id": "s1",
                 "dfbnet_id": "M-1",
+                # Die Spielkennung, nach der die Fallanlage in DFBnet sucht --
+                # eine andere Zahl als die Kennung der Trefferliste.
+                "spielnummer": "633203004",
                 "datum": (HEUTE - dt.timedelta(days=1)).isoformat(),
+            }
+        }
+        self.vorgaenge_nach_id: dict[str, dict[str, Any]] | None = {
+            "v1": {
+                "id": "v1",
+                "art": "sportgericht",
+                "grund": "Feldverweis auf Dauer wegen Tätlichkeit",
+                "text": "Der ganze Antrag, viel zu lang für das Formular.",
             }
         }
         self.zugang_geholt = 0
@@ -134,6 +147,11 @@ class FalschesGateway:
         if self.spiele_nach_id is None:
             raise GatewayFehler("Artefakt weg")
         return self.spiele_nach_id[spiel_id]
+
+    def vorgang(self, vorgang_id: str) -> dict[str, Any]:
+        if self.vorgaenge_nach_id is None:
+            raise GatewayFehler("Artefakt weg")
+        return self.vorgaenge_nach_id[vorgang_id]
 
     def uebertragung(self) -> dict[str, Any]:
         return {
@@ -578,12 +596,16 @@ class TestUebertragung:
         assert zustand == "fehler"
         assert "Trefferliste" in meldung
 
-    def test_eine_andere_aktion_wird_nicht_stillschweigend_erledigt(self) -> None:
-        """Die Fallanlage ist nicht portiert. Eine Zeile auf "fertig" zu
-        setzen, ohne dass etwas passiert ist, wäre die schlimmste aller
-        Auskünfte."""
+    def test_eine_unbekannte_aktion_wird_nicht_stillschweigend_erledigt(self) -> None:
+        """Eine Zeile auf "fertig" zu setzen, ohne dass etwas passiert ist,
+        wäre die schlimmste aller Auskünfte.
+
+        Das Beispiel war einmal die Fallanlage. Die gibt es inzwischen; die
+        Aussage gilt für jede Aktion, die ein älteres Artefakt einreiht und
+        dieser Dienst noch nicht kennt.
+        """
         gateway = FalschesGateway(pausiert=False, offen=1)
-        gateway._warteschlange[0]["aktion"] = "fallanlage"
+        gateway._warteschlange[0]["aktion"] = "briefkasten_leeren"
 
         lauf(gateway, DemoLeser(), darf_schreiben=True).runde()
 
@@ -913,3 +935,126 @@ class TestBefundeImLauf:
             "confirmation_missing",
             "aufstellung_fehlt",
         ]
+
+
+class TestFallanlage:
+    """Einen Sportgerichtsfall aus der Warteschlange anlegen.
+
+    Die folgenreichste Handlung des Dienstes: sie eroeffnet ein Verfahren
+    gegen eine benannte Person. Deshalb steht hier mehr ueber das Abweisen als
+    ueber das Gelingen.
+    """
+
+    def _zeile(self, gateway: Any) -> None:
+        gateway._warteschlange[0].update(
+            {"aktion": "fallanlage", "referenz": "v1", "spiel_id": "sp1"}
+        )
+
+    def test_der_fall_wird_angelegt(self) -> None:
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        self._zeile(gateway)
+        leser = DemoLeser()
+
+        lauf(gateway, leser, darf_schreiben=True).runde()
+
+        assert gateway.gemeldet[0][1] == "fertig"
+        assert len(leser.faelle) == 1
+
+    def test_die_angaben_kommen_aus_vorgang_staffel_und_spiel(self) -> None:
+        """Jede aus der Quelle, in der sie lebt -- nicht auf die Zeile kopiert.
+
+        Die Spielkennung ist die **Spielnummer** und nicht die Kennung der
+        Trefferliste: danach sucht das Formular in DFBnet.
+        """
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        self._zeile(gateway)
+        leser = DemoLeser()
+
+        lauf(gateway, leser, darf_schreiben=True).runde()
+
+        anlage = leser.faelle[0]
+        assert anlage.spielkennung == "633203004"
+        assert anlage.saison == "26/27"
+        assert anlage.gericht.startswith("Sportgericht")
+        assert anlage.tatbestand == "Feldverweis auf Dauer wegen Tätlichkeit"
+
+    def test_der_tatbestand_ist_der_grund_und_nicht_das_ganze_schreiben(self) -> None:
+        """Im Formular steht ein Tatbestand, kein Antrag.
+
+        Der Text des Vorgangs ist das Schreiben an den Verband -- mit Anrede,
+        Kopfdaten und Unterschrift. In das Feld gehoert der Grund.
+        """
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        self._zeile(gateway)
+        leser = DemoLeser()
+
+        lauf(gateway, leser, darf_schreiben=True).runde()
+
+        assert "Sehr geehrte" not in leser.faelle[0].tatbestand
+        assert "viel zu lang" not in leser.faelle[0].tatbestand
+
+    def test_ohne_sportgericht_wird_kein_browser_gestartet(self) -> None:
+        """Die Staffel sagt, welches Gericht zustaendig ist. Ohne sie waere
+        jede Wahl geraten -- und ein Verfahren vor dem falschen Gericht ist
+        schlimmer als keines."""
+        ohne = {**STAFFEL, "sportgericht": ""}
+        gateway = FalschesGateway(pausiert=False, offen=1, staffeln=[ohne])
+        self._zeile(gateway)
+        leser = DemoLeser()
+
+        lauf(gateway, leser, darf_schreiben=True).runde()
+
+        assert gateway.gemeldet[0][1] == "fehler"
+        assert "Gericht" in gateway.gemeldet[0][2]
+        assert leser.faelle == []
+
+    def test_ohne_spielnummer_ebenso(self) -> None:
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        self._zeile(gateway)
+        assert gateway.spiele_nach_id is not None
+        gateway.spiele_nach_id["sp1"]["spielnummer"] = ""
+        leser = DemoLeser()
+
+        lauf(gateway, leser, darf_schreiben=True).runde()
+
+        assert gateway.gemeldet[0][1] == "fehler"
+        assert "Spielkennung" in gateway.gemeldet[0][2]
+        assert leser.faelle == []
+
+    def test_ohne_vorgang_in_der_zeile_ebenso(self) -> None:
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        self._zeile(gateway)
+        gateway._warteschlange[0]["referenz"] = ""
+        leser = DemoLeser()
+
+        lauf(gateway, leser, darf_schreiben=True).runde()
+
+        assert gateway.gemeldet[0][1] == "fehler"
+        assert leser.faelle == []
+
+    def test_ein_weggebrochenes_artefakt_meldet_den_grund(self) -> None:
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        self._zeile(gateway)
+        gateway.vorgaenge_nach_id = None
+
+        lauf(gateway, DemoLeser(), darf_schreiben=True).runde()
+
+        assert gateway.gemeldet[0][1] == "fehler"
+        assert "lesen" in gateway.gemeldet[0][2]
+
+    def test_der_demo_leser_erfindet_kein_aktenzeichen(self) -> None:
+        """Aus dieser Nummer entstuende die Mail an den Sportrichter."""
+        leser = DemoLeser()
+
+        ergebnis = leser.fall_anlegen(
+            fallanlage.Anlage(
+                spielkennung="633203004",
+                saison="26/27",
+                gericht="Sportgericht",
+                tatbestand="Tätlichkeit",
+            )
+        )
+
+        assert ergebnis.erfolg
+        assert ergebnis.aktenzeichen == ""
+        assert "Simuliert" in ergebnis.meldung

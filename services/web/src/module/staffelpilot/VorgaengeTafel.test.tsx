@@ -274,4 +274,64 @@ describe("Ein Vorgang", () => {
       expect(screen.queryByRole("link", { name: /Mahnung/ })).toBeNull();
     });
   });
+
+  describe("Ein Fall beim Sportgericht", () => {
+    const alsFall = () =>
+      mitListe(
+        [zeile({ art: "sportgericht" })],
+        vorgang({ art: "sportgericht" }),
+        entwurf({ anhang: "" }),
+      );
+
+    it("bietet den Knopf nur bei einem Sportgerichtsfall an", async () => {
+      // Aus einer Mahnung entsteht kein Verfahren.
+      mitListe();
+      render(<VorgaengeTafel />);
+      await aufklappen();
+
+      await screen.findByRole("button", { name: "Speichern" });
+      expect(screen.queryByRole("button", { name: /vormerken/ })).toBeNull();
+    });
+
+    it("merkt den Fall vor und sagt, dass noch nichts passiert ist", async () => {
+      alsFall();
+      const merken = vi.spyOn(api, "merkeFallAn").mockResolvedValue({
+        id: "u1",
+        aktion: "fallanlage",
+        referenz: "v1",
+        spiel_id: "sp1",
+        zustand: "offen",
+        versuche: 0,
+        letzter_fehler: "",
+        erledigt_am: null,
+        angelegt: "2026-10-21T10:00:00Z",
+      });
+      render(<VorgaengeTafel />);
+      await aufklappen();
+
+      await userEvent.click(
+        await inDerKarte().findByRole("button", { name: /vormerken/ }),
+      );
+
+      await waitFor(() => expect(merken).toHaveBeenCalledWith("v1"));
+      expect(await screen.findByText(/vorgemerkt/)).toBeInTheDocument();
+    });
+
+    it("nennt die fehlende Angabe, statt sie zu verschlucken", async () => {
+      // Meist das Sportgericht, das an der Staffel steht - zwei Klicks
+      // entfernt, und ohne diesen Satz sucht man sie dort nicht.
+      alsFall();
+      vi.spyOn(api, "merkeFallAn").mockRejectedValue(
+        new ApiError("Es fehlt noch: Sportgericht an der Staffel.", 409),
+      );
+      render(<VorgaengeTafel />);
+      await aufklappen();
+
+      await userEvent.click(
+        await inDerKarte().findByRole("button", { name: /vormerken/ }),
+      );
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Sportgericht");
+    });
+  });
 });

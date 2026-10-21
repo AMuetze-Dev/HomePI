@@ -18,6 +18,8 @@ export interface Staffel {
   saison: string;
   /** 0 heißt *nicht bekannt* — nicht "keine". */
   spieltage: number;
+  /** Das zustaendige Sportgericht, wortgleich mit der Auswahl in DFBnet. */
+  sportgericht: string;
   aktiv: boolean;
 }
 
@@ -247,6 +249,7 @@ export interface NeueStaffel {
   spielklasse: string;
   saison?: string;
   spieltage?: number;
+  sportgericht?: string;
 }
 
 const { anfrage } = API;
@@ -564,4 +567,18 @@ export function ladeErgebnisse(
 ): Promise<Auswertung> {
   const frage = staffelId ? `?staffel_id=${encodeURIComponent(staffelId)}` : "";
   return anfrage<Auswertung>(`/ergebnisse${frage}`, {}, signal);
+}
+
+/**
+ * Einen Sportgerichtsfall in DFBnet vormerken.
+ *
+ * **Das eröffnet ein Verfahren gegen eine benannte Person.** Deshalb ein
+ * eigener Aufruf an einem eigenen Knopf — nie nebenbei beim Abhaken, anders
+ * als die Prüferfreigabe.
+ *
+ * Vorgemerkt, nicht getan: angelegt wird es vom Prüfdienst, und der arbeitet
+ * nur, wenn die Übertragung nicht pausiert ist.
+ */
+export function merkeFallAn(vorgangId: string): Promise<Uebertragung> {
+  return anfrage<Uebertragung>(`/vorgaenge/${vorgangId}/fallanlage`, { method: "POST" });
 }

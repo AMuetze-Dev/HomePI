@@ -83,6 +83,39 @@ class NochOffeneBefunde(ServiceError):
     title = "Es sind noch Befunde offen"
 
 
+class FallNichtAnlegbar(ServiceError):
+    """Aus diesem Vorgang laesst sich kein Sportgerichtsfall anlegen.
+
+    **Lieber hier als spaeter.** Eine vorgemerkte Zeile, der eine Pflichtangabe
+    fehlt, scheitert erst draussen am Formular -- dann steht in der
+    Warteschlange ein Fehler, dessen Ursache zwei Klicks entfernt in den
+    Staffeleinstellungen liegt.
+    """
+
+    status = 409
+    title = "Fall nicht anlegbar"
+
+
+#: Was DFBnet im Erstellungsformular verlangt. Dieselben vier wie in
+#: `fallanlage.Anlage.fehlende_felder` des Pruefdienstes -- hier, weil das
+#: Artefakt sie kennt, bevor ein Browser startet.
+def fall_pruefen(art: str, sportgericht: str, spielnummer: str, tatbestand: str) -> None:
+    """Wirft, wenn ein Fall nicht vollstaendig angelegt werden koennte."""
+    if art != "sportgericht":
+        raise FallNichtAnlegbar(
+            "Ein Sportgerichtsfall entsteht nur aus einem Vorgang der Art "
+            f"'sportgericht'; dieser ist '{art}'."
+        )
+    fehlt = {
+        "Sportgericht an der Staffel": sportgericht,
+        "Spielnummer am Spielbericht": spielnummer,
+        "Grund oder Text am Vorgang": tatbestand,
+    }
+    offen = [name for name, wert in fehlt.items() if not wert.strip()]
+    if offen:
+        raise FallNichtAnlegbar("Es fehlt noch: " + ", ".join(offen) + ".")
+
+
 class BeispieldatenNichtErlaubt(ServiceError):
     """Ein Lauf wollte erfundene Spiele einspielen, und das war nicht gewollt.
 

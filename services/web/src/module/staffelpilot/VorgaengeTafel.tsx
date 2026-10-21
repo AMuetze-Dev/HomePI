@@ -20,6 +20,7 @@ import {
   ladeVorgaenge,
   ladeVorgang,
   mahnungAdresse,
+  merkeFallAn,
   setzeVorgangZustand,
   verwerfeVorgang,
 } from "./api";
@@ -234,6 +235,9 @@ function VorgangInhalt({
   const [text, setText] = useState(offen.text);
   const [kopiert, setKopiert] = useState(false);
   const [entwurf, setEntwurf] = useState<Mailentwurf | null>(null);
+  const [fallLaeuft, setFallLaeuft] = useState(false);
+  const [fallVorgemerkt, setFallVorgemerkt] = useState(false);
+  const [fallFehler, setFallFehler] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -274,6 +278,31 @@ function VorgangInhalt({
     window.location.href = ziel;
   }
 
+  /**
+   * Einen Sportgerichtsfall in DFBnet vormerken.
+   *
+   * **Das eröffnet ein Verfahren gegen eine benannte Person.** Deshalb ein
+   * eigener Knopf und nicht beim Abhaken nebenbei, anders als die
+   * Prüferfreigabe.
+   *
+   * Vorgemerkt, nicht getan: angelegt wird es vom Prüfdienst, und der arbeitet
+   * nur, wenn die Übertragung nicht pausiert ist. Fehlt dem Fall eine
+   * Pflichtangabe, sagt die Antwort welche — meist das Sportgericht, das an
+   * der Staffel steht.
+   */
+  async function fallVormerken() {
+    setFallLaeuft(true);
+    setFallFehler("");
+    try {
+      await merkeFallAn(offen.id);
+      setFallVorgemerkt(true);
+    } catch (f) {
+      setFallFehler(f instanceof Error ? f.message : "Unbekannter Fehler");
+    } finally {
+      setFallLaeuft(false);
+    }
+  }
+
   return (
     <div className={stil.befunde}>
       <p className={stil.vorgangHinweis}>
@@ -310,6 +339,19 @@ function VorgangInhalt({
         </Hinweis>
       )}
 
+      {fallFehler && (
+        <Hinweis ton="fehler" dringend>
+          {fallFehler}
+        </Hinweis>
+      )}
+
+      {fallVorgemerkt && (
+        <Hinweis ton="neutral">
+          Der Fall ist vorgemerkt. Angelegt wird er vom Prüfdienst — solange die
+          Übertragung pausiert, passiert nichts.
+        </Hinweis>
+      )}
+
       <div className={stil.knoepfe}>
         <Knopf groesse="sm" onClick={() => void onSpeichern({ empfaenger, text })}>
           Speichern
@@ -329,6 +371,16 @@ function VorgangInhalt({
           >
             Mahnung (PDF)
           </KnopfVerweis>
+        )}
+        {offen.art === "sportgericht" && (
+          <Knopf
+            groesse="sm"
+            auspraegung="sekundaer"
+            onClick={() => void fallVormerken()}
+            disabled={fallLaeuft}
+          >
+            {fallVorgemerkt ? "Vorgemerkt" : "Fall in DFBnet vormerken"}
+          </Knopf>
         )}
         {NAECHSTE[offen.zustand].map((z) => (
           <Knopf

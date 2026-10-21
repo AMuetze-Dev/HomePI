@@ -22,7 +22,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from . import aufstellung, auswahl, dienst, freigabe, meldung
+from . import aufstellung, auswahl, dienst, fallanlage, freigabe, meldung
 from .bericht import MatchReport, MatchReportExtractor
 from .dienst import Spielzeile, Staffelkennung, StaffelNichtGefunden
 
@@ -492,6 +492,22 @@ class DfbnetLeser:
                 popup.close()
             except Exception:
                 logger.exception("Das Berichtsfenster liess sich nicht schliessen")
+
+    def fall_anlegen(self, anlage: fallanlage.Anlage) -> fallanlage.Ergebnis:
+        """Einen Sportgerichtsfall in DFBnet anlegen.
+
+        **Die folgenreichste Handlung dieses Dienstes** -- sie eroeffnet ein
+        Verfahren gegen eine benannte Person. Sie passiert nur, wenn beide
+        Schalter an sind und der Staffelleiter sie ausdruecklich vorgemerkt
+        hat; darueber wacht die Schleife.
+
+        Ueber den Kontext der angemeldeten Seite und in einem eigenen Fenster:
+        die Sportgerichtsbarkeit ist ein anderes Modul, und der Prueflauf soll
+        seine Trefferliste nicht verlieren.
+        """
+        if self._seite is None:
+            return fallanlage.Ergebnis(False, "Es ist keine DFBnet-Sitzung offen")
+        return fallanlage.fall_anlegen(self._seite.context, anlage)
 
     def _verlauf(self, popup: Any, kennung: str) -> str:
         """Der Reiter "Spielverlauf".

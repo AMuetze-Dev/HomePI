@@ -232,6 +232,22 @@ Ein Kreuz wird nur gesetzt, wo der Verband einen Tatbestand vorsieht
 Zuordnung bekommt keins. Ein geratenes Kreuz behauptete etwas, das niemand
 geprueft hat.
 
+### Ein Fall beim Sportgericht
+
+`POST /vorgaenge/{id}/fallanlage` merkt einen Sportgerichtsfall vor. **Das
+eroeffnet ein Verfahren gegen eine benannte Person** -- deshalb haengt es an
+einem eigenen Aufruf und passiert nie nebenbei, wenn jemand einen Spielbericht
+abhakt. Die Prueferfreigabe tut das; ein Verfahren nicht.
+
+Vorgemerkt, nicht getan: angelegt wird es vom Pruefdienst, und der arbeitet
+nur, wenn die Uebertragung nicht pausiert ist.
+
+Abgewiesen wird **hier** und nicht draussen am Formular, wenn eine der vier
+Pflichtangaben fehlt, die DFBnet verlangt: Art des Vorgangs, Sportgericht an
+der Staffel, Spielnummer am Bericht, Grund am Vorgang. Eine vorgemerkte Zeile,
+der eine davon fehlt, scheitert sonst erst im Browser -- und ihre Ursache
+liegt zwei Klicks entfernt in den Staffeleinstellungen.
+
 ### Die Saetze
 
 Welcher Satz zu welchem Vergehen gehoert, steht in `vordrucke/texte.yaml`:
@@ -318,6 +334,18 @@ ALTER TABLE staffelpilot_befunde
 Darin stehen Zeitstempel, Rollen und Passnummern -- die Werte, die im
 Schreiben an der Stelle eines Platzhalters landen. Ein alter Befund hat sie
 nicht; dann faellt der Satzteil weg, statt eine Luecke zu hinterlassen.
+
+**Seit 21.10.2026: das Sportgericht an der Staffel.**
+
+```sql
+ALTER TABLE staffelpilot_staffeln
+  ADD COLUMN sportgericht VARCHAR(200) NOT NULL DEFAULT '';
+```
+
+Es gehoert an die Staffel und nicht in die Einstellungen: wer Staffeln in zwei
+Gebieten fuehrt, hat nicht dasselbe Gericht. Leer heisst: aus dieser Staffel
+laesst sich kein Fall anlegen -- und das sagt die Route, statt vor einem
+falschen Gericht eines zu eroeffnen.
 
 ### Der Schlüssel für die Zugangsdaten
 

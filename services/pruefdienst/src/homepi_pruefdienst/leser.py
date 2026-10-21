@@ -14,6 +14,7 @@ import datetime as dt
 import hashlib
 from typing import Protocol
 
+from . import fallanlage
 from .bericht import MatchReport
 from .dienst import Spielzeile, Staffelkennung
 
@@ -42,6 +43,10 @@ class Leser(Protocol):
         """Die Prueferfreigabe erteilen. (geklappt, was zu sehen war)"""
         ...
 
+    def fall_anlegen(self, anlage: fallanlage.Anlage) -> fallanlage.Ergebnis:
+        """Einen Sportgerichtsfall anlegen und sein Aktenzeichen melden."""
+        ...
+
     def schliessen(self) -> None: ...
 
 
@@ -67,6 +72,7 @@ class DemoLeser:
         self.spieltage = 0
         self.sichtbar = False
         self.freigegeben: list[str] = []
+        self.faelle: list[fallanlage.Anlage] = []
 
     def anmelden(self, benutzer: str, passwort: str) -> None:
         # Das Passwort wird bewusst nicht gemerkt: auch ein Demo-Leser soll
@@ -101,6 +107,18 @@ class DemoLeser:
         """
         self.freigegeben.append(kennung)
         return True, "Simuliert — es war kein Browser bei DFBnet"
+
+    def fall_anlegen(self, anlage: fallanlage.Anlage) -> fallanlage.Ergebnis:
+        """Der Demo-Leser eroeffnet kein Verfahren -- und sagt das.
+
+        Auch hier kein stiller Erfolg, und erst recht keiner mit erfundenem
+        Aktenzeichen: aus dieser Nummer entstuende die Mail an den
+        Sportrichter.
+        """
+        self.faelle.append(anlage)
+        return fallanlage.Ergebnis(
+            True, "Simuliert — es war kein Browser bei DFBnet", aktenzeichen=""
+        )
 
     def schliessen(self) -> None:
         self.geschlossen = True

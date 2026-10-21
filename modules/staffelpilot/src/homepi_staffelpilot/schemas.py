@@ -61,9 +61,11 @@ class StaffelAnlegen(BaseModel):
     saison: Annotated[str, Field(max_length=10)] = ""
     #: 0 heisst *nicht bekannt*. Siehe `modelle.Staffel.spieltage`.
     spieltage: Annotated[int, Field(ge=0, le=99)] = 0
+    #: Das zustaendige Sportgericht. Siehe `modelle.Staffel.sportgericht`.
+    sportgericht: Annotated[str, Field(max_length=200)] = ""
     aktiv: bool = True
 
-    @field_validator("name", "spielklasse", "saison", mode="before")
+    @field_validator("name", "spielklasse", "saison", "sportgericht", mode="before")
     @classmethod
     def _trimmen(cls, wert: object) -> object:
         return _getrimmt(wert)
@@ -82,9 +84,10 @@ class StaffelAendern(BaseModel):
     spielklasse: NameFeld | None = None
     saison: Annotated[str, Field(max_length=10)] | None = None
     spieltage: Annotated[int, Field(ge=0, le=99)] | None = None
+    sportgericht: Annotated[str, Field(max_length=200)] | None = None
     aktiv: bool | None = None
 
-    @field_validator("name", "spielklasse", "saison", mode="before")
+    @field_validator("name", "spielklasse", "saison", "sportgericht", mode="before")
     @classmethod
     def _trimmen(cls, wert: object) -> object:
         return _getrimmt(wert)
@@ -99,6 +102,8 @@ class StaffelAusgabe(BaseModel):
     spielklasse: str
     saison: str
     spieltage: int
+    #: Das zustaendige Sportgericht, wortgleich mit der Auswahl in DFBnet.
+    sportgericht: str
     aktiv: bool
 
 

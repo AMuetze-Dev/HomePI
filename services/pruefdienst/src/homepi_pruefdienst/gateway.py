@@ -124,6 +124,17 @@ class Gateway:
         """
         return self._json("GET", f"/staffelpilot/spiele/{spiel_id}")  # type: ignore[no-any-return]
 
+    def vorgang(self, vorgang_id: str) -> dict[str, Any]:
+        """Ein Vorgang mit Grund und Text.
+
+        Fuer die Fallanlage: der Tatbestand, den DFBnet im Formular verlangt,
+        steht am Vorgang und nicht am Spielbericht. Er wird **frisch gelesen**
+        und nicht aus der Warteschlange mitgeschleppt -- zwischen Vormerken und
+        Anlegen kann der Staffelleiter ihn noch korrigiert haben, und was im
+        Verfahren steht, soll das Spaetere sein.
+        """
+        return self._json("GET", f"/staffelpilot/vorgaenge/{vorgang_id}")  # type: ignore[no-any-return]
+
     def regeln(self) -> list[dict[str, Any]]:
         """Der Regelkatalog, wie er im Artefakt steht -- mit den Schaltern."""
         return self._json("GET", "/staffelpilot/regeln")  # type: ignore[no-any-return]

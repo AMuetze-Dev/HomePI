@@ -29,6 +29,7 @@ from .dienst import (
     darf_angefordert_werden,
     darf_zurueckgenommen_werden,
     entscheidung_pruefen,
+    fall_pruefen,
     ist_faellig,
     mannschaft_unsicher,
     mannschaftsart_fuer,
@@ -507,6 +508,38 @@ def _formular(
         spielort=spiel.spielort,
         verein=vorgang.verein or befund.mannschaft,
         kreuze=mahnung.kreuze_fuer([befund.regel]),
+    )
+
+
+@router.post(
+    "/vorgaenge/{vorgang_id}/fallanlage",
+    summary="Einen Sportgerichtsfall in DFBnet vormerken",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[erfordert("staffelpilot", Rolle.VERWALTER)],
+)
+async def vorgang_fallanlage(vorgang_id: uuid.UUID, sitzung: DbSitzung) -> UebertragungAusgabe:
+    """Einen Fall beim Sportgericht vormerken.
+
+    **Das eröffnet ein Verfahren gegen eine benannte Person.** Deshalb hängt es
+    an einem eigenen Knopf und passiert nie nebenbei, weil jemand einen
+    Spielbericht abgehakt hat — anders als die Prüferfreigabe.
+
+    Vorgemerkt, nicht getan: angelegt wird es vom DFBnet-Dienst, und der
+    arbeitet nur, wenn die Übertragung nicht pausiert ist. Fehlt eine
+    Pflichtangabe, wird hier abgewiesen statt draußen am Formular.
+    """
+    vorgang, befund, spiel, staffel = await speicher.vorgang_mit_spiel(sitzung, vorgang_id)
+    fall_pruefen(
+        vorgang.art,
+        staffel.sportgericht,
+        spiel.spielnummer,
+        vorgang.grund or befund.text,
+    )
+    return UebertragungAusgabe.model_validate(
+        await speicher.uebertragung_einreihen(
+            sitzung,
+            UebertragungEinreihen(aktion="fallanlage", referenz=str(vorgang_id), spiel_id=spiel.id),
+        )
     )
 
 

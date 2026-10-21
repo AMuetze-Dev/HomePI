@@ -330,3 +330,48 @@ def test_der_sportgerichtsantrag_nimmt_denselben_satz() -> None:
     assert "Max Müller gleichzeitig als Leiter Ordnungsdienst" in schreiben.text
     # Ein Antrag ist keine Mahnung: der Folgesatz gehört nicht hinein.
     assert "weiterer Verstoß dieser Mannschaft" not in schreiben.text
+
+
+# ── Ein Fall beim Sportgericht ────────────────────────────────────────────
+
+
+def test_aus_einer_mahnung_entsteht_kein_verfahren() -> None:
+    """Die Art des Vorgangs entscheidet, nicht der Knopf, den jemand trifft."""
+    with pytest.raises(dienst.FallNichtAnlegbar) as fehler:
+        dienst.fall_pruefen("mahnung", "Sportgericht X", "633203004", "Tätlichkeit")
+
+    assert "sportgericht" in str(fehler.value)
+    assert fehler.value.status == 409
+
+
+@pytest.mark.parametrize(
+    ("sportgericht", "spielnummer", "tatbestand", "erwartet"),
+    [
+        ("", "633203004", "Tätlichkeit", "Sportgericht"),
+        ("Sportgericht X", "", "Tätlichkeit", "Spielnummer"),
+        ("Sportgericht X", "633203004", "", "Grund"),
+        ("Sportgericht X", "633203004", "   ", "Grund"),
+    ],
+)
+def test_jede_fehlende_pflichtangabe_wird_benannt(
+    sportgericht: str, spielnummer: str, tatbestand: str, erwartet: str
+) -> None:
+    """Eine Meldung, die nur „unvollständig" sagt, kostet eine Stunde Suchen."""
+    with pytest.raises(dienst.FallNichtAnlegbar) as fehler:
+        dienst.fall_pruefen("sportgericht", sportgericht, spielnummer, tatbestand)
+
+    assert erwartet in str(fehler.value)
+
+
+def test_mehrere_fehlende_stehen_zusammen_in_einem_satz() -> None:
+    with pytest.raises(dienst.FallNichtAnlegbar) as fehler:
+        dienst.fall_pruefen("sportgericht", "", "", "")
+
+    text = str(fehler.value)
+    assert "Sportgericht" in text
+    assert "Spielnummer" in text
+    assert "Grund" in text
+
+
+def test_ein_vollstaendiger_fall_kommt_durch() -> None:
+    dienst.fall_pruefen("sportgericht", "Sportgericht X", "633203004", "Tätlichkeit")

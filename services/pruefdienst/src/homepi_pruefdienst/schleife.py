@@ -12,7 +12,7 @@ import datetime as dt
 import logging
 from typing import Any
 
-from . import dienst, katalog, regeln
+from . import dienst, fallanlage, katalog, regeln
 from .auskunft import GatewayAuskunft
 from .gateway import Gateway, GatewayFehler
 from .leser import BeispielLeser, Leser
@@ -431,10 +431,12 @@ class Prueflauf:
         if isinstance(self._leser, BeispielLeser):
             return True, "Simuliert — es war kein Browser bei DFBnet"
 
+        if aktion == "fallanlage":
+            return self._fall_anlegen(zeile)
+
         if aktion != "prueferfreigabe":
-            # Die Fallanlage ist nicht portiert. Eine Zeile auf "fertig" zu
-            # setzen, ohne dass etwas passiert ist, wäre die schlimmste aller
-            # Auskünfte.
+            # Eine Zeile auf "fertig" zu setzen, ohne dass etwas passiert ist,
+            # wäre die schlimmste aller Auskünfte.
             return False, f"Die Aktion {aktion!r} ist noch nicht portiert"
 
         spiel_id = str(zeile.get("spiel_id") or zeile.get("referenz") or "")
@@ -451,6 +453,58 @@ class Prueflauf:
             return False, "Der Spielbericht steht nicht in der Trefferliste von DFBnet"
 
         return self._leser.freigeben(str(spiel["dfbnet_id"]))
+
+    def _fall_anlegen(self, zeile: dict[str, Any]) -> tuple[bool, str]:
+        """Einen Sportgerichtsfall in DFBnet anlegen.
+
+        **Die folgenreichste Handlung dieses Dienstes.** Sie eröffnet ein
+        Verfahren gegen eine benannte Person. Vorgemerkt wird sie nur über
+        einen eigenen Knopf am Vorgang, nie nebenbei beim Abhaken -- das
+        Artefakt hat dort schon geprüft, dass die Pflichtangaben da sind.
+
+        Hier wird trotzdem nochmal gelesen statt verlassen: zwischen Vormerken
+        und Anlegen liegen Minuten bis Tage, und der Tatbestand, der im
+        Verfahren steht, soll der sein, der jetzt am Vorgang steht.
+        """
+        vorgang_id = str(zeile.get("referenz") or "")
+        spiel_id = str(zeile.get("spiel_id") or "")
+        if not vorgang_id or not spiel_id:
+            return False, "Zu dieser Übertragung fehlt der Vorgang oder das Spiel"
+
+        try:
+            vorgang = self._gateway.vorgang(vorgang_id)
+            spiel = self._gateway.spiel(spiel_id)
+            staffeln = {str(s["id"]): s for s in self._gateway.staffeln()}
+        except Exception as fehler:
+            logger.exception("Die Angaben zum Fall liessen sich nicht lesen")
+            return False, f"Die Angaben zum Fall liessen sich nicht lesen: {fehler}"
+
+        staffel = staffeln.get(str(spiel.get("staffel_id")))
+        if staffel is None:
+            return False, "Zu diesem Spiel gibt es keine Staffel mehr"
+
+        anlage = fallanlage.Anlage(
+            spielkennung=str(spiel.get("spielnummer") or ""),
+            saison=str(staffel.get("saison") or ""),
+            gericht=str(staffel.get("sportgericht") or ""),
+            tatbestand=str(vorgang.get("grund") or ""),
+        )
+        fehlt = anlage.fehlende_felder()
+        if fehlt:
+            # Dieselbe Liste wie im Artefakt. Dass sie hier erneut geprüft
+            # wird, ist Absicht: die Angaben können sich seit dem Vormerken
+            # geändert haben, und ein Browser soll gar nicht erst starten.
+            return False, "Es fehlt noch: " + ", ".join(fehlt) + "."
+
+        try:
+            ergebnis = self._leser.fall_anlegen(anlage)
+        except fallanlage.FallanlageFehler as fehler:
+            logger.warning("Fallanlage gescheitert: %s", fehler)
+            return False, str(fehler)
+        except Exception as fehler:  # pragma: no cover - unerwartet
+            logger.exception("Fallanlage gescheitert")
+            return False, f"Die Fallanlage ist gescheitert: {fehler}"
+        return ergebnis.erfolg, ergebnis.meldung
 
     def _trefferliste_fuer(self, spiel: dict[str, Any]) -> bool:
         """DFBnet auf den Spieltag dieses Berichts stellen.

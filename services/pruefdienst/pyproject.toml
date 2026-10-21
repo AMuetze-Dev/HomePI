@@ -95,6 +95,13 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 # Und fuer die Freigabe: uebernommen samt eingebettetem JavaScript, das
 # sich nicht umbrechen laesst, ohne den Selektor zu veraendern.
 "src/homepi_pruefdienst/freigabe.py" = ["E501", "RUF001", "RUF002", "RUF003"]
+# Und fuer die Fallanlage, aus demselben Grund: woertlich uebernommen, die
+# Selektoren am 31.08.2026 am lebenden Modul abgelesen. Wer sie umbricht oder
+# die Anfuehrungszeichen begradigt, aendert Zeichenketten, die DFBnet liest.
+"src/homepi_pruefdienst/fallanlage.py" = ["E501", "RUF001", "RUF002", "RUF003"]
+# Die uebernommenen Tests dazu halten die nachgebaute Seite -- dieselben
+# Zeichen, dieselben Formen.
+"tests/unit/test_fallanlage.py" = ["E501", "RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -127,4 +134,12 @@ ignore_errors = true
 # des Status, nicht eine Typannotation an einem Playwright-Locator.
 [[tool.mypy.overrides]]
 module = "homepi_pruefdienst.freigabe"
+ignore_errors = true
+
+# Und die Fallanlage. Ebenfalls woertlich uebernommen; ihre Zusicherung ist
+# das Zurueckstellen vor dem Speichern -- unvollstaendige Anlage, kein
+# Treffer, halb gerendertes Formular, falsches Spiel -, nicht eine
+# Typannotation an einem Playwright-Locator.
+[[tool.mypy.overrides]]
+module = "homepi_pruefdienst.fallanlage"
 ignore_errors = true

@@ -16,6 +16,7 @@ function staffel(rest: Partial<api.Staffel> = {}): api.Staffel {
     spielklasse: "3.Kreisliga (C)",
     saison: "26/27",
     spieltage: 0,
+    sportgericht: "",
     aktiv: true,
     ...rest,
   };
