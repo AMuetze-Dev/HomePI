@@ -99,24 +99,29 @@ export function EinstellungenTafel() {
           value={werte.absender}
           onChange={(e) => aendern("absender", e.target.value)}
         />
-        <Feld
-          beschriftung="Prüfzeitraum (Tage)"
-          hinweis="Wie weit zurück ein Spiel noch geprüft wird."
-          type="number"
-          min={1}
-          max={365}
-          value={String(werte.pruefzeitraum_tage)}
-          onChange={(e) => aendern("pruefzeitraum_tage", Number(e.target.value))}
-        />
-        <Feld
-          beschriftung="Frist (Tage)"
-          hinweis="Wie lange ein Verein Zeit bekommt zu antworten."
-          type="number"
-          min={1}
-          max={90}
-          value={String(werte.frist_tage)}
-          onChange={(e) => aendern("frist_tage", Number(e.target.value))}
-        />
+        {/* Zwei Zahlen nebeneinander statt untereinander. Ein Feld ueber die
+            ganze Breite fuer "30" ist siebenhundert Pixel fuer zwei Ziffern --
+            und macht die Seite zweimal so lang, wie sie sein muesste. */}
+        <div className={stil.zahlenpaar}>
+          <Feld
+            beschriftung="Prüfzeitraum (Tage)"
+            hinweis="Wie weit zurück ein Spiel noch geprüft wird."
+            type="number"
+            min={1}
+            max={365}
+            value={String(werte.pruefzeitraum_tage)}
+            onChange={(e) => aendern("pruefzeitraum_tage", Number(e.target.value))}
+          />
+          <Feld
+            beschriftung="Frist (Tage)"
+            hinweis="Wie lange ein Verein Zeit bekommt zu antworten."
+            type="number"
+            min={1}
+            max={90}
+            value={String(werte.frist_tage)}
+            onChange={(e) => aendern("frist_tage", Number(e.target.value))}
+          />
+        </div>
 
         <label className={stil.schalter}>
           <input

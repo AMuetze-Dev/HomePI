@@ -412,16 +412,18 @@ function Uebertragungsstreifen({
       )}
 
       <ul className={stil.kennzahlen} aria-label="Übertragung">
+        {/* Drei Nullen nebeneinander waren drei Blickfaenge ohne Inhalt.
+            Was nichts zu tun gibt, tritt zurueck. */}
         <li className={stil.kennzahl}>
-          <span className={stil.zahl}>{stand.offen}</span>
+          <span className={stand.offen ? stil.zahl : stil.zahlLeer}>{stand.offen}</span>
           <span className={stil.zahlName}>vorgemerkt</span>
         </li>
         <li className={stil.kennzahl}>
-          <span className={stil.zahl}>{stand.fertig}</span>
+          <span className={stand.fertig ? stil.zahl : stil.zahlLeer}>{stand.fertig}</span>
           <span className={stil.zahlName}>eingetragen</span>
         </li>
         <li className={stil.kennzahl}>
-          <span className={stand.fehler > 0 ? stil.zahlWarnend : stil.zahl}>
+          <span className={stand.fehler ? stil.zahlWarnend : stil.zahlLeer}>
             {stand.fehler}
           </span>
           <span className={stil.zahlName}>gescheitert</span>

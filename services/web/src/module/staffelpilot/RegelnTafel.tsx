@@ -34,9 +34,40 @@ const WEG_WORT = {
  * Regel meldet nichts mehr, und wo ein eigener Satz steht, steht er später im
  * Schreiben an den Verein. Geprüft wird im Prüfdienst, der hier nachliest.
  */
+/** Wonach sich die Liste einschränken lässt. */
+const FILTER = {
+  alle: "Alle",
+  aktiv: "An",
+  aus: "Aus",
+  schreiben: "Mit Schreiben",
+} as const;
+
+type Filter = keyof typeof FILTER;
+
+/**
+ * Ob eine Regel bei dieser Einschränkung sichtbar bleibt.
+ *
+ * Als eigene Funktion, nicht als Kette im JSX: so steht die Bedeutung der
+ * vier Fälle an einer Stelle, und „Mit Schreiben" heißt nachlesbar „aus ihr
+ * entsteht eine Mahnung oder ein Antrag".
+ */
+function passt(regel: Regel, filter: Filter, suche: string): boolean {
+  const wort = suche.trim().toLowerCase();
+  if (wort) {
+    const heuhaufen = `${regel.name} ${regel.beschreibung} ${regel.schluessel}`.toLowerCase();
+    if (!heuhaufen.includes(wort)) return false;
+  }
+  if (filter === "aktiv") return regel.aktiv;
+  if (filter === "aus") return !regel.aktiv;
+  if (filter === "schreiben") return regel.weg !== "kein";
+  return true;
+}
+
 export function RegelnTafel() {
   const [regeln, setRegeln] = useState<Regel[] | null>(null);
   const [fehler, setFehler] = useState("");
+  const [filter, setFilter] = useState<Filter>("alle");
+  const [suche, setSuche] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -77,6 +108,8 @@ export function RegelnTafel() {
     );
   }
 
+  const sichtbar = regeln.filter((r) => passt(r, filter, suche));
+
   if (regeln.length === 0) {
     return (
       <Leerzustand titel="Kein Regelkatalog">
@@ -94,8 +127,53 @@ export function RegelnTafel() {
         </Hinweis>
       )}
 
+      {/* Vierundvierzig Regeln als vierundvierzig Karten waren fünf
+          Bildschirme ohne jeden Griff: keine Suche, kein Filter, und die
+          eine, die man sucht, findet man durch Scrollen. */}
+      {/* Alles in einer Zeile. Untereinander waren Filter, Beschriftung,
+          Feld, Hinweis und Zaehler zusammen ein Viertel des Bildschirms --
+          bevor eine einzige Regel kam. Der Hinweis steckt jetzt im
+          Platzhalter, wo man ihn liest, wenn man das Feld ansieht. */}
+      <div className={stil.werkzeugleiste}>
+        <div className={stil.filterZeile} role="group" aria-label="Regeln einschränken">
+          {(Object.keys(FILTER) as Filter[]).map((f) => (
+            <Knopf
+              key={f}
+              groesse="sm"
+              auspraegung={filter === f ? "primaer" : "leise"}
+              aria-pressed={filter === f}
+              onClick={() => setFilter(f)}
+            >
+              {FILTER[f]}
+            </Knopf>
+          ))}
+        </div>
+
+        <input
+          type="search"
+          className={stil.suchfeld}
+          aria-label="Suchen"
+          placeholder="Name, Beschreibung oder Kennung"
+          value={suche}
+          onChange={(e) => setSuche(e.target.value)}
+        />
+
+        <span className={stil.zaehler}>
+          {sichtbar.length === regeln.length
+            ? `${regeln.length} Regeln`
+            : `${sichtbar.length} von ${regeln.length}`}
+        </span>
+      </div>
+
+      {sichtbar.length === 0 && (
+        <Leerzustand titel="Keine Regel passt dazu">
+          Die Einschränkung oben nimmt alle weg. Mit „Alle" und leerer Suche
+          stehen wieder alle {regeln.length} da.
+        </Leerzustand>
+      )}
+
       <ul className={stil.liste} aria-label="Regeln">
-        {regeln.map((r) => (
+        {sichtbar.map((r) => (
           <li key={r.id}>
             <Karte>
               <label className={stil.ankreuz}>

@@ -172,3 +172,92 @@ describe("Die Sätze fürs Schreiben", () => {
     expect(screen.getByRole("button", { name: "Speichern" })).toBeDisabled();
   });
 });
+
+describe("Einschränken", () => {
+  const dreiRegeln = () => [
+    // Jede mit eigener Beschreibung: die Vorgabe traegt selbst das Wort
+    // "Feldverweis", und dann traefe die Suche danach zwei Regeln.
+    regel({
+      id: "r1",
+      name: "Feldverweis auf Dauer",
+      schluessel: "rote_karte",
+      weg: "sportgericht",
+      beschreibung: "Meldet jeden Platzverweis.",
+    }),
+    regel({
+      id: "r2",
+      name: "Bestätigung fehlt",
+      schluessel: "confirmation_missing",
+      weg: "mahnung",
+      beschreibung: "Eine Mannschaft hat nicht bestätigt.",
+    }),
+    regel({
+      id: "r3",
+      name: "Dokumente am Spielbericht",
+      schluessel: "documents_present",
+      weg: "kein",
+      aktiv: false,
+      beschreibung: "Nennt Anhaenge am Bericht.",
+    }),
+  ];
+
+  it("zählt, wie viele von wie vielen zu sehen sind", async () => {
+    // Vierundvierzig Karten ohne diese Zeile sind fünf Bildschirme, von denen
+    // man nicht weiß, ob sie vollständig sind.
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue(dreiRegeln());
+    render(<RegelnTafel />);
+
+    expect(await screen.findByText("3 Regeln")).toBeInTheDocument();
+  });
+
+  it("sucht im Namen", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue(dreiRegeln());
+    render(<RegelnTafel />);
+
+    await userEvent.type(await screen.findByLabelText("Suchen"), "Feldverweis");
+
+    expect(await screen.findByText("1 von 3")).toBeInTheDocument();
+    expect(screen.queryByText("Bestätigung fehlt")).toBeNull();
+  });
+
+  it("sucht auch in der technischen Kennung", async () => {
+    // Beim Nachsehen, warum ein Befund so heißt, hat man die Kennung und
+    // nicht den Namen.
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue(dreiRegeln());
+    render(<RegelnTafel />);
+
+    await userEvent.type(await screen.findByLabelText("Suchen"), "confirmation");
+
+    expect(await screen.findByText("1 von 3")).toBeInTheDocument();
+  });
+
+  it("zeigt auf Wunsch nur die abgeschalteten", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue(dreiRegeln());
+    render(<RegelnTafel />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Aus" }));
+
+    expect(await screen.findByText("1 von 3")).toBeInTheDocument();
+    expect(screen.getByText("Dokumente am Spielbericht")).toBeInTheDocument();
+  });
+
+  it("zeigt auf Wunsch nur die, aus denen ein Schreiben entsteht", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue(dreiRegeln());
+    render(<RegelnTafel />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Mit Schreiben" }));
+
+    expect(await screen.findByText("2 von 3")).toBeInTheDocument();
+  });
+
+  it("sagt es, wenn die Einschränkung alles wegnimmt", async () => {
+    // Eine leere Liste ohne Erklärung sieht aus wie ein leerer Regelkatalog -
+    // und dann sucht jemand den Fehler im Prüfdienst.
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue(dreiRegeln());
+    render(<RegelnTafel />);
+
+    await userEvent.type(await screen.findByLabelText("Suchen"), "gibtesnicht");
+
+    expect(await screen.findByText(/Keine Regel passt dazu/)).toBeInTheDocument();
+  });
+});

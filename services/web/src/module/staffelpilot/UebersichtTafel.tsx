@@ -181,6 +181,21 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
   );
 }
 
+/**
+ * Wie laut eine Zahl auftritt.
+ *
+ * Leer, wenn es nichts zu tun gibt; warnend nur, wenn wirklich etwas offen
+ * ist. Eine Null in Rot wäre eine Warnung ohne Anlass, eine Null in voller
+ * Schriftstärke ein Blickfang ohne Inhalt.
+ */
+// Der Rueckgabetyp ist `string | undefined` und nicht `string`: die
+// Stilklassen sind so getypt, und `className` nimmt beides. Ein `!` hier
+// waere eine Behauptung ueber eine Datei, die der Uebersetzer erzeugt.
+function zahlStil(wert: number, warnend?: boolean): string | undefined {
+  if (wert === 0) return stil.zahlLeer;
+  return warnend ? stil.zahlWarnend : stil.zahl;
+}
+
 function Zahl({
   wert,
   name,
@@ -197,7 +212,11 @@ function Zahl({
       {/* Jede Zahl ist ein Weg dorthin, wo man etwas damit tut. Eine Zahl,
           die nur dasteht, lässt den Leser die Navigation suchen. */}
       <button type="button" className={stil.kennzahlKnopf} onClick={onKlick}>
-        <span className={warnend && wert > 0 ? stil.zahlWarnend : stil.zahl}>{wert}</span>
+        {/* Drei Stufen, nicht zwei. Eine Null ist eine gute Nachricht und
+            braucht keine Aufmerksamkeit -- sie stand hier aber genauso laut da
+            wie "8 kritische Befunde" daneben. Was nichts zu tun gibt, tritt
+            zurueck. */}
+        <span className={zahlStil(wert, warnend)}>{wert}</span>
         <span className={stil.zahlName}>{name}</span>
       </button>
     </li>
