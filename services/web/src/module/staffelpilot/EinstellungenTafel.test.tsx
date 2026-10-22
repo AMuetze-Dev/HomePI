@@ -175,13 +175,17 @@ describe("Einstellungen", () => {
       );
     });
 
-    it("sagt, dass im Container nichts zu sehen ist", async () => {
-      // Sonst legt jemand den Schalter um, sieht nichts und sucht den Fehler
-      // im Prüflauf.
+    it("sagt, wo das Zusehen stattfindet", async () => {
+      // Sonst legt jemand den Schalter um und sucht das Fenster.
+      //
+      // Vorher stand hier die Zusicherung, dass im Container *nichts* zu
+      // sehen ist -- damals die ehrliche Auskunft. Seit es das
+      // Vorschaufenster gibt, waere sie falsch; der Schalter muss jetzt
+      // sagen, wohin man schaut.
       mitWerten();
       render(<EinstellungenTafel />);
 
-      expect(await screen.findByText(/kein(en)? Bildschirm/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Vorschaufenster/i)).toBeInTheDocument();
     });
   });
 });

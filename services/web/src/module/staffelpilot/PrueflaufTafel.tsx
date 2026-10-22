@@ -173,8 +173,12 @@ export function PrueflaufTafel({
                 </select>
               </label>
             )}
+            {/* Eine Rangfolge. Vorher sahen alle drei gleich aus, obwohl
+                der erste die taegliche Handlung ist und die beiden anderen
+                zweimal im Jahr gebraucht werden. */}
             <div className={stil.knoepfe}>
               <Knopf
+                auspraegung="primaer"
                 onClick={() =>
                   void handeln(() => fordereAuftragAn("pruflauf", staffelId || undefined))
                 }
@@ -182,7 +186,7 @@ export function PrueflaufTafel({
                 Prüflauf anfordern
               </Knopf>
               <Knopf
-                auspraegung="sekundaer"
+                auspraegung="leise"
                 onClick={() =>
                   void handeln(() =>
                     fordereAuftragAn("initialisierung", staffelId || undefined),
@@ -196,7 +200,7 @@ export function PrueflaufTafel({
                   die Pruefung gescheitert, an einer Spielklasse, die DFBnet
                   nicht kennt. */}
               <Knopf
-                auspraegung="sekundaer"
+                auspraegung="leise"
                 onClick={() => void handeln(() => fordereAuftragAn("staffeln"))}
               >
                 Meine Staffeln aus DFBnet holen

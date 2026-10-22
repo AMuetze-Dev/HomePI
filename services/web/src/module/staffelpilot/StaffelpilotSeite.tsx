@@ -245,18 +245,27 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
             />
           )}
 
-          <div className={stil.filterZeile}>
-            <Knopf
-              groesse="sm"
-              auspraegung={nurFaellig ? "primaer" : "leise"}
-              aria-pressed={nurFaellig}
-              onClick={() => {
-                setOffenesSpiel(null);
-                setNurFaellig(!nurFaellig);
-              }}
-            >
-              Nur fällige
-            </Knopf>
+          {/* Zwei Knoepfe statt eines Schalters.
+              Vorher stand "Nur fällige" allein da und war im Aus-Zustand
+              ("leise") von Fliesstext nicht zu unterscheiden -- man sah ihm
+              weder an, dass man ihn druecken kann, noch ob er an ist. Zu
+              zweit liest sich die Zeile als Auswahl, und welche gilt, steht
+              da. Genauso machen es die Vorgaenge schon. */}
+          <div className={stil.filterZeile} role="group" aria-label="Welche Spiele">
+            {([false, true] as const).map((nur) => (
+              <Knopf
+                key={String(nur)}
+                groesse="sm"
+                auspraegung={nurFaellig === nur ? "primaer" : "leise"}
+                aria-pressed={nurFaellig === nur}
+                onClick={() => {
+                  setOffenesSpiel(null);
+                  setNurFaellig(nur);
+                }}
+              >
+                {nur ? "Nur fällige" : "Alle"}
+              </Knopf>
+            ))}
           </div>
 
           {spiele.length === 0 ? (
@@ -361,8 +370,12 @@ function SpielKarte({
           {zeile.heim} – {zeile.gast}
         </span>
         <span className={stil.zeile}>
-          <span className={stil.datum}>{alsDatum(zeile.datum)}</span>
-          {zeile.ergebnis && <span className={stil.datum}>{zeile.ergebnis}</span>}
+          {/* Feste Spalten. Vorher standen Datum, Ergebnis und Etiketten
+              einfach nebeneinander -- und weil die Etiketten je Zeile
+              verschieden breit sind, sass das Datum jedes Mal woanders. Eine
+              Liste, die man herunterscannt, braucht eine Kante. */}
+          <span className={stil.spalteDatum}>{alsDatum(zeile.datum)}</span>
+          <span className={stil.spalteErgebnis}>{zeile.ergebnis}</span>
           {zeile.abgehakt && <Etikett ton="gut">abgehakt</Etikett>}
           {!zeile.faellig && !zeile.abgehakt && (
             <Etikett>außerhalb des Prüfzeitraums</Etikett>

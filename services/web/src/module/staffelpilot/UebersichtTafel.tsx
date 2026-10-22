@@ -161,7 +161,9 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
                     {z.heim} – {z.gast}
                   </span>
                   <span className={stil.zeile}>
-                    <span className={stil.datum}>{alsDatum(z.datum)}</span>
+                    {/* Feste Spalte, damit das Datum unter dem Datum steht --
+                        siehe `spalteDatum`. */}
+                    <span className={stil.spalteDatum}>{alsDatum(z.datum)}</span>
                     {z.kritische_befunde > 0 && (
                       <Etikett ton="fehler">{z.kritische_befunde} kritisch</Etikett>
                     )}

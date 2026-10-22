@@ -166,6 +166,12 @@ function Saetze({
   return (
     <details className={stil.saetze}>
       <summary className={stil.saetzeKopf}>
+        {/* Ein eigenes Zeichen statt des Browser-Dreiecks: das ist je nach
+            Browser mal da, mal nicht, und ohne irgendeines sah die Zeile wie
+            Fliesstext aus -- niemand haette sie angeklickt. */}
+        <span aria-hidden="true" className={stil.saetzePfeil}>
+          ▸
+        </span>
         Text fürs Schreiben
         {(regel.sachverhalt || regel.hinweis) && <Etikett>eigener</Etikett>}
       </summary>

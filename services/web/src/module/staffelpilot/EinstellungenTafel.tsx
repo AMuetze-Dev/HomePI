@@ -128,10 +128,9 @@ export function EinstellungenTafel() {
           <span className={stil.schalterText}>
             <span>Beim Prüfen zusehen</span>
             <span className={stil.wahlName}>
-              Der Prüfdienst zeigt sein Browserfenster, statt im Verborgenen zu arbeiten.
-              Zum Zusehen schön, beim Arbeiten im Weg — das Fenster nimmt den Vordergrund.
-              Läuft der Dienst im Container, wo es keinen Bildschirm gibt, prüft er weiter
-              unsichtbar und schreibt das ins Protokoll.
+              Der Prüflauf schickt Abbilder der Seite, die er gerade vor sich hat; sie
+              stehen im Prüflauf als Vorschaufenster. Beim Scheitern bleibt das letzte
+              stehen — daran sieht man, woran es lag. Kostet pro Abbild rund 85 KiB.
             </span>
           </span>
         </label>

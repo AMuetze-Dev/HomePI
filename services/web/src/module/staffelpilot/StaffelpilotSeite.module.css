@@ -567,3 +567,68 @@
   object-fit: cover;
   object-position: top left;
 }
+
+/* ── Spalten in einer Listenzeile ────────────────────────────────────── */
+/*
+ * Datum, Ergebnis und Etiketten standen einfach nebeneinander. Weil die
+ * Etiketten je Zeile verschieden breit sind ("2 offen" gegen "1 kritisch
+ * 5 offen"), sass das Datum in jeder Zeile woanders -- und die Kante, wegen
+ * der die Liste ueberhaupt einzeilig wurde, gab es gar nicht.
+ *
+ * Feste Mindestbreiten statt eines Rasters: die Zahl der Etiketten wechselt
+ * je Zeile, ein Raster braeuchte dafuer eine feste Spaltenzahl.
+ */
+.spalteDatum,
+.spalteErgebnis {
+  font-size: var(--text-sm);
+  color: var(--farbe-text-leise);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  flex: 0 0 auto;
+}
+
+/* "18.10.2026" -- breit genug fuer jedes Datum, nicht breiter.
+ *
+ * `order` schiebt es ans Ende der Zeile, hinter die Etiketten. Feste Breiten
+ * allein genuegten nicht: gemessen am 22.10.2026 sass das Datum bei vier
+ * Zeilen auf 752 px und bei zweien auf 677 -- die laengeren Etiketten
+ * ("1 kritisch" und "5 offen") schoben die ganze rechtsbuendige Gruppe nach
+ * links. Ganz rechts steht es immer an derselben Stelle, und die Etiketten
+ * wachsen nach links weg.
+ *
+ * Im DOM bleibt es vorn: vorgelesen gehoert das Datum vor die Etiketten.
+ */
+.spalteDatum {
+  min-width: 5.5rem;
+  order: 2;
+}
+
+/* "10 : 0" -- und leer, solange kein Ergebnis da ist. Die Spalte bleibt
+   trotzdem stehen, sonst ruecken die Etiketten der ungespielten Zeilen
+   gegenueber den gespielten nach links. */
+.spalteErgebnis {
+  min-width: 3.2rem;
+  order: 1;
+}
+
+/* Das Zeichen vor "Text fuers Schreiben". Es dreht sich beim Aufklappen --
+   daran sieht man, dass da etwas aufgeht, ohne es gelesen zu haben. */
+.saetzePfeil {
+  display: inline-block;
+  transition: transform var(--dauer-schnell) var(--verlauf);
+  color: var(--farbe-text-leise);
+}
+
+.saetze[open] .saetzePfeil {
+  transform: rotate(90deg);
+}
+
+/* Das Dreieck des Browsers weg: es sitzt je nach Browser anders und doppelt
+   sich mit dem eigenen Zeichen. */
+.saetzeKopf::-webkit-details-marker {
+  display: none;
+}
+
+.saetzeKopf {
+  list-style: none;
+}
