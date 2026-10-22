@@ -168,6 +168,14 @@ class Gateway:
             "PUT", "/staffelpilot/staffeln/aus-dfbnet", json={"staffeln": staffeln}
         )
 
+    def regeldateien(self) -> list[dict[str, Any]]:
+        """Die Regeldateien, ohne Quelltext -- Namen und Schalter."""
+        return self._json("GET", "/staffelpilot/regeldateien")  # type: ignore[no-any-return]
+
+    def regeldatei(self, datei_id: str) -> dict[str, Any]:
+        """Eine Regeldatei mit ihrem Quelltext."""
+        return self._json("GET", f"/staffelpilot/regeldateien/{datei_id}")  # type: ignore[no-any-return]
+
     def regeln(self) -> list[dict[str, Any]]:
         """Der Regelkatalog, wie er im Artefakt steht -- mit den Schaltern."""
         return self._json("GET", "/staffelpilot/regeln")  # type: ignore[no-any-return]

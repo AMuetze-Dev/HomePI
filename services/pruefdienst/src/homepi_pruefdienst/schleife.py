@@ -9,6 +9,7 @@ und kein Thread.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
 from typing import Any
 
@@ -16,6 +17,7 @@ from . import dienst, fallanlage, katalog, regeln
 from .auskunft import GatewayAuskunft
 from .gateway import Gateway, GatewayFehler
 from .leser import BeispielLeser, Leser
+from .regelwerk.ordner import regelordner
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +114,85 @@ class Prueflauf:
         if staffel_id:
             return [s for s in alle if str(s["id"]) == str(staffel_id)]
         return [s for s in alle if s.get("aktiv")]
+
+    def _regeln_spiegeln(self, kennung: str) -> None:
+        """Die Regeldateien aus dem Artefakt in den eigenen Ordner schreiben.
+
+        **Der Quelltext im Artefakt ist die Wahrheit, der Ordner die Kopie.**
+        Vorher lagen die Pruefungen nur in einem Band am Dienst; wer sie
+        aendern wollte, brauchte eine Konsole auf dem Pi.
+
+        Geschrieben wird nur, was sich geaendert hat -- und entfernt, was im
+        Artefakt nicht mehr steht oder dort abgeschaltet ist. Eine Datei, die
+        im Ordner liegengeblieben ist, waere eine Regel, die laeuft, obwohl
+        niemand sie mehr fuehrt.
+
+        Die mitgelieferten Vorlagen bleiben unberuehrt: sie tragen keine
+        Entsprechung im Artefakt, solange sie niemand hochgeladen hat, und sie
+        hier wegzuraeumen hiesse, das Regelwerk beim ersten Lauf zu leeren.
+        """
+        try:
+            verzeichnis = self._gateway.regeldateien()
+        except GatewayFehler:
+            logger.exception("Die Regeldateien liessen sich nicht holen")
+            # Nur hier zurueck: das Artefakt war nicht erreichbar, und dann
+            # ist auch das Buch unten nicht zu beurteilen.
+            return
+
+        # **Kein frueher Ausstieg bei leerer Liste.** Wer seine letzte eigene
+        # Regeldatei loescht, soll sie auch aus dem Ordner los sein -- mit
+        # einem `return` an dieser Stelle laege die Kopie fuer immer da und
+        # liefe bei jedem Lauf mit.
+        ordner = regelordner()
+        ordner.mkdir(parents=True, exist_ok=True)
+        gefuehrt = {str(d.get("name") or "") for d in verzeichnis}
+        geschrieben = 0
+
+        for eintrag in verzeichnis:
+            name = str(eintrag.get("name") or "")
+            if not name:
+                continue
+            ziel = ordner / name
+            if not eintrag.get("aktiv"):
+                # Abgeschaltet heisst: liegt im Artefakt, laeuft hier nicht.
+                ziel.unlink(missing_ok=True)
+                continue
+            try:
+                inhalt = str(self._gateway.regeldatei(str(eintrag["id"])).get("inhalt") or "")
+            except GatewayFehler:
+                logger.exception("Regeldatei %s liess sich nicht holen", name)
+                continue
+            if ziel.exists() and ziel.read_text(encoding="utf-8") == inhalt:
+                continue
+            ziel.write_text(inhalt, encoding="utf-8")
+            geschrieben += 1
+
+        # Was das Artefakt einmal geschrieben hat und jetzt nicht mehr fuehrt,
+        # muss weg -- sonst laeuft eine geloeschte Regel weiter.
+        #
+        # Welche das sind, steht in einem eigenen Verzeichnis im Ordner: ohne
+        # das liesse sich eine geloeschte Datei nicht von einer der
+        # mitgelieferten Vorlagen unterscheiden, und ein Aufraeumen leerte
+        # beim ersten Lauf das ganze Regelwerk. Der Unterstrich haelt es vom
+        # Lader fern.
+        buch = ordner / "_aus_artefakt.json"
+        try:
+            vorher = set(json.loads(buch.read_text(encoding="utf-8"))) if buch.is_file() else set()
+        except (OSError, ValueError):
+            logger.warning("Das Verzeichnis der gespiegelten Regeln ist unlesbar")
+            vorher = set()
+
+        for name in sorted(vorher - gefuehrt):
+            (ordner / name).unlink(missing_ok=True)
+            logger.info("Regeldatei %s entfernt -- das Artefakt fuehrt sie nicht mehr", name)
+
+        buch.write_text(json.dumps(sorted(gefuehrt), ensure_ascii=False), encoding="utf-8")
+
+        if geschrieben:
+            logger.info("%d Regeldatei(en) aus dem Artefakt geschrieben", geschrieben)
+            self._gateway.fortschritt(
+                kennung, zeile=f"{geschrieben} Regeldatei(en) aus dem Artefakt übernommen"
+            )
 
     def _katalog_melden(self, kennung: str) -> set[str]:
         """Was geprüft wird, dem Artefakt sagen -- und holen, was aus ist.
@@ -307,6 +388,10 @@ class Prueflauf:
         # Der Verwarnungszaehler nach Paragraf 58. Einer je Lauf, damit die
         # Karten einer Person einmal geholt werden und nicht je Spiel neu.
         auskunft = GatewayAuskunft(self._gateway, regeln.saisonbeginn(bis.strftime("%d.%m.%Y")))
+        # Erst spiegeln, dann melden: der Katalog entsteht aus den Dateien
+        # im Ordner, und eine frisch hochgeladene Regel soll schon in diesem
+        # Lauf zaehlen.
+        self._regeln_spiegeln(kennung)
         abgeschaltet = self._katalog_melden(kennung)
 
         gepruefte = befunde = 0
@@ -337,6 +422,26 @@ class Prueflauf:
             # Erst jetzt, nicht vor dem Abruf: vorher stuende auf dem Bild noch
             # die Seite der vorigen Staffel -- unter dem Namen der naechsten.
             self._zusehen(kennung, f"Trefferliste {name}"[:200])
+
+            # Was der Staffelleiter schon freigegeben hat, wird nicht noch
+            # einmal gelesen: "Prueferfreigabe" ist der Stand, den **seine**
+            # Freigabe setzt. Ein Bericht in diesem Stand ist bearbeitet, und
+            # ihn erneut einzuspielen setzte abgehakte Spiele zurueck in die
+            # Warteschlange.
+            #
+            # Nur dieser eine Stand. "Schiedsrichterfreigabe" und "In
+            # Nacherfassung" warten noch auf ihn, und ein **leerer** Stand
+            # heisst *nicht bekannt* -- der wird geprueft, nicht uebersprungen.
+            bearbeitet = [z for z in zeilen if dienst.schon_bearbeitet(z.status)]
+            if bearbeitet:
+                zeilen = [z for z in zeilen if not dienst.schon_bearbeitet(z.status)]
+                self._gateway.fortschritt(
+                    kennung,
+                    zeile=(
+                        f"{name}: {len(bearbeitet)} Bericht(e) mit Prüferfreigabe "
+                        "übersprungen — die sind schon bearbeitet"
+                    ),
+                )
 
             mannschaften = self._mannschaften_von(staffel)
 

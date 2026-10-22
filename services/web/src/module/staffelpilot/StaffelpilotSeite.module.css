@@ -739,3 +739,66 @@
   outline: 2px solid var(--farbe-fokus);
   outline-offset: 1px;
 }
+
+/* ── Auswertung: Farbe und Anteil ────────────────────────────────────── */
+/*
+ * Vorher trugen kritisch, Warnung und Hinweis denselben Balken in
+ * `--signal-warnung-flaeche` -- kaum sichtbar und ohne Unterschied. Die
+ * Schwere ist das staerkste Signal der ganzen Auswertung; sie gehoert in die
+ * Farbe, die sie ueberall sonst schon hat.
+ */
+.balkenFehler {
+  background: var(--signal-fehler);
+  opacity: 0.22;
+}
+
+.balkenWarnung {
+  background: var(--signal-warnung);
+  opacity: 0.22;
+}
+
+.balkenNeutral {
+  background: var(--farbe-text-leise);
+  opacity: 0.18;
+}
+
+/* Der Anteilsstreifen ueber der Liste. Er beantwortet "wie verteilt sich das"
+   in einem Blick -- aus nebeneinanderliegenden Laengen geht das erst durch
+   Rechnen hervor. */
+.anteil {
+  display: flex;
+  height: 0.5rem;
+  margin: var(--raum-3) 0 var(--raum-1);
+  overflow: hidden;
+  border-radius: var(--rundung-voll);
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+/* Im Streifen voll deckend: dort stehen die Stuecke nebeneinander und nicht
+   hinter Text. */
+.anteil > span {
+  opacity: 1;
+}
+
+/* Quelltext. Monospace und Tabulatoren: hier steht Python, und Einrueckung
+   ist dort keine Geschmacksfrage. */
+.quelltext {
+  width: 100%;
+  padding: var(--raum-3);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche-gedaempft);
+  color: var(--farbe-text);
+  font-family: var(--schrift-mono);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-normal);
+  tab-size: 4;
+  white-space: pre;
+  overflow-x: auto;
+  resize: vertical;
+}
+
+.quelltext:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 1px;
+}

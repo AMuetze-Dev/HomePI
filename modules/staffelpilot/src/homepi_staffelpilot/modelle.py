@@ -303,6 +303,37 @@ class Regel(Base, ZeitstempelMixin):
     aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
+class Regeldatei(Base, ZeitstempelMixin):
+    """Eine Regeldatei des Staffelleiters -- der Quelltext, nicht das Ergebnis.
+
+    Bisher lagen die dreissig Pruefungen der Spielordnung nur in einem Band am
+    Pruefdienst. Wer sie aendern wollte, brauchte eine Konsole auf dem Pi.
+
+    **Hier ist der Quelltext die Wahrheit, das Band die Kopie.** Der
+    Pruefdienst schreibt sich die Dateien vor jedem Lauf in seinen Ordner --
+    damit liegen sie in derselben Sicherung wie alles andere, und eine
+    geaenderte Regel ist eine Zeile in der Datenbank statt eines Handgriffs
+    per SSH.
+
+    **Das ist ausfuehrbarer Code.** Er laeuft im Pruefdienst, in dessen
+    Container, mit dessen Rechten. Schreiben darf das nur ein Verwalter -- die
+    Routen sagen das, und es ist kein Zufall, sondern die ganze Begruendung
+    dafuer, dass hier kein Nutzer herankommt.
+    """
+
+    __tablename__ = "staffelpilot_regeldateien"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    #: Der Dateiname, unter dem sie im Ordner landet ("20_stammspieler.py").
+    #: Die Zahl davor bestimmt die Reihenfolge beim Laden.
+    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    inhalt: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Ob sie in den Ordner geschrieben wird. Aus heisst: liegt hier, laeuft
+    #: nicht -- besser als geloescht, wenn jemand sie nur vorruebergehend
+    #: stilllegen will.
+    aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
 class Regeltext(Base, ZeitstempelMixin):
     """Die Saetze, die aus einem Befund ein Schreiben machen.
 

@@ -239,6 +239,11 @@ export function PrueflaufTafel({
                   <span className={stil.datum}>{alsZeit(z.angelegt)}</span>
                 </div>
                 <p className={stil.vorgangHinweis}>{ergebnisSatz(z)}</p>
+                {/* Auch hier das Abbild. Vorher gab es die Vorschau nur,
+                    solange ein Lauf arbeitete -- und genau das Bild, das man
+                    sehen will, entsteht beim Scheitern: danach war es weg,
+                    und uebrig blieb das Protokoll. */}
+                <Vorschau auftrag={z} />
               </Karte>
             </li>
           ))}
@@ -326,7 +331,13 @@ const VORSCHAU_TAKT_MS = 2000;
  * Es erscheint **nur, wenn es etwas zu zeigen gibt**: der Schalter dafür
  * steht in den Einstellungen unter „Beim Prüfen zusehen".
  */
-function Vorschau({ auftrag }: { auftrag: Auftrag }) {
+function Vorschau({
+  auftrag,
+}: {
+  // Nur Kennung und Zustand. Der ganze `Auftrag` waere zu viel verlangt: im
+  // Verlauf stehen `AuftragZeile`n, die kein Protokoll mitbringen.
+  auftrag: Pick<Auftrag, "id" | "zustand">;
+}) {
   const [arten, setArten] = useState<string[]>([]);
   const [stand, setStand] = useState(() => Date.now());
   const [gross, setGross] = useState(false);

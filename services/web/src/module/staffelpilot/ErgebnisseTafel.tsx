@@ -134,6 +134,7 @@ export function ErgebnisseTafel({ staffeln }: { staffeln: Staffel[] }) {
             titel="Nach Schwere"
             posten={werte.nach_schwere}
             beschriften={SCHWERE_WORT}
+            toene={SCHWERE_BALKEN}
           />
           <Gruppe titel="Nach Regel" posten={werte.nach_regel} />
           <Gruppe titel="Nach Mannschaft" posten={werte.nach_mannschaft} />
@@ -149,14 +150,38 @@ export function ErgebnisseTafel({ staffeln }: { staffeln: Staffel[] }) {
   );
 }
 
+/** Welche Farbe ein Balken traegt. Nur die Schwere hat eine eigene. */
+type Ton = "fehler" | "warnung" | "neutral";
+
+const SCHWERE_BALKEN: Record<string, Ton> = {
+  kritisch: "fehler",
+  warnung: "warnung",
+  hinweis: "neutral",
+};
+
+const BALKEN_STIL: Record<Ton, string | undefined> = {
+  fehler: stil.balkenFehler,
+  warnung: stil.balkenWarnung,
+  neutral: stil.balkenNeutral,
+};
+
 function Gruppe({
   titel,
   posten,
   beschriften,
+  toene,
 }: {
   titel: string;
   posten: Posten[];
   beschriften?: Record<string, string> | ((wert: string) => string);
+  /**
+   * Farbe je Zeile. Ohne sie bleibt alles neutral.
+   *
+   * Vorher trugen kritisch, Warnung und Hinweis denselben, kaum sichtbaren
+   * Balken -- die Schwere ist das stärkste Signal der ganzen Auswertung, und
+   * genau sie war nicht zu sehen.
+   */
+  toene?: Record<string, Ton>;
 }) {
   if (posten.length === 0) return null;
 
@@ -169,9 +194,29 @@ function Gruppe({
     return beschriften?.[wert] ?? wert;
   }
 
+  const gesamt = posten.reduce((summe, p) => summe + p.anzahl, 0);
+
   return (
     <Karte>
       <h2 className={stil.formularTitel}>{titel}</h2>
+
+      {/* Ein Anteilsbalken ueber der Liste: er beantwortet "wie verteilt sich
+          das" in einem Blick, was aus nebeneinanderliegenden Laengen erst
+          durch Rechnen hervorgeht. Nur wo es Toene gibt -- bei dreissig
+          Regeln waere ein Streifen aus dreissig Stuecken ein Farbsalat. */}
+      {toene && gesamt > 0 && (
+        <div className={stil.anteil} role="img" aria-label={`${titel}, Anteile`}>
+          {posten.map((p) => (
+            <span
+              key={p.name}
+              className={BALKEN_STIL[toene[p.name] ?? "neutral"]}
+              style={{ width: `${(p.anzahl / gesamt) * 100}%` }}
+              title={`${name(p.name)}: ${p.anzahl}`}
+            />
+          ))}
+        </div>
+      )}
+
       <ul className={stil.auswertung} aria-label={titel}>
         {posten.map((p) => (
           <li key={p.name} className={stil.auswertungZeile}>
@@ -184,7 +229,9 @@ function Gruppe({
               )}
             </span>
             <span
-              className={stil.auswertungBalken}
+              className={[stil.auswertungBalken, BALKEN_STIL[toene?.[p.name] ?? "neutral"]]
+                .filter(Boolean)
+                .join(" ")}
               style={{ width: `${(p.anzahl / groesster) * 100}%` }}
               aria-hidden="true"
             />

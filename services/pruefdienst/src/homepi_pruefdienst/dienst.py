@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 #: Ein Datum, wie DFBnet es in die Tabelle schreibt.
@@ -78,7 +79,7 @@ def datum_lesen(text: str) -> dt.date | None:
         return None
 
 
-def zeile_zerlegen(zellen: list[str], kennung: str) -> Spielzeile:
+def zeile_zerlegen(zellen: list[str], kennung: str, titel: Iterable[str] = ()) -> Spielzeile:
     """Aus den Zellen einer Trefferzeile ein Spiel machen.
 
     Die Spalten von DFBnet haben sich schon einmal verschoben, deshalb wird
@@ -114,8 +115,52 @@ def zeile_zerlegen(zellen: list[str], kennung: str) -> Spielzeile:
         heim=heim,
         gast=gast,
         ergebnis=ergebnis,
-        status=sauber[-1] if sauber else "",
+        # Aus den Symboltiteln und nicht aus der letzten Zelle: die ist leer.
+        status=stand_aus(titel),
     )
+
+
+#: Die Staende, die DFBnet am Symbol der letzten Spalte fuehrt.
+#:
+#: Am 22.10.2026 abgelesen: die Statusspalte traegt **keinen Text**, sondern
+#: ein Bild, und der Stand steht in dessen `title`. `zellen[-1]` war deshalb
+#: immer leer -- der Filter haette auf nichts gestanden.
+STAND_PRUEFERFREIGABE = "Prüferfreigabe"
+STAND_SCHIEDSRICHTER = "Schiedsrichterfreigabe"
+STAND_NACHERFASSUNG = "In Nacherfassung"
+
+#: Welche Titel ein Stand sein koennen. Die uebrigen Titel derselben Zeile
+#: ("Einzelspielbericht bearbeiten", "Spiel ist freigegeben") sind Knoepfe und
+#: Haken, keine Staende.
+_STAENDE = (STAND_PRUEFERFREIGABE, STAND_SCHIEDSRICHTER, STAND_NACHERFASSUNG)
+
+
+def stand_aus(titel: Iterable[str]) -> str:
+    """Der Bearbeitungsstand aus den Symboltiteln einer Zeile, oder "".
+
+    Leer heisst *nicht bekannt* und nicht "unbearbeitet": ein unbekannter
+    Stand muss geprueft werden, nicht uebersprungen. Alles andere waere die
+    gefaehrlichste Zeile in der Warteschlange -- ein Bericht, den niemand
+    angesehen hat und der aussieht, als sei er erledigt.
+    """
+    for text in titel:
+        sauber = (text or "").strip()
+        for stand in _STAENDE:
+            if sauber.casefold() == stand.casefold():
+                return stand
+    return ""
+
+
+def schon_bearbeitet(stand: str) -> bool:
+    """Ob der Staffelleiter diesen Bericht bereits freigegeben hat.
+
+    Nur bei **Prueferfreigabe**. Das ist der Stand, den seine eigene Freigabe
+    setzt; "Schiedsrichterfreigabe" und "In Nacherfassung" sind die beiden,
+    die noch auf ihn warten.
+
+    Ein leerer Stand zaehlt ausdruecklich **nicht** als bearbeitet.
+    """
+    return stand.strip().casefold() == STAND_PRUEFERFREIGABE.casefold()
 
 
 def _ist_mannschaft(text: str) -> bool:

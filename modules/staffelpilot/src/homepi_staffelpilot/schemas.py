@@ -592,6 +592,55 @@ class RegelkatalogSetzen(BaseModel):
     regeln: list[RegelEingang]
 
 
+#: Wie eine Regeldatei heissen darf.
+#:
+#: Nur Ziffern, Buchstaben, Unterstrich und das `.py` am Ende -- der Name wird
+#: zu einem Pfad im Ordner des Pruefdienstes. Ein "../" darin waere ein Weg
+#: aus dem Ordner heraus, und ein Leerzeichen eine Datei, die der Lader
+#: uebersieht.
+REGELDATEI_MUSTER = r"^[0-9A-Za-z_]+\.py$"
+
+
+class RegeldateiAusgabe(BaseModel):
+    """Eine Regeldatei ohne ihren Inhalt -- fuer die Liste."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    aktiv: bool
+    #: Wie viele Zeilen sie hat. Der Inhalt selbst kommt erst beim Oeffnen:
+    #: dreissig Dateien mit je zweihundert Zeilen waeren eine Antwort von
+    #: einem Viertelmegabyte fuer eine Liste.
+    zeilen: int = 0
+    geaendert: dt.datetime | None = None
+
+
+class RegeldateiInhalt(RegeldateiAusgabe):
+    """Eine Regeldatei mit ihrem Quelltext."""
+
+    inhalt: str = ""
+
+
+class RegeldateiSetzen(BaseModel):
+    """Eine Regeldatei anlegen oder ueberschreiben.
+
+    **Das ist ausfuehrbarer Code.** Er laeuft im Pruefdienst; schreiben darf
+    das nur ein Verwalter.
+    """
+
+    name: Annotated[str, Field(pattern=REGELDATEI_MUSTER, max_length=120)]
+    inhalt: Annotated[str, Field(max_length=200_000)]
+    aktiv: bool = True
+
+
+class RegeldateiAendern(BaseModel):
+    """Nur die mitgeschickten Felder."""
+
+    inhalt: Annotated[str, Field(max_length=200_000)] | None = None
+    aktiv: bool | None = None
+
+
 class RegelAusgabe(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -32,6 +32,7 @@ from .modelle import (
     Karte,
     Mannschaft,
     Regel,
+    Regeldatei,
     Regeltext,
     Spielbericht,
     Staffel,
@@ -46,6 +47,8 @@ from .schemas import (
     ImportAuftrag,
     MannschaftEingang,
     RegelAendern,
+    RegeldateiAendern,
+    RegeldateiSetzen,
     RegelEingang,
     StaffelAendern,
     StaffelAnlegen,
@@ -82,6 +85,66 @@ async def staffel_anlegen(sitzung: AsyncSession, daten: StaffelAnlegen) -> Staff
         raise StaffelVergeben(f"Eine Staffel namens '{daten.name}' gibt es bereits") from fehler
     await sitzung.refresh(neue)
     return neue
+
+
+async def regeldateien(sitzung: AsyncSession) -> list[Regeldatei]:
+    """Alle Regeldateien, nach Namen -- das ist die Ladereihenfolge.
+
+    `10_` vor `20_`: eine `90_eigene.py` kann am Ende gezielt etwas ersetzen.
+    """
+    ergebnis = await sitzung.execute(select(Regeldatei).order_by(Regeldatei.name))
+    return list(ergebnis.scalars())
+
+
+async def regeldatei(sitzung: AsyncSession, datei_id: uuid.UUID) -> Regeldatei:
+    gefunden = await sitzung.get(Regeldatei, datei_id)
+    if gefunden is None:
+        raise dienst.RegeldateiUnbekannt(f"Es gibt keine Regeldatei mit der Kennung {datei_id}")
+    return gefunden
+
+
+async def regeldatei_setzen(sitzung: AsyncSession, daten: RegeldateiSetzen) -> Regeldatei:
+    """Anlegen oder ueberschreiben, am Namen erkannt.
+
+    Ueberschreiben und nicht danebenlegen: zwei Dateien desselben Namens gaebe
+    es im Ordner des Pruefdienstes ohnehin nicht, und welche gewaenne, haenge
+    an der Reihenfolge des Schreibens.
+    """
+    vorhanden = await sitzung.execute(select(Regeldatei).where(Regeldatei.name == daten.name))
+    ziel = vorhanden.scalars().first()
+    if ziel is None:
+        ziel = Regeldatei(name=daten.name, inhalt=daten.inhalt, aktiv=daten.aktiv)
+        sitzung.add(ziel)
+    else:
+        ziel.inhalt, ziel.aktiv = daten.inhalt, daten.aktiv
+    await sitzung.flush()
+    await sitzung.refresh(ziel)
+    return ziel
+
+
+async def regeldatei_aendern(
+    sitzung: AsyncSession, datei_id: uuid.UUID, daten: RegeldateiAendern
+) -> Regeldatei:
+    """Nur die mitgeschickten Felder. Ausgelassene bleiben stehen."""
+    ziel = await regeldatei(sitzung, datei_id)
+    if daten.inhalt is not None:
+        ziel.inhalt = daten.inhalt
+    if daten.aktiv is not None:
+        ziel.aktiv = daten.aktiv
+    await sitzung.flush()
+    return ziel
+
+
+async def regeldatei_loeschen(sitzung: AsyncSession, datei_id: uuid.UUID) -> None:
+    """Weg. Der Pruefdienst raeumt sie beim naechsten Lauf aus seinem Ordner.
+
+    Was daran haengt, bleibt: Befunde dieser Regel stehen weiter in der
+    Warteschlange. Eine geloeschte Datei heisst "wird nicht mehr geprueft" und
+    nicht "ist nie passiert".
+    """
+    ziel = await regeldatei(sitzung, datei_id)
+    await sitzung.delete(ziel)
+    await sitzung.flush()
 
 
 async def ansicht_setzen(

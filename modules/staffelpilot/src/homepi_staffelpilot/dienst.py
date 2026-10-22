@@ -84,6 +84,11 @@ class NochOffeneBefunde(ServiceError):
     title = "Es sind noch Befunde offen"
 
 
+class RegeldateiUnbekannt(ServiceError):
+    status = 404
+    title = "Regeldatei unbekannt"
+
+
 class AnsichtUnbekannt(ServiceError):
     status = 404
     title = "Keine Ansicht vorhanden"

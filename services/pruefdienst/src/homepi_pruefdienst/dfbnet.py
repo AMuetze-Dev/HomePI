@@ -353,13 +353,23 @@ class DfbnetLeser:
                         ? Array.from(reihe.querySelectorAll("td")).map(
                             (td) => (td.innerText || "").trim())
                         : [],
+                    // Der Bearbeitungsstand steht als `title` am Symbol der
+                    // letzten Spalte, nicht als Text in der Zelle.
+                    titel: reihe
+                        ? Array.from(reihe.querySelectorAll("[title]")).map(
+                            (e) => (e.getAttribute("title") || "").trim())
+                        : [],
                 };
             })
             """
         )
 
         return [
-            dienst.zeile_zerlegen(eintrag["zellen"], dienst.kennung_aus_href(eintrag["href"]))
+            dienst.zeile_zerlegen(
+                eintrag["zellen"],
+                dienst.kennung_aus_href(eintrag["href"]),
+                eintrag.get("titel") or (),
+            )
             for eintrag in roh
         ]
 

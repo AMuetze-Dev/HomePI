@@ -9,6 +9,7 @@ das zeigt kein Test, sondern der erste echte Lauf.
 from __future__ import annotations
 
 import datetime as dt
+from pathlib import Path
 from typing import Any, ClassVar
 
 import pytest
@@ -99,6 +100,9 @@ class FalschesGateway:
         }
         self.zugang_geholt = 0
         self.uebernommen_staffeln: list[list[dict[str, Any]]] = []
+        # Leer: dieses Artefakt fuehrt keine eigenen Regeldateien, also
+        # schreibt der Dienst auch keine in seinen Ordner.
+        self.regeldateien_liste: list[dict[str, Any]] = []
         self.uebernommen: list[str] = []
         self.gemeldet: list[tuple[str, str, str]] = []
         self._warteschlange = [
@@ -148,6 +152,12 @@ class FalschesGateway:
         if self.spiele_nach_id is None:
             raise GatewayFehler("Artefakt weg")
         return self.spiele_nach_id[spiel_id]
+
+    def regeldateien(self) -> list[dict[str, Any]]:
+        return self.regeldateien_liste
+
+    def regeldatei(self, datei_id: str) -> dict[str, Any]:
+        return next(d for d in self.regeldateien_liste if str(d["id"]) == datei_id)
 
     def staffeln_aus_dfbnet(self, staffeln: list[dict[str, Any]]) -> dict[str, Any]:
         self.uebernommen_staffeln.append(staffeln)
@@ -1135,3 +1145,158 @@ class TestEigeneStaffeln:
         """Eine erfundene Staffel waere schlimmer als keine: aus ihr
         entstuenden Spiele, die es nie gab, und daraus Mahnungen."""
         assert DemoLeser().eigene_staffeln("26/27") == []
+
+
+class TestSchonBearbeitete:
+    """Was der Staffelleiter freigegeben hat, wird nicht noch einmal gelesen.
+
+    "Prueferfreigabe" ist der Stand, den **seine** Freigabe setzt. Einen
+    solchen Bericht erneut einzuspielen setzte ein abgehaktes Spiel zurueck in
+    die Warteschlange -- und er saehe wieder aus wie Arbeit.
+    """
+
+    def _lauf(self, zeilen: list[Spielzeile]) -> FalschesGateway:
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf"})
+        leser = DemoLeser({STAFFEL["name"]: zeilen})
+        lauf(gateway, leser).runde()
+        return gateway
+
+    def test_prueferfreigabe_wird_uebersprungen(self) -> None:
+        gateway = self._lauf(
+            [
+                zeile("M-1", status="Prüferfreigabe"),
+                zeile("M-2", status="Schiedsrichterfreigabe"),
+            ]
+        )
+
+        kennungen = [s["dfbnet_id"] for _, spiele in gateway.importe for s in spiele]
+        assert kennungen == ["M-2"]
+
+    def test_das_ueberspringen_steht_im_protokoll(self) -> None:
+        """Still weglassen waere schlimmer als nicht filtern: niemand wuesste,
+        warum von vierzehn Spielen keines ankam."""
+        gateway = self._lauf([zeile("M-1", status="Prüferfreigabe")])
+
+        zeilen = [z for f in gateway.fortschritte for z in [f.get("zeile") or ""]]
+        assert any("Prüferfreigabe" in z and "übersprungen" in z for z in zeilen)
+
+    def test_ein_leerer_stand_wird_geprueft(self) -> None:
+        """Leer heisst *nicht bekannt*. Ihn zu ueberspringen waere die
+        gefaehrlichste Zeile in der Warteschlange."""
+        gateway = self._lauf([zeile("M-1", status="")])
+
+        kennungen = [s["dfbnet_id"] for _, spiele in gateway.importe for s in spiele]
+        assert kennungen == ["M-1"]
+
+    def test_in_nacherfassung_wird_geprueft(self) -> None:
+        gateway = self._lauf([zeile("M-1", status="In Nacherfassung")])
+
+        kennungen = [s["dfbnet_id"] for _, spiele in gateway.importe for s in spiele]
+        assert kennungen == ["M-1"]
+
+
+class TestRegeldateienSpiegeln:
+    """Der Quelltext im Artefakt ist die Wahrheit, der Ordner die Kopie.
+
+    Vorher lagen die Pruefungen nur in einem Band am Dienst; wer eine aendern
+    wollte, brauchte eine Konsole auf dem Pi.
+    """
+
+    def _lauf(self, gateway: Any, ordner: Path) -> None:
+        import homepi_pruefdienst.schleife as schleife_modul
+
+        urspruenglich = schleife_modul.regelordner
+        schleife_modul.regelordner = lambda: ordner  # type: ignore[assignment]
+        try:
+            lauf(gateway, DemoLeser()).runde()
+        finally:
+            schleife_modul.regelordner = urspruenglich  # type: ignore[assignment]
+
+    def _gateway(self, dateien: list[dict[str, Any]]) -> Any:
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf"})
+        gateway.regeldateien_liste = dateien
+        return gateway
+
+    def test_eine_datei_landet_im_ordner(self, tmp_path: Path) -> None:
+        gateway = self._gateway(
+            [{"id": "d1", "name": "95_eigene.py", "aktiv": True, "inhalt": "# hallo\n"}]
+        )
+
+        self._lauf(gateway, tmp_path)
+
+        assert (tmp_path / "95_eigene.py").read_text(encoding="utf-8") == "# hallo\n"
+
+    def test_eine_abgeschaltete_wird_nicht_geschrieben(self, tmp_path: Path) -> None:
+        """Aus heisst: liegt im Artefakt, laeuft hier nicht."""
+        gateway = self._gateway(
+            [{"id": "d1", "name": "95_eigene.py", "aktiv": False, "inhalt": "# hallo\n"}]
+        )
+
+        self._lauf(gateway, tmp_path)
+
+        assert not (tmp_path / "95_eigene.py").exists()
+
+    def test_eine_abgeschaltete_wird_wieder_entfernt(self, tmp_path: Path) -> None:
+        (tmp_path / "95_eigene.py").write_text("# alt\n", encoding="utf-8")
+        gateway = self._gateway(
+            [{"id": "d1", "name": "95_eigene.py", "aktiv": False, "inhalt": "# hallo\n"}]
+        )
+
+        self._lauf(gateway, tmp_path)
+
+        assert not (tmp_path / "95_eigene.py").exists()
+
+    def test_eine_geloeschte_faellt_beim_naechsten_lauf(self, tmp_path: Path) -> None:
+        """Der Fall, der beim ersten Anlauf kaputt war.
+
+        Wer seine **letzte** eigene Datei loescht, bekam eine leere Liste --
+        und das Spiegeln kehrte frueh zurueck. Die Kopie lag fuer immer da und
+        lief bei jedem Lauf mit.
+        """
+        self._lauf(
+            self._gateway(
+                [{"id": "d1", "name": "95_eigene.py", "aktiv": True, "inhalt": "# hallo\n"}]
+            ),
+            tmp_path,
+        )
+        assert (tmp_path / "95_eigene.py").exists()
+
+        self._lauf(self._gateway([]), tmp_path)
+
+        assert not (tmp_path / "95_eigene.py").exists()
+
+    def test_die_mitgelieferten_vorlagen_bleiben(self, tmp_path: Path) -> None:
+        """Sie tragen keine Entsprechung im Artefakt. Sie wegzuraeumen hiesse,
+        das Regelwerk beim ersten Lauf zu leeren."""
+        (tmp_path / "10_altersklassen.py").write_text("# Vorlage\n", encoding="utf-8")
+
+        self._lauf(self._gateway([]), tmp_path)
+
+        assert (tmp_path / "10_altersklassen.py").exists()
+
+    def test_unveraenderte_dateien_werden_nicht_neu_geschrieben(self, tmp_path: Path) -> None:
+        datei = tmp_path / "95_eigene.py"
+        datei.write_text("# hallo\n", encoding="utf-8")
+        vorher = datei.stat().st_mtime_ns
+        gateway = self._gateway(
+            [{"id": "d1", "name": "95_eigene.py", "aktiv": True, "inhalt": "# hallo\n"}]
+        )
+
+        self._lauf(gateway, tmp_path)
+
+        assert datei.stat().st_mtime_ns == vorher
+
+    def test_ein_weggebrochenes_artefakt_raeumt_nichts_weg(self, tmp_path: Path) -> None:
+        """Nicht erreichbar heisst *nicht bekannt*. Daraufhin den Ordner zu
+        leeren waere ein Lauf ohne Regeln -- und der saehe aus wie einer, bei
+        dem nichts war."""
+        (tmp_path / "95_eigene.py").write_text("# alt\n", encoding="utf-8")
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf"})
+
+        def kaputt() -> list[dict[str, Any]]:
+            raise GatewayFehler("Artefakt weg")
+
+        gateway.regeldateien = kaputt  # type: ignore[method-assign]
+        self._lauf(gateway, tmp_path)
+
+        assert (tmp_path / "95_eigene.py").exists()

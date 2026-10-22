@@ -29,6 +29,7 @@ import { PrueflaufTafel } from "./PrueflaufTafel";
 import { StaffelnTafel } from "./StaffelnTafel";
 import { UebersichtTafel } from "./UebersichtTafel";
 import { ZugangKarte } from "./ZugangKarte";
+import { RegeldateienTafel } from "./RegeldateienTafel";
 import { RegelnTafel } from "./RegelnTafel";
 import { VorgaengeTafel } from "./VorgaengeTafel";
 import type { ModulProps } from "../typen";
@@ -206,6 +207,10 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
         onFertig={() => void laden(staffelFilter, nurFaellig)}
       />
     );
+  }
+
+  if (unterseite === "regeldateien") {
+    return <RegeldateienTafel />;
   }
 
   if (unterseite === "regeln") {

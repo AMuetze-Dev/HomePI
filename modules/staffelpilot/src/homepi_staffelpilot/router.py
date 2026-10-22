@@ -38,7 +38,16 @@ from .dienst import (
     sortiert,
     zusammenfassen,
 )
-from .modelle import Befund, Mannschaft, Regel, Regeltext, Spielbericht, Staffel, Vorgang
+from .modelle import (
+    Befund,
+    Mannschaft,
+    Regel,
+    Regeldatei,
+    Regeltext,
+    Spielbericht,
+    Staffel,
+    Vorgang,
+)
 from .schemas import (
     Abschluss,
     Ansichten,
@@ -63,6 +72,10 @@ from .schemas import (
     Posten,
     RegelAendern,
     RegelAusgabe,
+    RegeldateiAendern,
+    RegeldateiAusgabe,
+    RegeldateiInhalt,
+    RegeldateiSetzen,
     RegelkatalogSetzen,
     SpielAusgabe,
     SpielZeile,
@@ -676,6 +689,98 @@ def _regel(r: Regel, eigener: Regeltext | None = None) -> RegelAusgabe:
             "vorgabe_hinweis": vorgabe.hinweis,
         }
     )
+
+
+# ── Regeldateien ──────────────────────────────────────────────────────────
+#
+# Der Quelltext der Prüfungen. **Das ist ausführbarer Code**: er läuft im
+# Prüfdienst, in dessen Container, mit dessen Rechten. Lesen darf jeder, der
+# das Artefakt sieht; schreiben nur ein Verwalter — das ist der ganze Grund,
+# warum diese vier Routen eine eigene Abhängigkeit tragen.
+
+
+def _zeilen(inhalt: str) -> int:
+    return inhalt.count("\n") + 1 if inhalt else 0
+
+
+def _regeldatei(d: Regeldatei) -> RegeldateiAusgabe:
+    """Die Zeile fuer die Liste -- ohne Quelltext."""
+    return RegeldateiAusgabe(
+        id=d.id,
+        name=d.name,
+        aktiv=d.aktiv,
+        zeilen=_zeilen(d.inhalt),
+        geaendert=d.geaendert,
+    )
+
+
+def _regeldatei_mit_inhalt(d: Regeldatei) -> RegeldateiInhalt:
+    """Dieselbe Zeile samt Quelltext -- beim Oeffnen zum Bearbeiten."""
+    return RegeldateiInhalt(
+        id=d.id,
+        name=d.name,
+        aktiv=d.aktiv,
+        zeilen=_zeilen(d.inhalt),
+        geaendert=d.geaendert,
+        inhalt=d.inhalt,
+    )
+
+
+@router.get("/regeldateien", summary="Die Regeldateien dieser Installation")
+async def regeldateien(sitzung: DbSitzung) -> list[RegeldateiAusgabe]:
+    """Ohne Quelltext. Dreißig Dateien mit je zweihundert Zeilen wären ein
+    Viertelmegabyte für eine Liste."""
+    return [_regeldatei(d) for d in await speicher.regeldateien(sitzung)]
+
+
+@router.get("/regeldateien/{datei_id}", summary="Eine Regeldatei mit Quelltext")
+async def regeldatei(datei_id: uuid.UUID, sitzung: DbSitzung) -> RegeldateiInhalt:
+    return _regeldatei_mit_inhalt(await speicher.regeldatei(sitzung, datei_id))
+
+
+@router.put(
+    "/regeldateien",
+    summary="Eine Regeldatei anlegen oder überschreiben",
+    dependencies=[erfordert("staffelpilot", Rolle.VERWALTER)],
+)
+async def regeldatei_setzen(daten: RegeldateiSetzen, sitzung: DbSitzung) -> RegeldateiAusgabe:
+    """Hochladen oder ändern — am Dateinamen erkannt.
+
+    **Nur Verwalter.** Was hier ankommt, führt der Prüfdienst aus.
+
+    Der Name wird zu einem Pfad in seinem Ordner; das Muster lässt deshalb nur
+    Ziffern, Buchstaben, Unterstrich und `.py` zu. Ein `../` darin wäre ein
+    Weg aus dem Ordner heraus.
+    """
+    return _regeldatei(await speicher.regeldatei_setzen(sitzung, daten))
+
+
+@router.patch(
+    "/regeldateien/{datei_id}",
+    summary="Eine Regeldatei ändern oder stilllegen",
+    dependencies=[erfordert("staffelpilot", Rolle.VERWALTER)],
+)
+async def regeldatei_aendern(
+    datei_id: uuid.UUID, daten: RegeldateiAendern, sitzung: DbSitzung
+) -> RegeldateiAusgabe:
+    return _regeldatei(await speicher.regeldatei_aendern(sitzung, datei_id, daten))
+
+
+@router.delete(
+    "/regeldateien/{datei_id}",
+    summary="Eine Regeldatei entfernen",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    dependencies=[erfordert("staffelpilot", Rolle.VERWALTER)],
+)
+async def regeldatei_loeschen(datei_id: uuid.UUID, sitzung: DbSitzung) -> Response:
+    """Weg — der Prüfdienst räumt sie beim nächsten Lauf aus seinem Ordner.
+
+    Befunde dieser Regel bleiben stehen: gelöscht heißt „wird nicht mehr
+    geprüft" und nicht „ist nie passiert".
+    """
+    await speicher.regeldatei_loeschen(sitzung, datei_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/regeln", summary="Was geprüft wird")

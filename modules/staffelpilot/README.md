@@ -232,6 +232,33 @@ Ein Kreuz wird nur gesetzt, wo der Verband einen Tatbestand vorsieht
 Zuordnung bekommt keins. Ein geratenes Kreuz behauptete etwas, das niemand
 geprueft hat.
 
+### Die Regeldateien
+
+Der Quelltext der Pruefungen steht jetzt **im Artefakt**. Bisher lag er nur in
+einem Band am Pruefdienst: wer eine Regel aendern wollte, brauchte eine
+Konsole auf dem Pi.
+
+`GET /regeldateien` listet sie ohne Quelltext -- dreissig Dateien mit je
+zweihundert Zeilen waeren ein Viertelmegabyte fuer eine Liste. Der Text kommt
+beim Oeffnen. `PUT` legt an oder ueberschreibt (am Dateinamen erkannt),
+`PATCH` aendert Text oder Schalter, `DELETE` entfernt.
+
+**Das ist ausfuehrbarer Code.** Er laeuft im Pruefdienst, in dessen Container,
+mit dessen Rechten. Schreiben darf deshalb nur ein Verwalter; lesen jeder, der
+das Artefakt sieht. Der Dateiname wird zu einem Pfad in jenem Ordner, also
+laesst das Muster nur Ziffern, Buchstaben, Unterstrich und `.py` zu -- ein
+`../` darin waere ein Weg aus dem Ordner heraus.
+
+Der Pruefdienst schreibt sich die Dateien **vor jedem Lauf** in seinen Ordner
+und fuehrt Buch darueber in `_aus_artefakt.json`. Ohne dieses Buch liesse sich
+eine geloeschte Datei nicht von einer mitgelieferten Vorlage unterscheiden,
+und das Aufraeumen leerte beim ersten Lauf das ganze Regelwerk.
+
+Abgeschaltet heisst: liegt im Artefakt, laeuft nicht -- besser als geloescht,
+wenn jemand sie nur vorruebergehend stilllegen will. Entfernt heisst "wird
+nicht mehr geprueft" und nicht "ist nie passiert": Befunde frueherer Laeufe
+bleiben stehen.
+
 ### Wer ueber wem spielt
 
 Welche Mannschaft eines Vereins ueber welcher steht, liefert DFBnet nicht mit.

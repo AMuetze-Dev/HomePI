@@ -41,6 +41,9 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
       { id: "staffeln", wort: "Staffeln", breite: "normal" },
       { id: "vorgaenge", wort: "Vorgänge", breite: "weit" },
       { id: "regeln", wort: "Regeln", breite: "normal" },
+      // Quelltext. Breiter als ein Formular, denn hier steht Python mit
+      // Einrückung -- in einer Textspalte bricht jede zweite Zeile um.
+      { id: "regeldateien", wort: "Regeldateien", breite: "normal" },
       { id: "einstellungen", wort: "Einstellungen", breite: "text" },
       { id: "zugang", wort: "DFBnet-Zugang", breite: "text" },
     ],

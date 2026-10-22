@@ -614,3 +614,56 @@ export function ladeAnsichten(auftragId: string, signal?: AbortSignal): Promise<
 export function ansichtAdresse(auftragId: string, art: string, stand: number): string {
   return API.adresse(`/auftraege/${auftragId}/ansicht/${art}?t=${stand}`);
 }
+
+// ── Regeldateien ─────────────────────────────────────────────────────────
+//
+// Der Quelltext der Prüfungen. **Das ist ausführbarer Code** — er läuft im
+// Prüfdienst. Schreiben darf nur ein Verwalter; das Gateway weist alles
+// andere ab, und die Oberfläche zeigt die Knöpfe gar nicht erst.
+
+/** Eine Regeldatei ohne Quelltext — für die Liste. */
+export interface Regeldatei {
+  id: string;
+  name: string;
+  aktiv: boolean;
+  /** Wie viele Zeilen sie hat. Der Quelltext kommt erst beim Öffnen. */
+  zeilen: number;
+  geaendert: string | null;
+}
+
+export interface RegeldateiInhalt extends Regeldatei {
+  inhalt: string;
+}
+
+export function ladeRegeldateien(signal?: AbortSignal): Promise<Regeldatei[]> {
+  return anfrage<Regeldatei[]>("/regeldateien", {}, signal);
+}
+
+export function ladeRegeldatei(id: string, signal?: AbortSignal): Promise<RegeldateiInhalt> {
+  return anfrage<RegeldateiInhalt>(`/regeldateien/${id}`, {}, signal);
+}
+
+/**
+ * Eine Regeldatei anlegen oder überschreiben — am Dateinamen erkannt.
+ *
+ * Der Name wird zu einem Pfad im Ordner des Prüfdienstes; erlaubt sind nur
+ * Ziffern, Buchstaben, Unterstrich und `.py`.
+ */
+export function speichereRegeldatei(
+  name: string,
+  inhalt: string,
+  aktiv = true,
+): Promise<Regeldatei> {
+  return anfrage<Regeldatei>("/regeldateien", mitKoerper("PUT", { name, inhalt, aktiv }));
+}
+
+export function aendereRegeldatei(
+  id: string,
+  felder: { inhalt?: string; aktiv?: boolean },
+): Promise<Regeldatei> {
+  return anfrage<Regeldatei>(`/regeldateien/${id}`, mitKoerper("PATCH", felder));
+}
+
+export function entferneRegeldatei(id: string): Promise<void> {
+  return anfrage<void>(`/regeldateien/${id}`, { method: "DELETE" });
+}

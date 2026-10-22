@@ -10,7 +10,7 @@ import {
 } from "./register";
 
 describe("Das Register der Oberflächen", () => {
-  it("nennt für Staffelpilot die neun Bereiche in dieser Reihenfolge", () => {
+  it("nennt für Staffelpilot die zehn Bereiche in dieser Reihenfolge", () => {
     // Die Reihenfolge ist keine Formalie: Der erste Bereich ist die Fläche,
     // auf der man morgens landet, und die Leiste liest die Liste von oben.
     expect(unterseitenFuer("staffelpilot").map((u) => u.wort)).toEqual([
@@ -21,6 +21,7 @@ describe("Das Register der Oberflächen", () => {
       "Staffeln",
       "Vorgänge",
       "Regeln",
+      "Regeldateien",
       "Einstellungen",
       "DFBnet-Zugang",
     ]);
