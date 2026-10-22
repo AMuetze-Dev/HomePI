@@ -16,6 +16,7 @@ function mannschaft(rest: Partial<api.Mannschaft> = {}): api.Mannschaft {
     hoehere: ["SV Loschwitz"],
     bestaetigt: false,
     unsicher: false,
+    vorschlaege: [],
     ...rest,
   };
 }
@@ -112,5 +113,109 @@ describe("Mannschaften einer Staffel", () => {
     render(<MannschaftenListe staffelId="s1" />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("kein Zugriff");
+  });
+});
+
+describe("Höherklassige Mannschaften eintragen", () => {
+  const sg = () =>
+    mannschaft({
+      id: "m9",
+      name: "SpG Kickers 2 / Hafen 2",
+      ist_sg: true,
+      bestaetigt: false,
+      hoehere: [],
+      vorschlaege: [],
+    });
+
+  const dritte = () =>
+    mannschaft({
+      id: "m8",
+      name: "Dresdner SC 1898 3",
+      hoehere: [],
+      vorschlaege: ["Dresdner SC 1898 2", "Dresdner SC 1898"],
+    });
+
+  async function aufklappen(name: string) {
+    await userEvent.click(await screen.findByRole("button", { name: new RegExp(name) }));
+  }
+
+  it("bietet die abgeleiteten Mannschaften an, die nicht mitspielen", async () => {
+    // "Dresdner SC 1898 2" spielt höherklassig und steht deshalb gar nicht in
+    // dieser Staffel - ankreuzen ließ sich vorher nur, wer hier mitspielt.
+    vi.spyOn(api, "ladeMannschaften").mockResolvedValue([dritte()]);
+    render(<MannschaftenListe staffelId="s1" />);
+    await aufklappen("Dresdner SC 1898 3");
+
+    expect(
+      await screen.findByRole("button", { name: "+ Dresdner SC 1898 2" }),
+    ).toBeInTheDocument();
+  });
+
+  it("trägt einen Vorschlag auf Klick ein", async () => {
+    vi.spyOn(api, "ladeMannschaften").mockResolvedValue([dritte()]);
+    const speichern = vi
+      .spyOn(api, "speichereMannschaften")
+      .mockResolvedValue([dritte()]);
+    render(<MannschaftenListe staffelId="s1" />);
+    await aufklappen("Dresdner SC 1898 3");
+
+    await userEvent.click(screen.getByRole("button", { name: "+ Dresdner SC 1898" }));
+
+    await waitFor(() =>
+      expect(speichern).toHaveBeenCalledWith("s1", [
+        expect.objectContaining({ hoehere: ["Dresdner SC 1898"] }),
+      ]),
+    );
+  });
+
+  it("schlägt bei einer Spielgemeinschaft nichts vor", async () => {
+    // "SpG Kickers 2 / Hafen 2" gehört zwei Vereinen; ein Vorschlag wäre
+    // geraten, und ein falscher ändert still, wessen Einsätze zählen.
+    vi.spyOn(api, "ladeMannschaften").mockResolvedValue([sg()]);
+    render(<MannschaftenListe staffelId="s1" />);
+    await aufklappen("SpG Kickers 2 / Hafen 2");
+
+    await screen.findByLabelText("Höherklassige Mannschaft eintragen");
+    expect(screen.queryByRole("button", { name: /^\+ / })).toBeNull();
+  });
+
+  it("nimmt für die Spielgemeinschaft einen Namen von Hand", async () => {
+    vi.spyOn(api, "ladeMannschaften").mockResolvedValue([sg()]);
+    const speichern = vi.spyOn(api, "speichereMannschaften").mockResolvedValue([sg()]);
+    render(<MannschaftenListe staffelId="s1" />);
+    await aufklappen("SpG Kickers 2 / Hafen 2");
+
+    await userEvent.type(
+      await screen.findByLabelText("Höherklassige Mannschaft eintragen"),
+      "FV Löbtauer Kickers",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Eintragen" }));
+
+    await waitFor(() =>
+      expect(speichern).toHaveBeenCalledWith("s1", [
+        expect.objectContaining({ hoehere: ["FV Löbtauer Kickers"] }),
+      ]),
+    );
+  });
+
+  it("lässt einen eingetragenen Namen wieder entfernen", async () => {
+    // Ohne diese Liste stand eine von Hand eingetippte Mannschaft nur im Satz
+    // darüber - und war nie wieder loszuwerden.
+    vi.spyOn(api, "ladeMannschaften").mockResolvedValue([
+      mannschaft({ hoehere: ["FV Hafen Dresden"], vorschlaege: [] }),
+    ]);
+    const speichern = vi.spyOn(api, "speichereMannschaften").mockResolvedValue([mannschaft()]);
+    render(<MannschaftenListe staffelId="s1" />);
+    await aufklappen("SV Loschwitz 2");
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "FV Hafen Dresden entfernen" }),
+    );
+
+    await waitFor(() =>
+      expect(speichern).toHaveBeenCalledWith("s1", [
+        expect.objectContaining({ hoehere: [] }),
+      ]),
+    );
   });
 });

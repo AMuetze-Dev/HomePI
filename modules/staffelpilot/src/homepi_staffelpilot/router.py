@@ -31,6 +31,7 @@ from .dienst import (
     darf_zurueckgenommen_werden,
     entscheidung_pruefen,
     fall_pruefen,
+    hoehere_vorschlaege,
     ist_faellig,
     mannschaft_unsicher,
     mannschaftsart_fuer,
@@ -124,6 +125,7 @@ def _mannschaft(m: Mannschaft) -> MannschaftAusgabe:
         hoehere=list(m.hoehere),
         bestaetigt=m.bestaetigt,
         unsicher=mannschaft_unsicher(m.ist_sg, m.bestaetigt),
+        vorschlaege=hoehere_vorschlaege(m.name, m.ist_sg),
     )
 
 

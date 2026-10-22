@@ -232,6 +232,31 @@ Ein Kreuz wird nur gesetzt, wo der Verband einen Tatbestand vorsieht
 Zuordnung bekommt keins. Ein geratenes Kreuz behauptete etwas, das niemand
 geprueft hat.
 
+### Wer ueber wem spielt
+
+Welche Mannschaft eines Vereins ueber welcher steht, liefert DFBnet nicht mit.
+Daran haengt Paragraf 68: ein falscher Schluss faellt nicht laut auf, er
+aendert still, wessen Einsaetze als Stammspieler zaehlen.
+
+Angeboten werden jetzt drei Wege, und keiner davon raet fuer den
+Staffelleiter:
+
+* **Die Mannschaften derselben Staffel** zum Ankreuzen, wie bisher.
+* **Vorschlaege aus dem Namen** (`dienst.hoehere_vorschlaege`): zu
+  "Dresdner SC 1898 3" gehoeren "Dresdner SC 1898 2" und "Dresdner SC 1898".
+  Die Erste traegt keine Nummer -- das ist die Schreibweise des Verbandes.
+  Diese beiden spielen hoeherklassig und stehen deshalb gar nicht in dieser
+  Staffel; ankreuzen liess sich vorher nur, wer hier mitspielt, und damit war
+  Paragraf 68 fuer genau die Faelle blind, um die es geht.
+* **Ein Textfeld.** Fuer die Spielgemeinschaft gibt es keinen anderen Weg:
+  "SpG Kickers 2 / Hafen 2" gehoert zwei Vereinen, darueber stehen
+  "FV Loebtauer Kickers" und "FV Hafen Dresden", und keiner der beiden Namen
+  steckt im Namen der SG. Deshalb kommt dort auch **kein** Vorschlag: ein
+  geratener waere schlimmer als keiner.
+
+Eingetragene Namen stehen als Chips mit Kreuz -- ohne sie war eine von Hand
+getippte Mannschaft nie wieder loszuwerden.
+
 ### Zusehen ohne Bildschirm
 
 Der Pruefdienst faehrt einen Browser in einem Container **ohne Bildschirm**.

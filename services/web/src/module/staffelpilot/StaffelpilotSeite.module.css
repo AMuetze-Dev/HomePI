@@ -701,3 +701,41 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* ── Eingetragene Werte, die wieder weg koennen ──────────────────────── */
+/*
+ * Eine von Hand eingetippte Mannschaft stand vorher nur im Satz darueber --
+ * und war nie wieder loszuwerden. Als Chip traegt sie ihr eigenes Kreuz.
+ */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+  margin: var(--raum-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--raum-2);
+  padding: var(--raum-1) var(--raum-2);
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-voll);
+  background: var(--farbe-flaeche-gedaempft);
+  color: var(--farbe-text);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--signal-fehler);
+  color: var(--signal-fehler);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 1px;
+}

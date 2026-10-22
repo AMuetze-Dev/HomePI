@@ -469,6 +469,10 @@ class MannschaftAusgabe(BaseModel):
     #: Blick wert ist. Eine gespeicherte Spalte waere nach jeder Aenderung an
     #: der Regel falsch.
     unsicher: bool
+    #: Aus dem Namen abgeleitete hoeherklassige Mannschaften -- Vorschlaege,
+    #: keine Zuordnung. Bei einer Spielgemeinschaft leer: dort raet der Name
+    #: falsch, und dafuer gibt es das Textfeld.
+    vorschlaege: list[str] = Field(default_factory=list)
 
 
 class MannschaftenSetzen(BaseModel):

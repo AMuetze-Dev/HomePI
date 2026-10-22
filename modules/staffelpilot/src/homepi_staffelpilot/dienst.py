@@ -433,6 +433,45 @@ def mannschaft_unsicher(ist_sg: bool, bestaetigt: bool) -> bool:
     return ist_sg and not bestaetigt
 
 
+#: Woran eine Mannschaftsnummer am Namensende zu erkennen ist.
+#:
+#: "Dresdner SC 1898 3" -- die 3. Nicht die 1898: die steht mitten im Namen
+#: und ist eine Jahreszahl. Deshalb nur ein- bis zweistellig und nur ganz am
+#: Ende.
+_NUMMER_AM_ENDE = re.compile(r"^(?P<stamm>.+?)\s+(?P<nummer>\d{1,2})$")
+
+
+def hoehere_vorschlaege(name: str, ist_sg: bool = False) -> list[str]:
+    """Welche Mannschaften desselben Vereins wahrscheinlich darueber stehen.
+
+    Aus dem Namenszusatz abgeleitet: zu "Dresdner SC 1898 3" gehoeren
+    "Dresdner SC 1898 2" und "Dresdner SC 1898". Die Erste traegt keine
+    Nummer -- das ist die Schreibweise des Verbandes, nicht unsere Annahme.
+
+    **Bei einer Spielgemeinschaft kommt nichts.** "SpG Kickers 2 / Hafen 2"
+    gehoert zwei Vereinen; darueber stehen "FV Loebtauer Kickers" und "FV Hafen
+    Dresden", und keiner der beiden Namen steckt im Namen der SG. Ein
+    Vorschlag waere hier geraten, und ein falscher aendert still, wessen
+    Einsaetze als Stammspieler zaehlen. Dafuer gibt es das Textfeld.
+
+    Vorschlaege, keine Zuordnung: gespeichert wird nur, was jemand anklickt.
+    """
+    if ist_sg:
+        return []
+    treffer = _NUMMER_AM_ENDE.match((name or "").strip())
+    if treffer is None:
+        # Ohne Nummer ist es die Erste. Ueber ihr steht nichts.
+        return []
+    stamm = treffer.group("stamm").strip()
+    nummer = int(treffer.group("nummer"))
+    if not stamm or nummer < 2:
+        return []
+    # Absteigend: die naechsthoehere zuerst, die Erste zuletzt.
+    hoehere = [f"{stamm} {n}" for n in range(nummer - 1, 1, -1)]
+    hoehere.append(stamm)
+    return hoehere
+
+
 # ── Vorgaenge: Mahnung und Sportgerichtsfall ──────────────────────────────
 
 

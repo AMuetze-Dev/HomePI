@@ -211,6 +211,11 @@ export interface Mannschaft {
   bestaetigt: boolean;
   /** Berechnet: ob der geratene Aufbau einen zweiten Blick wert ist. */
   unsicher: boolean;
+  /**
+   * Aus dem Namen abgeleitete höherklassige Mannschaften — Vorschläge, keine
+   * Zuordnung. Bei einer Spielgemeinschaft leer: dort rät der Name falsch.
+   */
+  vorschlaege: string[];
 }
 
 export interface VorgangZeile {

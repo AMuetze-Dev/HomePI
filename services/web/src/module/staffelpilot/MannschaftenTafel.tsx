@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { Etikett, Hinweis, Karte, Platzhalter } from "../../ui";
+import { Etikett, Hinweis, Karte, Knopf, Platzhalter } from "../../ui";
 import { type Mannschaft, ladeMannschaften, speichereMannschaften } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
 
@@ -114,6 +114,7 @@ function MannschaftKarte({
   onSetzen: (hoehere: string[]) => void;
 }) {
   const [offen, setOffen] = useState(false);
+  const [eingabe, setEingabe] = useState("");
   const andere = alle.filter((x) => x.name !== mannschaft.name);
 
   function umschalten(name: string) {
@@ -124,6 +125,28 @@ function MannschaftKarte({
         : [...mannschaft.hoehere, name].sort(),
     );
   }
+
+  function hinzufuegen() {
+    const name = eingabe.trim();
+    if (!name || mannschaft.hoehere.includes(name)) {
+      setEingabe("");
+      return;
+    }
+    onSetzen([...mannschaft.hoehere, name].sort());
+    setEingabe("");
+  }
+
+  /**
+   * Was weder in dieser Staffel spielt noch schon eingetragen ist.
+   *
+   * „Dresdner SC 1898 2" und „Dresdner SC 1898" stehen höherklassig und
+   * tauchen deshalb in dieser Staffel gar nicht auf — ankreuzen ließ sich
+   * vorher nur, wer hier mitspielt, und damit war § 68 für genau die Fälle
+   * blind, um die es geht.
+   */
+  const offeneVorschlaege = mannschaft.vorschlaege.filter(
+    (v) => !mannschaft.hoehere.includes(v) && !andere.some((x) => x.name === v),
+  );
 
   return (
     <Karte blank>
@@ -156,23 +179,93 @@ function MannschaftKarte({
             entscheidet, wessen Einsätze als Stammspieler zählen — bei einer
             Spielgemeinschaft rät der Name falsch.
           </p>
-          <ul
-            className={stil.auswahlListe}
-            aria-label={`Höherklassig als ${mannschaft.name}`}
-          >
-            {andere.map((x) => (
-              <li key={x.id}>
-                <label className={stil.ankreuz}>
-                  <input
-                    type="checkbox"
-                    checked={mannschaft.hoehere.includes(x.name)}
-                    onChange={() => umschalten(x.name)}
-                  />
-                  <span>{x.name}</span>
-                </label>
-              </li>
-            ))}
-          </ul>
+          {/* Was schon eingetragen ist -- und wieder weg kann. Ohne diese
+              Liste sah man eine von Hand eingetippte Mannschaft nur im Satz
+              darueber und wurde sie nie wieder los. */}
+          {mannschaft.hoehere.length > 0 && (
+            <ul className={stil.chips} aria-label={`Darüber: ${mannschaft.name}`}>
+              {mannschaft.hoehere.map((name) => (
+                <li key={name}>
+                  <button
+                    type="button"
+                    className={stil.chip}
+                    onClick={() => umschalten(name)}
+                    aria-label={`${name} entfernen`}
+                  >
+                    {name}
+                    <span aria-hidden="true">×</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {andere.length > 0 && (
+            <ul
+              className={stil.auswahlListe}
+              aria-label={`Höherklassig als ${mannschaft.name}`}
+            >
+              {andere.map((x) => (
+                <li key={x.id}>
+                  <label className={stil.ankreuz}>
+                    <input
+                      type="checkbox"
+                      checked={mannschaft.hoehere.includes(x.name)}
+                      onChange={() => umschalten(x.name)}
+                    />
+                    <span>{x.name}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* Vorschlaege aus dem Namen: "Dresdner SC 1898 3" -> die 2 und die
+              Erste. Sie spielen hoeherklassig und stehen deshalb nicht in
+              dieser Staffel. */}
+          {offeneVorschlaege.length > 0 && (
+            <>
+              <p className={stil.vorgangHinweis}>
+                Aus dem Namen abgeleitet — nur ein Vorschlag:
+              </p>
+              <div className={stil.filterZeile}>
+                {offeneVorschlaege.map((v) => (
+                  <Knopf
+                    key={v}
+                    groesse="sm"
+                    auspraegung="sekundaer"
+                    onClick={() => umschalten(v)}
+                  >
+                    + {v}
+                  </Knopf>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Das Textfeld. Fuer die Spielgemeinschaft gibt es keinen anderen
+              Weg: "SpG Kickers 2 / Hafen 2" gehoert zwei Vereinen, und ueber
+              ihr stehen "FV Loebtauer Kickers" und "FV Hafen Dresden" --
+              keiner der Namen steckt im Namen der SG. */}
+          <div className={stil.werkzeugleiste}>
+            <input
+              type="text"
+              className={stil.suchfeld}
+              aria-label="Höherklassige Mannschaft eintragen"
+              placeholder="Name genau wie in DFBnet"
+              value={eingabe}
+              onChange={(e) => setEingabe(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  hinzufuegen();
+                }
+              }}
+            />
+            <Knopf groesse="sm" onClick={hinzufuegen} disabled={!eingabe.trim()}>
+              Eintragen
+            </Knopf>
+          </div>
         </div>
       )}
     </Karte>
