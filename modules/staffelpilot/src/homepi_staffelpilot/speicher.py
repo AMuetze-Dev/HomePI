@@ -25,6 +25,7 @@ from .dienst import (
     VorgangVergeben,
 )
 from .modelle import (
+    Ansicht,
     Auftrag,
     Befund,
     Einstellung,
@@ -81,6 +82,49 @@ async def staffel_anlegen(sitzung: AsyncSession, daten: StaffelAnlegen) -> Staff
         raise StaffelVergeben(f"Eine Staffel namens '{daten.name}' gibt es bereits") from fehler
     await sitzung.refresh(neue)
     return neue
+
+
+async def ansicht_setzen(
+    sitzung: AsyncSession, auftrag_id: uuid.UUID, art: str, bild: bytes, schritt: str
+) -> None:
+    """Das Abbild zu diesem Auftrag ablegen -- ersetzt, nicht angehaeuft.
+
+    Hoechstens zwei je Auftrag (siehe `modelle.Ansicht`). Ein Band aus Bildern
+    waere nach drei Prueflaeufen groesser als die ganze uebrige Datenbank.
+    """
+    await auftrag(sitzung, auftrag_id)
+    vorhanden = await sitzung.execute(
+        select(Ansicht).where(Ansicht.auftrag_id == auftrag_id, Ansicht.art == art)
+    )
+    ziel = vorhanden.scalars().first()
+    if ziel is None:
+        sitzung.add(Ansicht(auftrag_id=auftrag_id, art=art, bild=bild, schritt=schritt))
+    else:
+        ziel.bild, ziel.schritt = bild, schritt
+    await sitzung.flush()
+
+
+async def ansicht(sitzung: AsyncSession, auftrag_id: uuid.UUID, art: str) -> Ansicht:
+    """Das Abbild, oder 404. Kein leeres Bild und kein Platzhalter."""
+    gefunden = await sitzung.execute(
+        select(Ansicht).where(Ansicht.auftrag_id == auftrag_id, Ansicht.art == art)
+    )
+    ziel = gefunden.scalars().first()
+    if ziel is None:
+        raise dienst.AnsichtUnbekannt(f"Zu diesem Auftrag gibt es keine Ansicht '{art}'")
+    return ziel
+
+
+async def ansicht_arten(sitzung: AsyncSession, auftrag_id: uuid.UUID) -> list[str]:
+    """Welche Abbilder es zu diesem Auftrag gibt.
+
+    Damit die Oberflaeche nicht auf zwei Adressen raten muss, von denen eine
+    404 gibt -- ein Fehler im Protokoll des Browsers, den niemand bestellt hat.
+    """
+    gefunden = await sitzung.execute(
+        select(Ansicht.art).where(Ansicht.auftrag_id == auftrag_id).order_by(Ansicht.art)
+    )
+    return [str(a) for a in gefunden.scalars()]
 
 
 async def staffeln_aus_dfbnet(

@@ -10,6 +10,8 @@ import {
   brichAuftragAb,
   fordereAuftragAn,
   ladeAuftraege,
+  ansichtAdresse,
+  ladeAnsichten,
   ladeOffenenAuftrag,
   ladeUebertragung,
   setzeUebertragungPause,
@@ -289,12 +291,95 @@ function Laufend({
         </ul>
       )}
 
+      <Vorschau auftrag={auftrag} />
+
       <div className={stil.knoepfe}>
         <Knopf auspraegung="leise" onClick={onAbbrechen}>
           Abbrechen
         </Knopf>
       </div>
     </>
+  );
+}
+
+/** Wie oft ein neues Abbild geholt wird, solange ein Lauf arbeitet. */
+const VORSCHAU_TAKT_MS = 2000;
+
+/**
+ * Was der Prüfdienst gerade vor sich hat.
+ *
+ * Er fährt einen Browser in einem Container **ohne Bildschirm**: ein
+ * sichtbares Chromium kann es dort nie geben (`Missing X server`), und auf
+ * Windows soll der Dienst nicht laufen müssen, damit jemand zusehen kann.
+ * Also fotografiert er die Seite.
+ *
+ * Kein gespiegeltes HTML: DFBnets CSS und Bilder liegen hinter derselben
+ * Sitzung, relative Verweise zeigen ins Leere, und fremdes HTML in die eigene
+ * Seite zu hängen ist ein XSS-Loch. Vor allem sind die Comboboxen
+ * JS-getrieben — genau das, was man sehen will, stünde im DOM nicht drin. Im
+ * Abbild schon, samt aufgeklappter Liste.
+ *
+ * Es erscheint **nur, wenn es etwas zu zeigen gibt**: der Schalter dafür
+ * steht in den Einstellungen unter „Beim Prüfen zusehen".
+ */
+function Vorschau({ auftrag }: { auftrag: Auftrag }) {
+  const [arten, setArten] = useState<string[]>([]);
+  const [stand, setStand] = useState(() => Date.now());
+  const [gross, setGross] = useState(false);
+
+  const laeuft = auftrag.zustand === "laeuft" || auftrag.zustand === "angefordert";
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let aktiv = true;
+
+    const nachsehen = () => {
+      ladeAnsichten(auftrag.id, controller.signal)
+        .then((a) => {
+          if (!aktiv) return;
+          setArten(a.arten);
+          setStand(Date.now());
+        })
+        .catch(() => {
+          // Eine Zugabe. Ohne sie bleibt der Fortschritt, und der ist die
+          // Hauptsache.
+        });
+    };
+
+    nachsehen();
+    // Nur solange gearbeitet wird. Ein fertiger Lauf ändert sein Bild nicht
+    // mehr, und ein Takt, der ewig weiterläuft, ist eine Anfrage alle zwei
+    // Sekunden für nichts.
+    const uhr = laeuft ? window.setInterval(nachsehen, VORSCHAU_TAKT_MS) : undefined;
+    return () => {
+      aktiv = false;
+      controller.abort();
+      if (uhr !== undefined) window.clearInterval(uhr);
+    };
+  }, [auftrag.id, laeuft]);
+
+  // Das Fehlerbild gewinnt: es ist der Beweis, woran es lag, und veraltet
+  // nicht.
+  const art = arten.includes("fehler") ? "fehler" : arten.includes("aktuell") ? "aktuell" : "";
+  if (!art) return null;
+
+  const adresse = ansichtAdresse(auftrag.id, art, stand);
+  const beschriftung =
+    art === "fehler" ? "Die Seite im Augenblick des Scheiterns" : "Was der Prüfdienst gerade sieht";
+
+  return (
+    <figure className={gross ? stil.vorschauGross : stil.vorschau}>
+      <figcaption className={stil.vorschauKopf}>
+        <span>{beschriftung}</span>
+        <Knopf groesse="sm" auspraegung="leise" onClick={() => setGross(!gross)}>
+          {gross ? "Verkleinern" : "Vergrößern"}
+        </Knopf>
+      </figcaption>
+      {/* Ohne `key` tauscht der Browser die Quelle, behält aber das alte Bild
+          stehen, bis das neue da ist - bei einem Fehlerbild wäre das die
+          Ansicht von davor. */}
+      <img key={adresse} className={stil.vorschauBild} src={adresse} alt={beschriftung} />
+    </figure>
   );
 }
 

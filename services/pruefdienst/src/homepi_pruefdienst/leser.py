@@ -51,6 +51,10 @@ class Leser(Protocol):
         """Die Staffeln, die diesem Konto gehoeren."""
         ...
 
+    def abbild(self) -> bytes:
+        """Die Seite als JPEG, oder leer. Fuers Zusehen, nicht fuers Pruefen."""
+        ...
+
     def schliessen(self) -> None: ...
 
 
@@ -103,6 +107,10 @@ class DemoLeser:
 
     def mannschaften(self, staffel: Staffelkennung, verband: str = "") -> list[dict[str, object]]:
         return self._mannschaften.get(staffel.name, [])
+
+    def abbild(self) -> bytes:
+        """Der Demo-Leser hat keine Seite, also auch kein Abbild."""
+        return b""
 
     def eigene_staffeln(self, saison: str, verband: str = "") -> list[dict[str, object]]:
         """Die Staffeln, die ihm mitgegeben wurden -- erfunden wird keine.

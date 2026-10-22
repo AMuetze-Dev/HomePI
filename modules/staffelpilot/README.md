@@ -232,6 +232,41 @@ Ein Kreuz wird nur gesetzt, wo der Verband einen Tatbestand vorsieht
 Zuordnung bekommt keins. Ein geratenes Kreuz behauptete etwas, das niemand
 geprueft hat.
 
+### Zusehen ohne Bildschirm
+
+Der Pruefdienst faehrt einen Browser in einem Container **ohne Bildschirm**.
+Ein sichtbares Chromium kann es dort nie geben (`Missing X server`), und auf
+Windows soll er nicht laufen muessen -- wer kein Windows und kein Docker hat,
+soll ihn trotzdem betreiben koennen. Also fotografiert er die Seite, statt sie
+zu zeigen.
+
+**Warum ein Bild und kein gespiegeltes HTML.** Gemessen am 22.10.2026: die
+Spielberichtssuche wiegt als JPEG 85 KiB, ihr rohes HTML 203 KiB. Und das
+HTML waere in der eigenen Oberflaeche trotzdem unbrauchbar -- DFBnets CSS und
+Bilder liegen hinter derselben Sitzung, relative Verweise zeigen ins Leere,
+und fremdes HTML in die eigene Seite zu haengen ist ein XSS-Loch. Vor allem
+sind die Comboboxen JS-getrieben: genau das, was man sehen will, stuende im
+rohen DOM nicht drin. Im Abbild schon, samt aufgeklappter Liste -- 73
+Optionen, nachgezaehlt.
+
+`PUT`/`GET /auftraege/{id}/ansicht/{art}`, dazu `/ansichten` fuer die Frage,
+welche es gibt. Der Rumpf ist das JPEG selbst und kein JSON mit Base64 darin:
+das waere ein Drittel mehr Bytes fuer nichts.
+
+**Hoechstens zwei je Auftrag**, ersetzt statt angehaeuft: `aktuell` veraltet
+im Sekundentakt, `fehler` ist der Beweis und wird vom naechsten Schritt nicht
+ueberschrieben. Ein Band aus Bildern waere nach drei Prueflaeufen groesser als
+die ganze uebrige Datenbank.
+
+Fotografiert wird beim Anmelden, nach jeder Trefferliste und **beim Scheitern,
+bevor der Browser zugeht** -- genau dieses Bild beantwortet die Frage, an der
+ohne Bildschirm niemand weiterkam. Der Schalter dafuer ist
+"Beim Pruefen zusehen" in den Einstellungen.
+
+Ein Prueflauf stirbt nie am Fotografieren: Fehler dabei bleiben folgenlos und
+landen im Protokoll. Eine Vorschau, die einen Lauf mitnimmt, waere schlimmer
+als gar keine.
+
 ### Die eigenen Staffeln
 
 `PUT /staffeln/aus-dfbnet` uebernimmt, was DFBnet unter "Eigene Staffeln"

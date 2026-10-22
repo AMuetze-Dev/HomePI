@@ -582,3 +582,30 @@ export function ladeErgebnisse(
 export function merkeFallAn(vorgangId: string): Promise<Uebertragung> {
   return anfrage<Uebertragung>(`/vorgaenge/${vorgangId}/fallanlage`, { method: "POST" });
 }
+
+// ── Das Vorschaufenster ──────────────────────────────────────────────────
+//
+// Der Prüfdienst fährt einen Browser in einem Container ohne Bildschirm. Ein
+// sichtbares Chromium kann es dort nie geben, und auf Windows soll er nicht
+// laufen müssen. Also schickt er Abbilder.
+
+/** Welche Abbilder es zu einem Auftrag gibt. */
+export interface Ansichten {
+  arten: string[];
+}
+
+export function ladeAnsichten(auftragId: string, signal?: AbortSignal): Promise<Ansichten> {
+  return anfrage<Ansichten>(`/auftraege/${auftragId}/ansichten`, {}, signal);
+}
+
+/**
+ * Die Adresse eines Abbilds.
+ *
+ * Mit einem Zeitstempel daran: dieselbe Adresse liefert alle zwei Sekunden
+ * ein anderes Bild, und ohne ihn zeigt mancher Browser trotz `no-store` das
+ * alte weiter — eine Ansicht von vor zwei Minuten, die aussieht wie eine
+ * aktuelle.
+ */
+export function ansichtAdresse(auftragId: string, art: string, stand: number): string {
+  return API.adresse(`/auftraege/${auftragId}/ansicht/${art}?t=${stand}`);
+}

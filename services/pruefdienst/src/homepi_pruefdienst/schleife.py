@@ -27,6 +27,10 @@ class Prueflauf:
         self._gateway = gateway
         self._leser = leser
         self._darf_schreiben = darf_schreiben
+        # Ob jemand zusieht. Steht in den Einstellungen und wird je Lauf neu
+        # gelesen -- vor dem Anmelden ist es aus, denn ohne Seite gibt es auch
+        # nichts zu fotografieren.
+        self._zuschauen = False
 
     # ── Eine Runde ────────────────────────────────────────────────────────
 
@@ -67,9 +71,32 @@ class Prueflauf:
             # Containers: der Staffelleiter sieht sonst eine Anzeige, die
             # stehenbleibt, und weiß nicht, warum.
             logger.exception("Auftrag %s gescheitert", kennung)
+            # Zuerst das Bild, dann die Meldung: beim Abschluss schliesst der
+            # Leser seinen Browser, und danach gibt es nichts mehr zu
+            # fotografieren. Genau dieses Bild beantwortet die Frage, an der
+            # ohne Bildschirm niemand weiterkam -- woran es lag.
+            self._zusehen(kennung, f"Gescheitert: {fehler}"[:200], art="fehler")
             self._melden_dass_gescheitert(kennung, fehler)
         finally:
             self._leser.schliessen()
+
+    def _zusehen(self, kennung: str, schritt: str, art: str = "aktuell") -> None:
+        """Ein Abbild der Seite ans Artefakt, fuer das Vorschaufenster.
+
+        Nur wenn der Schalter "Beim Pruefen zusehen" an ist. Er hiess einmal
+        "browser_sichtbar" und meinte ein echtes Fenster; im Container gibt es
+        keinen Bildschirm, und auf Windows soll dieser Dienst nicht laufen
+        muessen. Also wird die Seite fotografiert statt gezeigt.
+
+        Fehler bleiben folgenlos. Ein Prueflauf, der am Zusehen scheitert,
+        waere die schlechteste aller Hilfestellungen.
+        """
+        if not self._zuschauen:
+            return
+        try:
+            self._gateway.ansicht(kennung, art, self._leser.abbild(), schritt)
+        except Exception:
+            logger.warning("Das Zusehen ist gescheitert", exc_info=True)
 
     def _melden_dass_gescheitert(self, kennung: str, fehler: Exception) -> None:
         try:
@@ -189,6 +216,9 @@ class Prueflauf:
         # einem Neustart des Dienstes.
         gewuenscht = bool(self._gateway.einstellungen().get("browser_sichtbar"))
         self._leser.sichtbar = gewuenscht
+        # Derselbe Schalter steuert das Vorschaufenster: wer zusehen will,
+        # bekommt Abbilder -- im Container ist das die einzige Art zuzusehen.
+        self._zuschauen = gewuenscht
 
         benutzer, passwort = self._gateway.zugang()
         self._leser.anmelden(benutzer, passwort)
@@ -210,6 +240,7 @@ class Prueflauf:
                 self._gateway.fortschritt(kennung, zeile="Der Browser ist sichtbar")
 
         self._gateway.fortschritt(kennung, zeile=f"Angemeldet als {benutzer}")
+        self._zusehen(kennung, "Angemeldet")
 
     def _staffeln_holen(self, kennung: str) -> None:
         """Die eigenen Staffeln aus DFBnet uebernehmen.
@@ -297,7 +328,15 @@ class Prueflauf:
                 nicht_geprueft.append(name)
                 self._gateway.fortschritt(kennung, zeile=f"{name}: {fehler}")
                 logger.error("Staffel %s wurde nicht geprueft: %s", name, fehler)
+                # Die Suchmaske steht noch, samt dem, was in den Auswahlfeldern
+                # stand. Genau dieses Bild beantwortet die Frage, woran es lag:
+                # welche Spielklasse DFBnet anbot und welche gesucht wurde.
+                self._zusehen(kennung, f"{name} nicht gefunden"[:200], art="fehler")
                 continue
+
+            # Erst jetzt, nicht vor dem Abruf: vorher stuende auf dem Bild noch
+            # die Seite der vorigen Staffel -- unter dem Namen der naechsten.
+            self._zusehen(kennung, f"Trefferliste {name}"[:200])
 
             mannschaften = self._mannschaften_von(staffel)
 

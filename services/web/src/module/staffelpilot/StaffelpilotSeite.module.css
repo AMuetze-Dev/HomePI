@@ -531,3 +531,39 @@
   outline: 2px solid var(--farbe-fokus);
   outline-offset: 1px;
 }
+
+/* ── Das Vorschaufenster ─────────────────────────────────────────────── */
+
+.vorschau,
+.vorschauGross {
+  margin: var(--raum-4) 0 0;
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche-gedaempft);
+  overflow: hidden;
+}
+
+.vorschauKopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-2);
+  padding: var(--raum-2) var(--raum-3);
+  border-bottom: 1px solid var(--farbe-rand);
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+}
+
+.vorschauBild {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Klein ist die Voreinstellung: das Bild soll den Fortschritt nicht aus dem
+   Blick draengen. Wer hinsehen will, vergroessert. */
+.vorschau .vorschauBild {
+  max-height: 14rem;
+  object-fit: cover;
+  object-position: top left;
+}

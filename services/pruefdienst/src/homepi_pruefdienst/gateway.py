@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class GatewayFehler(RuntimeError):
@@ -134,6 +137,26 @@ class Gateway:
         Verfahren steht, soll das Spaetere sein.
         """
         return self._json("GET", f"/staffelpilot/vorgaenge/{vorgang_id}")  # type: ignore[no-any-return]
+
+    def ansicht(self, auftrag_id: str, art: str, bild: bytes, schritt: str = "") -> None:
+        """Ein Abbild der Seite ans Artefakt. Fehler bleiben folgenlos.
+
+        **Das Zusehen darf den Lauf nicht gefaehrden.** Eine Vorschau, die
+        beim Hochladen scheitert und dabei einen Prueflauf mitnimmt, waere
+        schlimmer als gar keine -- deshalb wird hier geschluckt, was sonst
+        nirgends geschluckt wird, und eine Zeile ins Protokoll geschrieben.
+        """
+        if not bild:
+            return
+        try:
+            self._ruf(
+                "PUT",
+                f"/staffelpilot/auftraege/{auftrag_id}/ansicht/{art}",
+                content=bild,
+                headers={"Content-Type": "image/jpeg", "X-Schritt": schritt[:200]},
+            )
+        except Exception:
+            logger.warning("Das Abbild liess sich nicht ablegen", exc_info=True)
 
     def staffeln_aus_dfbnet(self, staffeln: list[dict[str, Any]]) -> dict[str, Any]:
         """Die Liste "Eigene Staffeln" ins Artefakt.

@@ -364,6 +364,16 @@ class Zusammenfassung(BaseModel):
 # ── Einstellungen ─────────────────────────────────────────────────────────
 
 
+class Ansichten(BaseModel):
+    """Welche Abbilder es zu einem Auftrag gibt.
+
+    Damit die Oberflaeche nicht auf zwei Adressen raten muss, von denen eine
+    404 gibt -- ein Fehler im Protokoll des Browsers, den niemand bestellt hat.
+    """
+
+    arten: list[str] = Field(default_factory=list)
+
+
 class Beispieldatenstand(BaseModel):
     """Wie viele erfundene Spiele in den Listen stehen -- oder weg sind.
 

@@ -12,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -365,6 +366,45 @@ class Auftrag(Base, ZeitstempelMixin):
     protokoll: Mapped[list[dict[str, str]]] = mapped_column(JSONB, nullable=False, default=list)
     gestartet_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     beendet_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class Ansicht(Base, ZeitstempelMixin):
+    """Ein Abbild der Seite, die der Pruefdienst gerade vor sich hat.
+
+    **Warum ein Bild und kein HTML.** Gemessen am 22.10.2026: das Abbild der
+    Spielberichtssuche wiegt als JPEG 85 KiB, ihr rohes HTML 203 KiB -- und
+    das HTML waere in unserer Oberflaeche trotzdem unbrauchbar. DFBnets CSS
+    und Bilder liegen hinter derselben Sitzung, relative Verweise zeigen ins
+    Leere, und fremdes HTML in die eigene Seite zu haengen ist ein XSS-Loch.
+    Vor allem: die Comboboxen sind JS-getrieben. Genau das, was man sehen
+    will, stuende im rohen DOM nicht drin -- im Abbild dagegen schon, samt
+    aufgeklappter Liste.
+
+    **Hoechstens zwei Zeilen je Auftrag**, und die werden ersetzt statt
+    angehaeuft: die laufende Ansicht und die vom Augenblick des Scheiterns.
+    Ein Band aus Bildern waere nach drei Prueflaeufen groesser als die ganze
+    uebrige Datenbank, und die mittleren schaut niemand an.
+    """
+
+    __tablename__ = "staffelpilot_ansichten"
+    __table_args__ = (UniqueConstraint("auftrag_id", "art", name="uq_ansicht_je_auftrag"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    auftrag_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("staffelpilot_auftraege.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    #: "aktuell" oder "fehler". Zwei verschiedene Aussagen: die eine veraltet
+    #: im Sekundentakt, die andere ist der Beweis.
+    art: Mapped[str] = mapped_column(String(10), nullable=False)
+    #: Das JPEG selbst. In der Datenbank und nicht im Dateisystem: ein Band
+    #: mehr waere eine Stelle mehr, an der Rechte nicht stimmen -- genau daran
+    #: ist der Regelordner am 21.10.2026 gescheitert.
+    bild: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    #: Wobei es entstand. Ohne das ist ein Bild nur ein Bild.
+    schritt: Mapped[str] = mapped_column(String(200), nullable=False, default="")
 
 
 class Uebertragung(Base, ZeitstempelMixin):

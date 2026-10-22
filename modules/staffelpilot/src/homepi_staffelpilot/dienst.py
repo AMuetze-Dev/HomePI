@@ -84,6 +84,11 @@ class NochOffeneBefunde(ServiceError):
     title = "Es sind noch Befunde offen"
 
 
+class AnsichtUnbekannt(ServiceError):
+    status = 404
+    title = "Keine Ansicht vorhanden"
+
+
 class FallNichtAnlegbar(ServiceError):
     """Aus diesem Vorgang laesst sich kein Sportgerichtsfall anlegen.
 
@@ -576,6 +581,37 @@ def beispieldaten_pruefen(kennungen: Iterable[str], erlaubt: bool) -> None:
         "DFBnet umstellen oder in den Einstellungen „Beispieldaten annehmen“ "
         "einschalten."
     )
+
+
+class AnsichtZuGross(ServiceError):
+    status = 413
+    title = "Das Abbild ist zu gross"
+
+
+#: Wie gross ein Abbild hoechstens sein darf.
+#:
+#: Gemessen am 22.10.2026: die Spielberichtssuche wiegt als JPEG 85 KiB. Zwei
+#: Megabyte sind also das Zwanzigfache und trotzdem eine Grenze -- ohne sie
+#: legte ein Dienst, der versehentlich ein PNG in voller Hoehe schickt, die
+#: Datenbank mit Bildern zu, die niemand ansieht.
+ANSICHT_GRENZE = 2 * 1024 * 1024
+
+#: Welche Abbilder es gibt. Zwei verschiedene Aussagen: das eine veraltet im
+#: Sekundentakt, das andere ist der Beweis, woran es lag.
+ANSICHT_ARTEN = ("aktuell", "fehler")
+
+
+def ansicht_pruefen(art: str, bild: bytes) -> None:
+    """Wirft, wenn das Abbild nicht angenommen werden kann."""
+    if art not in ANSICHT_ARTEN:
+        raise AnsichtUnbekannt(f"'{art}' ist keine Ansicht; es gibt {', '.join(ANSICHT_ARTEN)}")
+    if not bild:
+        raise AnsichtZuGross("Das Abbild ist leer")
+    if len(bild) > ANSICHT_GRENZE:
+        raise AnsichtZuGross(
+            f"Das Abbild ist {len(bild) // 1024} KiB gross; erlaubt sind "
+            f"{ANSICHT_GRENZE // 1024} KiB"
+        )
 
 
 def gefaltet(text: str) -> str:

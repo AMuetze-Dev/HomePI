@@ -13,7 +13,7 @@ import uuid
 from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 from homepi_core.auth import Rolle, erfordert
 from homepi_core.deps import DbSitzung
 
@@ -23,6 +23,7 @@ from .dienst import (
     Einstellungen,
     NochOffeneBefunde,
     SpielSicht,
+    ansicht_pruefen,
     auswerten,
     betreff_fuer,
     darf_abgehakt_werden,
@@ -39,6 +40,7 @@ from .dienst import (
 from .modelle import Befund, Mannschaft, Regel, Regeltext, Spielbericht, Staffel, Vorgang
 from .schemas import (
     Abschluss,
+    Ansichten,
     AuftragAnfordern,
     AuftragAusgabe,
     AuftragZeile,
@@ -789,6 +791,60 @@ async def auftrag_fortschritt(
     """
     return AuftragAusgabe.model_validate(
         await speicher.auftrag_fortschreiben(sitzung, auftrag_id, daten)
+    )
+
+
+@router.put(
+    "/auftraege/{auftrag_id}/ansicht/{art}",
+    summary="Ein Abbild der Seite ablegen",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+async def ansicht_setzen(
+    auftrag_id: uuid.UUID, art: str, sitzung: DbSitzung, anfrage: Request
+) -> Response:
+    """Vom Prüfdienst aufgerufen, nicht von der Oberfläche.
+
+    Der Rumpf ist das JPEG selbst und kein JSON mit Base64 darin: das wäre ein
+    Drittel mehr Bytes für nichts.
+
+    Es gibt genau zwei Arten. `aktuell` veraltet im Sekundentakt, `fehler` ist
+    der Beweis, woran es lag — und wird deshalb beim nächsten Schritt **nicht**
+    überschrieben.
+    """
+    bild = await anfrage.body()
+    ansicht_pruefen(art, bild)
+    schritt = anfrage.headers.get("X-Schritt", "")[:200]
+    await speicher.ansicht_setzen(sitzung, auftrag_id, art, bild, schritt)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/auftraege/{auftrag_id}/ansichten", summary="Welche Abbilder es gibt")
+async def ansichten(auftrag_id: uuid.UUID, sitzung: DbSitzung) -> Ansichten:
+    return Ansichten(arten=await speicher.ansicht_arten(sitzung, auftrag_id))
+
+
+@router.get(
+    "/auftraege/{auftrag_id}/ansicht/{art}",
+    summary="Das Abbild der Seite",
+    response_class=Response,
+    responses={200: {"content": {"image/jpeg": {}}}},
+)
+async def ansicht(auftrag_id: uuid.UUID, art: str, sitzung: DbSitzung) -> Response:
+    """Was der Prüfdienst zuletzt vor sich hatte.
+
+    **Nicht zwischenspeichern.** Dasselbe Bild unter derselben Adresse ändert
+    sich im Sekundentakt; ein Browser, der es behält, zeigt eine Ansicht von
+    vor zwei Minuten und sieht dabei aus wie eine aktuelle.
+    """
+    gefunden = await speicher.ansicht(sitzung, auftrag_id, art)
+    return Response(
+        content=gefunden.bild,
+        media_type="image/jpeg",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Schritt": gefunden.schritt,
+        },
     )
 
 

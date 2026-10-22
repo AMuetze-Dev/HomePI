@@ -691,6 +691,31 @@ class DfbnetLeser:
             logger.exception("Die Meldung zu %r liess sich nicht holen", staffel.name)
             return []
 
+    def abbild(self) -> bytes:
+        """Die aktuelle Seite als JPEG.
+
+        Das Vorschaufenster der Oberflaeche. Im Container gibt es keinen
+        Bildschirm -- ein sichtbares Chromium kann es dort nie geben, und der
+        Dienst soll auch nicht auf Windows laufen muessen, damit jemand
+        zusehen kann.
+
+        JPEG und nicht PNG: gemessen am 22.10.2026 wiegt die
+        Spielberichtssuche 85 gegen 108 KiB, und fuer eine Vorschau zaehlt
+        jedes Kilobyte, das alle zwei Sekunden ueber die Leitung geht.
+
+        Scheitert es, kommt **leer** zurueck und keine Ausnahme: ein
+        Prueflauf, der am Fotografieren stirbt, waere die schlechteste aller
+        Hilfestellungen.
+        """
+        if self._seite is None:
+            return b""
+        try:
+            bild: bytes = self._seite.screenshot(type="jpeg", quality=55)
+            return bild
+        except Exception:
+            logger.warning("Ein Abbild der Seite liess sich nicht machen", exc_info=True)
+            return b""
+
     def eigene_staffeln(self, saison: str, verband: str = "") -> list[dict[str, object]]:
         """Die Staffeln, die diesem Konto gehoeren.
 
