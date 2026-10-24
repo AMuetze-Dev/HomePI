@@ -92,9 +92,25 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
     await expect(page.getByLabel("StaffelPilot")).toHaveValue("verwalter");
   });
 
-  test("ohne Staffel sagt die Übersicht, was zuerst zu tun ist", async ({ page }) => {
-    await zuStaffelpilot(page);
+  test("die Übersicht führt zuerst in die Einrichtung", async ({ page }) => {
+    // Ohne DFBnet-Zugang und ohne Staffel bleibt jede Liste leer. Der Weg
+    // dorthin steht in `einrichtung.spec.ts`; diese Reise prüft die Bedienung
+    // und schließt ihn deshalb gleich wieder -- genau dafür gibt es den
+    // Ausgang. Ein Weg, der sich nicht schließen lässt, ist eine Sackgasse.
+    await anmelden(page);
+    await artefakt(page, "StaffelPilot").click();
 
+    await expect(
+      page.getByRole("list", { name: "Schritte der Einrichtung" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: /Später/ }).click();
+
+    // "Später" führt in die Spielprüfung -- dort wird gearbeitet.
+    await expect(page).toHaveURL(/\/modul\/staffelpilot\/spiele$/);
+
+    // Und die Übersicht zeigt jetzt den ehrlichen Erstzustand, statt wieder
+    // in den Weg zu führen: abgehakt heißt abgehakt.
+    await bereich(page, "Übersicht").click();
     await expect(page.getByText("Keine aktive Staffel")).toBeVisible();
     await expect(page.getByRole("button", { name: "Staffeln verwalten" })).toBeVisible();
   });
@@ -242,6 +258,31 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
       const text = await zahlen.textContent();
       expect(text).toMatch(/1[\s\S]*eingetragen|eingetragen[\s\S]*1/);
     }).toPass({ timeout: DIENST_WARTET });
+  });
+
+  test("die Regeln stehen da, und der Quelltext dazu", async ({ page }) => {
+    // Die neun mitgelieferten Prüfungen lagen einmal nur im Ordner des
+    // Dienstes: die Oberfläche zeigte "Keine eigenen Regeldateien", obwohl
+    // neun liefen. Dass sie herüberkommen, passiert beim ersten Lauf -- und
+    // der ist in dieser Reise längst gewesen.
+    await zuStaffelpilot(page);
+    await bereich(page, "Regeldateien").click();
+
+    const dateien = page.getByRole("list", { name: "Regeldateien" });
+    await expect(dateien.getByText("10_altersklassen.py")).toBeVisible();
+
+    // Und sie lassen sich öffnen: ein Feld mit Zeilennummern, kein leeres
+    // Kästchen.
+    await dateien.getByRole("button", { name: /10_altersklassen\.py/ }).click();
+    await expect(page.getByRole("textbox", { name: "Quelltext" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Quelltext" })).toHaveValue(/@regel/);
+  });
+
+  test("die Regelübersicht nennt, was geprüft wird", async ({ page }) => {
+    await zuStaffelpilot(page);
+    await bereich(page, "Regeln").click();
+
+    await expect(page.getByRole("list", { name: /Regeln/ })).toBeVisible();
   });
 
   test("die Ergebnisse zählen mit", async ({ page }) => {

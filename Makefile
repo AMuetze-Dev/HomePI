@@ -237,13 +237,20 @@ PRUEFDIENST_PW ?= nur-zum-durchklicken-im-eigenen-netz
 #: Der Port der Entwicklungsumgebung. Dieselbe Vorgabe wie in
 #: compose.dev.yml -- wer dort umstellt, stellt hier mit um.
 DEV_API_PORT ?= 18000
-E2E := DEV_PROJEKT=homepi-e2e DEV_WEB_PORT=$(E2E_WEB_PORT) DEV_API_PORT=$(E2E_API_PORT) DEV_DB_PORT=$(E2E_DB_PORT) docker compose -f compose.dev.yml
+#: **Nie DFBnet.** Die Oberflaechentests melden sich mit erfundenen
+#: Zugangsdaten an und fordern Laeufe an. Mit dem echten Leser faehrt
+#: dabei ein Browser zum Verband -- mit Daten, die dort niemandem
+#: gehoeren. Hier ausdruecklich gesetzt und nicht dem Standard
+#: ueberlassen: eine .env in diesem Verzeichnis gilt fuer *jedes*
+#: compose-Projekt daraus, auch fuer dieses.
+E2E := DEV_PROJEKT=homepi-e2e DEV_WEB_PORT=$(E2E_WEB_PORT) DEV_API_PORT=$(E2E_API_PORT) DEV_DB_PORT=$(E2E_DB_PORT) PRUEFDIENST_LESER=demo docker compose -f compose.dev.yml
 
-# Beide Reisen brauchen eine **frische** Installation: die eine richtet ein,
-# die andere prueft, dass die Einrichtung noch offen ist. Sie koennen sich
-# also keine Datenbank teilen - deshalb je ein eigener Durchgang.
+# Jede Reise braucht eine **frische** Installation: die eine richtet die
+# Anlage ein, die zweite geht den Weg durch die Einrichtung des Artefakts,
+# die dritte bedient es. Sie koennen sich also keine Datenbank teilen --
+# deshalb je ein eigener Durchgang.
 e2e:
-	@for spec in weg staffelpilot; do \
+	@for spec in weg einrichtung staffelpilot; do \
 	  echo "=== $$spec"; \
 	  $(MAKE) --no-print-directory e2e-hoch || exit 1; \
 	  ( cd services/web && E2E_URL=http://127.0.0.1:$(E2E_WEB_PORT) \
