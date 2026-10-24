@@ -20,6 +20,14 @@ UMGEBUNG = "PRUEFDIENST_REGELN"
 #: Wo er im Container liegt, wenn nichts gesagt wird.
 VORGABE = "/data/regeln"
 
+#: Das Buch des Spiegels: welche Dateien aus dem Artefakt stammen.
+#:
+#: Steht hier und nicht in der Schleife, weil der Lader es ebenfalls braucht
+#: -- fuer ihn ist es das Zeichen, dass das Artefakt die Regeln fuehrt und er
+#: keine Vorlage mehr hinlegen darf. Der Unterstrich haelt es vom Lader fern,
+#: der nur `*.py` ohne Unterstrich einsammelt.
+BUCH = "_aus_artefakt.json"
+
 
 def regelordner() -> Path:
     return Path(os.environ.get(UMGEBUNG) or VORGABE)

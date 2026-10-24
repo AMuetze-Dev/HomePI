@@ -56,6 +56,7 @@ from .schemas import (
     UebertragungAbschluss,
     UebertragungEinreihen,
     VorgangAnlegen,
+    VorlagenUebergeben,
     ZugangSetzen,
 )
 
@@ -120,6 +121,44 @@ async def regeldatei_setzen(sitzung: AsyncSession, daten: RegeldateiSetzen) -> R
     await sitzung.flush()
     await sitzung.refresh(ziel)
     return ziel
+
+
+async def vorlagen_uebernehmen(
+    sitzung: AsyncSession, daten: VorlagenUebergeben
+) -> tuple[list[str], list[str], bool]:
+    """Die mitgelieferten Regeln des Pruefdienstes einmalig uebernehmen.
+
+    Gibt zurueck: was angelegt wurde, was schon dastand, und ob die Uebergabe
+    frueher schon stattgefunden hat.
+
+    Der Vermerk liegt in derselben Tabelle wie die Einstellungen, unter einem
+    Schluessel mit Unterstrich. Nicht im Ordner des Pruefdienstes: der
+    ueberlebt kein neues Abbild, die Datenbank schon -- und eine Uebergabe,
+    die sich nach jedem Neubau wiederholt, holt geloeschte Regeln zurueck.
+    """
+    gefunden = await sitzung.execute(
+        select(Einstellung.schluessel).where(Einstellung.schluessel == dienst.VORLAGEN_VERMERK)
+    )
+    schon_geschehen = gefunden.scalars().first() is not None
+
+    vorhanden = set((await sitzung.execute(select(Regeldatei.name))).scalars().all())
+    angeboten = {v.name: v.inhalt for v in daten.vorlagen}
+    zu_nehmen = dienst.vorlagen_auswaehlen(angeboten, vorhanden, schon_geschehen)
+
+    for name in zu_nehmen:
+        # Eingeschaltet: neun stillgelegte Regeln waeren dasselbe wie keine,
+        # nur mit mehr Klicks.
+        sitzung.add(Regeldatei(name=name, inhalt=angeboten[name], aktiv=True))
+
+    if not schon_geschehen:
+        # Vermerkt wird auch, wenn nichts anzulegen war -- sonst bietet der
+        # Dienst beim naechsten Lauf wieder an, und die Entscheidung "weg"
+        # haelt keinen Neustart aus.
+        sitzung.add(Einstellung(schluessel=dienst.VORLAGEN_VERMERK, wert="true"))
+
+    await sitzung.flush()
+    uebergangen = sorted(name for name in angeboten if name in vorhanden)
+    return zu_nehmen, uebergangen, schon_geschehen
 
 
 async def regeldatei_aendern(

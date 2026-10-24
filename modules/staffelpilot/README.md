@@ -254,6 +254,29 @@ und fuehrt Buch darueber in `_aus_artefakt.json`. Ohne dieses Buch liesse sich
 eine geloeschte Datei nicht von einer mitgelieferten Vorlage unterscheiden,
 und das Aufraeumen leerte beim ersten Lauf das ganze Regelwerk.
 
+**Die neun mitgelieferten Pruefungen kommen herueber.** Sie lagen bisher nur
+im Ordner des Dienstes: die Oberflaeche zeigte "Keine eigenen Regeldateien",
+obwohl neun liefen -- und zu bearbeiten gab es nichts. Vor dem Spiegeln bietet
+der Dienst sie deshalb an (`POST /regeldateien/vorlagen`), und das Artefakt
+entscheidet:
+
+* **Einmal.** Der Vermerk steht als eigener Schluessel neben den
+  Einstellungen, mit Unterstrich, denn er entscheidet nichts, sondern haelt
+  etwas fest. Er liegt im Artefakt und nicht im Ordner: der ueberlebt kein
+  neues Abbild, die Datenbank schon -- und eine Uebergabe, die sich nach jedem
+  Neubau wiederholt, holt geloeschte Regeln zurueck.
+* **Nie ueber etwas drueber.** Was schon dasteht, bleibt stehen, auch wenn
+  eine neuere Fassung die Vorlage geaendert hat. Eine Aktualisierung, die eine
+  von Hand geschaerfte Regel zuruecksetzt, ist schlimmer als eine veraltete
+  Vorlage, weil sie nichts sagt. Zweite Sperre neben dem Vermerk: fiele der
+  aus, griffe noch diese.
+
+Danach fuehrt das Artefakt die Regeln allein. Der Lader des Dienstes legt
+keine Vorlage mehr hin, sobald das Buch im Ordner liegt -- sonst waere jedes
+Loeschen vergeblich: der Spiegel raeumte die Datei weg, und der naechste
+Ladevorgang legte sie als Vorlage wieder hin. Die Regel liefe weiter, und
+niemand saehe warum.
+
 Abgeschaltet heisst: liegt im Artefakt, laeuft nicht -- besser als geloescht,
 wenn jemand sie nur vorruebergehend stilllegen will. Entfernt heisst "wird
 nicht mehr geprueft" und nicht "ist nie passiert": Befunde frueherer Laeufe

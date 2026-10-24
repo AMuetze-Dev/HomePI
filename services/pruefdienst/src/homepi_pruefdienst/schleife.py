@@ -17,7 +17,8 @@ from . import dienst, fallanlage, katalog, regeln
 from .auskunft import GatewayAuskunft
 from .gateway import Gateway, GatewayFehler
 from .leser import BeispielLeser, Leser
-from .regelwerk.ordner import regelordner
+from .regelwerk import lader
+from .regelwerk.ordner import BUCH, regelordner
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,51 @@ class Prueflauf:
             return [s for s in alle if str(s["id"]) == str(staffel_id)]
         return [s for s in alle if s.get("aktiv")]
 
+    def _vorlagen_anbieten(self, kennung: str) -> None:
+        """Die mitgelieferten Regeldateien dem Artefakt anbieten.
+
+        Die neun Pruefungen der Spielordnung lagen bisher nur hier im Ordner.
+        Die Oberflaeche zeigte "Keine eigenen Regeldateien", obwohl neun
+        liefen -- und zu bearbeiten gab es nichts.
+
+        **Angeboten, nicht gesetzt.** Ob etwas davon angenommen wird,
+        entscheidet das Artefakt: einmalig, und nie ueber etwas drueber. Der
+        Vermerk liegt dort, weil dieser Ordner kein neues Abbild ueberlebt und
+        eine Uebergabe, die sich nach jedem Neubau wiederholt, geloeschte
+        Regeln zurueckholt.
+
+        Ein Fehler kippt den Lauf nicht: die Vorlagen sind eine
+        Bequemlichkeit, der Prueflauf die Arbeit. Aber er steht im Protokoll.
+        """
+        vorlagen = []
+        for pfad in sorted(lader.VORLAGEN.glob("*.py")):
+            try:
+                vorlagen.append({"name": pfad.name, "inhalt": pfad.read_text(encoding="utf-8")})
+            except OSError:
+                logger.exception("Vorlage %s liess sich nicht lesen", pfad.name)
+        if not vorlagen:
+            return
+
+        try:
+            stand = self._gateway.vorlagen_uebergeben(vorlagen)
+        except GatewayFehler:
+            logger.exception("Die mitgelieferten Regeln liessen sich nicht uebergeben")
+            self._gateway.fortschritt(
+                kennung,
+                zeile="Die mitgelieferten Regeln ließen sich nicht übergeben — "
+                "der Lauf nutzt die Dateien, die hier liegen",
+            )
+            return
+
+        uebernommen = [str(n) for n in stand.get("uebernommen") or []]
+        if uebernommen:
+            logger.info("Mitgelieferte Regeln uebergeben: %s", ", ".join(uebernommen))
+            self._gateway.fortschritt(
+                kennung,
+                zeile=f"{len(uebernommen)} mitgelieferte Regeln ins Artefakt übernommen "
+                "— sie lassen sich jetzt dort bearbeiten",
+            )
+
     def _regeln_spiegeln(self, kennung: str) -> None:
         """Die Regeldateien aus dem Artefakt in den eigenen Ordner schreiben.
 
@@ -131,6 +177,8 @@ class Prueflauf:
         Entsprechung im Artefakt, solange sie niemand hochgeladen hat, und sie
         hier wegzuraeumen hiesse, das Regelwerk beim ersten Lauf zu leeren.
         """
+        self._vorlagen_anbieten(kennung)
+
         try:
             verzeichnis = self._gateway.regeldateien()
         except GatewayFehler:
@@ -175,7 +223,7 @@ class Prueflauf:
         # mitgelieferten Vorlagen unterscheiden, und ein Aufraeumen leerte
         # beim ersten Lauf das ganze Regelwerk. Der Unterstrich haelt es vom
         # Lader fern.
-        buch = ordner / "_aus_artefakt.json"
+        buch = ordner / BUCH
         try:
             vorher = set(json.loads(buch.read_text(encoding="utf-8"))) if buch.is_file() else set()
         except (OSError, ValueError):

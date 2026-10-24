@@ -241,6 +241,24 @@ class TestLaden:
         assert vorlagen_ausrollen(ziel) == []
         assert (ziel / "10_altersklassen.py").read_text(encoding="utf-8") == "# von Hand"
 
+    def test_no_rollout_once_the_artefakt_leads(self, tmp_path):
+        """Sobald das Artefakt die Regeln fuehrt, legt der Lader keine Vorlage
+        mehr hin.
+
+        Sonst waere jedes Loeschen vergeblich: der Spiegel raeumt die Datei
+        aus dem Ordner, und der naechste Ladevorgang legte sie als Vorlage
+        wieder hin -- die Regel liefe weiter, und niemand saehe warum.
+
+        Woran der Lader das erkennt: am Buch des Spiegels. Es entsteht beim
+        ersten Abgleich mit dem Artefakt und sagt damit genau das aus.
+        """
+        ziel = tmp_path / "regeln"
+        ziel.mkdir()
+        (ziel / "_aus_artefakt.json").write_text("[]", encoding="utf-8")
+
+        assert vorlagen_ausrollen(ziel) == []
+        assert list(ziel.glob("*.py")) == []
+
     def test_an_update_never_overwrites_a_hand_edited_rule(self, tmp_path):
         """Eine Aktualisierung, die eine geschärfte Regel zurücksetzt, ist
         schlimmer als eine veraltete Vorlage — sie sagt nichts."""

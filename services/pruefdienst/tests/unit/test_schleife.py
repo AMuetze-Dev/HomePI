@@ -19,6 +19,7 @@ from homepi_pruefdienst.bericht import MatchMeta, MatchReport, Player, TeamSquad
 from homepi_pruefdienst.dienst import Spielzeile, Staffelkennung
 from homepi_pruefdienst.gateway import GatewayFehler
 from homepi_pruefdienst.leser import BeispielLeser, DemoLeser
+from homepi_pruefdienst.regelwerk import lader
 from homepi_pruefdienst.schleife import Prueflauf
 
 HEUTE = dt.date.today()
@@ -100,9 +101,15 @@ class FalschesGateway:
         }
         self.zugang_geholt = 0
         self.uebernommen_staffeln: list[list[dict[str, Any]]] = []
-        # Leer: dieses Artefakt fuehrt keine eigenen Regeldateien, also
-        # schreibt der Dienst auch keine in seinen Ordner.
-        self.regeldateien_liste: list[dict[str, Any]] = []
+        # Wie nach der Uebergabe: das Artefakt fuehrt die mitgelieferten
+        # Regeln, und der Dienst schreibt sie sich in seinen Ordner.
+        self.regeldateien_liste: list[dict[str, Any]] = mitgelieferte_regeldateien()
+        # Was der Dienst an Vorlagen angeboten hat, je Aufruf eine Liste.
+        self.angebotene_vorlagen: list[list[str]] = []
+        # Wie eine Installation, die die Uebergabe hinter sich hat. Sonst
+        # bekaeme jeder Test hier neun mitgelieferte Regeln dazu, die er nicht
+        # bestellt hat -- und pruefte etwas anderes als das, was dasteht.
+        self.vorlagen_schon_geschehen = True
         self.uebernommen: list[str] = []
         self.gemeldet: list[tuple[str, str, str]] = []
         self._warteschlange = [
@@ -156,6 +163,23 @@ class FalschesGateway:
     def regeldateien(self) -> list[dict[str, Any]]:
         return self.regeldateien_liste
 
+    def vorlagen_uebergeben(self, vorlagen: list[dict[str, Any]]) -> dict[str, Any]:
+        self.angebotene_vorlagen.append([str(v["name"]) for v in vorlagen])
+        if self.vorlagen_schon_geschehen:
+            return {"uebernommen": [], "uebergangen": [], "schon_geschehen": True}
+        schon_da = {str(d["name"]) for d in self.regeldateien_liste}
+        neu = [v for v in vorlagen if str(v["name"]) not in schon_da]
+        self.regeldateien_liste += [
+            {"id": f"v{i}", "name": v["name"], "aktiv": True, "inhalt": v["inhalt"]}
+            for i, v in enumerate(neu)
+        ]
+        self.vorlagen_schon_geschehen = True
+        return {
+            "uebernommen": [str(v["name"]) for v in neu],
+            "uebergangen": sorted(schon_da & {str(v["name"]) for v in vorlagen}),
+            "schon_geschehen": False,
+        }
+
     def regeldatei(self, datei_id: str) -> dict[str, Any]:
         return next(d for d in self.regeldateien_liste if str(d["id"]) == datei_id)
 
@@ -195,6 +219,19 @@ class FalschesGateway:
     @property
     def schritte(self) -> str:
         return " | ".join(str(f.get("schritt", "")) for f in self.fortschritte)
+
+
+def mitgelieferte_regeldateien() -> list[dict[str, Any]]:
+    """Die neun Vorlagen, wie sie nach der Uebergabe im Artefakt stehen.
+
+    Frueher legte der Lader sie in den Ordner, und jeder Lauf hatte sie.
+    Jetzt fuehrt sie das Artefakt -- ein falsches Gateway ohne sie pruefte
+    eine Installation, die es so nicht gibt.
+    """
+    return [
+        {"id": f"v{i}", "name": p.name, "aktiv": True, "inhalt": p.read_text(encoding="utf-8")}
+        for i, p in enumerate(sorted(lader.VORLAGEN.glob("*.py")))
+    ]
 
 
 def lauf(gateway: Any, leser: Any = None, darf_schreiben: bool = False) -> Prueflauf:
@@ -300,6 +337,88 @@ class TestRegelkatalog:
 
         assert gateway.abschluesse[0][1] == "fertig"
         assert gateway.importe
+
+
+class TestVorlagen:
+    """Die mitgelieferten Regeln gehoeren ins Artefakt, nicht nur in den Ordner.
+
+    Vorher lagen die neun Pruefungen allein im Band am Dienst: die Oberflaeche
+    zeigte "Keine eigenen Regeldateien", obwohl neun liefen -- und zu
+    bearbeiten gab es nichts. Genau das hat der Staffelleiter gemeldet.
+    """
+
+    def _lauf(self, gateway: Any, ordner: Any) -> None:
+        """Wie beim Spiegeln: `regelordner` wird in der Schleife nachgeschlagen,
+        also muss der Tausch dort stattfinden und nicht nur in der Umgebung."""
+        import homepi_pruefdienst.schleife as schleife_modul
+
+        urspruenglich = schleife_modul.regelordner
+        schleife_modul.regelordner = lambda: ordner  # type: ignore[assignment]
+        try:
+            lauf(gateway, DemoLeser()).runde()
+        finally:
+            schleife_modul.regelordner = urspruenglich  # type: ignore[assignment]
+
+    def test_der_dienst_bietet_sie_an(self, tmp_path: Any, monkeypatch: Any) -> None:
+        monkeypatch.setenv("PRUEFDIENST_REGELN", str(tmp_path / "regeln"))
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf"})
+        gateway.regeldateien_liste = []
+        gateway.vorlagen_schon_geschehen = False
+
+        lauf(gateway).runde()
+
+        assert gateway.angebotene_vorlagen, "es wurde nichts angeboten"
+        angeboten = gateway.angebotene_vorlagen[0]
+        assert "10_altersklassen.py" in angeboten
+        assert len(angeboten) >= 9
+
+    def test_was_das_artefakt_nimmt_landet_im_ordner(self, tmp_path: Any, monkeypatch: Any) -> None:
+        """Erst herueber, dann zurueck: das Artefakt ist die Wahrheit, der
+        Ordner die Kopie -- auch bei den mitgelieferten."""
+        ordner = tmp_path / "regeln"
+        monkeypatch.setenv("PRUEFDIENST_REGELN", str(ordner))
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf"})
+        gateway.regeldateien_liste = []
+        gateway.vorlagen_schon_geschehen = False
+
+        self._lauf(gateway, ordner)
+
+        assert (ordner / "10_altersklassen.py").is_file()
+
+    def test_angeboten_wird_nur_einmal(self, tmp_path: Any, monkeypatch: Any) -> None:
+        """Das Artefakt entscheidet, und es sagt es auch: nach der Uebergabe
+        kommt "schon geschehen" zurueck. Wer eine Regel loescht, soll sie los
+        sein."""
+        ordner = tmp_path / "regeln"
+        monkeypatch.setenv("PRUEFDIENST_REGELN", str(ordner))
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf"})
+        # Die Uebergabe ist geschehen, und der Staffelleiter hat alle geloescht.
+        gateway.regeldateien_liste = []
+
+        self._lauf(gateway, ordner)
+
+        assert gateway.angebotene_vorlagen, "angeboten wird trotzdem -- es entscheidet das Artefakt"
+        assert gateway.regeldateien_liste == []
+        assert not (ordner / "10_altersklassen.py").exists()
+
+    def test_ein_fehler_beim_anbieten_kippt_den_lauf_nicht(
+        self, tmp_path: Any, monkeypatch: Any
+    ) -> None:
+        """Die Vorlagen sind eine Bequemlichkeit, der Prueflauf die Arbeit.
+        Ein Artefakt, das die Uebergabe abweist, darf ihn nicht umreissen --
+        aber es muss im Protokoll stehen."""
+        ordner = tmp_path / "regeln"
+        monkeypatch.setenv("PRUEFDIENST_REGELN", str(ordner))
+
+        class Streikt(FalschesGateway):
+            def vorlagen_uebergeben(self, vorlagen: list[dict[str, Any]]) -> dict[str, Any]:
+                raise GatewayFehler("Artefakt weg")
+
+        gateway = Streikt({"id": "a1", "art": "pruflauf"})
+        self._lauf(gateway, ordner)
+
+        assert gateway.abschluesse and gateway.abschluesse[-1][1] == "fertig"
+        assert "ließen sich nicht übergeben" in gateway.protokoll
 
 
 class TestZusehen:

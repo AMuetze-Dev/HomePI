@@ -658,6 +658,45 @@ def ansicht_pruefen(art: str, bild: bytes) -> None:
         )
 
 
+#: Wo vermerkt steht, dass die mitgelieferten Regeln uebergeben wurden.
+#:
+#: Ein eigener Schluessel in derselben Tabelle wie die Einstellungen, aber
+#: **keine Einstellung**: er gehoert nicht in das Formular, weil er nichts
+#: entscheidet, sondern etwas festhaelt. Der Unterstrich sagt das, und
+#: `einstellungen_aus` uebergeht unbekannte Schluessel ohnehin.
+VORLAGEN_VERMERK = "_vorlagen_uebernommen"
+
+
+def vorlagen_auswaehlen(
+    angeboten: Iterable[str],
+    vorhanden: Iterable[str],
+    schon_geschehen: bool,
+) -> list[str]:
+    """Welche der angebotenen Vorlagen das Artefakt uebernimmt.
+
+    Der Pruefdienst bringt neun Regeldateien mit. Sie lagen bisher nur in
+    seinem Ordner: die Oberflaeche zeigte "Keine eigenen Regeldateien",
+    obwohl neun liefen -- und zu bearbeiten gab es nichts.
+
+    **Einmal.** Wer eine Regel loescht, soll sie los sein; ein Dienst, der sie
+    beim naechsten Lauf wieder anbietet, holt sie zurueck. Deshalb der
+    Vermerk, und deshalb entscheidet nicht der Dienst, sondern das Artefakt:
+    der Ordner ueberlebt kein neues Abbild, die Datenbank schon.
+
+    **Nie ueber etwas drueber.** Was schon dasteht, bleibt stehen -- auch wenn
+    eine neuere Fassung die Vorlage geaendert hat. Eine Aktualisierung, die
+    eine von Hand geschaerfte Regel zuruecksetzt, ist schlimmer als eine
+    veraltete Vorlage, weil sie nichts sagt. Das ist die zweite Sperre neben
+    dem Vermerk: fiele der aus, griffe noch diese.
+    """
+    if schon_geschehen:
+        return []
+    schon_da = set(vorhanden)
+    # Sortiert, weil der Lader nach Namen sortiert: "10_" vor "20_", und eine
+    # "90_eigene.py" soll am Ende gezielt etwas ersetzen koennen.
+    return sorted(name for name in angeboten if name not in schon_da)
+
+
 def gefaltet(text: str) -> str:
     """Einen Staffelnamen auf das reduzieren, was zu vergleichen lohnt.
 

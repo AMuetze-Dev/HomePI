@@ -84,16 +84,18 @@ export function RegeldateienTafel() {
       <Karte>
         <h2 className={stil.formularTitel}>Regeldateien</h2>
         <p className={stil.vorgangHinweis}>
-          Der Quelltext der Prüfungen. Er wird im Prüfdienst ausgeführt — vor jedem
-          Lauf schreibt er sich die Dateien von hier in seinen Ordner. Was hier steht,
-          ist die Wahrheit; der Ordner ist die Kopie.
+          Der Quelltext der Prüfungen. Er wird im Prüfdienst ausgeführt — vor jedem Lauf
+          schreibt er sich die Dateien von hier in seinen Ordner. Was hier steht, ist die
+          Wahrheit; der Ordner ist die Kopie.
         </p>
         <Hinweis ton="warnung">
-          Das ist ausführbarer Code und kein Formular. Eine Datei mit einem Fehler
-          darin lässt der Prüfdienst stehen und meldet sie als fehlerhafte Regel — sie
-          reißt keinen Lauf um, aber sie prüft auch nichts.
+          Das ist ausführbarer Code und kein Formular. Eine Datei mit einem Fehler darin
+          lässt der Prüfdienst stehen und meldet sie als fehlerhafte Regel — sie reißt
+          keinen Lauf um, aber sie prüft auch nichts.
         </Hinweis>
-        <Hochladen onFertig={(name, inhalt) => handeln(() => speichereRegeldatei(name, inhalt))} />
+        <Hochladen
+          onFertig={(name, inhalt) => handeln(() => speichereRegeldatei(name, inhalt))}
+        />
       </Karte>
 
       {fehler && (
@@ -103,10 +105,10 @@ export function RegeldateienTafel() {
       )}
 
       {dateien.length === 0 ? (
-        <Leerzustand titel="Keine eigenen Regeldateien">
-          Der Prüfdienst legt beim ersten Lauf seine mitgelieferten Vorlagen an. Was
-          hier steht, sind die Dateien, die diese Installation selbst führt — hochgeladen
-          oder hier geschrieben.
+        <Leerzustand titel="Noch keine Regeldateien">
+          Beim ersten Prüflauf übergibt der Prüfdienst seine mitgelieferten Prüfungen
+          hierher — danach stehen sie hier und lassen sich bearbeiten. Einmalig: was hier
+          gelöscht wird, bietet er nicht wieder an.
         </Leerzustand>
       ) : (
         <ul className={stil.liste} aria-label="Regeldateien">
@@ -116,8 +118,12 @@ export function RegeldateienTafel() {
                 datei={d}
                 offen={offen === d.id}
                 onOeffnen={() => setOffen(offen === d.id ? null : d.id)}
-                onSpeichern={(inhalt) => handeln(() => aendereRegeldatei(d.id, { inhalt }))}
-                onSchalten={() => handeln(() => aendereRegeldatei(d.id, { aktiv: !d.aktiv }))}
+                onSpeichern={(inhalt) =>
+                  handeln(() => aendereRegeldatei(d.id, { inhalt }))
+                }
+                onSchalten={() =>
+                  handeln(() => aendereRegeldatei(d.id, { aktiv: !d.aktiv }))
+                }
                 onEntfernen={() => handeln(() => entferneRegeldatei(d.id))}
               />
             </li>
@@ -218,7 +224,12 @@ function DateiKarte({
 
   return (
     <Karte>
-      <button type="button" className={stil.kopf} onClick={onOeffnen} aria-expanded={offen}>
+      <button
+        type="button"
+        className={stil.kopf}
+        onClick={onOeffnen}
+        aria-expanded={offen}
+      >
         <span className={stil.paarung}>{datei.name}</span>
         <span className={stil.zeile}>
           <Etikett mono>{datei.zeilen} Zeilen</Etikett>
@@ -241,12 +252,20 @@ function DateiKarte({
                 <Knopf groesse="sm" onClick={() => void onSpeichern(inhalt)}>
                   Speichern
                 </Knopf>
-                <Knopf groesse="sm" auspraegung="sekundaer" onClick={() => void onSchalten()}>
+                <Knopf
+                  groesse="sm"
+                  auspraegung="sekundaer"
+                  onClick={() => void onSchalten()}
+                >
                   {datei.aktiv ? "Stilllegen" : "Wieder einschalten"}
                 </Knopf>
                 {fragtNach ? (
                   <>
-                    <Knopf groesse="sm" auspraegung="leise" onClick={() => void onEntfernen()}>
+                    <Knopf
+                      groesse="sm"
+                      auspraegung="leise"
+                      onClick={() => void onEntfernen()}
+                    >
                       Wirklich entfernen
                     </Knopf>
                     <Knopf
@@ -258,7 +277,11 @@ function DateiKarte({
                     </Knopf>
                   </>
                 ) : (
-                  <Knopf groesse="sm" auspraegung="leise" onClick={() => setFragtNach(true)}>
+                  <Knopf
+                    groesse="sm"
+                    auspraegung="leise"
+                    onClick={() => setFragtNach(true)}
+                  >
                     Entfernen
                   </Knopf>
                 )}

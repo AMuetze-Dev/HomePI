@@ -145,3 +145,72 @@ class TestAbgewiesen:
         antwort = await client.get(f"/staffelpilot/regeldateien/{uuid.uuid4()}")
 
         assert antwort.status_code == 404
+
+
+class TestVorlagen:
+    """Die neun mitgelieferten Regeln kommen vom Prüfdienst herüber.
+
+    Vorher lagen sie nur in seinem Ordner: die Oberfläche zeigte „Keine
+    eigenen Regeldateien", obwohl neun liefen — und zu bearbeiten gab es
+    nichts. Genau das hat der Staffelleiter gemeldet.
+    """
+
+    async def test_beim_ersten_mal_kommen_sie_an(self, client: AsyncClient) -> None:
+        antwort = await client.post(
+            "/staffelpilot/regeldateien/vorlagen",
+            json={"vorlagen": [{"name": "10_alter.py", "inhalt": "pass\n"}]},
+        )
+
+        assert antwort.status_code == 200, antwort.text
+        assert antwort.json()["uebernommen"] == ["10_alter.py"]
+        assert antwort.json()["schon_geschehen"] is False
+        assert (await client.get("/staffelpilot/regeldateien")).json()[0]["name"] == "10_alter.py"
+
+    async def test_beim_zweiten_mal_nicht(self, client: AsyncClient) -> None:
+        """Wer eine Regel löscht, soll sie los sein. Ein Dienst, der beim
+        nächsten Lauf wieder anbietet, holt sie zurück."""
+        erste = {"vorlagen": [{"name": "10_alter.py", "inhalt": "pass\n"}]}
+        await client.post("/staffelpilot/regeldateien/vorlagen", json=erste)
+        kennung = (await client.get("/staffelpilot/regeldateien")).json()[0]["id"]
+        await client.delete(f"/staffelpilot/regeldateien/{kennung}")
+
+        antwort = await client.post("/staffelpilot/regeldateien/vorlagen", json=erste)
+
+        assert antwort.json()["schon_geschehen"] is True
+        assert antwort.json()["uebernommen"] == []
+        assert (await client.get("/staffelpilot/regeldateien")).json() == []
+
+    async def test_was_dasteht_bleibt_stehen(self, client: AsyncClient) -> None:
+        """Eine von Hand geschärfte Regel darf eine Vorlage nicht
+        zurücksetzen. Eine Aktualisierung, die das täte, sagte nichts."""
+        await ablegen(client, name="10_alter.py", inhalt="# von Hand\n")
+
+        antwort = await client.post(
+            "/staffelpilot/regeldateien/vorlagen",
+            json={"vorlagen": [{"name": "10_alter.py", "inhalt": "# Vorlage\n"}]},
+        )
+
+        assert antwort.json()["uebergangen"] == ["10_alter.py"]
+        kennung = (await client.get("/staffelpilot/regeldateien")).json()[0]["id"]
+        datei = (await client.get(f"/staffelpilot/regeldateien/{kennung}")).json()
+        assert datei["inhalt"] == "# von Hand\n"
+
+    async def test_sie_laufen_sofort(self, client: AsyncClient) -> None:
+        """Übernommen heißt eingeschaltet: neun stillgelegte Regeln wären
+        dasselbe wie keine, nur mit mehr Klicks."""
+        await client.post(
+            "/staffelpilot/regeldateien/vorlagen",
+            json={"vorlagen": [{"name": "10_alter.py", "inhalt": "pass\n"}]},
+        )
+
+        assert (await client.get("/staffelpilot/regeldateien")).json()[0]["aktiv"] is True
+
+    async def test_ein_name_der_ein_pfad_sein_koennte(self, client: AsyncClient) -> None:
+        """Dasselbe Muster wie beim Hochladen. Dass hier ein Dienst schickt
+        und kein Mensch, macht den Namen nicht vertrauenswürdiger."""
+        antwort = await client.post(
+            "/staffelpilot/regeldateien/vorlagen",
+            json={"vorlagen": [{"name": "../draussen.py", "inhalt": "pass\n"}]},
+        )
+
+        assert antwort.status_code == 422

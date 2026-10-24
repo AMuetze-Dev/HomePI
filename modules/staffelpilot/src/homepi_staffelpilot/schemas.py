@@ -634,6 +634,45 @@ class RegeldateiSetzen(BaseModel):
     aktiv: bool = True
 
 
+class Vorlage(BaseModel):
+    """Eine mitgelieferte Regeldatei, wie der Pruefdienst sie anbietet.
+
+    Derselbe Namensmuster wie beim Hochladen: dass hier ein Dienst schickt
+    und kein Mensch, macht den Namen nicht vertrauenswuerdiger.
+    """
+
+    name: Annotated[str, Field(pattern=REGELDATEI_MUSTER, max_length=120)]
+    inhalt: Annotated[str, Field(max_length=200_000)]
+
+
+class VorlagenUebergeben(BaseModel):
+    """Was der Pruefdienst mitbringt.
+
+    Die Obergrenze ist keine Schikane: neun sind es heute, und eine Liste mit
+    tausend Eintraegen zu je zweihundert Kilobyte waere ein Weg, die Datenbank
+    in einem Aufruf vollzuschreiben.
+    """
+
+    vorlagen: Annotated[list[Vorlage], Field(max_length=100)]
+
+
+class VorlagenStand(BaseModel):
+    """Was die Uebergabe ergeben hat.
+
+    Drei Antworten statt einer Zahl: der Dienst soll protokollieren koennen,
+    *warum* nichts ankam -- schon geschehen ist etwas anderes als
+    uebergangen.
+    """
+
+    #: Neu angelegt.
+    uebernommen: list[str] = []
+    #: Lag schon da und wurde deshalb nicht angefasst.
+    uebergangen: list[str] = []
+    #: Die Uebergabe hat frueher schon stattgefunden; es wird nichts mehr
+    #: angeboten. Danach fuehrt das Artefakt die Regeln allein.
+    schon_geschehen: bool = False
+
+
 class RegeldateiAendern(BaseModel):
     """Nur die mitgeschickten Felder."""
 

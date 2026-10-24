@@ -176,6 +176,18 @@ class Gateway:
         """Eine Regeldatei mit ihrem Quelltext."""
         return self._json("GET", f"/staffelpilot/regeldateien/{datei_id}")  # type: ignore[no-any-return]
 
+    def vorlagen_uebergeben(self, vorlagen: list[dict[str, Any]]) -> dict[str, Any]:
+        """Die mitgelieferten Regeldateien anbieten. Das Artefakt entscheidet.
+
+        Einmalig, und das Artefakt sagt es auch: nach der Uebergabe kommt
+        "schon geschehen" zurueck. Der Vermerk liegt dort und nicht hier --
+        dieser Ordner ueberlebt kein neues Abbild, die Datenbank schon.
+        """
+        antwort = self._json(
+            "POST", "/staffelpilot/regeldateien/vorlagen", json={"vorlagen": vorlagen}
+        )
+        return dict(antwort)
+
     def regeln(self) -> list[dict[str, Any]]:
         """Der Regelkatalog, wie er im Artefakt steht -- mit den Schaltern."""
         return self._json("GET", "/staffelpilot/regeln")  # type: ignore[no-any-return]

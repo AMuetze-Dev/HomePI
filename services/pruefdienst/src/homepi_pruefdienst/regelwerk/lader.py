@@ -28,7 +28,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from .dekorator import Registry, Sammler
-from .ordner import regelordner
+from .ordner import BUCH, regelordner
 from .spiel import datum_lesen
 
 logger = logging.getLogger(__name__)
@@ -119,6 +119,10 @@ def _laden(pfad: Path, ladung: Ladung) -> None:
 def vorlagen_ausrollen(ziel: Path | None = None) -> list[str]:
     """Die mitgelieferten Regeln einmalig hinterlegen. Nie überschreiben.
 
+    **Nur solange das Artefakt sie nicht führt.** Liegt das Buch des Spiegels
+    im Ordner, hat der Dienst seine Vorlagen übergeben; von da an entscheidet
+    das Artefakt, welche Regeln es gibt.
+
     Was der Staffelleiter angepasst hat, bleibt — auch wenn eine neue Version
     von StaffelPilot die Vorlage geändert hat. Eine Aktualisierung, die eine
     von Hand geschärfte Regel zurücksetzt, ist schlimmer als eine veraltete
@@ -127,6 +131,12 @@ def vorlagen_ausrollen(ziel: Path | None = None) -> list[str]:
     ziel = ziel or regelordner()
     ziel.mkdir(parents=True, exist_ok=True)
     neu: list[str] = []
+    if (ziel / BUCH).is_file():
+        # Das Artefakt fuehrt die Regeln. Eine Vorlage hier hinzulegen hiesse,
+        # eine geloeschte Regel zurueckzuholen: der Spiegel raeumt sie aus dem
+        # Ordner, und der naechste Ladevorgang legte sie wieder hin -- sie
+        # liefe weiter, und niemand saehe warum.
+        return neu
     if not VORLAGEN.is_dir():
         return neu
     for vorlage in sorted(VORLAGEN.glob("*.py")):

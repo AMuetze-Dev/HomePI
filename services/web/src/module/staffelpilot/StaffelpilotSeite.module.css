@@ -816,6 +816,14 @@
  * nicht in zweien, die man einzeln aendern kann.
  */
 .editorRahmen {
+  /* Der Deckel. Eine Regeldatei hat zweihundert Zeilen; ohne ihn waere das
+     Feld dreitausend Pixel hoch, der Knopf "Speichern" staende unter dem Ende
+     der Datei und die uebrigen acht Dateien noch viel weiter unten.
+     Gescrollt wird deshalb im Feld -- Farbe und Zeilennummern laufen mit.
+     Hier und nicht zweimal: Feld und Zeilenleiste muessen denselben Deckel
+     haben, sonst zieht eine von beiden den Rahmen wieder auf. */
+  --editor-deckel: min(70dvh, 44rem);
+
   display: flex;
   margin-top: var(--raum-1);
   border: 1px solid var(--farbe-rand);
@@ -842,6 +850,7 @@
   font-size: var(--text-sm);
   line-height: var(--zeile-normal);
   text-align: right;
+  max-height: var(--editor-deckel);
   overflow: hidden;
   user-select: none;
   font-variant-numeric: tabular-nums;
@@ -883,9 +892,12 @@
   position: relative;
   display: block;
   width: 100%;
-  min-height: 100%;
+  /* Kein `min-height`: es schlaegt `max-height` und machte den Deckel
+     wirkungslos. Die Hoehe kommt aus `rows`, und die Zeilenleiste zaehlt
+     dieselben Zeilen mit derselben Zeilenhoehe -- beide sind gleich hoch. */
   overflow: auto;
   resize: vertical;
+  max-height: var(--editor-deckel);
   color: transparent;
   background: transparent;
   caret-color: var(--farbe-text);

@@ -92,6 +92,8 @@ from .schemas import (
     VorgangAnlegen,
     VorgangAusgabe,
     VorgangZeile,
+    VorlagenStand,
+    VorlagenUebergeben,
     ZugangGeheim,
     ZugangSetzen,
     ZugangStand,
@@ -753,6 +755,26 @@ async def regeldatei_setzen(daten: RegeldateiSetzen, sitzung: DbSitzung) -> Rege
     Weg aus dem Ordner heraus.
     """
     return _regeldatei(await speicher.regeldatei_setzen(sitzung, daten))
+
+
+@router.post(
+    "/regeldateien/vorlagen",
+    summary="Die mitgelieferten Regeln des Prüfdienstes übernehmen",
+    dependencies=[erfordert("staffelpilot", Rolle.VERWALTER)],
+)
+async def vorlagen_uebernehmen(daten: VorlagenUebergeben, sitzung: DbSitzung) -> VorlagenStand:
+    """Einmalig. Der Prüfdienst bietet an, das Artefakt entscheidet.
+
+    Die neun mitgelieferten Prüfungen lagen bisher nur in seinem Ordner: die
+    Oberfläche zeigte „Keine eigenen Regeldateien", obwohl neun liefen — und
+    zu bearbeiten gab es nichts.
+
+    **Einmal**, denn wer eine Regel löscht, soll sie los sein. **Und nie über
+    etwas drüber**: was schon dasteht, bleibt stehen, auch wenn eine neuere
+    Fassung die Vorlage geändert hat.
+    """
+    uebernommen, uebergangen, schon = await speicher.vorlagen_uebernehmen(sitzung, daten)
+    return VorlagenStand(uebernommen=uebernommen, uebergangen=uebergangen, schon_geschehen=schon)
 
 
 @router.patch(
