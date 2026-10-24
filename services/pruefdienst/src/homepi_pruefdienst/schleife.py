@@ -63,7 +63,9 @@ class Prueflauf:
         logger.info("Auftrag %s (%s) übernommen", kennung, art)
 
         try:
-            if art == "staffeln":
+            if art == "anmeldeprobe":
+                self._anmeldeprobe(kennung)
+            elif art == "staffeln":
                 self._staffeln_holen(kennung)
             elif art == "initialisierung":
                 self._initialisieren(kennung, auftrag.get("staffel_id"))
@@ -370,6 +372,25 @@ class Prueflauf:
 
         self._gateway.fortschritt(kennung, zeile=f"Angemeldet als {benutzer}")
         self._zusehen(kennung, "Angemeldet")
+
+    def _anmeldeprobe(self, kennung: str) -> None:
+        """Anmelden und sonst nichts.
+
+        Der kuerzeste Auftrag von allen, und trotzdem ein eigener: ein
+        falsches Passwort soll als falsches Passwort dastehen und nicht als
+        "Staffeln liessen sich nicht holen". Fuer die Einrichtung ist das der
+        Unterschied zwischen "noch einmal eintippen" und stundenlangem Suchen
+        an der falschen Stelle.
+
+        Er liest nichts und aendert nichts. Eine Probe, die nebenbei Daten
+        anfasst, ist keine Probe -- und ein Verband sieht jeden Zugriff.
+        """
+        self._anmelden(kennung)
+        self._gateway.fortschritt(
+            kennung, schritt="Angemeldet", fortschritt=100, zeile="Der Zugang stimmt"
+        )
+        self._zusehen(kennung, "Angemeldet")
+        self._gateway.abschluss(kennung, "fertig", "Die Anmeldung bei DFBnet hat geklappt")
 
     def _staffeln_holen(self, kennung: str) -> None:
         """Die eigenen Staffeln aus DFBnet uebernehmen.

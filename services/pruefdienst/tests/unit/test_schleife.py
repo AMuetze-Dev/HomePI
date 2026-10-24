@@ -339,6 +339,49 @@ class TestRegelkatalog:
         assert gateway.importe
 
 
+class TestAnmeldeprobe:
+    """Der kuerzeste Auftrag von allen: anmelden und sonst nichts.
+
+    Ein eigener und kein Nebenprodukt des Staffelholens: ein falsches Passwort
+    soll als falsches Passwort dastehen und nicht als "Staffeln liessen sich
+    nicht holen". Wer das zusammenlegt, laesst den Staffelleiter raten, woran
+    es lag -- und genau dafuer ist die Einrichtung da.
+    """
+
+    def test_sie_meldet_sich_an_und_ist_fertig(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "anmeldeprobe"})
+
+        lauf(gateway).runde()
+
+        assert gateway.abschluesse == [("a1", "fertig", "Die Anmeldung bei DFBnet hat geklappt")]
+        assert gateway.zugang_geholt == 1
+
+    def test_sie_liest_nichts(self) -> None:
+        """Keine Staffel, kein Spiel, kein Einspielen. Eine Probe, die
+        nebenbei Daten aendert, ist keine Probe."""
+        gateway = FalschesGateway({"id": "a1", "art": "anmeldeprobe"})
+
+        lauf(gateway).runde()
+
+        assert gateway.importe == []
+        assert gateway.uebernommen_staffeln == []
+
+    def test_ein_falsches_passwort_steht_am_auftrag(self) -> None:
+        """Nicht nur im Protokoll des Containers: dort sucht niemand, und die
+        Oberflaeche zeigte sonst eine Anzeige, die stehenbleibt."""
+
+        class Weigert(DemoLeser):
+            def anmelden(self, benutzer: str, passwort: str) -> None:
+                raise RuntimeError("DFBnet hat die Anmeldung abgelehnt")
+
+        gateway = FalschesGateway({"id": "a1", "art": "anmeldeprobe"})
+        lauf(gateway, Weigert()).runde()
+
+        _, zustand, meldung = gateway.abschluesse[0]
+        assert zustand == "gescheitert"
+        assert "abgelehnt" in meldung
+
+
 class TestVorlagen:
     """Die mitgelieferten Regeln gehoeren ins Artefakt, nicht nur in den Ordner.
 

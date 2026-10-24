@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../api/client";
@@ -100,6 +100,28 @@ function zeige(unterseite = "uebersicht") {
   );
 }
 
+/**
+ * Zeigt die Adresse als Text an.
+ *
+ * Fuer die Weiche zur Einrichtung: sie navigiert, und ob sie das tut, steht
+ * in der Adresse -- nicht in der Flaeche, die diese Datei von Hand setzt.
+ */
+function Adresse() {
+  return <span>{useLocation().pathname}</span>;
+}
+
+/** Eine Anlage, bei der noch etwas fehlt. */
+function nichtEingerichtet(rest: Partial<api.Einrichtungsstand> = {}) {
+  vi.spyOn(api, "ladeEinrichtung").mockResolvedValue({
+    schritt: "zugang",
+    zugang: false,
+    staffeln: 0,
+    erledigt: false,
+    schluessel_vorhanden: true,
+    ...rest,
+  });
+}
+
 function mitDaten(
   staffeln: api.Staffel[] = [staffel()],
   spiele: api.SpielZeile[] = [zeile()],
@@ -125,8 +147,18 @@ beforeEach(() => {
     uebertragung_pausiert: true,
     browser_sichtbar: false,
     beispieldaten: false,
+    einrichtung_erledigt: true,
     folgesatz: "",
     vorgabe_folgesatz: "",
+  });
+  // Eingerichtet ist der Normalfall dieser Datei. Sonst schickte die Weiche
+  // jeden Test in die Einrichtung, und geprueft waere ueberall dasselbe.
+  vi.spyOn(api, "ladeEinrichtung").mockResolvedValue({
+    schritt: "fertig",
+    zugang: true,
+    staffeln: 1,
+    erledigt: true,
+    schluessel_vorhanden: true,
   });
   vi.spyOn(api, "ladeVorgaenge").mockResolvedValue([]);
   vi.spyOn(api, "ladeMannschaften").mockResolvedValue([]);
@@ -737,6 +769,43 @@ describe("Die später ergänzten Bereiche", () => {
     await screen.findByLabelText(/Staffelleiter/);
     expect(
       screen.queryByRole("heading", { name: "DFBnet-Zugang" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("Die Weiche zur Einrichtung", () => {
+  it("führt von der Übersicht aus hinein, solange etwas fehlt", async () => {
+    // Vorher stand dort "keine Spielberichte" und gemeint war "nicht
+    // eingerichtet". Das ist der Unterschied zwischen einer Anwendung, die
+    // nichts zu tun hat, und einer, die noch nichts tun kann.
+    //
+    // Geprueft wird die Adresse und nicht die Flaeche: welcher Bereich gilt,
+    // entscheidet die Huelle aus der Adresse -- hier steht nur, dass der Weg
+    // dorthin zeigt.
+    nichtEingerichtet();
+    mitDaten();
+
+    render(
+      <MemoryRouter initialEntries={["/modul/staffelpilot/uebersicht"]}>
+        <StaffelpilotSeite unterseite="uebersicht" />
+        <Adresse />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("/modul/staffelpilot/einrichten")).toBeInTheDocument();
+  });
+
+  it("lässt jeden anderen Bereich in Ruhe", async () => {
+    // Wer einen Bereich ansteuert, wollte dorthin. Ein Weg, der jeden Aufruf
+    // abfängt, ist eine Falle.
+    nichtEingerichtet();
+    mitDaten();
+
+    zeige("staffeln");
+
+    expect(await screen.findByRole("heading", { name: /Staffel/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("list", { name: /Schritte der Einrichtung/ }),
     ).not.toBeInTheDocument();
   });
 });

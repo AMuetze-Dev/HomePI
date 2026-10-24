@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../api/client";
@@ -37,11 +38,24 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/**
+ * Die Tafel fuehrt seit dem Knopf "Einrichtung noch einmal durchlaufen" einen
+ * Verweis und braucht deshalb einen Router -- in der Anwendung steht sie
+ * ohnehin in einem.
+ */
+function zeige() {
+  return render(
+    <MemoryRouter>
+      <EinstellungenTafel />
+    </MemoryRouter>,
+  );
+}
+
 describe("Einstellungen", () => {
   it("zeigt den mitgelieferten Folgesatz als Platzhalter und nicht als Inhalt", async () => {
     // Als Inhalt hätte das erste Speichern den heutigen Wortlaut eingefroren.
     mitWerten();
-    render(<EinstellungenTafel />);
+    zeige();
 
     const feld = await screen.findByLabelText(/Folgesatz/);
     expect(feld).toHaveValue("");
@@ -53,7 +67,7 @@ describe("Einstellungen", () => {
 
   it("zeigt, was gespeichert ist", async () => {
     mitWerten();
-    render(<EinstellungenTafel />);
+    zeige();
 
     expect(await screen.findByDisplayValue("Aaron Mütze")).toBeInTheDocument();
     expect(screen.getByDisplayValue("30")).toBeInTheDocument();
@@ -64,7 +78,7 @@ describe("Einstellungen", () => {
     const speichern = vi
       .spyOn(api, "speichereEinstellungen")
       .mockResolvedValue(werte({ staffelleiter: "Erika Beispiel" }));
-    render(<EinstellungenTafel />);
+    zeige();
 
     const feld = await screen.findByLabelText(/Staffelleiter/);
     await userEvent.clear(feld);
@@ -84,7 +98,7 @@ describe("Einstellungen", () => {
     vi.spyOn(api, "speichereEinstellungen").mockResolvedValue(
       werte({ staffelleiter: "Getrimmt" }),
     );
-    render(<EinstellungenTafel />);
+    zeige();
 
     const feld = await screen.findByLabelText(/Staffelleiter/);
     await userEvent.clear(feld);
@@ -100,7 +114,7 @@ describe("Einstellungen", () => {
     vi.spyOn(api, "speichereEinstellungen").mockRejectedValue(
       new ApiError("'frist_tage' muss zwischen 1 und 90 liegen", 422),
     );
-    render(<EinstellungenTafel />);
+    zeige();
 
     await screen.findByLabelText(/Staffelleiter/);
     await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
@@ -116,7 +130,7 @@ describe("Einstellungen", () => {
     vi.spyOn(api, "speichereEinstellungen").mockRejectedValue(
       new ApiError("kaputt", 500),
     );
-    render(<EinstellungenTafel />);
+    zeige();
 
     const feld = await screen.findByLabelText(/Verband/);
     await userEvent.clear(feld);
@@ -137,7 +151,7 @@ describe("Einstellungen", () => {
     vi.spyOn(api, "ladeEinstellungen").mockRejectedValue(
       new ApiError("kein Zugriff", 403),
     );
-    render(<EinstellungenTafel />);
+    zeige();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("kein Zugriff");
   });
@@ -145,7 +159,7 @@ describe("Einstellungen", () => {
   describe("Beim Prüfen zusehen", () => {
     it("ist aus, solange niemand ihn einschaltet", async () => {
       mitWerten();
-      render(<EinstellungenTafel />);
+      zeige();
 
       const schalter = await screen.findByRole("checkbox", { name: /zusehen/i });
       expect(schalter).not.toBeChecked();
@@ -153,7 +167,7 @@ describe("Einstellungen", () => {
 
     it("zeigt an, wenn er an ist", async () => {
       mitWerten({ browser_sichtbar: true });
-      render(<EinstellungenTafel />);
+      zeige();
 
       expect(await screen.findByRole("checkbox", { name: /zusehen/i })).toBeChecked();
     });
@@ -163,7 +177,7 @@ describe("Einstellungen", () => {
       const speichern = vi
         .spyOn(api, "speichereEinstellungen")
         .mockResolvedValue(werte({ browser_sichtbar: true }));
-      render(<EinstellungenTafel />);
+      zeige();
 
       await userEvent.click(await screen.findByRole("checkbox", { name: /zusehen/i }));
       await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
@@ -183,7 +197,7 @@ describe("Einstellungen", () => {
       // Vorschaufenster gibt, waere sie falsch; der Schalter muss jetzt
       // sagen, wohin man schaut.
       mitWerten();
-      render(<EinstellungenTafel />);
+      zeige();
 
       expect(await screen.findByText(/Vorschaufenster/i)).toBeInTheDocument();
     });

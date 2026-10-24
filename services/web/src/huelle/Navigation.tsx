@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { NavLink, useMatch } from "react-router-dom";
 
 import type { ModulEintrag } from "../api/client";
-import { unterseitenFuer } from "../module/register";
+import { sichtbareUnterseiten } from "../module/register";
 import { useModule } from "../module/useModule";
 import { Platzhalter } from "../ui";
 import stil from "./Navigation.module.css";
@@ -93,7 +93,7 @@ function Eintrag({
   offen: boolean;
   beiAuswahl?: (() => void) | undefined;
 }) {
-  const bereiche = unterseitenFuer(modul.id);
+  const bereiche = sichtbareUnterseiten(modul.id);
 
   return (
     <>

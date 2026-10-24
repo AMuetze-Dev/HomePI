@@ -401,6 +401,7 @@ class EinstellungenAusgabe(BaseModel):
     uebertragung_pausiert: bool
     browser_sichtbar: bool
     beispieldaten: bool
+    einrichtung_erledigt: bool
     folgesatz: str
     #: Was ohne eigenen gilt. Die Oberflaeche zeigt es als Platzhalter.
     vorgabe_folgesatz: str = ""
@@ -424,6 +425,9 @@ class EinstellungenSetzen(BaseModel):
     browser_sichtbar: bool | None = None
     #: Erfundene Spiele annehmen. Siehe `dienst.Einstellungen.beispieldaten`.
     beispieldaten: bool | None = None
+    #: Die Einrichtung abhaken -- oder wieder aufmachen, um sie erneut zu
+    #: durchlaufen. Siehe `dienst.Einstellungen.einrichtung_erledigt`.
+    einrichtung_erledigt: bool | None = None
     #: Der Satz unter jeder Mahnung. Leer heisst: der mitgelieferte.
     folgesatz: Annotated[str, Field(max_length=2000)] | None = None
 
@@ -634,6 +638,27 @@ class RegeldateiSetzen(BaseModel):
     aktiv: bool = True
 
 
+class Einrichtungsstand(BaseModel):
+    """Wo die Einrichtung steht -- in einer Antwort statt in dreien.
+
+    Die Oberflaeche fragt das beim Betreten des Artefakts. Drei Abrufe dafuer
+    (Zugang, Staffeln, Einstellungen) waeren drei Gelegenheiten, auf halbem
+    Weg stehenzubleiben und etwas anzuzeigen, das nur zur Haelfte stimmt.
+    """
+
+    #: "zugang", "staffeln" oder "fertig". Siehe `dienst.einrichtung_schritt`.
+    schritt: str
+    #: Ob ein DFBnet-Zugang hinterlegt ist. Das Passwort kommt nie zurueck.
+    zugang: bool
+    #: Wie viele aktive Staffeln gefuehrt werden.
+    staffeln: int
+    #: Ob jemand die Einrichtung abgehakt oder uebersprungen hat.
+    erledigt: bool
+    #: Ohne Schluessel in der Umgebung laesst sich kein Passwort ablegen --
+    #: dann hilft der ganze Weg nichts, und das muss dastehen.
+    schluessel_vorhanden: bool
+
+
 class Vorlage(BaseModel):
     """Eine mitgelieferte Regeldatei, wie der Pruefdienst sie anbietet.
 
@@ -764,8 +789,14 @@ class BefundZeile(BaseModel):
 # ── Aufträge ──────────────────────────────────────────────────────────────
 
 #: Was ein Auftrag tut. `pruflauf` prüft Spielberichte, `initialisierung`
-#: holt die Saisondaten einer Staffel aus DFBnet.
-AuftragArt = Literal["pruflauf", "initialisierung", "staffeln"]
+#: holt die Saisondaten einer Staffel aus DFBnet, `staffeln` die eigenen
+#: Staffeln, und `anmeldeprobe` meldet sich an und sonst nichts.
+#:
+#: Die Probe ist der kürzeste Auftrag von allen und trotzdem ein eigener: ein
+#: falsches Passwort soll als falsches Passwort dastehen und nicht als
+#: "Staffeln ließen sich nicht holen". Wer sie weglässt, lässt den
+#: Staffelleiter raten, woran es lag.
+AuftragArt = Literal["pruflauf", "initialisierung", "staffeln", "anmeldeprobe"]
 
 #: Wo er steht. Nur vorwärts — ein beendeter Lauf wird neu angefordert, nicht
 #: fortgesetzt.

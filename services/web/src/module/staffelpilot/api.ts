@@ -102,6 +102,8 @@ export interface Einstellungen {
   browser_sichtbar: boolean;
   /** Ob erfundene Spiele in die Listen dürfen. Frisch: aus. */
   beispieldaten: boolean;
+  /** Ob die Einrichtung abgehakt ist. Frisch: aus. */
+  einrichtung_erledigt: boolean;
   /** Der Satz unter jeder Mahnung. Leer heisst: der mitgelieferte gilt. */
   folgesatz: string;
   /** Der mitgelieferte. Platzhalter, nicht Inhalt. */
@@ -127,7 +129,13 @@ export interface Auswertung {
   nach_monat: Posten[];
 }
 
-export type AuftragArt = "pruflauf" | "initialisierung" | "staffeln";
+export type AuftragArt =
+  | "pruflauf"
+  | "initialisierung"
+  | "staffeln"
+  /** Anmelden und sonst nichts. Für die Einrichtung: ein falsches Passwort
+      soll als falsches Passwort dastehen. */
+  | "anmeldeprobe";
 export type AuftragZustand =
   "angefordert" | "laeuft" | "fertig" | "abgebrochen" | "gescheitert";
 
@@ -172,6 +180,22 @@ export interface UebertragungStand {
   fertig: number;
   fehler: number;
   fehlerhafte: Uebertragung[];
+}
+
+/**
+ * Wo die Einrichtung steht — in einer Antwort statt in dreien.
+ *
+ * Ohne DFBnet-Zugang und ohne Staffel bleibt jede Liste leer. Ohne diesen
+ * Abruf stünde dort „keine Spielberichte" statt „hier fehlt noch etwas".
+ */
+export interface Einrichtungsstand {
+  /** "zugang", "staffeln" oder "fertig". */
+  schritt: "zugang" | "staffeln" | "fertig";
+  zugang: boolean;
+  staffeln: number;
+  erledigt: boolean;
+  /** Ohne Schlüssel in der Umgebung lässt sich kein Passwort ablegen. */
+  schluessel_vorhanden: boolean;
 }
 
 export interface ZugangStand {
@@ -549,6 +573,12 @@ export function wiederholeUebertragung(id?: string): Promise<UebertragungStand> 
   });
 }
 
+// ── Einrichtung ──────────────────────────────────────────────────────────
+
+export function ladeEinrichtung(signal?: AbortSignal): Promise<Einrichtungsstand> {
+  return anfrage<Einrichtungsstand>("/einrichtung", {}, signal);
+}
+
 // ── DFBnet-Zugang ────────────────────────────────────────────────────────
 
 export function ladeZugang(signal?: AbortSignal): Promise<ZugangStand> {
@@ -599,7 +629,10 @@ export interface Ansichten {
   arten: string[];
 }
 
-export function ladeAnsichten(auftragId: string, signal?: AbortSignal): Promise<Ansichten> {
+export function ladeAnsichten(
+  auftragId: string,
+  signal?: AbortSignal,
+): Promise<Ansichten> {
   return anfrage<Ansichten>(`/auftraege/${auftragId}/ansichten`, {}, signal);
 }
 
@@ -639,7 +672,10 @@ export function ladeRegeldateien(signal?: AbortSignal): Promise<Regeldatei[]> {
   return anfrage<Regeldatei[]>("/regeldateien", {}, signal);
 }
 
-export function ladeRegeldatei(id: string, signal?: AbortSignal): Promise<RegeldateiInhalt> {
+export function ladeRegeldatei(
+  id: string,
+  signal?: AbortSignal,
+): Promise<RegeldateiInhalt> {
   return anfrage<RegeldateiInhalt>(`/regeldateien/${id}`, {}, signal);
 }
 

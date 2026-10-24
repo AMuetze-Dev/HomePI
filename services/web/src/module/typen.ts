@@ -57,6 +57,15 @@ export interface Unterseite {
    * Beschriftung außer Sichtweite.
    */
   breite?: Breite | undefined;
+  /**
+   * Nicht in der Navigation, aber eine echte Adresse.
+   *
+   * Für Wege statt Flächen: die Einrichtung wird einmal durchlaufen und
+   * danach nie wieder. Ein Dauereintrag in der Leiste wäre ein Knopf, der
+   * nach dem ersten Tag nur noch im Weg steht — und ohne Adresse ließe sich
+   * der Weg weder verlinken noch nach einem Neuladen fortsetzen.
+   */
+  versteckt?: boolean | undefined;
 }
 
 export interface ModulProps {

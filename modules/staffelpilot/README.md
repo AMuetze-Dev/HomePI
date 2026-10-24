@@ -232,6 +232,42 @@ Ein Kreuz wird nur gesetzt, wo der Verband einen Tatbestand vorsieht
 Zuordnung bekommt keins. Ein geratenes Kreuz behauptete etwas, das niemand
 geprueft hat.
 
+### Die Einrichtung
+
+Ohne DFBnet-Zugang und ohne Staffel bleibt jede Liste leer. Vorher stand dort
+"keine Spielberichte" -- gemeint war "nicht eingerichtet", und das ist der
+Unterschied zwischen einer Anwendung, die nichts zu tun hat, und einer, die
+noch nichts tun kann.
+
+`GET /einrichtung` beantwortet in **einer** Antwort, was fehlt: Zugang da,
+Anzahl aktiver Staffeln, abgehakt, Schluessel vorhanden. Drei Abrufe dafuer
+(Zugang, Staffeln, Einstellungen) waeren drei Gelegenheiten, auf halbem Weg
+stehenzubleiben und etwas anzuzeigen, das nur zur Haelfte stimmt. Welcher
+Schritt daraus folgt, entscheidet `dienst.einrichtung_schritt` -- und nur
+dort, sonst beantwortet jede Ansicht es selbst und zwei von ihnen antworten
+irgendwann verschieden.
+
+Die Reihenfolge ist nicht beliebig: ohne Zugang laesst sich keine Staffel
+holen. Von Hand angelegte Staffeln ersetzen ihn **nicht** -- ohne ihn liest
+der Pruefdienst keinen einzigen Spielbericht.
+
+**Geprueft wird wirklich.** Der Zugang wird nicht nur abgelegt, sondern mit
+einer Anmeldeprobe gegen DFBnet ausprobiert: Auftragsart `anmeldeprobe`,
+anmelden und sonst nichts. Ein eigener Auftrag und kein Nebenprodukt des
+Staffelholens, denn ein falsches Passwort soll als falsches Passwort dastehen
+und nicht als "Staffeln liessen sich nicht holen". Er liest nichts und aendert
+nichts -- eine Probe, die nebenbei Daten anfasst, ist keine Probe, und ein
+Verband sieht jeden Zugriff.
+
+`einrichtung_erledigt` steht in den Einstellungen und wird am Ende des Weges
+gesetzt -- oder wenn jemand ihn ueberspringt. Ein Weg, der sich nicht
+schliessen laesst, ist eine Sackgasse. Umgekehrt macht der Knopf in den
+Einstellungen ihn wieder auf; in der Navigationsleiste steht er nicht, denn er
+wird einmal durchlaufen und stuende ab dem zweiten Tag nur im Weg.
+
+Am 24.10.2026 scharf durchgelaufen: die Probe meldete "Angemeldet als
+63630712" und schloss mit "Die Anmeldung bei DFBnet hat geklappt".
+
 ### Die Regeldateien
 
 Der Quelltext der Pruefungen steht jetzt **im Artefakt**. Bisher lag er nur in

@@ -46,6 +46,10 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
       { id: "regeldateien", wort: "Regeldateien", breite: "normal" },
       { id: "einstellungen", wort: "Einstellungen", breite: "text" },
       { id: "zugang", wort: "DFBnet-Zugang", breite: "text" },
+      // Ein Weg, keine Flaeche: einmal durchlaufen, danach nur noch bei
+      // Bedarf aus den Einstellungen heraus. Deshalb versteckt -- in der
+      // Leiste waere es ein Eintrag, der ab dem zweiten Tag nur stoert.
+      { id: "einrichten", wort: "Einrichtung", breite: "text", versteckt: true },
     ],
   },
   {
@@ -86,6 +90,17 @@ export function breiteFuer(id: string, unterseite?: string): Breite {
 
 export function unterseitenFuer(id: string): readonly Unterseite[] {
   return oberflaecheFuer(id)?.unterseiten ?? [];
+}
+
+/**
+ * Dieselbe Liste ohne die versteckten.
+ *
+ * Die Navigation nimmt diese, alles andere die ganze: eine versteckte
+ * Unterseite ist eine echte Adresse und soll sich verlinken, neu laden und
+ * mit dem Zurück-Knopf verlassen lassen — sie steht nur in keiner Leiste.
+ */
+export function sichtbareUnterseiten(id: string): readonly Unterseite[] {
+  return unterseitenFuer(id).filter((u) => !u.versteckt);
 }
 
 /**

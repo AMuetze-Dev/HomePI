@@ -5,6 +5,7 @@ import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "
 import {
   entscheide,
   hakeAb,
+  ladeEinrichtung,
   ladeSpiel,
   ladeStaffeln,
   legeVorgangAn,
@@ -16,6 +17,7 @@ import {
   loescheStaffel,
   loeseHaken,
   type Befund,
+  type Einrichtungsstand,
   type Schwere,
   type Spiel,
   type SpielZeile,
@@ -23,6 +25,7 @@ import {
   type Zusammenfassung,
 } from "./api";
 import { alsDatum } from "./datum";
+import { Einrichtung } from "./Einrichtung";
 import { EinstellungenTafel } from "./EinstellungenTafel";
 import { ErgebnisseTafel } from "./ErgebnisseTafel";
 import { PrueflaufTafel } from "./PrueflaufTafel";
@@ -79,6 +82,9 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
     void navigate(`/modul/staffelpilot/${ziel}`);
   };
   const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
+  // `null` heisst "weiss ich noch nicht" und nicht "alles in Ordnung": solange
+  // der Stand nicht da ist, wird niemand irgendwohin geschickt.
+  const [einrichtung, setEinrichtung] = useState<Einrichtungsstand | null>(null);
   const [staffelFilter, setStaffelFilter] = useState<string>("");
   // Der haeufigste Handgriff am Montag: was ist seit dem Wochenende faellig.
   const [nurFaellig, setNurFaellig] = useState(false);
@@ -109,6 +115,28 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
     void laden(staffelFilter, nurFaellig, controller.signal);
     return () => controller.abort();
   }, [laden, staffelFilter, nurFaellig]);
+
+  // Ohne DFBnet-Zugang und ohne Staffel bleibt jede Liste leer -- vorher stand
+  // dort "keine Spielberichte" und gemeint war "nicht eingerichtet". Deshalb
+  // einmal fragen, wo die Einrichtung steht.
+  useEffect(() => {
+    const controller = new AbortController();
+    ladeEinrichtung(controller.signal)
+      .then(setEinrichtung)
+      .catch(() => {
+        // Stumm: eine frisch eingerichtete Anlage soll an einem Fehler dieses
+        // Abrufs nicht scheitern. Fehlt die Antwort, fuehrt eben niemand.
+      });
+    return () => controller.abort();
+  }, []);
+
+  // Nur von der Startflaeche aus und nur einmal: wer einen Bereich ansteuert,
+  // wollte dorthin. Ein Weg, der jeden Aufruf abfaengt, ist eine Falle.
+  useEffect(() => {
+    if (einrichtung === null || einrichtung.schritt === "fertig") return;
+    if (unterseite !== "uebersicht") return;
+    void navigate("/modul/staffelpilot/einrichten", { replace: true });
+  }, [einrichtung, unterseite, navigate]);
 
   async function mitFehlerbehandlung(aktion: () => Promise<unknown>): Promise<boolean> {
     setAktionsfehler("");
@@ -165,6 +193,20 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
   }
 
   const { staffeln, spiele } = zustand.daten;
+
+  if (unterseite === "einrichten") {
+    return (
+      <Einrichtung
+        onFertig={() => {
+          setEinrichtung((vorher) =>
+            vorher === null ? vorher : { ...vorher, erledigt: true, schritt: "fertig" },
+          );
+          void laden(staffelFilter, nurFaellig);
+          gehe("spiele");
+        }}
+      />
+    );
+  }
 
   if (unterseite === "uebersicht") {
     return <UebersichtTafel onWechsel={gehe} />;

@@ -6,11 +6,12 @@ import {
   ersteUnterseite,
   OBERFLAECHEN,
   oberflaecheFuer,
+  sichtbareUnterseiten,
   unterseitenFuer,
 } from "./register";
 
 describe("Das Register der Oberflächen", () => {
-  it("nennt für Staffelpilot die zehn Bereiche in dieser Reihenfolge", () => {
+  it("nennt für Staffelpilot die Bereiche in dieser Reihenfolge", () => {
     // Die Reihenfolge ist keine Formalie: Der erste Bereich ist die Fläche,
     // auf der man morgens landet, und die Leiste liest die Liste von oben.
     expect(unterseitenFuer("staffelpilot").map((u) => u.wort)).toEqual([
@@ -24,7 +25,19 @@ describe("Das Register der Oberflächen", () => {
       "Regeldateien",
       "Einstellungen",
       "DFBnet-Zugang",
+      "Einrichtung",
     ]);
+  });
+
+  it("hält die Einrichtung aus der Leiste heraus", () => {
+    // Ein Weg und keine Fläche: einmal durchlaufen, danach nur noch bei
+    // Bedarf. Als Dauereintrag stünde er ab dem zweiten Tag nur im Weg --
+    // eine echte Adresse bleibt er trotzdem, sonst liesse er sich weder
+    // verlinken noch nach einem Neuladen fortsetzen.
+    expect(sichtbareUnterseiten("staffelpilot").map((u) => u.id)).not.toContain(
+      "einrichten",
+    );
+    expect(unterseitenFuer("staffelpilot").map((u) => u.id)).toContain("einrichten");
   });
 
   it("macht den ersten Bereich zur Startfläche", () => {

@@ -576,6 +576,20 @@ async def einstellungen(sitzung: AsyncSession) -> dienst.Einstellungen:
     return dienst.einstellungen_aus({e.schluessel: e.wert for e in ergebnis.scalars()})
 
 
+async def einrichtungsstand(sitzung: AsyncSession) -> tuple[bool, int, bool]:
+    """Zugang vorhanden, Anzahl aktiver Staffeln, abgehakt.
+
+    Die Entscheidung daraus faellt `dienst.einrichtung_schritt`; hier wird nur
+    gelesen.
+    """
+    gefunden = await _zugang(sitzung)
+    anzahl = await sitzung.scalar(
+        select(func.count()).select_from(Staffel).where(Staffel.aktiv.is_(True))
+    )
+    werte = await einstellungen(sitzung)
+    return gefunden is not None, int(anzahl or 0), werte.einrichtung_erledigt
+
+
 async def einstellungen_setzen(
     sitzung: AsyncSession, daten: EinstellungenSetzen
 ) -> dienst.Einstellungen:

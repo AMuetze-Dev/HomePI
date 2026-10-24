@@ -29,6 +29,7 @@ from .dienst import (
     darf_abgehakt_werden,
     darf_angefordert_werden,
     darf_zurueckgenommen_werden,
+    einrichtung_schritt,
     entscheidung_pruefen,
     fall_pruefen,
     hoehere_vorschlaege,
@@ -58,6 +59,7 @@ from .schemas import (
     BefundAusgabe,
     BefundZeile,
     Beispieldatenstand,
+    Einrichtungsstand,
     EinstellungenAusgabe,
     EinstellungenSetzen,
     EntscheidungSetzen,
@@ -1097,6 +1099,24 @@ async def zugang_stand(sitzung: DbSitzung) -> ZugangStand:
     return ZugangStand(
         gespeichert=gespeichert,
         benutzer=benutzer,
+        schluessel_vorhanden=speicher.schluessel_vorhanden(),
+    )
+
+
+@router.get("/einrichtung", summary="Wo die Einrichtung steht")
+async def einrichtung(sitzung: DbSitzung) -> Einrichtungsstand:
+    """Zugang, Staffeln, abgehakt — in einer Antwort.
+
+    Die Oberfläche fragt das beim Betreten des Artefakts: ohne DFBnet-Zugang
+    und ohne Staffel bleibt jede Liste leer, und ohne diesen Ruf stünde dort
+    „keine Spielberichte" statt „hier fehlt noch etwas".
+    """
+    zugang, staffeln, erledigt = await speicher.einrichtungsstand(sitzung)
+    return Einrichtungsstand(
+        schritt=einrichtung_schritt(zugang=zugang, staffeln=staffeln, erledigt=erledigt),
+        zugang=zugang,
+        staffeln=staffeln,
+        erledigt=erledigt,
         schluessel_vorhanden=speicher.schluessel_vorhanden(),
     )
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { Feld, Hinweis, Karte, Knopf, Platzhalter } from "../../ui";
 import {
@@ -77,101 +78,156 @@ export function EinstellungenTafel() {
   }
 
   return (
-    <Karte>
-      <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
-        <h2 className={stil.formularTitel}>Einstellungen</h2>
+    <>
+      <Karte>
+        <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
+          <h2 className={stil.formularTitel}>Einstellungen</h2>
 
-        <Feld
-          beschriftung="Staffelleiter"
-          hinweis="Steht unter jedem Schreiben."
-          value={werte.staffelleiter}
-          onChange={(e) => aendern("staffelleiter", e.target.value)}
-        />
-        <Feld
-          beschriftung="Verband"
-          hinweis="Zeile unter der Unterschrift. Darf leer bleiben."
-          value={werte.verband}
-          onChange={(e) => aendern("verband", e.target.value)}
-        />
-        <Feld
-          beschriftung="Absenderadresse"
-          hinweis="Vorschlag für den Empfänger eines neuen Entwurfs."
-          value={werte.absender}
-          onChange={(e) => aendern("absender", e.target.value)}
-        />
-        {/* Zwei Zahlen nebeneinander statt untereinander. Ein Feld ueber die
+          <Feld
+            beschriftung="Staffelleiter"
+            hinweis="Steht unter jedem Schreiben."
+            value={werte.staffelleiter}
+            onChange={(e) => aendern("staffelleiter", e.target.value)}
+          />
+          <Feld
+            beschriftung="Verband"
+            hinweis="Zeile unter der Unterschrift. Darf leer bleiben."
+            value={werte.verband}
+            onChange={(e) => aendern("verband", e.target.value)}
+          />
+          <Feld
+            beschriftung="Absenderadresse"
+            hinweis="Vorschlag für den Empfänger eines neuen Entwurfs."
+            value={werte.absender}
+            onChange={(e) => aendern("absender", e.target.value)}
+          />
+          {/* Zwei Zahlen nebeneinander statt untereinander. Ein Feld ueber die
             ganze Breite fuer "30" ist siebenhundert Pixel fuer zwei Ziffern --
             und macht die Seite zweimal so lang, wie sie sein muesste. */}
-        <div className={stil.zahlenpaar}>
-          <Feld
-            beschriftung="Prüfzeitraum (Tage)"
-            hinweis="Wie weit zurück ein Spiel noch geprüft wird."
-            type="number"
-            min={1}
-            max={365}
-            value={String(werte.pruefzeitraum_tage)}
-            onChange={(e) => aendern("pruefzeitraum_tage", Number(e.target.value))}
-          />
-          <Feld
-            beschriftung="Frist (Tage)"
-            hinweis="Wie lange ein Verein Zeit bekommt zu antworten."
-            type="number"
-            min={1}
-            max={90}
-            value={String(werte.frist_tage)}
-            onChange={(e) => aendern("frist_tage", Number(e.target.value))}
-          />
-        </div>
+          <div className={stil.zahlenpaar}>
+            <Feld
+              beschriftung="Prüfzeitraum (Tage)"
+              hinweis="Wie weit zurück ein Spiel noch geprüft wird."
+              type="number"
+              min={1}
+              max={365}
+              value={String(werte.pruefzeitraum_tage)}
+              onChange={(e) => aendern("pruefzeitraum_tage", Number(e.target.value))}
+            />
+            <Feld
+              beschriftung="Frist (Tage)"
+              hinweis="Wie lange ein Verein Zeit bekommt zu antworten."
+              type="number"
+              min={1}
+              max={90}
+              value={String(werte.frist_tage)}
+              onChange={(e) => aendern("frist_tage", Number(e.target.value))}
+            />
+          </div>
 
-        <label className={stil.schalter}>
-          <input
-            type="checkbox"
-            className={stil.schalterKasten}
-            checked={werte.browser_sichtbar}
-            onChange={(e) => aendern("browser_sichtbar", e.target.checked)}
-          />
-          <span className={stil.schalterText}>
-            <span>Beim Prüfen zusehen</span>
-            <span className={stil.wahlName}>
-              Der Prüflauf schickt Abbilder der Seite, die er gerade vor sich hat; sie
-              stehen im Prüflauf als Vorschaufenster. Beim Scheitern bleibt das letzte
-              stehen — daran sieht man, woran es lag. Kostet pro Abbild rund 85 KiB.
+          <label className={stil.schalter}>
+            <input
+              type="checkbox"
+              className={stil.schalterKasten}
+              checked={werte.browser_sichtbar}
+              onChange={(e) => aendern("browser_sichtbar", e.target.checked)}
+            />
+            <span className={stil.schalterText}>
+              <span>Beim Prüfen zusehen</span>
+              <span className={stil.wahlName}>
+                Der Prüflauf schickt Abbilder der Seite, die er gerade vor sich hat; sie
+                stehen im Prüflauf als Vorschaufenster. Beim Scheitern bleibt das letzte
+                stehen — daran sieht man, woran es lag. Kostet pro Abbild rund 85 KiB.
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
 
-        <Beispieldaten
-          an={werte.beispieldaten}
-          onSchalten={(an) => aendern("beispieldaten", an)}
-        />
-
-        <label className={stil.textfeldEtikett}>
-          Folgesatz unter jeder Mahnung
-          <textarea
-            className={stil.satzfeld}
-            rows={3}
-            value={werte.folgesatz}
-            placeholder={werte.vorgabe_folgesatz}
-            onChange={(e) => aendern("folgesatz", e.target.value)}
+          <Beispieldaten
+            an={werte.beispieldaten}
+            onSchalten={(an) => aendern("beispieldaten", an)}
           />
-        </label>
-        <p className={stil.vorgangHinweis}>
-          Er macht aus der Mahnung eine Mahnung — ein späterer Antrag ans Sportgericht
-          beruft sich auf ihn. Leer lassen heißt: der mitgelieferte Satz gilt, und eine
-          spätere Korrektur daran kommt an.
-        </p>
 
-        {fehler && (
-          <Hinweis ton="fehler" dringend>
-            {fehler}
-          </Hinweis>
-        )}
-        {gespeichert && !fehler && <Hinweis ton="neutral">Gespeichert.</Hinweis>}
+          <label className={stil.textfeldEtikett}>
+            Folgesatz unter jeder Mahnung
+            <textarea
+              className={stil.satzfeld}
+              rows={3}
+              value={werte.folgesatz}
+              placeholder={werte.vorgabe_folgesatz}
+              onChange={(e) => aendern("folgesatz", e.target.value)}
+            />
+          </label>
+          <p className={stil.vorgangHinweis}>
+            Er macht aus der Mahnung eine Mahnung — ein späterer Antrag ans Sportgericht
+            beruft sich auf ihn. Leer lassen heißt: der mitgelieferte Satz gilt, und eine
+            spätere Korrektur daran kommt an.
+          </p>
 
-        <Knopf type="submit" disabled={laeuft}>
-          {laeuft ? "Speichert …" : "Speichern"}
+          {fehler && (
+            <Hinweis ton="fehler" dringend>
+              {fehler}
+            </Hinweis>
+          )}
+          {gespeichert && !fehler && <Hinweis ton="neutral">Gespeichert.</Hinweis>}
+
+          <Knopf type="submit" disabled={laeuft}>
+            {laeuft ? "Speichert …" : "Speichern"}
+          </Knopf>
+        </form>
+      </Karte>
+
+      <Einrichtungsweg />
+    </>
+  );
+}
+
+/**
+ * Die Einrichtung noch einmal — der einzige Weg zurück.
+ *
+ * Sie steht in keiner Navigationsleiste, denn sie wird einmal durchlaufen.
+ * Ohne diesen Knopf wäre sie danach aber unerreichbar, und wer seinen
+ * DFBnet-Zugang gewechselt hat oder in eine neue Saison geht, stünde vor
+ * zwei Formularen ohne Reihenfolge.
+ */
+function Einrichtungsweg() {
+  const navigate = useNavigate();
+  const [laeuft, setLaeuft] = useState(false);
+  const [fehler, setFehler] = useState("");
+
+  function nochEinmal() {
+    void (async () => {
+      setFehler("");
+      setLaeuft(true);
+      try {
+        // Erst aufmachen, dann hingehen: ohne das zeigte der Weg sofort
+        // wieder "fertig" und schickte einen zurück.
+        await speichereEinstellungen({ einrichtung_erledigt: false });
+        await navigate("/modul/staffelpilot/einrichten");
+      } catch (f) {
+        setFehler(meldung(f));
+        setLaeuft(false);
+      }
+    })();
+  }
+
+  return (
+    <Karte>
+      <h2 className={stil.formularTitel}>Einrichtung</h2>
+      <p className={stil.vorgangHinweis}>
+        Zugang eintragen, prüfen, Staffeln holen — in dieser Reihenfolge und mit
+        Erklärung. Das ist derselbe Weg wie beim ersten Start; nützlich bei einem neuen
+        DFBnet-Zugang oder zum Saisonwechsel.
+      </p>
+      <div className={stil.knoepfe}>
+        <Knopf groesse="sm" onClick={nochEinmal} disabled={laeuft}>
+          {laeuft ? "Einen Moment …" : "Einrichtung noch einmal durchlaufen"}
         </Knopf>
-      </form>
+      </div>
+      {fehler && (
+        <Hinweis ton="fehler" dringend>
+          {fehler}
+        </Hinweis>
+      )}
     </Karte>
   );
 }

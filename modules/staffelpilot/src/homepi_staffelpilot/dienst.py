@@ -345,6 +345,15 @@ class Einstellungen:
     #: Spielen. Ein Spiel, das niemand bei DFBnet gesehen hat, darf nicht in
     #: einer Liste stehen, aus der Mahnungen entstehen.
     beispieldaten: bool = False
+    #: Ob die Einrichtung abgehakt ist.
+    #:
+    #: **Aus.** Eine frische Installation hat weder Zugang noch Staffel, und
+    #: ohne beides bleibt jede Liste leer -- ohne zu sagen, warum. Solange das
+    #: aus ist und etwas fehlt, fuehrt die Oberflaeche durch die Einrichtung.
+    #:
+    #: Abgehakt wird am Ende des Weges oder wenn jemand ihn ueberspringt. Ein
+    #: Weg, der sich nicht schliessen laesst, ist eine Sackgasse.
+    einrichtung_erledigt: bool = False
     #: Der Satz unter jeder Mahnung, wenn ein eigener gewuenscht ist.
     #:
     #: Leer heisst: der mitgelieferte aus `vordrucke/texte.yaml`. Leer und
@@ -358,7 +367,12 @@ class Einstellungen:
 #: den Fehler dann im Prueflauf statt in den Einstellungen.
 _ZAHLEN = {"pruefzeitraum_tage": (1, 365), "frist_tage": (1, 90)}
 _TEXTE = ("staffelleiter", "verband", "absender", "folgesatz")
-_WAHRHEITEN = ("uebertragung_pausiert", "browser_sichtbar", "beispieldaten")
+_WAHRHEITEN = (
+    "uebertragung_pausiert",
+    "browser_sichtbar",
+    "beispieldaten",
+    "einrichtung_erledigt",
+)
 
 #: Was als "ja" gilt. Geschrieben wird immer "true"; gelesen wird grosszuegig,
 #: weil eine Zeile auch einmal von Hand in der Datenbank landet.
@@ -695,6 +709,34 @@ def vorlagen_auswaehlen(
     # Sortiert, weil der Lader nach Namen sortiert: "10_" vor "20_", und eine
     # "90_eigene.py" soll am Ende gezielt etwas ersetzen koennen.
     return sorted(name for name in angeboten if name not in schon_da)
+
+
+#: Die Schritte der Einrichtung, in dieser Reihenfolge.
+EINRICHTUNG_SCHRITTE = ("zugang", "staffeln", "fertig")
+
+
+def einrichtung_schritt(*, zugang: bool, staffeln: int, erledigt: bool) -> str:
+    """Wo der Staffelleiter bei der Einrichtung steht.
+
+    Zwei Dinge muessen stehen, bevor dieses Artefakt irgendetwas kann: ein
+    DFBnet-Zugang und mindestens eine Staffel. Fehlt eines, bleibt die
+    Spielpruefung leer -- und sagt nicht, warum.
+
+    Die Reihenfolge ist nicht beliebig: ohne Zugang laesst sich keine Staffel
+    holen. Von Hand angelegte Staffeln ersetzen ihn nicht, denn ohne ihn liest
+    der Pruefdienst keinen einzigen Spielbericht.
+
+    Die Entscheidung steht hier und nicht in der Oberflaeche: sonst
+    beantwortet jede Ansicht sie selbst, und zwei von ihnen antworten
+    irgendwann verschieden.
+    """
+    if erledigt:
+        return "fertig"
+    if not zugang:
+        return "zugang"
+    if staffeln <= 0:
+        return "staffeln"
+    return "fertig"
 
 
 def gefaltet(text: str) -> str:

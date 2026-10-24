@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as client from "../api/client";
-import { unterseitenFuer } from "../module/register";
+import { sichtbareUnterseiten } from "../module/register";
 import { mitAnmeldung, TESTBENUTZER } from "../testhilfen";
 import { Navigation } from "./Navigation";
 
@@ -78,7 +78,7 @@ describe("Die Navigationsleiste", () => {
     // aus dieser Datei: sonst scheitert dieser Test bei jedem neuen Bereich,
     // ohne dass an der Leiste etwas falsch waere.
     expect(within(bereiche).getAllByRole("link")).toHaveLength(
-      unterseitenFuer("staffelpilot").length,
+      sichtbareUnterseiten("staffelpilot").length,
     );
   });
 

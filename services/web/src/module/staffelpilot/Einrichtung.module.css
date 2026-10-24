@@ -1,0 +1,356 @@
+/*
+ * Die Einrichtung.
+ *
+ * Sie darf anders aussehen als der Rest -- groessere Schrift, mehr Luft, eine
+ * Seite je Schritt -- und muss trotzdem dieselbe Anwendung bleiben. Deshalb
+ * steht hier kein einziger eigener Farbwert: alles kommt aus
+ * `src/styles/tokens.css`. Was sich unterscheidet, sind Groessen und
+ * Bewegung, nicht die Palette.
+ *
+ * Gescrollt wird hier nicht. Ein Weg, bei dem man scrollen muss, um den Knopf
+ * zu finden, ist kein Weg, sondern ein Formular mit Zwischenueberschriften.
+ */
+
+.buehne {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-6);
+}
+
+/* ── Die Schrittleiste ────────────────────────────────────────────────── */
+/*
+ * Sie beantwortet die eine Frage, die ein Formular nie beantwortet: wie viel
+ * kommt noch. Ohne sie ist jeder Schritt der letzte, den man kennt.
+ */
+.leiste {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.punkt,
+.punktJetzt,
+.punktFertig {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+  flex: 1 1 0;
+  min-width: 0;
+  padding: var(--raum-2) 0 0;
+  border-top: 2px solid var(--farbe-rand);
+  color: var(--farbe-text-leise);
+  font-size: var(--text-xs);
+  transition:
+    color var(--dauer-normal) var(--verlauf),
+    border-color var(--dauer-normal) var(--verlauf);
+}
+
+.punktJetzt {
+  border-top-color: var(--farbe-aktion);
+  color: var(--farbe-text);
+}
+
+.punktFertig {
+  border-top-color: var(--signal-gut);
+  color: var(--farbe-text-gedaempft);
+}
+
+.punktZahl {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-voll);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.punktJetzt .punktZahl {
+  border-color: transparent;
+  background: var(--farbe-aktion);
+  color: var(--farbe-aktion-schrift);
+}
+
+.punktFertig .punktZahl {
+  border-color: var(--signal-gut);
+  color: var(--signal-gut);
+}
+
+.punktWort {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Das Blatt ───────────────────────────────────────────────────────── */
+/*
+ * Eine Seite je Schritt. Die feste Mindesthoehe ist kein Schmuck: ohne sie
+ * springt der Knopf bei jedem Wechsel an eine andere Stelle, und man klickt
+ * zweimal, weil er unter dem Zeiger weggerutscht ist.
+ */
+.blatt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  /* Gleich hohe Seiten, solange Platz ist. Ohne das springt der Knopf bei
+     jedem Wechsel an eine andere Stelle -- und man klickt zweimal, weil er
+     unter dem Zeiger weggerutscht ist. Auf kurzen Schirmen weicht die Hoehe,
+     bevor sie Scrollen erzwingt. */
+  min-height: min(32rem, 70dvh);
+  padding: var(--raum-8);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-lg);
+  background: var(--farbe-flaeche);
+  box-shadow: var(--schatten-md);
+  animation: blattEin var(--dauer-normal) var(--verlauf-eintritt) both;
+}
+
+@keyframes blattEin {
+  from {
+    opacity: 0;
+    /* Nach rechts herein: der Weg geht vorwaerts, und die Richtung sagt das
+       mit. Zwoelf Pixel, nicht hundert -- es soll begleiten, nicht auffallen. */
+    transform: translateX(12px);
+  }
+}
+
+.ueber {
+  margin: 0;
+  color: var(--farbe-text-leise);
+  font-size: var(--text-xs);
+  font-weight: var(--gewicht-halbfett);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.titel {
+  margin: 0;
+  font-size: var(--text-3xl);
+  font-weight: var(--gewicht-halbfett);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.satz {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-lg);
+  line-height: var(--zeile-weit);
+}
+
+.leise {
+  max-width: 52ch;
+  margin: 0;
+  color: var(--farbe-text-leise);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+}
+
+/* ── Die Aufzaehlung ─────────────────────────────────────────────────── */
+.punkte {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  margin: var(--raum-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.punkte li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--raum-4);
+  max-width: 56ch;
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-md);
+  line-height: var(--zeile-weit);
+  /* Nacheinander statt alle auf einmal: der Blick geht die Liste entlang,
+     statt vor einer fertigen Wand zu stehen. */
+  animation: zeileEin var(--dauer-normal) var(--verlauf-eintritt) both;
+}
+
+.punkte li:nth-child(2) {
+  animation-delay: 60ms;
+}
+
+.punkte li:nth-child(3) {
+  animation-delay: 120ms;
+}
+
+@keyframes zeileEin {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.punkte strong {
+  color: var(--farbe-text);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.punkteZahl {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--rundung-voll);
+  background: var(--farbe-flaeche-gedaempft);
+  color: var(--farbe-text);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Formular und Fuss ───────────────────────────────────────────────── */
+.formular {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  max-width: 28rem;
+}
+
+.fuss {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-3);
+  margin-top: auto;
+  padding-top: var(--raum-2);
+}
+
+/* ── Der laufende Auftrag ────────────────────────────────────────────── */
+.lauf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  padding: var(--raum-4);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+.laufKopf {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-3);
+}
+
+.laufZeile {
+  margin: 0;
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-sm);
+}
+
+/* Ein Herzschlag, kein Kreisel: er sagt "es lebt", nicht "es arbeitet". Der
+   Unterschied ist wichtig, solange der Auftrag nur wartet. */
+.pulsschlag {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--rundung-voll);
+  background: var(--farbe-text-leise);
+  animation: schlagen 1.6s ease-in-out infinite;
+}
+
+@keyframes schlagen {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.balken {
+  height: 0.375rem;
+  border-radius: var(--rundung-voll);
+  background: var(--farbe-rand);
+  overflow: hidden;
+}
+
+.balkenWert {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--farbe-aktion);
+  transition: width var(--dauer-normal) var(--verlauf);
+}
+
+/* Wartet: ein Streifen, der hin und her geht, und ausdruecklich KEIN
+   Fortschritt. Solange der Dienst nicht laeuft, gibt es keinen. */
+.balkenWartet {
+  height: 100%;
+  width: 30% !important;
+  border-radius: inherit;
+  background: var(--farbe-text-leise);
+  animation: wandern 1.8s var(--verlauf) infinite;
+}
+
+@keyframes wandern {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(333%);
+  }
+}
+
+/* ── Der Haken am Ende ───────────────────────────────────────────────── */
+.haken {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--rundung-voll);
+  background: var(--signal-gut-flaeche);
+  color: var(--signal-gut);
+  font-size: var(--text-2xl);
+  animation: haken var(--dauer-normal) var(--verlauf-eintritt) both;
+}
+
+@keyframes haken {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+/* Wer Bewegung abbestellt hat, bekommt keine. Die globale Regel in
+   `basis.css` kuerzt jede Dauer auf nichts; der Herzschlag und der wandernde
+   Streifen muessen zusaetzlich aufhoeren -- eine Dauerschleife mit 0.01ms
+   flackert, statt zu verschwinden. */
+@media (prefers-reduced-motion: reduce) {
+  .pulsschlag,
+  .balkenWartet {
+    animation: none;
+  }
+
+  .balkenWartet {
+    width: 100% !important;
+    opacity: 0.4;
+  }
+}
+
+@media (max-width: 40rem) {
+  .blatt {
+    padding: var(--raum-5);
+  }
+
+  .titel {
+    font-size: var(--text-2xl);
+  }
+
+  /* Auf dem Telefon bleibt von vier Woertern nebeneinander nichts Lesbares --
+     die Zahlen reichen, das aktive Wort steht im Titel. */
+  .punktWort {
+    display: none;
+  }
+}
