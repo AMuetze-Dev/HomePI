@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as client from "../api/client";
+import { unterseitenFuer } from "../module/register";
 import { mitAnmeldung, TESTBENUTZER } from "../testhilfen";
 import { Navigation } from "./Navigation";
 
@@ -72,8 +73,13 @@ describe("Die Navigationsleiste", () => {
       "href",
       "/modul/staffelpilot/spiele",
     );
-    // Neun Bereiche laut Register - die Leiste erfindet keine dazu.
-    expect(within(bereiche).getAllByRole("link")).toHaveLength(9);
+    // So viele Bereiche, wie im Register stehen -- die Leiste erfindet keine
+    // dazu und laesst keinen weg. Die Zahl kommt aus dem Register und nicht
+    // aus dieser Datei: sonst scheitert dieser Test bei jedem neuen Bereich,
+    // ohne dass an der Leiste etwas falsch waere.
+    expect(within(bereiche).getAllByRole("link")).toHaveLength(
+      unterseitenFuer("staffelpilot").length,
+    );
   });
 
   it("gibt einem Artefakt ohne Bereiche auch keine leere Liste", async () => {

@@ -9,6 +9,7 @@ import {
   ladeRegeldateien,
   speichereRegeldatei,
 } from "./api";
+import { Quelltexteditor } from "./Quelltexteditor";
 import stil from "./StaffelpilotSeite.module.css";
 
 function meldung(fehler: unknown): string {
@@ -233,20 +234,8 @@ function DateiKarte({
             <Platzhalter breite="100%" hoehe="12rem" />
           ) : (
             <>
-              {/* Monospace und Tabulatoren: hier steht Python, und Einrückung
-                  ist dort keine Geschmacksfrage. Kein Syntaxhighlighting --
-                  das wäre eine Bibliothek für ein Feld, das zweimal im Jahr
-                  angefasst wird. */}
-              <label className={stil.textfeldEtikett}>
-                Quelltext
-                <textarea
-                  className={stil.quelltext}
-                  rows={20}
-                  spellCheck={false}
-                  value={inhalt}
-                  onChange={(e) => setInhalt(e.target.value)}
-                />
-              </label>
+              <span className={stil.textfeldEtikett}>Quelltext</span>
+              <Quelltexteditor wert={inhalt} onAendern={setInhalt} />
 
               <div className={stil.knoepfe}>
                 <Knopf groesse="sm" onClick={() => void onSpeichern(inhalt)}>

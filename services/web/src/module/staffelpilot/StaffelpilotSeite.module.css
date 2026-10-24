@@ -802,3 +802,157 @@
   outline: 2px solid var(--farbe-fokus);
   outline-offset: 1px;
 }
+
+/* ── Editor fuer Regeldateien ────────────────────────────────────────── */
+/*
+ * Ein durchsichtiges `textarea` ueber einem `pre` mit denselben Zeichen. Das
+ * Browser-Textfeld behaelt damit alles, was es gut kann -- Schreibmarke,
+ * Auswahl, Rueckgaengig, Bildlauf, Vorlesen --, und das `pre` darunter
+ * liefert nur die Farbe.
+ *
+ * Beide **muessen** in Schrift, Groesse, Zeilenhoehe und Polsterung
+ * uebereinstimmen. Weicht eine davon ab, laufen Text und Farbe
+ * auseinander -- deshalb stehen sie hier in einer gemeinsamen Regel und
+ * nicht in zweien, die man einzeln aendern kann.
+ */
+.editorRahmen {
+  display: flex;
+  margin-top: var(--raum-1);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche-gedaempft);
+  overflow: hidden;
+}
+
+.editorRahmen:focus-within {
+  border-color: var(--farbe-fokus);
+}
+
+/* Zeilennummern. Sie sind kein Schmuck: die Fehlermeldung des Laders nennt
+   eine Zeile ("Zeile 42"), und ohne Nummern zaehlt man sie ab. */
+.editorLeiste {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  padding: var(--raum-3) var(--raum-2);
+  border-right: 1px solid var(--farbe-rand);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text-leise);
+  font-family: var(--schrift-mono);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-normal);
+  text-align: right;
+  overflow: hidden;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.editorFlaeche {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.editorFarbe,
+.editorEingabe {
+  margin: 0;
+  padding: var(--raum-3);
+  border: 0;
+  font-family: var(--schrift-mono);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-normal);
+  tab-size: 4;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.editorFarbe {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  pointer-events: none;
+  color: var(--farbe-text);
+  background: none;
+}
+
+/* Durchsichtige Schrift, sichtbare Schreibmarke: der Text kommt von
+   darunter. `caret-color` muss gesetzt sein -- sonst ist auch die Marke
+   durchsichtig und niemand sieht, wo er tippt. */
+.editorEingabe {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 100%;
+  overflow: auto;
+  resize: vertical;
+  color: transparent;
+  background: transparent;
+  caret-color: var(--farbe-text);
+}
+
+.editorEingabe:focus-visible {
+  outline: none;
+}
+
+.editorEingabe::selection {
+  /* Ohne eigene Auswahlfarbe waere die Markierung unsichtbar: die Schrift
+     darin ist durchsichtig. */
+  background: var(--farbe-fokus);
+  color: transparent;
+}
+
+/* Der Tastaturhinweis unter dem Feld. Er steht da, weil der Tabulator hier
+   einrueckt und der Ausgang sonst niemandem auffaellt. */
+.editorFuss {
+  margin: var(--raum-1) 0 0;
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-xs);
+}
+
+.editorFuss kbd {
+  padding: 0 0.25em;
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-sm);
+  background: var(--farbe-flaeche);
+  font-family: var(--schrift-mono);
+  font-size: 0.95em;
+}
+
+/* ── Die Farben des Quelltextes ──────────────────────────────────────── */
+/*
+ * Entsaettigt und aus den vorhandenen Signalfarben, nicht aus einem fremden
+ * Farbsatz: ein Editor, der mitten in der Oberflaeche sechs neue Toene
+ * aufmacht, sieht aus wie hineinkopiert.
+ */
+/* Gedaempft und nicht leise: als Fliesstext reicht --farbe-text-leise, im
+   Quelltext kommt sie auf 4.3:1 und bleibt unter AA. Gemessen. */
+.tkKommentar {
+  color: var(--farbe-text-gedaempft);
+  font-style: italic;
+}
+
+.tkZeichenkette {
+  color: var(--signal-gut);
+}
+
+.tkSchluessel {
+  color: var(--farbe-fokus-schrift);
+}
+
+.tkZahl {
+  color: var(--signal-warnung);
+}
+
+/* Der Dekorator steht ueber jeder Pruefung -- @regel(...) ist die Zeile, an
+   der man eine Regel im Text wiederfindet. */
+.tkDekorator {
+  color: var(--signal-warnung);
+  font-weight: var(--gewicht-halbfett);
+}
+
+/* `regel`, `melde`, `spiel`, `ANZAHL`: sie stehen in keinem import, weil der
+   Lader sie stellt. Genau deshalb lohnt es sich, sie zu zeigen. */
+.tkEingebaut {
+  color: var(--signal-fehler);
+}

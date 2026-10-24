@@ -67,6 +67,11 @@
   --farbe-aktion-hover: light-dark(var(--neutral-800), #ffffff);
 
   --farbe-fokus: light-dark(#3b6ee0, #6a93f0);
+  /* Dieselbe Farbe als SCHRIFT, eine Spur dunkler. Als Rand oder Ring reicht
+   * --farbe-fokus; als Text auf heller Flaeche kommt sie auf 4.37:1 und
+   * bleibt damit unter den 4.5:1, die AA fuer normalen Text verlangt.
+   * Gemessen, nicht geschaetzt -- siehe docs/08-design.md. */
+  --farbe-fokus-schrift: light-dark(#3464d6, #6a93f0);
   /* Markierter Text. Aus der Fokusfarbe, nur durchscheinend - beides meint
    * "hier bist du gerade". */
   --farbe-auswahl: light-dark(rgb(59 110 224 / 16%), rgb(106 147 240 / 28%));

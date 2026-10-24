@@ -259,6 +259,31 @@ wenn jemand sie nur vorruebergehend stilllegen will. Entfernt heisst "wird
 nicht mehr geprueft" und nicht "ist nie passiert": Befunde frueherer Laeufe
 bleiben stehen.
 
+**Der Editor.** Hochladen reicht fuer eine Regel, die anderswo entstanden ist;
+wer eine Schwelle aendert, will sie nicht herunterladen, bearbeiten und wieder
+hochladen. Das Feld faerbt deshalb ein, nummeriert die Zeilen -- die
+Fehlermeldung des Laders nennt eine Zeile, und ohne Nummern zaehlt man sie ab
+-- und behandelt Tabulator und Eingabetaste so, wie Python es verlangt:
+einruecken, Einrueckung halten, nach einem Doppelpunkt eine Stufe tiefer.
+
+Gebaut ist es als durchsichtiges `textarea` ueber einem `pre`
+(`Quelltexteditor.tsx`). Damit behaelt das Browser-Textfeld alles, was es gut
+kann -- Schreibmarke, Auswahl, Rueckgaengig, Vorlesen --, und das `pre`
+darunter liefert nur die Farbe. **Kein Editorpaket:** die Oberflaeche hat drei
+Laufzeitabhaengigkeiten und bindet nicht einmal eine Schrift von aussen ein,
+weil sie auf einem Pi laeuft; CodeMirror waeren sechs Pakete mehr fuer ein
+Feld, in dem Regeldateien stehen. Der Einfaerber (`quelltext.ts`) versteht
+Python **nicht**, er erkennt es nur -- ob eine Datei laedt, sagt weiterhin der
+Pruefdienst.
+
+Weil der Tabulator hier einrueckt, gibt **Escape** ihn einmal frei: ein Feld,
+das die Tastatur festhaelt, ist eine Falle und kein Editor. Das steht unter dem
+Feld, denn raten wuerde es niemand. Die sechs Farben kommen aus den
+vorhandenen Signalfarben und erfuellen AA in beiden Ansichten (gemessen am
+24.10.2026: hell 4.67:1 bis 6.89:1, dunkel 5.76:1 bis 7.73:1) -- deshalb steht
+der Quelltext-Blau in `tokens.css` als eigener Wert: als Rand reicht
+`--farbe-fokus`, als Schrift auf heller Flaeche nicht.
+
 ### Wer ueber wem spielt
 
 Welche Mannschaft eines Vereins ueber welcher steht, liefert DFBnet nicht mit.
