@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
 import {
   type Auftrag,
+  type AuftragArt,
   type AuftragZeile,
   type AuftragZustand,
   type Staffel,
@@ -40,11 +41,16 @@ const ZUSTAND_TON: Record<AuftragZustand, "gut" | "warnung" | "fehler" | "neutra
   gescheitert: "fehler",
 };
 
-const ART_WORT = {
+// Ausdrücklich getippt und nicht `as const`: so verlangt TypeScript für jede
+// neue Auftragsart ein Wort. Ohne das stand in der Liste "undefined", sobald
+// eine dazukam -- und zwar genau dort, wo jemand nachsieht, was gerade läuft.
+const ART_WORT: Record<AuftragArt, string> = {
   pruflauf: "Prüflauf",
   initialisierung: "Initialisierung",
   staffeln: "Staffeln holen",
-} as const;
+  anmeldeprobe: "Anmeldeprobe",
+  fallprobe: "Fallprobe",
+};
 
 /** Wie oft nachgesehen wird, solange etwas unterwegs ist. */
 const TAKT_MS = 3000;
@@ -375,12 +381,18 @@ function Vorschau({
 
   // Das Fehlerbild gewinnt: es ist der Beweis, woran es lag, und veraltet
   // nicht.
-  const art = arten.includes("fehler") ? "fehler" : arten.includes("aktuell") ? "aktuell" : "";
+  const art = arten.includes("fehler")
+    ? "fehler"
+    : arten.includes("aktuell")
+      ? "aktuell"
+      : "";
   if (!art) return null;
 
   const adresse = ansichtAdresse(auftrag.id, art, stand);
   const beschriftung =
-    art === "fehler" ? "Die Seite im Augenblick des Scheiterns" : "Was der Prüfdienst gerade sieht";
+    art === "fehler"
+      ? "Die Seite im Augenblick des Scheiterns"
+      : "Was der Prüfdienst gerade sieht";
 
   return (
     <figure className={gross ? stil.vorschauGross : stil.vorschau}>

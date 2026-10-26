@@ -39,7 +39,13 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-q --strict-markers --strict-config"
+# Die Browsertests bleiben draussen, solange niemand sie ausdruecklich holt:
+# sie starten Chromium, brauchen `playwright install chromium` und dauern
+# Sekunden statt Millisekunden. Die rot-gruen-Schleife soll schnell bleiben.
+addopts = "-q --strict-markers --strict-config -m 'not browser'"
+markers = [
+    "browser: startet einen echten Browser gegen die nachgebauten Seiten",
+]
 
 # Die Schwelle steht beim Projekt, nicht in der CI - so gilt sie auch lokal.
 [tool.coverage.report]

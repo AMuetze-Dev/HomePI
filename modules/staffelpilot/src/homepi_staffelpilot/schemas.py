@@ -523,6 +523,25 @@ class VorgangAendern(BaseModel):
     empfaenger: Annotated[str, Field(max_length=200)] | None = None
     betreff: Annotated[str, Field(max_length=200)] | None = None
     text: str | None = None
+    #: Wer die Mahnung bekommt, und bei einem Sportgerichtsfall: gegen wen er
+    #: geht. Beides steht im Schreiben und darf sich korrigieren lassen.
+    verein: Annotated[str, Field(max_length=120)] | None = None
+    betroffener: Annotated[str, Field(max_length=120)] | None = None
+    #: Das Aktenzeichen aus DFBnet -- von Hand, wenn es auf der Seite nicht
+    #: stand. Ohne diesen Weg waere ein angelegter Fall unbrauchbar: die Mail
+    #: an den Sportrichter beruft sich darauf.
+    dfbnet_aktenzeichen: Annotated[str, Field(max_length=60)] | None = None
+    #: Beilagen und Schlusssatz der Mail an den Sportrichter. Siehe
+    #: `sportrichtermail.Fall`.
+    anlagen: Annotated[str, Field(max_length=300)] | None = None
+    hinweis: Annotated[str, Field(max_length=500)] | None = None
+
+    @field_validator(
+        "verein", "betroffener", "dfbnet_aktenzeichen", "anlagen", "hinweis", mode="before"
+    )
+    @classmethod
+    def _getrimmt_lassen(cls, wert: object) -> object:
+        return _getrimmt(wert)
 
     @field_validator("empfaenger", "betreff", mode="before")
     @classmethod
@@ -539,8 +558,20 @@ class VorgangAusgabe(BaseModel):
 
     id: uuid.UUID
     befund_id: uuid.UUID
+    #: Das Spiel, aus dem er kommt.
+    #:
+    #: Er haengt am Befund, der Befund am Spiel -- ohne diese Zeile muesste
+    #: jeder Aufrufer den Umweg selbst gehen. Der Pruefdienst braucht sie fuer
+    #: Spielnummer und Staffel: beide stehen am Spiel und nicht am Vorgang,
+    #: und auf den Vorgang kopiert waeren sie zweimal da und irgendwann
+    #: verschieden.
+    spiel_id: uuid.UUID | None = None
     art: VorgangArt
     aktenzeichen: str
+    #: Die Nummer aus DFBnet. Leer, solange der Fall nicht angelegt ist.
+    dfbnet_aktenzeichen: str = ""
+    anlagen: str = ""
+    hinweis: str = ""
     verein: str
     betroffener: str
     grund: str
@@ -796,7 +827,16 @@ class BefundZeile(BaseModel):
 #: falsches Passwort soll als falsches Passwort dastehen und nicht als
 #: "Staffeln ließen sich nicht holen". Wer sie weglässt, lässt den
 #: Staffelleiter raten, woran es lag.
-AuftragArt = Literal["pruflauf", "initialisierung", "staffeln", "anmeldeprobe"]
+AuftragArt = Literal[
+    "pruflauf",
+    "initialisierung",
+    "staffeln",
+    "anmeldeprobe",
+    # Dieselben Schritte wie die Fallanlage, bis vor das Speichern. Ein
+    # Aktenzeichen ist dauerhaft -- wer die Anlage ausprobieren will, legt
+    # sonst ein Verfahren gegen eine benannte Person an.
+    "fallprobe",
+]
 
 #: Wo er steht. Nur vorwärts — ein beendeter Lauf wird neu angefordert, nicht
 #: fortgesetzt.
@@ -808,6 +848,9 @@ class AuftragAnfordern(BaseModel):
 
     art: AuftragArt = "pruflauf"
     staffel_id: uuid.UUID | None = None
+    #: Worauf er sich sonst bezieht -- bei der Fallprobe der Vorgang. Die
+    #: Route dafuer setzt ihn selbst; von aussen wird er nicht gebraucht.
+    referenz: Annotated[str, Field(max_length=120)] = ""
 
 
 class Protokollzeile(BaseModel):
@@ -821,6 +864,8 @@ class AuftragAusgabe(BaseModel):
     id: uuid.UUID
     art: AuftragArt
     staffel_id: uuid.UUID | None
+    #: Bei der Fallprobe die Kennung des Vorgangs, sonst leer.
+    referenz: str = ""
     zustand: AuftragZustand
     schritt: str
     fortschritt: int
@@ -841,6 +886,7 @@ class AuftragZeile(BaseModel):
     id: uuid.UUID
     art: AuftragArt
     staffel_id: uuid.UUID | None
+    referenz: str = ""
     zustand: AuftragZustand
     schritt: str
     fortschritt: int
@@ -945,8 +991,15 @@ class UebertragungStand(BaseModel):
 class UebertragungAbschluss(BaseModel):
     zustand: Literal["fertig", "fehler"]
     meldung: Annotated[str, Field(max_length=1000)] = ""
+    #: Das Aktenzeichen, das DFBnet dem Fall gegeben hat.
+    #:
+    #: Nur bei der Fallanlage und nur, wenn es auf der Seite stand. Es landet
+    #: am Vorgang, denn aus ihm entsteht die Mail an den Sportrichter -- bis
+    #: hierher endete es in einer Meldungszeile, und das Schreiben liess sich
+    #: danach nicht vorbereiten.
+    aktenzeichen: Annotated[str, Field(max_length=60)] = ""
 
-    @field_validator("meldung", mode="before")
+    @field_validator("meldung", "aktenzeichen", mode="before")
     @classmethod
     def _trimmen(cls, wert: object) -> object:
         return _getrimmt(wert)

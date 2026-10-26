@@ -135,7 +135,10 @@ export type AuftragArt =
   | "staffeln"
   /** Anmelden und sonst nichts. Für die Einrichtung: ein falsches Passwort
       soll als falsches Passwort dastehen. */
-  | "anmeldeprobe";
+  | "anmeldeprobe"
+  /** Die Fallanlage bis vor das Speichern -- und dann nicht. Ein
+      Aktenzeichen ist dauerhaft. */
+  | "fallprobe";
 export type AuftragZustand =
   "angefordert" | "laeuft" | "fertig" | "abgebrochen" | "gescheitert";
 
@@ -258,6 +261,20 @@ export interface Vorgang extends VorgangZeile {
   empfaenger: string;
   text: string;
   versandt_am: string | null;
+  /** Das Spiel dahinter. Der Vorgang hängt am Befund, der am Spiel. */
+  spiel_id: string | null;
+  /**
+   * Die Nummer, die **DFBnet** dem Sportgerichtsfall gegeben hat.
+   *
+   * Eine andere Sache als `aktenzeichen`: das vergibt diese Anwendung
+   * fortlaufend je Saison. Aus dieser hier entsteht die Mail an den
+   * Sportrichter; leer, solange der Fall nicht angelegt ist.
+   */
+  dfbnet_aktenzeichen: string;
+  /** Beilagen der Mail, in Worten. Leer lässt die Zeile weg. */
+  anlagen: string;
+  /** Der Satz am Ende. Leer erlaubt. */
+  hinweis: string;
 }
 
 /** Was in ein Mailfenster gehört — und nichts, was es abschickt. */
@@ -432,7 +449,16 @@ export function legeVorgangAn(
 
 export function aendereVorgang(
   id: string,
-  daten: { empfaenger?: string; betreff?: string; text?: string },
+  daten: {
+    empfaenger?: string;
+    betreff?: string;
+    text?: string;
+    verein?: string;
+    betroffener?: string;
+    dfbnet_aktenzeichen?: string;
+    anlagen?: string;
+    hinweis?: string;
+  },
 ): Promise<Vorgang> {
   return anfrage<Vorgang>(`/vorgaenge/${id}`, mitKoerper("PATCH", daten));
 }
@@ -616,6 +642,18 @@ export function ladeErgebnisse(
  */
 export function merkeFallAn(vorgangId: string): Promise<Uebertragung> {
   return anfrage<Uebertragung>(`/vorgaenge/${vorgangId}/fallanlage`, { method: "POST" });
+}
+
+/**
+ * Die Fallanlage proben, ohne etwas anzulegen.
+ *
+ * Derselbe Weg bis vor das Speichern: Menü, Suche, Treffer, Formular, Felder.
+ * **Ein Aktenzeichen ist dauerhaft** — wer die Anlage ausprobieren will, legt
+ * sonst ein Verfahren gegen eine benannte Person an und löscht es nicht
+ * wieder.
+ */
+export function probeFallanlage(vorgangId: string): Promise<Auftrag> {
+  return anfrage<Auftrag>(`/vorgaenge/${vorgangId}/fallprobe`, { method: "POST" });
 }
 
 // ── Das Vorschaufenster ──────────────────────────────────────────────────

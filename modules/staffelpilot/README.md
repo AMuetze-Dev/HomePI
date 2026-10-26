@@ -232,6 +232,78 @@ Ein Kreuz wird nur gesetzt, wo der Verband einen Tatbestand vorsieht
 Zuordnung bekommt keins. Ein geratenes Kreuz behauptete etwas, das niemand
 geprueft hat.
 
+### Die Fallprobe
+
+**Ein Aktenzeichen ist dauerhaft.** Wer die Fallanlage ausprobieren will, legt
+sonst ein Verfahren gegen eine benannte Person an -- und loescht es nicht
+wieder. Es gibt deshalb eine Auftragsart `fallprobe`: sie geht denselben Weg
+bis **vor** das Speichern (Menue, Suche, Treffer, Formular, Felder) und
+druckt es nicht.
+
+`POST /vorgaenge/{id}/fallprobe` fordert sie an -- mit denselben
+Pflichtangaben wie die Anlage, denn eine Probe, die mehr durchlaesst als die
+Sache selbst, prueft die falsche Sache. Ein **Auftrag** und keine Uebertragung:
+die Uebertragung ist die Liste dessen, was wirklich hinaus soll.
+
+Sie haengt **nicht** an den beiden Schaltern, die das Eintragen hueten. Eine
+Probe traegt nichts ein; sie an ihnen haengen zu lassen hiesse, dass gerade
+der nicht an sie herankommt, der sie am dringendsten braucht.
+
+Geprueft ist der Weg zweifach:
+
+* `tests/unit/test_fallanlage.py` im Pruefdienst -- die Logik, mit einer
+  nachgebauten Playwright-Schnittstelle, in Millisekunden.
+* `tests/browser/test_fallanlage_seite.py` -- **dieselben Selektoren in einem
+  echten DOM**, gegen nachgebaute Seiten unter `tests/seiten/sportgericht/`
+  und einen echten Chromium (`uv run pytest -m browser`). Ein Tippfehler in
+  `input[name='kontext.suche.spielkennung']` faellt einer Attrappe nicht auf;
+  er faellt beim ersten echten Fall auf, und der ist nicht zurueckzunehmen.
+
+Dabei kam eine Berichtigung heraus: `context.new_page()` liefert eine leere
+Seite, und auf einer leeren Seite gibt es kein Menue -- `_navigieren` lief in
+einen Zeitablauf. Dass es in der alten Anwendung genauso stand, heisst nur,
+dass es dort nie gelaufen ist.
+
+### Die Mail an den Sportrichter
+
+Der Pruefdienst legt den Fall an, DFBnet vergibt eine Nummer, und **aus dieser
+Nummer entsteht die Mail an den Sportrichter.** Bis zum 26.10.2026 endete sie
+in einer Meldungszeile: der Fall war angelegt, aber das Schreiben dazu liess
+sich nicht vorbereiten, weil niemand mehr wusste, wie die Akte heisst.
+
+Jetzt wandert sie mit: `POST /uebertragungen/{id}/abschluss` nimmt ein
+`aktenzeichen` an, der Speicher traegt es an den Vorgang, und
+`GET /vorgaenge/{id}/mail` macht daraus das Schreiben. Steht sie nicht auf der
+Seite -- das kommt vor --, bleibt sie leer und laesst sich von Hand nachtragen
+(`PATCH /vorgaenge/{id}`). Erfunden wird keine: sie benennt eine Akte, die es
+dann nicht gaebe.
+
+Der Wortlaut stammt vom Staffelleiter (30.08.2026) und steht in
+`sportrichtermail.py`. Zwei Schreibfehler sind berichtigt; Aufbau, Reihenfolge
+der Kerndaten und Tonfall sind seine. Betreff: `[Aktenzeichen], Verein,
+Angeklagter` -- die Klammern gehoeren dazu, so sortiert der Sportrichter seine
+Eingaenge. Der Text endet nach dem Hinweis, ohne Gruss; auch das ist seine
+Entscheidung.
+
+Zwei Schreiben, je nach Stand:
+
+| Stand | Was `/mail` liefert |
+|---|---|
+| Fall noch nicht angelegt | Der **Antrag** an das Sportgericht, aus der Vorlage |
+| Aktenzeichen da | Die **Mail an den Sportrichter**, aus der Nummer |
+
+`fehlende_felder` nennt in beiden Faellen, was noch fehlt. Ein Schreiben mit
+Luecke ist besser als eines mit erfundener Angabe -- aber nur, wenn die Luecke
+auffaellt.
+
+**Versendet wird nichts.** Nirgends. `tests/unit/test_kein_mailversand.py`
+macht aus dieser Entscheidung eine Eigenschaft: keine Mailbibliothek, keine
+Funktion, die wie ein Versand heisst, kein Selektor, der auf ein Postfach
+zeigt, und kein Schalter, der es einschalten koennte. Geprueft wird das ganze
+Mehrfachpaket und nicht nur dieses Artefakt -- gefaehrlich waere der
+Pruefdienst, der mit einer angemeldeten DFBnet-Sitzung vor dem
+Verbandspostfach steht.
+
 ### Die Einrichtung
 
 Ohne DFBnet-Zugang und ohne Staffel bleibt jede Liste leer. Vorher stand dort
@@ -553,6 +625,45 @@ Sponsornamen ("Brandible Stadtliga C"), und die Spielklasse heisst in den
 beiden Masken von DFBnet verschieden -- in der Spielplanbearbeitung
 "Kreisliga C", in der Spielberichtssuche "3.Kreisliga (C)". Leer bei allem,
 was von Hand angelegt wurde.
+
+**Seit 26.10.2026: das Aktenzeichen aus DFBnet und die Beilagen.**
+
+```sql
+ALTER TABLE staffelpilot_vorgaenge
+  ADD COLUMN dfbnet_aktenzeichen VARCHAR(60)  NOT NULL DEFAULT '',
+  ADD COLUMN anlagen             VARCHAR(300) NOT NULL DEFAULT '',
+  ADD COLUMN hinweis             VARCHAR(500) NOT NULL DEFAULT '';
+```
+
+`dfbnet_aktenzeichen` ist eine andere Sache als das `aktenzeichen` daneben:
+das eine vergibt diese Anwendung fortlaufend je Saison, das andere DFBnet beim
+Anlegen des Falls. Aus dem zweiten entsteht die Mail an den Sportrichter.
+`anlagen` und `hinweis` sind ihre letzten beiden Zeilen ("Sonderbericht des
+Schiedsrichters", "Ich habe bisher keine Stellungnahmen angefordert.") -- leer
+laesst die Zeile weg, denn eine leere Anlagenzeile liest sich wie "ich habe es
+vergessen".
+
+### Nachsehen, was vorbereitet ist
+
+`tools/nachsehen.py` liest aus, was dastehen **wuerde** -- und tut nichts:
+
+```bash
+HOMEPI_BENUTZER=... HOMEPI_PASSWORT=... python tools/nachsehen.py mails
+HOMEPI_BENUTZER=... HOMEPI_PASSWORT=... python tools/nachsehen.py faelle
+HOMEPI_BENUTZER=... HOMEPI_PASSWORT=... python tools/nachsehen.py probe <vorgang-id>
+```
+
+`mails` zeigt jeden Vorgang mit seinem Mailentwurf, Wort fuer Wort. `faelle`
+zeigt, was im DFBnet-Formular staende, und was davon fehlt. Beide rufen nur
+`GET`-Routen auf. `probe` fordert eine Fallprobe an -- der einzige Aufruf, der
+etwas anlegt, und das ist ein Auftrag und kein Verfahren.
+
+Wozu, wenn es Tests gibt: ein Test prueft, ob etwas stimmt. Hier geht es
+darum, **nachzulesen**, was wirklich dasteht. Vor einem Schreiben an einen
+Verein oder ein Sportgericht ist das keine Bequemlichkeit -- und genau so kam
+am 26.10.2026 heraus, dass `GET /spiele/{id}` alle sechs Kopfdaten weglaesst
+und damit jede Fallanlage an einer Spielkennung gescheitert waere, die in der
+Datenbank steht.
 
 ### Der Schlüssel für die Zugangsdaten
 

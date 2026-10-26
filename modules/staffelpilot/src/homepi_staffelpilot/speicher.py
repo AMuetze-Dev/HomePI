@@ -1003,11 +1003,11 @@ async def offener_auftrag(sitzung: AsyncSession) -> Auftrag | None:
 
 
 async def auftrag_anfordern(
-    sitzung: AsyncSession, art: str, staffel_id: uuid.UUID | None
+    sitzung: AsyncSession, art: str, staffel_id: uuid.UUID | None, referenz: str = ""
 ) -> Auftrag:
     if staffel_id is not None:
         await staffel(sitzung, staffel_id)
-    neuer = Auftrag(art=art, staffel_id=staffel_id)
+    neuer = Auftrag(art=art, staffel_id=staffel_id, referenz=referenz)
     sitzung.add(neuer)
     await sitzung.flush()
     await sitzung.refresh(neuer)
@@ -1166,6 +1166,15 @@ async def uebertragung_abschliessen(
     gefunden.versuche += 1
     gefunden.letzter_fehler = daten.meldung if daten.zustand == "fehler" else ""
     gefunden.erledigt_am = dt.datetime.now(dt.UTC) if daten.zustand == "fertig" else None
+
+    # Die Nummer, die DFBnet dem Fall gegeben hat, gehoert an den Vorgang und
+    # nicht in eine Meldungszeile: aus ihr entsteht die Mail an den
+    # Sportrichter, und eine Zeile im Protokoll laesst sich nicht abschicken.
+    if daten.aktenzeichen and gefunden.aktion == "fallanlage":
+        ziel = await sitzung.get(Vorgang, uuid.UUID(gefunden.referenz))
+        if ziel is not None:
+            ziel.dfbnet_aktenzeichen = daten.aktenzeichen
+
     await sitzung.flush()
     return gefunden
 

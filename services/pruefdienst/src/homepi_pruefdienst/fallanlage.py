@@ -24,6 +24,19 @@ nie ueber einen direkten Verweis.
 wenn der Staffelleiter den Knopf dafuer drueckt -- nie nebenbei, weil jemand
 einen Spielbericht abgehakt hat -, und es meldet das Aktenzeichen zurueck, das
 DFBnet vergibt: aus dieser Nummer entsteht die Mail an den Sportrichter.
+
+**Zwei Abweichungen vom woertlichen Port**, beide am 26.10.2026 gegen die
+nachgebauten Seiten in `tests/seiten/sportgericht/` entstanden:
+
+* `start` -- *eine Berichtigung.* Das neue Fenster eines Kontexts ist leer.
+  Auf einer leeren Seite gibt es kein Menue, und `_navigieren` lief in einen
+  Zeitablauf, statt irgendwohin zu navigieren. Dass es in der alten Anwendung
+  genauso stand, heisst nur, dass es dort nie gelaufen ist. Die Sitzung liegt
+  am Kontext, also genuegt ein `goto` -- angemeldet ist das neue Fenster damit
+  schon.
+* `trockenlauf` -- *eine Zugabe.* Derselbe Weg bis vor das Speichern, und dann
+  nicht. Anders laesst sich am echten DFBnet nicht pruefen, ob die Selektoren
+  noch passen: ein Aktenzeichen ist dauerhaft, und Testakten loescht niemand.
 """
 
 from __future__ import annotations
@@ -107,8 +120,16 @@ class Ergebnis:
     aktenzeichen: str = ""
 
 
-def _navigieren(seite) -> None:
-    """Sportgerichtsbarkeit → Fall."""
+def _navigieren(seite, start: str) -> None:
+    """Erst zu DFBnet, dann Sportgerichtsbarkeit → Fall.
+
+    Das `goto` ist kein Umweg, sondern der Anfang: ein frisches Fenster steht
+    auf `about:blank`, und dort gibt es kein Menue. Die Anmeldung liegt am
+    Kontext -- die Seite kommt also angemeldet hoch.
+    """
+    if start:
+        seite.goto(start, wait_until="domcontentloaded", timeout=KLICK_MS)
+        seite.wait_for_timeout(LADEN_MS)
     seite.get_by_role("link", name=MENUE_SPORTGERICHTSBARKEIT).first.click(timeout=KLICK_MS)
     seite.wait_for_timeout(LADEN_MS)
     seite.get_by_role("link", name=MENUE_FALL, exact=True).first.click(timeout=KLICK_MS)
@@ -183,13 +204,23 @@ def aktenzeichen_lesen(seite) -> str:
     return treffer.group(0) if treffer else ""
 
 
-def fall_anlegen(context, anlage: Anlage) -> Ergebnis:
+def fall_anlegen(
+    context, anlage: Anlage, *, start: str = "", trockenlauf: bool = False
+) -> Ergebnis:
     """Create one Sportgerichtsfall and return its Aktenzeichen.
 
     This is the one function in StaffelPilot that opens proceedings. It is
     called from an explicit button, never as a side effect of ticking a match
     off, and it refuses an incomplete Anlage rather than creating a case with a
     gap in it.
+
+    `start` ist die Adresse, von der aus navigiert wird -- siehe
+    `_navigieren`. Leer heisst: die Seite steht schon irgendwo (so laufen die
+    Tests ohne Browser).
+
+    `trockenlauf` geht denselben Weg bis vor das Speichern und drueckt es
+    **nicht**. Damit laesst sich am echten DFBnet pruefen, ob diese Selektoren
+    noch passen, ohne ein Verfahren zu eroeffnen.
     """
     fehlt = anlage.fehlende_felder()
     if fehlt:
@@ -197,10 +228,21 @@ def fall_anlegen(context, anlage: Anlage) -> Ergebnis:
 
     seite = context.new_page()
     try:
-        _navigieren(seite)
+        _navigieren(seite, start)
         _suchen(seite, anlage)
         _formular_oeffnen(seite, anlage)
         _ausfuellen(seite, anlage)
+
+        if trockenlauf:
+            # Hier endet er, und zwar vor dem Klick. Alles davor ist derselbe
+            # Weg: Menue, Suche, Treffer, Formular, ausgefuellt.
+            logger.info(
+                "Trockenlauf fuer Spiel %s -- es wird nicht gespeichert", anlage.spielkennung
+            )
+            return Ergebnis(
+                True,
+                "Trockenlauf: Suche, Formular und Felder haben gepasst. Gespeichert wurde nichts.",
+            )
 
         logger.info("Creating Sportgerichtsfall for match %s", anlage.spielkennung)
         seite.locator(SPEICHERN).first.click(timeout=KLICK_MS)

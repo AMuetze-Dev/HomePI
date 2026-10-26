@@ -21,6 +21,7 @@ import {
   ladeVorgang,
   mahnungAdresse,
   merkeFallAn,
+  probeFallanlage,
   setzeVorgangZustand,
   verwerfeVorgang,
 } from "./api";
@@ -188,7 +189,13 @@ function VorgangKarte({
   zeile: VorgangZeile;
   offen: Vorgang | null;
   onOeffnen: () => void;
-  onSpeichern: (daten: { empfaenger: string; text: string }) => Promise<boolean>;
+  onSpeichern: (daten: {
+    empfaenger: string;
+    text: string;
+    dfbnet_aktenzeichen?: string;
+    anlagen?: string;
+    hinweis?: string;
+  }) => Promise<boolean>;
   onZustand: (zustand: VorgangZustand) => Promise<boolean>;
   onVerwerfen: () => Promise<boolean>;
 }) {
@@ -238,6 +245,13 @@ function VorgangInhalt({
   const [fallLaeuft, setFallLaeuft] = useState(false);
   const [fallVorgemerkt, setFallVorgemerkt] = useState(false);
   const [fallFehler, setFallFehler] = useState("");
+  const [probeLaeuft, setProbeLaeuft] = useState(false);
+  const [probeAngefordert, setProbeAngefordert] = useState(false);
+  // Die Angaben, aus denen die Mail an den Sportrichter entsteht. Eigener
+  // Zustand wie Empfänger und Text: gespeichert wird über den Knopf.
+  const [aktenzeichen, setAktenzeichen] = useState(offen.dfbnet_aktenzeichen);
+  const [anlagen, setAnlagen] = useState(offen.anlagen);
+  const [hinweis, setHinweis] = useState(offen.hinweis);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -303,6 +317,36 @@ function VorgangInhalt({
     }
   }
 
+  /**
+   * Die Anlage proben, ohne etwas anzulegen.
+   *
+   * **Ein Aktenzeichen ist dauerhaft.** Wer wissen will, ob die Anlage
+   * durchläuft, legt sonst ein Verfahren gegen eine benannte Person an — und
+   * löscht es nicht wieder. Die Probe geht denselben Weg bis vor das
+   * Speichern und sagt, ob alles gepasst hat.
+   */
+  async function fallProben() {
+    setProbeLaeuft(true);
+    setFallFehler("");
+    try {
+      await probeFallanlage(offen.id);
+      setProbeAngefordert(true);
+    } catch (f) {
+      setFallFehler(f instanceof Error ? f.message : "Unbekannter Fehler");
+    } finally {
+      setProbeLaeuft(false);
+    }
+  }
+
+  async function mailKopieren(was: string) {
+    try {
+      await navigator.clipboard.writeText(was);
+      setKopiert(true);
+    } catch {
+      /* Ohne Zwischenablage bleibt der Text markierbar - mehr geht nicht. */
+    }
+  }
+
   return (
     <div className={stil.befunde}>
       <p className={stil.vorgangHinweis}>
@@ -332,6 +376,64 @@ function VorgangInhalt({
         />
       </label>
 
+      {offen.art === "sportgericht" && (
+        <>
+          <Feld
+            beschriftung="Aktenzeichen aus DFBnet"
+            value={aktenzeichen}
+            placeholder="00042-26/27-SPG_DD"
+            hinweis={
+              aktenzeichen
+                ? "Aus ihm entsteht die Mail an den Sportrichter."
+                : "Trägt der Prüfdienst nach dem Anlegen ein. Stand es nicht auf der Seite: in DFBnet nachsehen und hier eintragen."
+            }
+            onChange={(e) => setAktenzeichen(e.target.value)}
+          />
+          <Feld
+            beschriftung="Anlagen"
+            value={anlagen}
+            placeholder="Sonderbericht des Schiedsrichters"
+            hinweis="Steht als eigene Zeile in der Mail. Leer lässt sie weg."
+            onChange={(e) => setAnlagen(e.target.value)}
+          />
+          <Feld
+            beschriftung="Hinweis"
+            value={hinweis}
+            placeholder="Ich habe bisher keine Stellungnahmen angefordert."
+            hinweis="Der Satz am Ende der Mail. Leer erlaubt."
+            onChange={(e) => setHinweis(e.target.value)}
+          />
+        </>
+      )}
+
+      {/* Zwei Schreiben, zwei Kästen. Oben steht der Antrag an das
+          Sportgericht -- der ist längst hinaus. Hier steht die Mail an den
+          Sportrichter, die sich auf das Aktenzeichen beruft. Eines das andere
+          überschreiben zu lassen, hieße eines davon zu verlieren. */}
+      {offen.art === "sportgericht" && offen.dfbnet_aktenzeichen && entwurf !== null && (
+        <div className={stil.mailkasten}>
+          <span className={stil.textfeldEtikett}>Mail an den Sportrichter</span>
+          <p className={stil.vorgangHinweis}>{entwurf.betreff}</p>
+          <pre className={stil.mailtext}>{entwurf.text}</pre>
+          <div className={stil.knoepfe}>
+            <Knopf
+              groesse="sm"
+              auspraegung="sekundaer"
+              onClick={() => void mailKopieren(entwurf.text)}
+            >
+              {kopiert ? "Kopiert" : "Mailtext kopieren"}
+            </Knopf>
+          </div>
+        </div>
+      )}
+
+      {probeAngefordert && (
+        <Hinweis ton="neutral">
+          Die Probe ist angefordert. Der Prüfdienst geht denselben Weg bis vor das
+          Speichern — angelegt wird nichts. Was dabei herauskam, steht unter „Prüflauf“.
+        </Hinweis>
+      )}
+
       {entwurf !== null && entwurf.fehlende_felder.length > 0 && (
         <Hinweis ton="warnung">
           Im Formular fehlen: {entwurf.fehlende_felder.join(", ")}. Bitte vor dem Absenden
@@ -353,7 +455,18 @@ function VorgangInhalt({
       )}
 
       <div className={stil.knoepfe}>
-        <Knopf groesse="sm" onClick={() => void onSpeichern({ empfaenger, text })}>
+        <Knopf
+          groesse="sm"
+          onClick={() =>
+            void onSpeichern({
+              empfaenger,
+              text,
+              ...(offen.art === "sportgericht"
+                ? { dfbnet_aktenzeichen: aktenzeichen, anlagen, hinweis }
+                : {}),
+            })
+          }
+        >
           Speichern
         </Knopf>
         <Knopf groesse="sm" auspraegung="sekundaer" onClick={() => void kopieren()}>
@@ -373,14 +486,26 @@ function VorgangInhalt({
           </KnopfVerweis>
         )}
         {offen.art === "sportgericht" && (
-          <Knopf
-            groesse="sm"
-            auspraegung="sekundaer"
-            onClick={() => void fallVormerken()}
-            disabled={fallLaeuft}
-          >
-            {fallVorgemerkt ? "Vorgemerkt" : "Fall in DFBnet vormerken"}
-          </Knopf>
+          <>
+            {/* Zuerst proben, dann anlegen: die Probe kostet nichts und
+                beantwortet genau die Frage, die man vorher hat. */}
+            <Knopf
+              groesse="sm"
+              auspraegung="sekundaer"
+              onClick={() => void fallProben()}
+              disabled={probeLaeuft}
+            >
+              {probeAngefordert ? "Probe läuft" : "Anlage proben"}
+            </Knopf>
+            <Knopf
+              groesse="sm"
+              auspraegung="sekundaer"
+              onClick={() => void fallVormerken()}
+              disabled={fallLaeuft}
+            >
+              {fallVorgemerkt ? "Vorgemerkt" : "Fall in DFBnet vormerken"}
+            </Knopf>
+          </>
         )}
         {NAECHSTE[offen.zustand].map((z) => (
           <Knopf

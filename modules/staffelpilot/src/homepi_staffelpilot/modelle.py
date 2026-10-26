@@ -265,6 +265,22 @@ class Vorgang(Base, ZeitstempelMixin):
     art: Mapped[str] = mapped_column(String(20), nullable=False)
     #: Fortlaufend je Saison, vergeben beim Anlegen. Steht auf jedem Schreiben.
     aktenzeichen: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
+    #: Die Nummer, die **DFBnet** dem Sportgerichtsfall gibt -- eine andere
+    #: Sache als das eigene Aktenzeichen oben.
+    #:
+    #: Leer, bis der Fall wirklich angelegt wurde. Aus ihr entsteht die Mail
+    #: an den Sportrichter; ohne sie gibt es keine Akte, auf die man sich
+    #: beruft. Nicht eindeutig gestellt: DFBnet vergibt sie, und zwei Zeilen
+    #: mit derselben Nummer waeren ein Fehler dort und kein Grund, hier eine
+    #: Eingabe abzuweisen.
+    dfbnet_aktenzeichen: Mapped[str] = mapped_column(String(60), nullable=False, default="")
+    #: Was der Mail an den Sportrichter beiliegt, in Worten: "Sonderbericht
+    #: des Schiedsrichters". Leer laesst die Zeile weg -- eine leere
+    #: Anlagenzeile liest sich wie "ich habe es vergessen".
+    anlagen: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    #: Der Satz am Ende, meistens "Ich habe bisher keine Stellungnahmen
+    #: angefordert." Leer erlaubt: das entscheidet der Staffelleiter je Fall.
+    hinweis: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     verein: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     betroffener: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     grund: Mapped[str] = mapped_column(String(500), nullable=False, default="")
@@ -386,6 +402,14 @@ class Auftrag(Base, ZeitstempelMixin):
     zustand: Mapped[str] = mapped_column(
         String(20), nullable=False, default="angefordert", index=True
     )
+    #: Worauf er sich bezieht, wenn es nicht die Staffel ist -- bei der
+    #: Fallprobe die Kennung des Vorgangs.
+    #:
+    #: Als Text und ohne Fremdschluessel: ein Auftrag ist ein Protokoll und
+    #: soll stehenbleiben, auch wenn der Vorgang spaeter verschwindet. Eine
+    #: Zeile "Probe zu einem Vorgang, den es nicht mehr gibt" ist eine
+    #: Auskunft; ein geloeschter Auftrag ist keine.
+    referenz: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     #: Was er gerade tut, in einem Satz. Ein Wartekreisel sagt nichts.
     schritt: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     fortschritt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

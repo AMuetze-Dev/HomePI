@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fall — Erstellung — nachgebaut</title>
+  </head>
+  <body>
+    <h1>Erstellung</h1>
+    <form action="gespeichert.html" method="get">
+      <!-- Was DFBnet selbst einsetzt. Gesperrt, und genau daran erkennt der
+           Lauf, dass er die richtige Akte offen hat. -->
+      <label>
+        Spielkennung
+        <input type="text" name="_kontext.fall.spielKennung" value="" readonly />
+      </label>
+      <label>
+        Anstoß
+        <input type="text" name="_kontext.fall.spielAnstoss" value="05.09.2026 15:00" readonly />
+      </label>
+
+      <label>
+        Vorgangsdatum
+        <input type="text" name="kontext.currentVorgang.datum" value="26.10.2026" />
+      </label>
+      <label>
+        Tatbestand
+        <textarea name="kontext.currentVorgang.tatbestand"></textarea>
+      </label>
+      <label>
+        Datum der Anzeige
+        <input type="text" name="kontext.fall.datumAnzeige" value="26.10.2026" />
+      </label>
+      <label>
+        Anzeige von
+        <input type="text" name="kontext.fall.anzeigeVon" value="Staffelleiter" />
+      </label>
+      <label>
+        Sitzungsdatum
+        <input type="text" name="kontext.fall.sitzung.datum" value="" />
+      </label>
+      <label>
+        Gericht
+        <select name="kontext.fall.sitzung.gericht">
+          <option value="">Bitte wählen</option>
+          <option value="42">Sportgericht Stadtverband Fußball Dresden e.V.</option>
+          <option value="43">Kreissportgericht Meißen</option>
+        </select>
+      </label>
+      <label>
+        Besetzung
+        <textarea name="kontext.fall.sitzung.besetzungFreitext"></textarea>
+      </label>
+
+      <input type="submit" name="SAVE_ERSTELLUNG" value="Speichern" />
+      <input type="submit" name="CANCEL" value="Abbrechen" />
+    </form>
+    <script src="fixtur.js"></script>
+  </body>
+</html>

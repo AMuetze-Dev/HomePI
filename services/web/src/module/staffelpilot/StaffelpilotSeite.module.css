@@ -931,6 +931,34 @@
   font-size: 0.95em;
 }
 
+/* ── Die Mail an den Sportrichter ────────────────────────────────────── */
+/*
+ * Ein eigener Kasten, weil es ein zweites Schreiben ist: oben steht der
+ * Antrag an das Sportgericht, hier die Mail, die sich auf das Aktenzeichen
+ * beruft. Beide in ein Feld zu legen hiesse, eines davon zu verlieren.
+ */
+.mailkasten {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  margin-top: var(--raum-4);
+  padding: var(--raum-4);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+/* Vorformatiert, weil der Wortlaut zaehlt: Absaetze und Kerndaten stehen so,
+   wie sie in die Mail gehoeren. Umbrechen ja, umsortieren nein. */
+.mailtext {
+  margin: 0;
+  font-family: var(--schrift);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* ── Die Farben des Quelltextes ──────────────────────────────────────── */
 /*
  * Entsaettigt und aus den vorhandenen Signalfarben, nicht aus einem fremden

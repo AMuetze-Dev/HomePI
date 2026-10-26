@@ -265,10 +265,24 @@ class Gateway:
         return self._json("POST", "/staffelpilot/uebertragungen/naechste")  # type: ignore[no-any-return]
 
     def uebertragung_abschliessen(
-        self, uebertragung_id: str, zustand: str, meldung: str = ""
+        self,
+        uebertragung_id: str,
+        zustand: str,
+        meldung: str = "",
+        aktenzeichen: str = "",
     ) -> None:
+        """Das Ergebnis einer Zeile melden -- bei der Fallanlage samt Nummer.
+
+        Das Aktenzeichen gehoert an den Vorgang und nicht in die Meldung: aus
+        ihm entsteht die Mail an den Sportrichter, und eine Protokollzeile
+        laesst sich nicht abschicken.
+        """
         self._json(
             "POST",
             f"/staffelpilot/uebertragungen/{uebertragung_id}/abschluss",
-            json={"zustand": zustand, "meldung": meldung},
+            json={
+                "zustand": zustand,
+                "meldung": meldung,
+                "aktenzeichen": aktenzeichen,
+            },
         )

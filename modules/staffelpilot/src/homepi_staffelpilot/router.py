@@ -17,7 +17,7 @@ from fastapi import APIRouter, Query, Request, Response, status
 from homepi_core.auth import Rolle, erfordert
 from homepi_core.deps import DbSitzung
 
-from . import mahnung, speicher, texte
+from . import mahnung, speicher, sportrichtermail, texte
 from .dienst import (
     BefundSicht,
     Einstellungen,
@@ -146,8 +146,17 @@ def _mannschaft(m: Mannschaft) -> MannschaftAusgabe:
     )
 
 
-def _vorgang(v: Vorgang) -> VorgangAusgabe:
-    return VorgangAusgabe.model_validate(v)
+def _vorgang(v: Vorgang, spiel_id: uuid.UUID | None = None) -> VorgangAusgabe:
+    """Die Ausgabe eines Vorgangs, mit dem Spiel dahinter, wenn es da ist.
+
+    `spiel_id` kommt von aussen und nicht aus einer nachgeladenen Beziehung:
+    die Route hat es meistens schon, und ein zweiter Abruf je Vorgang waere in
+    einer Liste ein Abruf je Zeile.
+    """
+    ausgabe = VorgangAusgabe.model_validate(v)
+    if spiel_id is not None:
+        ausgabe = ausgabe.model_copy(update={"spiel_id": spiel_id})
+    return ausgabe
 
 
 # ── Warteschlange und Kachel ──────────────────────────────────────────────
@@ -319,19 +328,22 @@ async def spiel(spiel_id: uuid.UUID, sitzung: DbSitzung) -> SpielAusgabe:
     # in einem Spiel teilen sich beides.
     nach_schluessel = {str(b.id): b for b in bericht.befunde}
     zu_vorgang = await speicher.vorgaenge_zu_befunden(sitzung, [b.id for b in bericht.befunde])
-    return SpielAusgabe(
-        id=bericht.id,
-        staffel_id=bericht.staffel_id,
-        dfbnet_id=bericht.dfbnet_id,
-        datum=bericht.datum,
-        heim=bericht.heim,
-        gast=bericht.gast,
-        ergebnis=bericht.ergebnis,
-        abgehakt=bericht.abgehakt,
-        abgehakt_am=bericht.abgehakt_am,
-        befunde=[
-            _befund(b := nach_schluessel[s.schluessel], zu_vorgang.get(b.id)) for s in geordnet
-        ],
+    # Aus dem Datensatz und nicht Feld fuer Feld: aufgezaehlt fehlten hier alle
+    # sechs Kopfdaten (Spielnummer, Anstoss, Spielort, Spieltag,
+    # Mannschaftsart, Wettbewerb). In der Datenbank standen sie, ueber die
+    # Schnittstelle kamen sie leer -- und weil die Spielnummer der
+    # Suchschluessel des DFBnet-Formulars ist, waere jede Fallanlage an "Es
+    # fehlt noch: Spielkennung" gescheitert, obwohl nichts fehlte. Gefunden am
+    # 26.10.2026 mit `tools/nachsehen.py faelle`.
+    #
+    # Nur die Befunde werden gesetzt: ihre Reihenfolge kommt aus der
+    # Fachlichkeit und nicht aus der Tabelle.
+    return SpielAusgabe.model_validate(bericht).model_copy(
+        update={
+            "befunde": [
+                _befund(b := nach_schluessel[s.schluessel], zu_vorgang.get(b.id)) for s in geordnet
+            ]
+        }
     )
 
 
@@ -506,7 +518,8 @@ async def vorgaenge(
 
 @router.get("/vorgaenge/{vorgang_id}", summary="Ein Vorgang mit seinem Text")
 async def vorgang(vorgang_id: uuid.UUID, sitzung: DbSitzung) -> VorgangAusgabe:
-    return _vorgang(await speicher.vorgang(sitzung, vorgang_id))
+    gefunden, _, spiel, _ = await speicher.vorgang_mit_spiel(sitzung, vorgang_id)
+    return _vorgang(gefunden, spiel.id)
 
 
 def _formular(
@@ -566,6 +579,42 @@ async def vorgang_fallanlage(vorgang_id: uuid.UUID, sitzung: DbSitzung) -> Ueber
     )
 
 
+@router.post(
+    "/vorgaenge/{vorgang_id}/fallprobe",
+    summary="Die Fallanlage proben, ohne etwas anzulegen",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[erfordert("staffelpilot", Rolle.VERWALTER)],
+)
+async def vorgang_fallprobe(vorgang_id: uuid.UUID, sitzung: DbSitzung) -> AuftragAusgabe:
+    """Denselben Weg gehen und **nicht** speichern.
+
+    **Ein Aktenzeichen ist dauerhaft.** Wer die Fallanlage ausprobieren will,
+    legt sonst ein Verfahren gegen eine benannte Person an — und löscht es
+    nicht wieder. Die Probe geht bis vor das Speichern: Menü, Suche, Treffer,
+    Formular, Felder. Passt alles, sagt sie das; passt etwas nicht, sagt sie
+    genau was.
+
+    Dieselben Pflichtangaben wie beim Anlegen. Eine Probe, die mehr durchlässt
+    als die Sache selbst, prüft die falsche Sache.
+
+    Ein **Auftrag** und keine Übertragung: die Übertragung ist die Liste
+    dessen, was wirklich hinaus soll, und eine Probe gehört nicht hinein.
+    """
+    vorgang, befund, spiel, staffel = await speicher.vorgang_mit_spiel(sitzung, vorgang_id)
+    fall_pruefen(
+        vorgang.art,
+        staffel.sportgericht,
+        spiel.spielnummer,
+        vorgang.grund or befund.text,
+    )
+    darf_angefordert_werden(1 if await speicher.offener_auftrag(sitzung) else 0)
+    return AuftragAusgabe.model_validate(
+        await speicher.auftrag_anfordern(
+            sitzung, art="fallprobe", staffel_id=None, referenz=str(vorgang_id)
+        )
+    )
+
+
 @router.get(
     "/vorgaenge/{vorgang_id}/mahnung.pdf",
     summary="Das ausgefüllte Mahnungsformular",
@@ -611,19 +660,55 @@ async def vorgang_mail(vorgang_id: uuid.UUID, sitzung: DbSitzung) -> MailEntwurf
     vorgang, befund, spiel, staffel = await speicher.vorgang_mit_spiel(sitzung, vorgang_id)
     werte = await speicher.einstellungen(sitzung)
 
-    fehlt: list[str] = []
     if vorgang.art == "mahnung":
-        fehlt = _formular(vorgang, befund, spiel, staffel, werte.staffelleiter).fehlende_felder()
+        return MailEntwurf(
+            empfaenger=vorgang.empfaenger,
+            betreff=vorgang.betreff
+            or betreff_fuer(vorgang.aktenzeichen, spiel.heim, spiel.gast, spiel.datum),
+            text=vorgang.text,
+            anhang=f"/staffelpilot/vorgaenge/{vorgang_id}/mahnung.pdf",
+            fehlende_felder=_formular(
+                vorgang, befund, spiel, staffel, werte.staffelleiter
+            ).fehlende_felder(),
+        )
+
+    # Ein Sportgerichtsfall. Zwei Schreiben, je nachdem, ob die Akte schon
+    # existiert:
+    #
+    #   * **Vorher** der Antrag an das Sportgericht -- der Text des Vorgangs,
+    #     aus der Vorlage entstanden.
+    #   * **Nachher** die Mail an den Sportrichter, die sich auf das
+    #     Aktenzeichen aus DFBnet beruft. Vorher gibt es keines, und eines zu
+    #     erfinden hiesse, eine Akte zu nennen, die es nicht gibt.
+    #
+    # Was in beiden Faellen fehlt, steht in `fehlende_felder` -- ein Schreiben
+    # mit Luecke ist besser als eines mit erfundener Angabe, aber nur, wenn
+    # die Luecke auffaellt.
+    fall = sportrichtermail.Fall(
+        aktenzeichen=vorgang.dfbnet_aktenzeichen,
+        verein=vorgang.verein,
+        angeklagter=vorgang.betroffener,
+        grund=vorgang.grund,
+        anlagen=vorgang.anlagen,
+        hinweis=vorgang.hinweis,
+    )
+    if not vorgang.dfbnet_aktenzeichen.strip():
+        return MailEntwurf(
+            empfaenger=vorgang.empfaenger,
+            betreff=vorgang.betreff
+            or betreff_fuer(vorgang.aktenzeichen, spiel.heim, spiel.gast, spiel.datum),
+            text=vorgang.text,
+            anhang="",
+            fehlende_felder=fall.fehlende_felder(),
+        )
 
     return MailEntwurf(
         empfaenger=vorgang.empfaenger,
-        betreff=vorgang.betreff
-        or betreff_fuer(vorgang.aktenzeichen, spiel.heim, spiel.gast, spiel.datum),
-        text=vorgang.text,
-        anhang=f"/staffelpilot/vorgaenge/{vorgang_id}/mahnung.pdf"
-        if vorgang.art == "mahnung"
-        else "",
-        fehlende_felder=fehlt,
+        betreff=sportrichtermail.betreff(fall),
+        text=sportrichtermail.text(fall),
+        # Der Sonderbericht des Schiedsrichters liegt in DFBnet, nicht hier.
+        anhang="",
+        fehlende_felder=fall.fehlende_felder(),
     )
 
 

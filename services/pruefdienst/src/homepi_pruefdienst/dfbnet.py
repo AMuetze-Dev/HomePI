@@ -510,7 +510,9 @@ class DfbnetLeser:
             except Exception:
                 logger.exception("Das Berichtsfenster liess sich nicht schliessen")
 
-    def fall_anlegen(self, anlage: fallanlage.Anlage) -> fallanlage.Ergebnis:
+    def fall_anlegen(
+        self, anlage: fallanlage.Anlage, *, trockenlauf: bool = False
+    ) -> fallanlage.Ergebnis:
         """Einen Sportgerichtsfall in DFBnet anlegen.
 
         **Die folgenreichste Handlung dieses Dienstes** -- sie eroeffnet ein
@@ -524,7 +526,15 @@ class DfbnetLeser:
         """
         if self._seite is None:
             return fallanlage.Ergebnis(False, "Es ist keine DFBnet-Sitzung offen")
-        return fallanlage.fall_anlegen(self._seite.context, anlage)
+        # Die Adresse der laufenden Seite als Start: ein frisches Fenster steht
+        # auf about:blank, und dort gibt es kein Menue. Die Anmeldung liegt am
+        # Kontext, das neue Fenster kommt also angemeldet hoch.
+        return fallanlage.fall_anlegen(
+            self._seite.context,
+            anlage,
+            start=self._seite.url,
+            trockenlauf=trockenlauf,
+        )
 
     def _verlauf(self, popup: Any, kennung: str) -> str:
         """Der Reiter "Spielverlauf".

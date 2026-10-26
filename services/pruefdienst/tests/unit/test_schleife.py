@@ -94,6 +94,9 @@ class FalschesGateway:
         self.vorgaenge_nach_id: dict[str, dict[str, Any]] | None = {
             "v1": {
                 "id": "v1",
+                # Das Spiel steht am Vorgang: Spielnummer und Staffel haengen
+                # daran, und auf den Vorgang kopiert waeren sie zweimal da.
+                "spiel_id": "sp1",
                 "art": "sportgericht",
                 "grund": "Feldverweis auf Dauer wegen Tätlichkeit",
                 "text": "Der ganze Antrag, viel zu lang für das Formular.",
@@ -112,6 +115,9 @@ class FalschesGateway:
         self.vorlagen_schon_geschehen = True
         self.uebernommen: list[str] = []
         self.gemeldet: list[tuple[str, str, str]] = []
+        # Was der Dienst als Aktenzeichen zurueckgemeldet hat, je Abschluss
+        # eines. Leer heisst: DFBnet hat keines gezeigt.
+        self.aktenzeichen: list[str] = []
         self._warteschlange = [
             {"id": f"u{i + 1}", "aktion": "prueferfreigabe", "spiel_id": "sp1", "referenz": "sp1"}
             for i in range(offen)
@@ -207,9 +213,10 @@ class FalschesGateway:
         return naechste
 
     def uebertragung_abschliessen(
-        self, uebertragung_id: str, zustand: str, meldung: str = ""
+        self, uebertragung_id: str, zustand: str, meldung: str = "", aktenzeichen: str = ""
     ) -> None:
         self.gemeldet.append((uebertragung_id, zustand, meldung))
+        self.aktenzeichen.append(aktenzeichen)
 
     # Hilfen fuer die Tests:
     @property
@@ -380,6 +387,59 @@ class TestAnmeldeprobe:
         _, zustand, meldung = gateway.abschluesse[0]
         assert zustand == "gescheitert"
         assert "abgelehnt" in meldung
+
+
+class TestFallprobe:
+    """Denselben Weg gehen und nicht speichern.
+
+    Ein Aktenzeichen ist dauerhaft: wer die Fallanlage ausprobieren will, legt
+    sonst ein Verfahren gegen eine benannte Person an. Die Probe geht bis vor
+    das Speichern und sagt, ob alles gepasst hat.
+    """
+
+    def test_sie_fuellt_dieselben_angaben(self) -> None:
+        """Eine Probe mit anderen Angaben pruefte eine andere Sache."""
+        gateway = FalschesGateway({"id": "a1", "art": "fallprobe", "referenz": "v1"})
+        leser = DemoLeser()
+
+        lauf(gateway, leser).runde()
+
+        assert len(leser.faelle) == 1
+        anlage = leser.faelle[0]
+        assert anlage.spielkennung == "633203004"
+        assert anlage.gericht.startswith("Sportgericht")
+        assert anlage.tatbestand == "Feldverweis auf Dauer wegen Tätlichkeit"
+
+    def test_sie_legt_nichts_an(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "fallprobe", "referenz": "v1"})
+        leser = DemoLeser()
+
+        lauf(gateway, leser).runde()
+
+        assert leser.trockenlaeufe == [True]
+        assert gateway.abschluesse[0][1] == "fertig"
+        assert "Trockenlauf" in gateway.abschluesse[0][2]
+
+    def test_ohne_vorgang_wird_nichts_geprobt(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "fallprobe", "referenz": ""})
+        leser = DemoLeser()
+
+        lauf(gateway, leser).runde()
+
+        assert leser.faelle == []
+        assert gateway.abschluesse[0][1] == "gescheitert"
+
+    def test_sie_braucht_keine_freigabe_der_uebertragung(self) -> None:
+        """Die beiden Schalter huetten das Eintragen. Eine Probe traegt nichts
+        ein -- sie an ihnen haengen zu lassen, hiesse: wer sie am dringendsten
+        braucht, kommt nicht an sie heran."""
+        gateway = FalschesGateway({"id": "a1", "art": "fallprobe", "referenz": "v1"}, pausiert=True)
+        leser = DemoLeser()
+
+        lauf(gateway, leser, darf_schreiben=False).runde()
+
+        assert leser.trockenlaeufe == [True]
+        assert gateway.abschluesse[0][1] == "fertig"
 
 
 class TestVorlagen:
@@ -1136,6 +1196,46 @@ class TestFallanlage:
 
         assert gateway.gemeldet[0][1] == "fertig"
         assert len(leser.faelle) == 1
+
+    def test_das_aktenzeichen_geht_an_das_artefakt_zurueck(self) -> None:
+        """Aus dieser Nummer entsteht die Mail an den Sportrichter.
+
+        Bis sie am Vorgang steht, endete sie in einer Meldungszeile: der Fall
+        war angelegt, aber das Schreiben dazu liess sich nicht vorbereiten,
+        weil niemand mehr wusste, wie die Akte heisst.
+        """
+
+        class MitNummer(DemoLeser):
+            def fall_anlegen(self, anlage: Any) -> Any:
+                self.faelle.append(anlage)
+                return fallanlage.Ergebnis(
+                    True, "Fall angelegt, Aktenzeichen 00042-26/27-SPG_DD.", "00042-26/27-SPG_DD"
+                )
+
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        self._zeile(gateway)
+
+        lauf(gateway, MitNummer(), darf_schreiben=True).runde()
+
+        assert gateway.aktenzeichen == ["00042-26/27-SPG_DD"]
+
+    def test_ohne_nummer_wird_keine_gemeldet(self) -> None:
+        """DFBnet zeigt sie nicht immer. Dann steht dort nichts -- und nicht
+        etwas Erfundenes."""
+        gateway = FalschesGateway(pausiert=False, offen=1)
+        self._zeile(gateway)
+
+        lauf(gateway, DemoLeser(), darf_schreiben=True).runde()
+
+        assert gateway.aktenzeichen == [""]
+
+    def test_eine_freigabe_meldet_keines(self) -> None:
+        """Sie traegt einen Haken, und dafuer vergibt DFBnet keine Nummer."""
+        gateway = FalschesGateway(pausiert=False, offen=1)
+
+        lauf(gateway, DemoLeser(), darf_schreiben=True).runde()
+
+        assert gateway.aktenzeichen == [""]
 
     def test_die_angaben_kommen_aus_vorgang_staffel_und_spiel(self) -> None:
         """Jede aus der Quelle, in der sie lebt -- nicht auf die Zeile kopiert.

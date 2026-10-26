@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fall — Suche — nachgebaut</title>
+  </head>
+  <body>
+    <h1>Fall</h1>
+    <!-- Saison und Spielkennung reichen; das sagt DFBnet auf der Seite
+         selbst. Jede weitere Angabe zoege das Mannschaftsart-Problem des
+         Prueflaufs hier mit herein. -->
+    <form action="treffer.html" method="get">
+      <label>
+        Saison
+        <select name="kontext.suche.saisonId">
+          <option value="">Bitte wählen</option>
+          <option value="2526">25/26</option>
+          <option value="2627" selected>26/27</option>
+        </select>
+      </label>
+      <label>
+        Spielkennung
+        <input type="text" name="kontext.suche.spielkennung" value="" />
+      </label>
+      <label>
+        Gericht
+        <select name="kontext.suche.gerichtId">
+          <option value="">Bitte wählen</option>
+          <option value="42">Sportgericht Stadtverband Fußball Dresden e.V.</option>
+          <option value="43">Kreissportgericht Meißen</option>
+        </select>
+      </label>
+      <input type="submit" name="SEARCH" value="Suchen" />
+    </form>
+    <script src="fixtur.js"></script>
+  </body>
+</html>

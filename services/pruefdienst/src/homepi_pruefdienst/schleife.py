@@ -65,6 +65,8 @@ class Prueflauf:
         try:
             if art == "anmeldeprobe":
                 self._anmeldeprobe(kennung)
+            elif art == "fallprobe":
+                self._fallprobe(kennung, str(auftrag.get("referenz") or ""))
             elif art == "staffeln":
                 self._staffeln_holen(kennung)
             elif art == "initialisierung":
@@ -392,6 +394,56 @@ class Prueflauf:
         self._zusehen(kennung, "Angemeldet")
         self._gateway.abschluss(kennung, "fertig", "Die Anmeldung bei DFBnet hat geklappt")
 
+    def _fallprobe(self, kennung: str, vorgang_id: str) -> None:
+        """Die Fallanlage proben: denselben Weg, und dann nicht speichern.
+
+        **Ein Aktenzeichen ist dauerhaft.** Wer die Anlage ausprobieren will,
+        legt sonst ein Verfahren gegen eine benannte Person an und loescht es
+        nicht wieder. Deshalb geht dieser Auftrag bis vor das Speichern:
+        Menue, Suche, Treffer, Formular, Felder.
+
+        **Ohne die beiden Schalter.** Die huetten das Eintragen in DFBnet --
+        eine Probe traegt nichts ein. Sie an ihnen haengen zu lassen hiesse:
+        wer sie am dringendsten braucht, kommt nicht an sie heran.
+        """
+        if not vorgang_id:
+            raise RuntimeError("Zu dieser Probe steht kein Vorgang")
+
+        self._anmelden(kennung)
+        self._gateway.fortschritt(
+            kennung,
+            schritt="Suche den Fall",
+            fortschritt=40,
+            zeile="Es wird nichts angelegt — nur nachgesehen, ob alles passt",
+        )
+
+        anlage = self._anlage_fuer(vorgang_id)
+        ergebnis = self._leser.fall_anlegen(anlage, trockenlauf=True)
+        self._zusehen(kennung, "Formular geprüft")
+        if not ergebnis.erfolg:
+            raise RuntimeError(ergebnis.meldung)
+        self._gateway.abschluss(kennung, "fertig", ergebnis.meldung)
+
+    def _anlage_fuer(self, vorgang_id: str) -> fallanlage.Anlage:
+        """Die Angaben eines Falls, jede aus der Quelle, in der sie lebt.
+
+        Gemeinsam fuer Probe und Anlage: zwei Stellen, die denselben Fall
+        zusammensetzen, setzen ihn irgendwann verschieden zusammen -- und dann
+        prueft die Probe etwas anderes als das, was spaeter hinausgeht.
+        """
+        vorgang = self._gateway.vorgang(vorgang_id)
+        spiel = self._gateway.spiel(str(vorgang.get("spiel_id") or ""))
+        staffeln = {str(s["id"]): s for s in self._gateway.staffeln()}
+        staffel = staffeln.get(str(spiel.get("staffel_id")))
+        if staffel is None:
+            raise RuntimeError("Zu diesem Spiel gibt es keine Staffel mehr")
+        return fallanlage.Anlage(
+            spielkennung=str(spiel.get("spielnummer") or ""),
+            saison=str(staffel.get("saison") or ""),
+            gericht=str(staffel.get("sportgericht") or ""),
+            tatbestand=str(vorgang.get("grund") or ""),
+        )
+
     def _staffeln_holen(self, kennung: str) -> None:
         """Die eigenen Staffeln aus DFBnet uebernehmen.
 
@@ -687,16 +739,24 @@ class Prueflauf:
 
         gemacht = 0
         while (zeile := self._gateway.uebertragung_uebernehmen()) is not None:
-            geklappt, meldung = self._eintragen(zeile)
+            geklappt, meldung, aktenzeichen = self._eintragen(zeile)
             self._gateway.uebertragung_abschliessen(
-                str(zeile["id"]), "fertig" if geklappt else "fehler", meldung[:900]
+                str(zeile["id"]),
+                "fertig" if geklappt else "fehler",
+                meldung[:900],
+                aktenzeichen,
             )
             gemacht += 1
         logger.info("%d Übertragung(en) abgearbeitet", gemacht)
         return gemacht > 0
 
-    def _eintragen(self, zeile: dict[str, Any]) -> tuple[bool, str]:
+    def _eintragen(self, zeile: dict[str, Any]) -> tuple[bool, str, str]:
         """Eine vorgemerkte Handlung in DFBnet ausführen.
+
+        Gibt zurück: ob es geklappt hat, was zu melden ist, und -- nur bei der
+        Fallanlage -- das Aktenzeichen, das DFBnet vergeben hat. Es gehört an
+        den Vorgang und nicht in die Meldung: aus ihm entsteht die Mail an den
+        Sportrichter, und eine Protokollzeile lässt sich nicht abschicken.
 
         **Hier verlässt die Software das eigene Netz.** Dass sie es darf, hat
         `_uebertragungen` schon geprüft: beide Schalter an.
@@ -707,7 +767,7 @@ class Prueflauf:
         """
         aktion = str(zeile.get("aktion") or "")
         if isinstance(self._leser, BeispielLeser):
-            return True, "Simuliert — es war kein Browser bei DFBnet"
+            return True, "Simuliert — es war kein Browser bei DFBnet", ""
 
         if aktion == "fallanlage":
             return self._fall_anlegen(zeile)
@@ -715,24 +775,26 @@ class Prueflauf:
         if aktion != "prueferfreigabe":
             # Eine Zeile auf "fertig" zu setzen, ohne dass etwas passiert ist,
             # wäre die schlimmste aller Auskünfte.
-            return False, f"Die Aktion {aktion!r} ist noch nicht portiert"
+            return False, f"Die Aktion {aktion!r} ist noch nicht portiert", ""
 
         spiel_id = str(zeile.get("spiel_id") or zeile.get("referenz") or "")
         if not spiel_id:
-            return False, "Zu dieser Übertragung steht kein Spiel"
+            return False, "Zu dieser Übertragung steht kein Spiel", ""
 
         try:
             spiel = self._gateway.spiel(spiel_id)
         except Exception as fehler:
             logger.exception("Spiel %s liess sich nicht lesen", spiel_id)
-            return False, f"Das Spiel liess sich nicht lesen: {fehler}"
+            return False, f"Das Spiel liess sich nicht lesen: {fehler}", ""
 
         if not self._trefferliste_fuer(spiel):
-            return False, "Der Spielbericht steht nicht in der Trefferliste von DFBnet"
+            return False, "Der Spielbericht steht nicht in der Trefferliste von DFBnet", ""
 
-        return self._leser.freigeben(str(spiel["dfbnet_id"]))
+        # Die Freigabe vergibt kein Aktenzeichen -- sie traegt nur einen
+        # Haken, und dafuer gibt es keine Nummer.
+        return (*self._leser.freigeben(str(spiel["dfbnet_id"])), "")
 
-    def _fall_anlegen(self, zeile: dict[str, Any]) -> tuple[bool, str]:
+    def _fall_anlegen(self, zeile: dict[str, Any]) -> tuple[bool, str, str]:
         """Einen Sportgerichtsfall in DFBnet anlegen.
 
         **Die folgenreichste Handlung dieses Dienstes.** Sie eröffnet ein
@@ -747,42 +809,33 @@ class Prueflauf:
         vorgang_id = str(zeile.get("referenz") or "")
         spiel_id = str(zeile.get("spiel_id") or "")
         if not vorgang_id or not spiel_id:
-            return False, "Zu dieser Übertragung fehlt der Vorgang oder das Spiel"
+            return False, "Zu dieser Übertragung fehlt der Vorgang oder das Spiel", ""
 
         try:
-            vorgang = self._gateway.vorgang(vorgang_id)
-            spiel = self._gateway.spiel(spiel_id)
-            staffeln = {str(s["id"]): s for s in self._gateway.staffeln()}
+            # Dieselbe Zusammenstellung wie bei der Probe. Zwei Stellen, die
+            # denselben Fall zusammensetzen, setzen ihn irgendwann verschieden
+            # zusammen -- und dann prueft die Probe etwas anderes als das, was
+            # hinausgeht.
+            anlage = self._anlage_fuer(vorgang_id)
         except Exception as fehler:
             logger.exception("Die Angaben zum Fall liessen sich nicht lesen")
-            return False, f"Die Angaben zum Fall liessen sich nicht lesen: {fehler}"
-
-        staffel = staffeln.get(str(spiel.get("staffel_id")))
-        if staffel is None:
-            return False, "Zu diesem Spiel gibt es keine Staffel mehr"
-
-        anlage = fallanlage.Anlage(
-            spielkennung=str(spiel.get("spielnummer") or ""),
-            saison=str(staffel.get("saison") or ""),
-            gericht=str(staffel.get("sportgericht") or ""),
-            tatbestand=str(vorgang.get("grund") or ""),
-        )
+            return False, f"Die Angaben zum Fall liessen sich nicht lesen: {fehler}", ""
         fehlt = anlage.fehlende_felder()
         if fehlt:
             # Dieselbe Liste wie im Artefakt. Dass sie hier erneut geprüft
             # wird, ist Absicht: die Angaben können sich seit dem Vormerken
             # geändert haben, und ein Browser soll gar nicht erst starten.
-            return False, "Es fehlt noch: " + ", ".join(fehlt) + "."
+            return False, "Es fehlt noch: " + ", ".join(fehlt) + ".", ""
 
         try:
             ergebnis = self._leser.fall_anlegen(anlage)
         except fallanlage.FallanlageFehler as fehler:
             logger.warning("Fallanlage gescheitert: %s", fehler)
-            return False, str(fehler)
+            return False, str(fehler), ""
         except Exception as fehler:  # pragma: no cover - unerwartet
             logger.exception("Fallanlage gescheitert")
-            return False, f"Die Fallanlage ist gescheitert: {fehler}"
-        return ergebnis.erfolg, ergebnis.meldung
+            return False, f"Die Fallanlage ist gescheitert: {fehler}", ""
+        return ergebnis.erfolg, ergebnis.meldung, ergebnis.aktenzeichen
 
     def _trefferliste_fuer(self, spiel: dict[str, Any]) -> bool:
         """DFBnet auf den Spieltag dieses Berichts stellen.

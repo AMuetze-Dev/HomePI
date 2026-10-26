@@ -43,8 +43,15 @@ class Leser(Protocol):
         """Die Prueferfreigabe erteilen. (geklappt, was zu sehen war)"""
         ...
 
-    def fall_anlegen(self, anlage: fallanlage.Anlage) -> fallanlage.Ergebnis:
-        """Einen Sportgerichtsfall anlegen und sein Aktenzeichen melden."""
+    def fall_anlegen(
+        self, anlage: fallanlage.Anlage, *, trockenlauf: bool = False
+    ) -> fallanlage.Ergebnis:
+        """Einen Sportgerichtsfall anlegen und sein Aktenzeichen melden.
+
+        `trockenlauf` geht denselben Weg bis vor das Speichern und legt
+        **nichts** an. Ein Aktenzeichen ist dauerhaft -- anders laesst sich die
+        Anlage nicht ausprobieren.
+        """
         ...
 
     def eigene_staffeln(self, saison: str, verband: str = "") -> list[dict[str, object]]:
@@ -81,6 +88,9 @@ class DemoLeser:
         self.sichtbar = False
         self.freigegeben: list[str] = []
         self.faelle: list[fallanlage.Anlage] = []
+        #: Ob der jeweilige Fall ein Trockenlauf war. Dieselbe Laenge wie
+        #: `faelle` -- ein Test soll beides nebeneinander lesen koennen.
+        self.trockenlaeufe: list[bool] = []
         self._eigene_staffeln: list[dict[str, object]] = []
 
     def anmelden(self, benutzer: str, passwort: str) -> None:
@@ -129,7 +139,9 @@ class DemoLeser:
         self.freigegeben.append(kennung)
         return True, "Simuliert — es war kein Browser bei DFBnet"
 
-    def fall_anlegen(self, anlage: fallanlage.Anlage) -> fallanlage.Ergebnis:
+    def fall_anlegen(
+        self, anlage: fallanlage.Anlage, *, trockenlauf: bool = False
+    ) -> fallanlage.Ergebnis:
         """Der Demo-Leser eroeffnet kein Verfahren -- und sagt das.
 
         Auch hier kein stiller Erfolg, und erst recht keiner mit erfundenem
@@ -137,6 +149,11 @@ class DemoLeser:
         Sportrichter.
         """
         self.faelle.append(anlage)
+        self.trockenlaeufe.append(trockenlauf)
+        if trockenlauf:
+            return fallanlage.Ergebnis(
+                True, "Trockenlauf simuliert — es war kein Browser bei DFBnet"
+            )
         return fallanlage.Ergebnis(
             True, "Simuliert — es war kein Browser bei DFBnet", aktenzeichen=""
         )

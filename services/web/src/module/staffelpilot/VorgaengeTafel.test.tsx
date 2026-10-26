@@ -27,6 +27,10 @@ function vorgang(rest: Partial<api.Vorgang> = {}): api.Vorgang {
     empfaenger: "verein@example.org",
     text: "Sehr geehrte Damen und Herren,\n\nFeldverweis in Minute 71.",
     versandt_am: null,
+    spiel_id: "sp1",
+    dfbnet_aktenzeichen: "",
+    anlagen: "",
+    hinweis: "",
     ...rest,
   };
 }
@@ -315,6 +319,88 @@ describe("Ein Vorgang", () => {
 
       await waitFor(() => expect(merken).toHaveBeenCalledWith("v1"));
       expect(await screen.findByText(/vorgemerkt/)).toBeInTheDocument();
+    });
+
+    it("bietet die Probe an, bevor etwas angelegt wird", async () => {
+      // Ein Aktenzeichen ist dauerhaft. Wer wissen will, ob die Anlage
+      // durchläuft, soll dafür nicht ein Verfahren eröffnen müssen.
+      alsFall();
+      const proben = vi.spyOn(api, "probeFallanlage").mockResolvedValue({
+        id: "a1",
+        art: "fallprobe",
+        staffel_id: null,
+        referenz: "v1",
+        zustand: "angefordert",
+        schritt: "",
+        fortschritt: 0,
+        gepruefte: 0,
+        befunde: 0,
+        meldung: "",
+        gestartet_am: null,
+        beendet_am: null,
+        angelegt: "2026-10-26T10:00:00Z",
+        protokoll: [],
+      });
+      render(<VorgaengeTafel />);
+      await aufklappen();
+
+      await userEvent.click(
+        await inDerKarte().findByRole("button", { name: "Anlage proben" }),
+      );
+
+      await waitFor(() => expect(proben).toHaveBeenCalledWith("v1"));
+      expect(await screen.findByText(/angelegt wird nichts/)).toBeInTheDocument();
+    });
+
+    it("trägt das Aktenzeichen aus DFBnet mit", async () => {
+      // Stand es nicht auf der Seite, steht es in DFBnet -- abtippen muss
+      // möglich sein, sonst ist der Fall unbrauchbar.
+      alsFall();
+      const aendern = vi
+        .spyOn(api, "aendereVorgang")
+        .mockResolvedValue(vorgang({ art: "sportgericht" }));
+      render(<VorgaengeTafel />);
+      await aufklappen();
+
+      await userEvent.type(
+        await screen.findByLabelText(/Aktenzeichen aus DFBnet/),
+        "00042-26/27-SPG_DD",
+      );
+      await userEvent.click(inDerKarte().getByRole("button", { name: "Speichern" }));
+
+      await waitFor(() =>
+        expect(aendern).toHaveBeenCalledWith(
+          "v1",
+          expect.objectContaining({ dfbnet_aktenzeichen: "00042-26/27-SPG_DD" }),
+        ),
+      );
+    });
+
+    it("zeigt die Mail an den Sportrichter erst mit Aktenzeichen", async () => {
+      // Vorher gibt es keine Akte, auf die man sich beruft.
+      alsFall();
+      render(<VorgaengeTafel />);
+      await aufklappen();
+
+      await screen.findByRole("button", { name: "Speichern" });
+      expect(screen.queryByText("Mail an den Sportrichter")).toBeNull();
+    });
+
+    it("und zeigt sie, sobald eines dasteht", async () => {
+      mitListe(
+        [zeile({ art: "sportgericht" })],
+        vorgang({ art: "sportgericht", dfbnet_aktenzeichen: "00042-26/27-SPG_DD" }),
+        entwurf({
+          anhang: "",
+          betreff: "[00042-26/27-SPG_DD], SG Gittersee, Redlingshöfer, Tom",
+          text: "Guten Tag,",
+        }),
+      );
+      render(<VorgaengeTafel />);
+      await aufklappen();
+
+      expect(await screen.findByText("Mail an den Sportrichter")).toBeInTheDocument();
+      expect(screen.getByText(/SG Gittersee, Redlingsh/)).toBeInTheDocument();
     });
 
     it("nennt die fehlende Angabe, statt sie zu verschlucken", async () => {
