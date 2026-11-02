@@ -31,6 +31,7 @@ function auftrag(rest: Partial<api.Auftrag> = {}): api.Auftrag {
     id: "a1",
     art: "anmeldeprobe",
     staffel_id: null,
+    referenz: "",
     zustand: "angefordert",
     schritt: "",
     fortschritt: 0,
