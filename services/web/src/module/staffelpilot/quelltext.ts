@@ -32,7 +32,15 @@ export interface Stueck {
   text: string;
 }
 
-/** Pythons Schlüsselwörter, so weit sie in Regeldateien vorkommen. */
+/**
+ * Pythons Schlüsselwörter, so weit sie in Regeldateien vorkommen.
+ *
+ * Absichtlich kompakt gesetzt, deshalb das `prettier-ignore`: aufgelöst
+ * stünde hier ein Wort je Zeile, 33 Zeilen lang. Das ist keine Liste mehr,
+ * die man überfliegt, sondern eine, durch die man scrollt - und man sieht
+ * nicht mehr auf einen Blick, was fehlt.
+ */
+// prettier-ignore
 const SCHLUESSEL = new Set([
   "and", "as", "assert", "async", "await", "break", "class", "continue", "def",
   "del", "elif", "else", "except", "finally", "for", "from", "global", "if",
@@ -47,7 +55,11 @@ const SCHLUESSEL = new Set([
  * werden nicht importiert, sondern in einem gestellten Namensraum ausgeführt
  * — wer sie sucht, findet sie in keinem `import`, und genau deshalb lohnt es
  * sich, sie hervorzuheben.
+ *
+ * Die Zeilenaufteilung ist die Gliederung - Lader, Literale, Eingebautes.
+ * Deshalb `prettier-ignore`: ein Name je Zeile löscht genau diese Aussage.
  */
+// prettier-ignore
 const EINGEBAUT = new Set([
   "regel", "melde", "spiel", "ANZAHL",
   "True", "False", "None", "self",
