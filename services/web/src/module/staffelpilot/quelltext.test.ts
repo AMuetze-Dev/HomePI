@@ -70,7 +70,9 @@ describe("Quelltext zerlegen", () => {
     // der Datei wäre Text.
     const quelle = 'def f():\n    """Erklärt,\n    was sie tut.\n    """\n    pass\n';
 
-    expect(texte(quelle, "zeichenkette")).toEqual(['"""Erklärt,\n    was sie tut.\n    """']);
+    expect(texte(quelle, "zeichenkette")).toEqual([
+      '"""Erklärt,\n    was sie tut.\n    """',
+    ]);
   });
 
   it("lässt eine einfache Zeichenkette am Zeilenende enden", () => {

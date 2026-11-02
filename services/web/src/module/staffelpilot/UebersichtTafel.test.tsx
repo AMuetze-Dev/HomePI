@@ -120,6 +120,7 @@ describe("Die Übersicht", () => {
       id: "a1",
       art: "pruflauf",
       staffel_id: null,
+      referenz: "",
       zustand: "laeuft",
       schritt: "Prüfe M-1",
       fortschritt: 40,

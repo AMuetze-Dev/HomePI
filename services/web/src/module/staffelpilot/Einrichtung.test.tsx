@@ -31,6 +31,7 @@ function auftrag(rest: Partial<api.Auftrag> = {}): api.Auftrag {
     id: "a1",
     art: "anmeldeprobe",
     staffel_id: null,
+    referenz: "",
     zustand: "angefordert",
     schritt: "",
     fortschritt: 0,
@@ -55,7 +56,12 @@ describe("Die Einrichtung", () => {
 
     render(<Einrichtung onFertig={vi.fn()} />);
 
-    expect(await screen.findByRole("heading")).toHaveTextContent(/prüft er mit/);
+    // Auf die Überschrift warten, die dastehen SOLL - nicht auf irgendeine
+    // und dann deren Text prüfen. Die Einrichtung hat je Schritt eine eigene,
+    // und die vorige ist beim Wechsel noch da. Siehe den Test ganz unten.
+    expect(
+      await screen.findByRole("heading", { name: /prüft er mit/ }),
+    ).toBeInTheDocument();
   });
 
   it("nennt die Schritte, damit man weiß, wie viel kommt", async () => {
@@ -198,6 +204,11 @@ describe("Die Einrichtung", () => {
     render(<Einrichtung onFertig={vi.fn()} />);
     await userEvent.click(await screen.findByRole("button", { name: /Staffeln holen/ }));
 
-    expect(await screen.findByRole("heading")).toHaveTextContent(/Fertig/);
+    // Nicht findByRole("heading") und dann auf den Text prüfen: das greift
+    // die Überschrift des vorigen Schrittes ("Deine Staffeln"), die noch
+    // dasteht, und prüft sie auf "Fertig". Unter Last - im vollen Lauf mit
+    // Coverage - war das in zwei von fünf Durchgängen rot. Mit dem Namen im
+    // Aufruf wartet findByRole, bis die richtige Überschrift da ist.
+    expect(await screen.findByRole("heading", { name: /Fertig/ })).toBeInTheDocument();
   });
 });
