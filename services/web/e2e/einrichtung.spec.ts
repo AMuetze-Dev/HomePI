@@ -180,7 +180,14 @@ test.describe("Eine Staffelleiterin richtet ein", () => {
     await anmelden(page);
     await artefakt(page, "StaffelPilot").click();
 
-    await expect(page).toHaveURL(/\/modul\/staffelpilot$/);
+    // Nicht auf den nackten Modulpfad pruefen: die Huelle leitet sofort auf
+    // die erste Unterseite weiter. Wer diesen Zwischenzustand zusichert,
+    // prueft die Geschwindigkeit der Maschine -- auf einer langsamen
+    // erwischt man ihn, auf einer schnellen nicht mehr. Welche Unterseite
+    // die erste ist, entscheidet ausserdem das Register und nicht dieser Test.
+    await expect(page).toHaveURL(/\/modul\/staffelpilot(\/|$)/);
+    // Das hier ist die Aussage des Tests: nicht wieder der Weg.
+    await expect(page).not.toHaveURL(/\/einrichten$/);
     await expect(schritte(page)).toHaveCount(0);
     // Stattdessen der ehrliche Erstzustand: es fehlt eine Staffel.
     await expect(page.getByText("Keine aktive Staffel")).toBeVisible();
