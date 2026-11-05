@@ -2,6 +2,9 @@ import { useState } from "react";
 
 import { Etikett, Feld, Karte, Knopf, Leerzustand } from "../../ui";
 import {
+  aendereKategorie,
+  aendereKonto,
+  aenderePerson,
   entferneKategorie,
   entferneKonto,
   entfernePerson,
@@ -9,7 +12,10 @@ import {
   legeKategorieAn,
   legeKontoAn,
   legePersonAn,
+  type Kategorie,
+  type Konto,
   type Kontoart,
+  type Person,
 } from "./api";
 import type { Daten } from "./daten";
 import stil from "./HaushaltsbuchSeite.module.css";
@@ -44,18 +50,70 @@ export function StammdatenTafel({ daten, aktion }: Props) {
   );
 }
 
+/**
+ * Ein Knopfpaar, das an jeder dieser drei Listen gleich aussieht.
+ *
+ * Ändern steht vor Entfernen, und zwar überall: wer einen Tippfehler sucht,
+ * soll ihn nicht neben der Schaltfläche finden, die den Eintrag wegwirft.
+ */
+function Zeilenknoepfe({
+  was,
+  onBearbeiten,
+  onEntfernen,
+}: {
+  was: string;
+  onBearbeiten: () => void;
+  onEntfernen: () => void;
+}) {
+  return (
+    <>
+      <Knopf
+        groesse="sm"
+        auspraegung="primaer"
+        onClick={onBearbeiten}
+        aria-label={`${was} ändern`}
+      >
+        Ändern
+      </Knopf>
+      <Knopf
+        groesse="sm"
+        auspraegung="leise"
+        onClick={onEntfernen}
+        aria-label={`${was} entfernen`}
+      >
+        Entfernen
+      </Knopf>
+    </>
+  );
+}
+
 function Personen({ daten, aktion }: Props) {
+  const [bearbeitet, setBearbeitet] = useState<Person | null>(null);
   const [name, setName] = useState("");
   const [laeuft, setLaeuft] = useState(false);
+
+  function beginne(person: Person) {
+    setBearbeitet(person);
+    setName(person.name);
+  }
+
+  function abbrechen() {
+    setBearbeitet(null);
+    setName("");
+  }
 
   async function absenden(ereignis: React.FormEvent) {
     ereignis.preventDefault();
     if (name.trim() === "" || laeuft) return;
 
     setLaeuft(true);
-    const geklappt = await aktion(() => legePersonAn({ name: name.trim() }));
+    const geklappt = await aktion(() =>
+      bearbeitet
+        ? aenderePerson(bearbeitet.id, { name: name.trim() })
+        : legePersonAn({ name: name.trim() }),
+    );
     setLaeuft(false);
-    if (geklappt) setName("");
+    if (geklappt) abbrechen();
   }
 
   return (
@@ -75,14 +133,13 @@ function Personen({ daten, aktion }: Props) {
             {daten.personen.map((person) => (
               <li key={person.id} className={stil.zeile}>
                 <span>{person.name}</span>
-                <Knopf
-                  groesse="sm"
-                  auspraegung="leise"
-                  onClick={() => void aktion(() => entfernePerson(person.id))}
-                  aria-label={`${person.name} entfernen`}
-                >
-                  Entfernen
-                </Knopf>
+                <div className={stil.aktionen}>
+                  <Zeilenknoepfe
+                    was={person.name}
+                    onBearbeiten={() => beginne(person)}
+                    onEntfernen={() => void aktion(() => entfernePerson(person.id))}
+                  />
+                </div>
               </li>
             ))}
           </ul>
@@ -98,13 +155,24 @@ function Personen({ daten, aktion }: Props) {
             placeholder="Aaron"
             autoComplete="off"
           />
-          <Knopf
-            type="submit"
-            auspraegung="primaer"
-            disabled={name.trim() === "" || laeuft}
-          >
-            {laeuft ? "Wird angelegt …" : "Person anlegen"}
-          </Knopf>
+          <div className={stil.formularfuss}>
+            {bearbeitet && (
+              <Knopf type="button" auspraegung="leise" onClick={abbrechen}>
+                Abbrechen
+              </Knopf>
+            )}
+            <Knopf
+              type="submit"
+              auspraegung="primaer"
+              disabled={name.trim() === "" || laeuft}
+            >
+              {laeuft
+                ? "Wird gespeichert …"
+                : bearbeitet
+                  ? `„${bearbeitet.name}" umbenennen`
+                  : "Person anlegen"}
+            </Knopf>
+          </div>
         </form>
       </Karte>
     </section>
@@ -112,6 +180,7 @@ function Personen({ daten, aktion }: Props) {
 }
 
 function Konten({ daten, aktion }: Props) {
+  const [bearbeitet, setBearbeitet] = useState<Konto | null>(null);
   const [name, setName] = useState("");
   const [art, setArt] = useState<Kontoart>("verteiler");
   const [inhaber, setInhaber] = useState("");
@@ -119,20 +188,44 @@ function Konten({ daten, aktion }: Props) {
 
   const inhaberName = new Map(daten.personen.map((p) => [p.id, p.name]));
 
+  function beginne(konto: Konto) {
+    setBearbeitet(konto);
+    setName(konto.name);
+    setArt(konto.art);
+    setInhaber(konto.inhaber_id ?? "");
+  }
+
+  function abbrechen() {
+    setBearbeitet(null);
+    setName("");
+    setArt("verteiler");
+    setInhaber("");
+  }
+
   async function absenden(ereignis: React.FormEvent) {
     ereignis.preventDefault();
     if (name.trim() === "" || laeuft) return;
 
     setLaeuft(true);
     const geklappt = await aktion(() =>
-      legeKontoAn({
-        name: name.trim(),
-        art,
-        inhaber_id: inhaber === "" ? null : inhaber,
-      }),
+      bearbeitet
+        ? aendereKonto(bearbeitet.id, {
+            name: name.trim(),
+            art,
+            // Ein leeres inhaber_id hiesse beim Ändern "nicht angefasst" -
+            // deshalb sagt das eigene Feld, dass es gemeinsam werden soll.
+            ...(inhaber === ""
+              ? { gemeinschaftlich: true }
+              : { inhaber_id: inhaber, gemeinschaftlich: false }),
+          })
+        : legeKontoAn({
+            name: name.trim(),
+            art,
+            inhaber_id: inhaber === "" ? null : inhaber,
+          }),
     );
     setLaeuft(false);
-    if (geklappt) setName("");
+    if (geklappt) abbrechen();
   }
 
   return (
@@ -164,14 +257,11 @@ function Konten({ daten, aktion }: Props) {
                   {konto.inhaber_id === null && (
                     <Etikett ton="neutral">gemeinsam</Etikett>
                   )}
-                  <Knopf
-                    groesse="sm"
-                    auspraegung="leise"
-                    onClick={() => void aktion(() => entferneKonto(konto.id))}
-                    aria-label={`${konto.name} entfernen`}
-                  >
-                    Entfernen
-                  </Knopf>
+                  <Zeilenknoepfe
+                    was={konto.name}
+                    onBearbeiten={() => beginne(konto)}
+                    onEntfernen={() => void aktion(() => entferneKonto(konto.id))}
+                  />
                 </div>
               </li>
             ))}
@@ -203,13 +293,24 @@ function Konten({ daten, aktion }: Props) {
               ...daten.personen.map((p): [string, string] => [p.id, p.name]),
             ]}
           />
-          <Knopf
-            type="submit"
-            auspraegung="primaer"
-            disabled={name.trim() === "" || laeuft}
-          >
-            {laeuft ? "Wird angelegt …" : "Konto anlegen"}
-          </Knopf>
+          <div className={stil.formularfuss}>
+            {bearbeitet && (
+              <Knopf type="button" auspraegung="leise" onClick={abbrechen}>
+                Abbrechen
+              </Knopf>
+            )}
+            <Knopf
+              type="submit"
+              auspraegung="primaer"
+              disabled={name.trim() === "" || laeuft}
+            >
+              {laeuft
+                ? "Wird gespeichert …"
+                : bearbeitet
+                  ? `„${bearbeitet.name}" ändern`
+                  : "Konto anlegen"}
+            </Knopf>
+          </div>
         </form>
       </Karte>
     </section>
@@ -217,9 +318,22 @@ function Konten({ daten, aktion }: Props) {
 }
 
 function Kategorien({ daten, aktion }: Props) {
+  const [bearbeitet, setBearbeitet] = useState<Kategorie | null>(null);
   const [name, setName] = useState("");
   const [spart, setSpart] = useState(false);
   const [laeuft, setLaeuft] = useState(false);
+
+  function beginne(kategorie: Kategorie) {
+    setBearbeitet(kategorie);
+    setName(kategorie.name);
+    setSpart(kategorie.zaehlt_als_sparen);
+  }
+
+  function abbrechen() {
+    setBearbeitet(null);
+    setName("");
+    setSpart(false);
+  }
 
   async function absenden(ereignis: React.FormEvent) {
     ereignis.preventDefault();
@@ -227,10 +341,12 @@ function Kategorien({ daten, aktion }: Props) {
 
     setLaeuft(true);
     const geklappt = await aktion(() =>
-      legeKategorieAn({ name: name.trim(), zaehlt_als_sparen: spart }),
+      bearbeitet
+        ? aendereKategorie(bearbeitet.id, { name: name.trim(), zaehlt_als_sparen: spart })
+        : legeKategorieAn({ name: name.trim(), zaehlt_als_sparen: spart }),
     );
     setLaeuft(false);
-    if (geklappt) setName("");
+    if (geklappt) abbrechen();
   }
 
   return (
@@ -264,14 +380,11 @@ function Kategorien({ daten, aktion }: Props) {
                   {kategorie.zaehlt_als_sparen && (
                     <Etikett ton="gut">zählt als Sparen</Etikett>
                   )}
-                  <Knopf
-                    groesse="sm"
-                    auspraegung="leise"
-                    onClick={() => void aktion(() => entferneKategorie(kategorie.id))}
-                    aria-label={`${kategorie.name} entfernen`}
-                  >
-                    Entfernen
-                  </Knopf>
+                  <Zeilenknoepfe
+                    was={kategorie.name}
+                    onBearbeiten={() => beginne(kategorie)}
+                    onEntfernen={() => void aktion(() => entferneKategorie(kategorie.id))}
+                  />
                 </div>
               </li>
             ))}
@@ -302,13 +415,24 @@ function Kategorien({ daten, aktion }: Props) {
               </span>
             </span>
           </label>
-          <Knopf
-            type="submit"
-            auspraegung="primaer"
-            disabled={name.trim() === "" || laeuft}
-          >
-            {laeuft ? "Wird angelegt …" : "Kategorie anlegen"}
-          </Knopf>
+          <div className={stil.formularfuss}>
+            {bearbeitet && (
+              <Knopf type="button" auspraegung="leise" onClick={abbrechen}>
+                Abbrechen
+              </Knopf>
+            )}
+            <Knopf
+              type="submit"
+              auspraegung="primaer"
+              disabled={name.trim() === "" || laeuft}
+            >
+              {laeuft
+                ? "Wird gespeichert …"
+                : bearbeitet
+                  ? `„${bearbeitet.name}" ändern`
+                  : "Kategorie anlegen"}
+            </Knopf>
+          </div>
         </form>
       </Karte>
     </section>

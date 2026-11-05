@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../api/client";
 import {
+  aendereKategorie,
   aendereKonto,
   aenderePerson,
   aenderePosten,
@@ -169,6 +170,17 @@ describe("Schreiben", () => {
     await aenderePosten("x", { aktiv: false });
 
     expect(JSON.parse(ersterAufruf(aufruf)[1].body as string)).toEqual({ aktiv: false });
+  });
+
+  it("ändert eine Kategorie per PATCH", async () => {
+    const aufruf = antworteMit({});
+
+    await aendereKategorie("kat1", { zaehlt_als_sparen: true });
+
+    const [url, init] = ersterAufruf(aufruf);
+    expect(url).toContain("/kategorien/kat1");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({ zaehlt_als_sparen: true });
   });
 
   it("ändert eine Person per PATCH", async () => {

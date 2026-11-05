@@ -174,6 +174,9 @@ beforeEach(() => {
   vi.spyOn(api, "legeKontoAn").mockResolvedValue(konten()[0]!);
   vi.spyOn(api, "legeKategorieAn").mockResolvedValue(kategorien()[0]!);
   vi.spyOn(api, "legeGrundgeruestAn").mockResolvedValue(kategorien());
+  vi.spyOn(api, "aendereKategorie").mockResolvedValue(kategorien()[0]!);
+  vi.spyOn(api, "aendereKonto").mockResolvedValue(konten()[0]!);
+  vi.spyOn(api, "aenderePerson").mockResolvedValue(personen()[0]!);
 });
 
 afterEach(() => {
@@ -438,6 +441,95 @@ describe("Posten", () => {
   });
 });
 
+describe("Posten ändern", () => {
+  it("füllt das Formular mit dem, was dasteht", async () => {
+    // Der Grund für diese ganze Maske: ein falscher Betrag soll sich
+    // korrigieren lassen, ohne den Posten samt Aufteilung wegzuwerfen.
+    alles();
+    render(<HaushaltsbuchSeite unterseite="posten" />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Miete ändern" }));
+
+    expect(
+      await screen.findByRole("heading", { name: /„Miete" ändern/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toHaveValue("Miete");
+    // Deutsch angezeigt, nicht "900.00".
+    expect(screen.getByLabelText(/Betrag je Abbuchung/)).toHaveValue("900,00");
+    expect(screen.getByLabelText("Abbuchungstag")).toHaveValue("1");
+    expect(screen.getByLabelText("Jessi")).toHaveValue("1");
+    expect(screen.getByLabelText("Aaron")).toHaveValue("2");
+  });
+
+  it("schickt die Änderung als PATCH und behält die Aufteilung", async () => {
+    alles();
+    render(<HaushaltsbuchSeite unterseite="posten" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Miete ändern" }));
+
+    const betrag = screen.getByLabelText(/Betrag je Abbuchung/);
+    await userEvent.clear(betrag);
+    await userEvent.type(betrag, "950,50");
+    await userEvent.click(screen.getByRole("button", { name: "Änderungen speichern" }));
+
+    expect(api.aenderePosten).toHaveBeenCalledWith(
+      MIETE,
+      expect.objectContaining({
+        name: "Miete",
+        betrag: "950.50",
+        kategorie_id: WOHNEN,
+        anteile: [
+          { person_id: AARON, gewicht: 2 },
+          { person_id: JESSI, gewicht: 1 },
+        ],
+      }),
+    );
+  });
+
+  it("sagt ausdrücklich, dass Kategorie und Tag weg sollen", async () => {
+    // Ein leeres Feld hieße beim PATCH sonst "nicht angefasst" - der Posten
+    // behielte seine Kategorie, obwohl man sie gerade entfernt hat.
+    alles();
+    render(<HaushaltsbuchSeite unterseite="posten" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Miete ändern" }));
+
+    await userEvent.selectOptions(screen.getByLabelText("Kategorie"), "");
+    await userEvent.clear(screen.getByLabelText("Abbuchungstag"));
+    await userEvent.click(screen.getByRole("button", { name: "Änderungen speichern" }));
+
+    expect(api.aenderePosten).toHaveBeenCalledWith(
+      MIETE,
+      expect.objectContaining({ kategorie_loeschen: true, tag_loeschen: true }),
+    );
+  });
+
+  it("lässt sich abbrechen, ohne etwas zu schicken", async () => {
+    alles();
+    render(<HaushaltsbuchSeite unterseite="posten" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Miete ändern" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Posten anlegen" }),
+    ).toBeInTheDocument();
+    expect(api.aenderePosten).not.toHaveBeenCalled();
+  });
+
+  it("dreht die Richtung um, statt den Posten wegzuwerfen", async () => {
+    alles();
+    render(<HaushaltsbuchSeite unterseite="posten" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Miete ändern" }));
+
+    await userEvent.selectOptions(screen.getByLabelText("Art"), "einnahme");
+    await userEvent.click(screen.getByRole("button", { name: "Änderungen speichern" }));
+
+    expect(api.aenderePosten).toHaveBeenCalledWith(
+      MIETE,
+      expect.objectContaining({ art: "einnahme" }),
+    );
+  });
+});
+
 describe("Stammdaten", () => {
   it("legt eine Person an und leert danach das Feld", async () => {
     alles();
@@ -519,6 +611,58 @@ describe("Stammdaten", () => {
 
     expect(api.entferneKonto).toHaveBeenCalledWith(GEMEINSAM);
     expect(api.entferneKategorie).toHaveBeenCalledWith(WOHNEN);
+  });
+
+  it("benennt eine Person um, statt sie neu anzulegen", async () => {
+    alles();
+    render(<HaushaltsbuchSeite unterseite="stammdaten" />);
+
+    const abschnitt = within(await screen.findByRole("region", { name: "Personen" }));
+    await userEvent.click(abschnitt.getByRole("button", { name: "Aaron ändern" }));
+    const feld = abschnitt.getByLabelText("Name");
+    expect(feld).toHaveValue("Aaron");
+
+    await userEvent.clear(feld);
+    await userEvent.type(feld, "Aaron M.");
+    await userEvent.click(abschnitt.getByRole("button", { name: /umbenennen/ }));
+
+    expect(api.aenderePerson).toHaveBeenCalledWith(AARON, { name: "Aaron M." });
+    expect(api.legePersonAn).not.toHaveBeenCalled();
+  });
+
+  it("macht ein Konto über das eigene Feld wieder gemeinschaftlich", async () => {
+    // Ein leeres inhaber_id hieße beim PATCH "nicht angefasst".
+    alles({
+      konten: [{ ...konten()[0]!, inhaber_id: AARON, name: "CON1", art: "verbrauch" }],
+    });
+    render(<HaushaltsbuchSeite unterseite="stammdaten" />);
+
+    const abschnitt = within(await screen.findByRole("region", { name: "Konten" }));
+    await userEvent.click(abschnitt.getByRole("button", { name: "CON1 ändern" }));
+    expect(abschnitt.getByLabelText("Inhaber")).toHaveValue(AARON);
+
+    await userEvent.selectOptions(abschnitt.getByLabelText("Inhaber"), "");
+    await userEvent.click(abschnitt.getByRole("button", { name: /„CON1" ändern/ }));
+
+    expect(api.aendereKonto).toHaveBeenCalledWith(
+      GEMEINSAM,
+      expect.objectContaining({ name: "CON1", gemeinschaftlich: true }),
+    );
+  });
+
+  it("ändert, ob eine Kategorie als Sparen zählt", async () => {
+    alles();
+    render(<HaushaltsbuchSeite unterseite="stammdaten" />);
+
+    const abschnitt = within(await screen.findByRole("region", { name: "Kategorien" }));
+    await userEvent.click(abschnitt.getByRole("button", { name: "Wohnen ändern" }));
+    await userEvent.click(abschnitt.getByLabelText(/Zählt als Sparen/));
+    await userEvent.click(abschnitt.getByRole("button", { name: /„Wohnen" ändern/ }));
+
+    expect(api.aendereKategorie).toHaveBeenCalledWith(WOHNEN, {
+      name: "Wohnen",
+      zaehlt_als_sparen: true,
+    });
   });
 
   it("sagt, dass ein Konto ohne Inhaber ein gemeinsames ist", async () => {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Etikett, Feld, Karte, Knopf, Leerzustand } from "../../ui";
 import {
@@ -8,10 +8,11 @@ import {
   type Anteil,
   type Konto,
   type Person,
+  type Posten,
   type Postenart,
 } from "./api";
-import { abbuchungstext, alsEuro, MONATE, rhythmus } from "./geld";
 import type { Daten } from "./daten";
+import { abbuchungstext, alsEuro, MONATE, rhythmus } from "./geld";
 import stil from "./HaushaltsbuchSeite.module.css";
 
 interface Props {
@@ -37,21 +38,43 @@ function alsZahlenfeld(eingabe: string): string {
 }
 
 export function PostenTafel({ daten, aktion }: Props) {
+  // Welcher Posten gerade im Formular liegt. null heißt: ein neuer.
+  const [bearbeitet, setBearbeitet] = useState<Posten | null>(null);
   const berechnet = new Map(daten.uebersicht.alle.map((z) => [z.id, z]));
+
+  // Nach dem Neuladen zeigt `daten` neue Objekte. Ohne das hier hinge im
+  // Formular der Stand von vor dem Speichern.
+  const frisch = bearbeitet
+    ? (daten.posten.find((p) => p.id === bearbeitet.id) ?? null)
+    : null;
+
+  if (daten.konten.length === 0) {
+    return (
+      <Leerzustand titel="Erst ein Konto, dann die Posten">
+        Ein Posten liegt immer auf einem Konto. Lege unter <strong>Stammdaten</strong>
+        mindestens eines an.
+      </Leerzustand>
+    );
+  }
 
   return (
     <>
-      {daten.konten.length === 0 ? (
-        <Leerzustand titel="Erst ein Konto, dann die Posten">
-          Ein Posten liegt immer auf einem Konto. Lege unter <strong>Stammdaten</strong>
-          mindestens eines an.
-        </Leerzustand>
-      ) : (
-        <>
-          <Liste daten={daten} berechnet={berechnet} aktion={aktion} />
-          <Anlegen daten={daten} aktion={aktion} />
-        </>
-      )}
+      <Liste
+        daten={daten}
+        berechnet={berechnet}
+        aktion={aktion}
+        bearbeitetId={frisch?.id}
+        onBearbeiten={setBearbeitet}
+      />
+      <PostenFormular
+        // Der Schlüssel wechselt mit dem Posten, damit React das Formular neu
+        // aufbaut: die Felder stehen sonst noch auf dem vorigen Eintrag.
+        key={frisch?.id ?? "neu"}
+        daten={daten}
+        aktion={aktion}
+        bearbeitet={frisch}
+        onAbbrechen={() => setBearbeitet(null)}
+      />
     </>
   );
 }
@@ -60,8 +83,12 @@ function Liste({
   daten,
   berechnet,
   aktion,
+  bearbeitetId,
+  onBearbeiten,
 }: Props & {
   berechnet: Map<string, { monatsrate: string; faellige_monate: number[] }>;
+  bearbeitetId: string | undefined;
+  onBearbeiten: (posten: Posten) => void;
 }) {
   if (daten.posten.length === 0) {
     return (
@@ -101,7 +128,11 @@ function Liste({
           </thead>
           <tbody>
             {daten.posten.map((posten) => (
-              <tr key={posten.id} className={posten.aktiv ? "" : stil.pausiert}>
+              <tr
+                key={posten.id}
+                className={posten.aktiv ? "" : stil.pausiert}
+                aria-current={posten.id === bearbeitetId ? "true" : undefined}
+              >
                 <td>
                   {posten.name}
                   <span className={stil.unterzeile}>
@@ -140,6 +171,14 @@ function Liste({
                   <div className={stil.aktionen}>
                     <Knopf
                       groesse="sm"
+                      auspraegung="primaer"
+                      onClick={() => onBearbeiten(posten)}
+                      aria-label={`${posten.name} ändern`}
+                    >
+                      Ändern
+                    </Knopf>
+                    <Knopf
+                      groesse="sm"
                       onClick={() =>
                         void aktion(() =>
                           aenderePosten(posten.id, { aktiv: !posten.aktiv }),
@@ -168,18 +207,50 @@ function Liste({
   );
 }
 
-function Anlegen({ daten, aktion }: Props) {
-  const [name, setName] = useState("");
-  const [art, setArt] = useState<Postenart>("ausgabe");
-  const [betrag, setBetrag] = useState("");
-  const [kontoId, setKontoId] = useState(daten.konten[0]?.id ?? "");
-  const [kategorieId, setKategorieId] = useState("");
-  const [intervall, setIntervall] = useState(1);
-  const [monat, setMonat] = useState(1);
-  const [tag, setTag] = useState("");
-  const [variabel, setVariabel] = useState(false);
-  const [gewichte, setGewichte] = useState<Record<string, string>>({});
+/**
+ * Ein Formular für beides: anlegen und ändern.
+ *
+ * Nicht zwei Masken mit denselben zwölf Feldern — die laufen auseinander,
+ * sobald ein Feld dazukommt, und dann kann man beim Ändern weniger als beim
+ * Anlegen. Was sich unterscheidet, sind drei Dinge: die Überschrift, der
+ * Knopf, und wohin die Eingabe geht.
+ */
+function PostenFormular({
+  daten,
+  aktion,
+  bearbeitet,
+  onAbbrechen,
+}: Props & { bearbeitet: Posten | null; onAbbrechen: () => void }) {
+  const [name, setName] = useState(bearbeitet?.name ?? "");
+  const [art, setArt] = useState<Postenart>(bearbeitet?.art ?? "ausgabe");
+  // Der Betrag kommt als "31.90" und wird hier deutsch angezeigt - sonst
+  // steht beim Ändern ein Punkt da, wo der Benutzer ein Komma getippt hat.
+  const [betrag, setBetrag] = useState(bearbeitet?.betrag.replace(".", ",") ?? "");
+  const [kontoId, setKontoId] = useState(
+    bearbeitet?.konto_id ?? daten.konten[0]?.id ?? "",
+  );
+  const [kategorieId, setKategorieId] = useState(bearbeitet?.kategorie_id ?? "");
+  const [intervall, setIntervall] = useState(bearbeitet?.intervall_monate ?? 1);
+  const [monat, setMonat] = useState(bearbeitet?.faelligkeitsmonat ?? 1);
+  const [tag, setTag] = useState(
+    bearbeitet?.abbuchungstag === null || bearbeitet?.abbuchungstag === undefined
+      ? ""
+      : String(bearbeitet.abbuchungstag),
+  );
+  const [variabel, setVariabel] = useState(bearbeitet?.variabel ?? false);
+  const [gewichte, setGewichte] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      (bearbeitet?.anteile ?? []).map((a) => [a.person_id, String(a.gewicht)]),
+    ),
+  );
   const [laeuft, setLaeuft] = useState(false);
+  const ueberschrift = useRef<HTMLHeadingElement>(null);
+
+  // Die Liste kann lang sein, das Formular steht darunter. Ohne diesen
+  // Sprung klickt man "Ändern" und sieht nichts passieren.
+  useEffect(() => {
+    if (bearbeitet) ueberschrift.current?.scrollIntoView?.({ block: "center" });
+  }, [bearbeitet]);
 
   const konto: Konto | undefined = daten.konten.find((k) => k.id === kontoId);
   const gemeinschaftlich = konto?.inhaber_id === null;
@@ -200,26 +271,39 @@ function Anlegen({ daten, aktion }: Props) {
     ereignis.preventDefault();
     if (!vollstaendig || laeuft) return;
 
+    const felder = {
+      name: name.trim(),
+      art,
+      betrag: alsZahlenfeld(betrag),
+      intervall_monate: intervall,
+      faelligkeitsmonat: intervall === 1 ? 1 : monat,
+      abbuchungstag: tag.trim() === "" ? null : Number(tag),
+      konto_id: kontoId,
+      kategorie_id: kategorieId === "" ? null : kategorieId,
+      variabel,
+      anteile: anteileBauen(),
+    };
+
     setLaeuft(true);
     const geklappt = await aktion(() =>
-      legePostenAn({
-        name: name.trim(),
-        art,
-        betrag: alsZahlenfeld(betrag),
-        intervall_monate: intervall,
-        faelligkeitsmonat: intervall === 1 ? 1 : monat,
-        abbuchungstag: tag.trim() === "" ? null : Number(tag),
-        konto_id: kontoId,
-        kategorie_id: kategorieId === "" ? null : kategorieId,
-        variabel,
-        anteile: anteileBauen(),
-      }),
+      bearbeitet
+        ? aenderePosten(bearbeitet.id, {
+            ...felder,
+            // Beim Ändern heißt ein leeres Feld sonst "nicht angefasst".
+            // Diese beiden sagen: wirklich weg.
+            tag_loeschen: felder.abbuchungstag === null,
+            kategorie_loeschen: felder.kategorie_id === null,
+          })
+        : legePostenAn(felder),
     );
     setLaeuft(false);
 
-    // Nur leeren, wenn es geklappt hat - sonst tippt man nach einem
-    // abgelehnten Betrag das ganze Formular neu.
-    if (geklappt) {
+    if (!geklappt) return;
+    // Nur bei Erfolg - sonst tippt man nach einem abgelehnten Betrag das
+    // ganze Formular neu.
+    if (bearbeitet) {
+      onAbbrechen();
+    } else {
       setName("");
       setBetrag("");
       setTag("");
@@ -227,9 +311,9 @@ function Anlegen({ daten, aktion }: Props) {
   }
 
   return (
-    <section aria-labelledby="posten-anlegen" className={stil.block}>
-      <h2 id="posten-anlegen" className={stil.abschnittstitel}>
-        Posten anlegen
+    <section aria-labelledby="posten-formular" className={stil.block}>
+      <h2 id="posten-formular" className={stil.abschnittstitel} ref={ueberschrift}>
+        {bearbeitet ? `„${bearbeitet.name}" ändern` : "Posten anlegen"}
       </h2>
 
       <Karte>
@@ -362,8 +446,17 @@ function Anlegen({ daten, aktion }: Props) {
             {gemeinschaftlich && anteileBauen().length === 0 && (
               <Etikett ton="warnung">Ohne Aufteilung zahlt diesen Posten niemand</Etikett>
             )}
+            {bearbeitet && (
+              <Knopf type="button" auspraegung="leise" onClick={onAbbrechen}>
+                Abbrechen
+              </Knopf>
+            )}
             <Knopf type="submit" auspraegung="primaer" disabled={!vollstaendig || laeuft}>
-              {laeuft ? "Wird angelegt …" : "Anlegen"}
+              {laeuft
+                ? "Wird gespeichert …"
+                : bearbeitet
+                  ? "Änderungen speichern"
+                  : "Anlegen"}
             </Knopf>
           </div>
         </form>

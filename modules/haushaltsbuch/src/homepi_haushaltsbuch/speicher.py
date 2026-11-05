@@ -238,6 +238,7 @@ async def posten_aendern(
         zeile,
         daten,
         "name",
+        "art",
         "betrag",
         "intervall_monate",
         "faelligkeitsmonat",

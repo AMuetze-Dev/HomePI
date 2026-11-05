@@ -205,6 +205,9 @@ class PostenAendern(BaseModel):
     """
 
     name: NameFeld | None = None
+    #: Auch die Richtung: wer beim Anlegen "Einnahme" statt "Ausgabe" erwischt
+    #: hat, soll das aendern koennen und nicht loeschen muessen.
+    art: Postenart | None = None
     betrag: BetragFeld | None = None
     intervall_monate: Intervall | None = None
     faelligkeitsmonat: MonatFeld | None = None

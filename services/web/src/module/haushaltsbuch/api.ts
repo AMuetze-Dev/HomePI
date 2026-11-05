@@ -230,6 +230,13 @@ export function legeKategorieAn(daten: NeueKategorie): Promise<Kategorie> {
   return sende<Kategorie>("POST", "/kategorien", daten);
 }
 
+export function aendereKategorie(
+  id: string,
+  daten: Partial<NeueKategorie>,
+): Promise<Kategorie> {
+  return sende<Kategorie>("PATCH", `/kategorien/${id}`, daten);
+}
+
 /** Legt die üblichen Kategorien an - und nur die, die noch fehlen. */
 export function legeGrundgeruestAn(): Promise<Kategorie[]> {
   return sende<Kategorie[]>("POST", "/kategorien/grundgeruest");
