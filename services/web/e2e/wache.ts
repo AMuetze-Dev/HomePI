@@ -1,4 +1,15 @@
+import { chromium } from "@playwright/test";
+
 import { BASIS_URL } from "./umgebung";
+
+/**
+ * So lange darf die Oberfläche brauchen, bis sie das erste Mal dasteht.
+ *
+ * Großzügig, weil hier nichts geprüft wird: es wird nur gewartet. Die Frist
+ * der Tests selbst (`expect.timeout`, 10 s) bleibt knapp, und das soll sie
+ * auch — eine Ansicht, die im Betrieb zehn Sekunden braucht, ist kaputt.
+ */
+const KALTSTART = 120_000;
 
 /**
  * Läuft, bevor der erste Test etwas anfasst.
@@ -40,5 +51,56 @@ export default async function wache(): Promise<void> {
         "frische Installation mit eigener Datenbank:\n" +
         "  make e2e",
     );
+  }
+
+  await aufwaermen();
+}
+
+/**
+ * Die Oberfläche einmal laden, bevor der erste Test sie misst.
+ *
+ * Die Prüfung oben fragt nur das Backend. Der Entwicklungsserver davor
+ * übersetzt die Anwendung aber erst, wenn ein Browser sie zum ersten Mal
+ * anfordert — und das dauert, je nach Maschine und Umfang des Bündels,
+ * mehrere Sekunden.
+ *
+ * Ohne dieses Aufwärmen zahlt der allererste Test diese Zeit innerhalb seiner
+ * eigenen Frist von zehn Sekunden. Genau dort ist er in der CI umgefallen:
+ * `expect(page.getByRole("heading", { name: "Ersteinrichtung" }))` lief
+ * 10,7 Sekunden ins Leere, während derselbe Test lokal 12,7 Sekunden braucht
+ * und durchläuft. Das ist keine Aussage über die Oberfläche, sondern über die
+ * Maschine — und `retries` wären die falsche Antwort darauf: sie würden einen
+ * echten Fehler genauso verdecken.
+ *
+ * Deshalb wird die Zeit hierhin verschoben, wo sie hingehört: vor den ersten
+ * Test, ohne Frist, die etwas behauptet.
+ *
+ * **Und deshalb scheitert das hier nie.** Die erste Fassung ließ den
+ * TimeoutError durch, und damit konnte das Aufwärmen den ganzen Lauf kippen,
+ * bevor ein einziger Test lief — in der CI genau einmal passiert, mit
+ * `locator.waitFor: Timeout 120000ms exceeded` als einziger Auskunft. Das ist
+ * schlimmer als die Flanke, die es schließen sollte: Aufwärmen ist eine
+ * Beschleunigung und keine Prüfung. Steht die Oberfläche wirklich nicht,
+ * sagen das die Tests gleich danach, und zwar mit einer brauchbaren Meldung.
+ */
+async function aufwaermen(): Promise<void> {
+  let browser;
+  try {
+    browser = await chromium.launch();
+    const seite = await browser.newPage();
+    await seite.goto(BASIS_URL, { timeout: KALTSTART });
+    // Auf das Gerüst warten, nicht auf eine bestimmte Ansicht: welche Maske
+    // dasteht, ist Sache der Tests. Hier geht es nur darum, dass überhaupt
+    // etwas gerendert wurde.
+    await seite.locator("#root > *").first().waitFor({ timeout: KALTSTART });
+  } catch (grund) {
+    // Absichtlich nur eine Notiz. Wer hier scheitert, erfährt den Grund im
+    // ersten Test - dort steht er im Zusammenhang.
+    console.warn(
+      `Aufwärmen der Oberfläche übersprungen (${String(grund)}).\n` +
+        "Der erste Test zahlt dann wieder die Übersetzungszeit aus seiner eigenen Frist.",
+    );
+  } finally {
+    await browser?.close();
   }
 }
