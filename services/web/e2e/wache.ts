@@ -74,17 +74,33 @@ export default async function wache(): Promise<void> {
  *
  * Deshalb wird die Zeit hierhin verschoben, wo sie hingehört: vor den ersten
  * Test, ohne Frist, die etwas behauptet.
+ *
+ * **Und deshalb scheitert das hier nie.** Die erste Fassung ließ den
+ * TimeoutError durch, und damit konnte das Aufwärmen den ganzen Lauf kippen,
+ * bevor ein einziger Test lief — in der CI genau einmal passiert, mit
+ * `locator.waitFor: Timeout 120000ms exceeded` als einziger Auskunft. Das ist
+ * schlimmer als die Flanke, die es schließen sollte: Aufwärmen ist eine
+ * Beschleunigung und keine Prüfung. Steht die Oberfläche wirklich nicht,
+ * sagen das die Tests gleich danach, und zwar mit einer brauchbaren Meldung.
  */
 async function aufwaermen(): Promise<void> {
-  const browser = await chromium.launch();
+  let browser;
   try {
+    browser = await chromium.launch();
     const seite = await browser.newPage();
     await seite.goto(BASIS_URL, { timeout: KALTSTART });
     // Auf das Gerüst warten, nicht auf eine bestimmte Ansicht: welche Maske
     // dasteht, ist Sache der Tests. Hier geht es nur darum, dass überhaupt
     // etwas gerendert wurde.
     await seite.locator("#root > *").first().waitFor({ timeout: KALTSTART });
+  } catch (grund) {
+    // Absichtlich nur eine Notiz. Wer hier scheitert, erfährt den Grund im
+    // ersten Test - dort steht er im Zusammenhang.
+    console.warn(
+      `Aufwärmen der Oberfläche übersprungen (${String(grund)}).\n` +
+        "Der erste Test zahlt dann wieder die Übersetzungszeit aus seiner eigenen Frist.",
+    );
   } finally {
-    await browser.close();
+    await browser?.close();
   }
 }
