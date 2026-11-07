@@ -1,0 +1,419 @@
+/* Nur Tokens aus src/styles/tokens.css - kein fester Farbwert, keine feste
+   Pixelzahl. Siehe docs/08-design.md.
+
+   Eine Datei für alle Tafeln dieses Artefakts: Dashboard, Spielplan und
+   Vorschau teilen Zeilen, Karten und Nebensätze. Drei Dateien mit denselben
+   vier Klassen laufen auseinander, sobald jemand eine davon ändert. */
+
+.laden {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+/* ------------------------------------------------------------------ Gerüst */
+
+.kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-3);
+  margin-bottom: var(--raum-5);
+}
+
+.turniername {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.turnierwahl,
+.auswahl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.turnierwahl select,
+.auswahl select {
+  padding: var(--raum-2) var(--raum-3);
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  font: inherit;
+  font-size: var(--text-md);
+}
+
+.auswahl select:disabled {
+  background: var(--farbe-flaeche-gedaempft);
+  color: var(--farbe-text-leise);
+}
+
+.auswahl select:focus-visible,
+.turnierwahl select:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+.abschnittstitel {
+  margin-bottom: var(--raum-4);
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.nebensache {
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-normal);
+}
+
+.aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-3);
+  margin-top: var(--raum-4);
+}
+
+/* ------------------------------------------------------------------ Listen */
+
+.liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+  padding: var(--raum-3) var(--raum-4);
+  border-bottom: 1px solid var(--farbe-rand);
+}
+
+.zeile:last-child {
+  border-bottom: none;
+}
+
+.name {
+  font-weight: var(--gewicht-mittel);
+}
+
+.zeilenaktionen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-2);
+}
+
+.sieger {
+  font-weight: var(--gewicht-halbfett);
+}
+
+/* --------------------------------------------------------------- Dashboard */
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-8);
+}
+
+/* Mobil eine Spalte: bei 375 px steht ein Tisch unter dem anderen, und das
+   laufende Spiel bleibt groß genug, um es aus zwei Metern zu lesen. */
+.tische {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--raum-4);
+}
+
+.tischkopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+  margin-bottom: var(--raum-3);
+}
+
+.tischname {
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-halbfett);
+  letter-spacing: var(--laufweite-eng);
+}
+
+.laufend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+.paarung {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--raum-3);
+}
+
+.spielername {
+  flex: 1 1 0;
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-mittel);
+  overflow-wrap: anywhere;
+}
+
+.paarung .spielername:last-child {
+  text-align: right;
+}
+
+.satzstand {
+  flex: none;
+  font-size: var(--text-2xl);
+  font-weight: var(--gewicht-halbfett);
+  font-variant-numeric: tabular-nums;
+}
+
+.satzstandKlein {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--gewicht-halbfett);
+}
+
+.danach {
+  list-style: none;
+  margin: var(--raum-4) 0 0;
+  padding: var(--raum-3) 0 0;
+  border-top: 1px solid var(--farbe-rand);
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  font-size: var(--text-sm);
+}
+
+.danach li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--raum-2);
+}
+
+.spalten {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--raum-8);
+}
+
+.paarungZeile {
+  font-weight: var(--gewicht-mittel);
+  overflow-wrap: anywhere;
+}
+
+.glocken {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+  margin: var(--raum-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stand {
+  color: var(--farbe-text-leise);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- Spielplan */
+
+.spielzeile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  padding: var(--raum-4);
+  border-bottom: 1px solid var(--farbe-rand);
+}
+
+.spielzeile:last-child {
+  border-bottom: none;
+}
+
+.spielkopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-3);
+}
+
+.spielnummer {
+  flex: none;
+  color: var(--farbe-text-leise);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.spielkopf .name {
+  flex: 1 1 12rem;
+  overflow-wrap: anywhere;
+}
+
+.ergebnis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  padding: var(--raum-4);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+.saetze {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.satzzeile {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--raum-3);
+}
+
+/* ------------------------------------------------------------------ Gruppen */
+
+.gruppen {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--raum-4);
+  margin-bottom: var(--raum-5);
+}
+
+.gruppenname {
+  margin: 0 0 var(--raum-3);
+  font-size: var(--text-md);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.gruppenliste {
+  margin: 0;
+  padding-left: var(--raum-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+}
+
+/* ----------------------------------------------------------------- Tabellen */
+
+.tabellen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+/* Sieben Spalten passen bei 375 px nicht - also darf dieser Rahmen scrollen
+   und nicht die Seite. Quer zu wischen ist in einer Tabelle erwartbar,
+   horizontales Scrollen der ganzen Seite ist ein Fehler. */
+.tabellenrahmen {
+  overflow-x: auto;
+}
+
+.tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabellenkopf {
+  padding: var(--raum-3) var(--raum-4);
+  font-size: var(--text-md);
+  font-weight: var(--gewicht-halbfett);
+  text-align: left;
+}
+
+.tabelle th,
+.tabelle td {
+  padding: var(--raum-2) var(--raum-3);
+  border-bottom: 1px solid var(--farbe-rand);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tabelle thead th {
+  color: var(--farbe-text-gedaempft);
+  font-weight: var(--gewicht-mittel);
+}
+
+.tabelle tbody tr:last-child th,
+.tabelle tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.namenszelle {
+  text-align: left !important;
+  font-weight: var(--gewicht-mittel);
+}
+
+/* ---------------------------------------------------------------- Formulare */
+
+/* Mobil zuerst: gestapelt. Zeilenlayout erst ab genug Breite - andersherum
+   müsste die Ausnahme das flex der Kinder wieder aufheben und bräuchte
+   dafür dieselbe Spezifität. */
+.formular {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--raum-4);
+}
+
+.absenden {
+  width: 100%;
+}
+
+.einstellungen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-5);
+}
+
+.zweispaltig {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--raum-4);
+}
+
+@media (width >= 34rem) {
+  .formular {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .formular > *:first-child {
+    flex: 1 1 12rem;
+  }
+
+  .absenden {
+    flex: none;
+    width: auto;
+  }
+
+  .zweispaltig {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tische {
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  }
+
+  .gruppen {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  }
+}
+
+@media (width >= 60rem) {
+  .spalten {
+    grid-template-columns: 1fr 1fr;
+  }
+}

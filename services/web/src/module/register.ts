@@ -2,6 +2,7 @@ import { GeraeteSeite } from "./geraete/GeraeteSeite";
 import type { Breite, ModulOberflaeche, Unterseite } from "./typen";
 import { StaffelpilotSeite } from "./staffelpilot/StaffelpilotSeite";
 import { VerwaltungSeite } from "./verwaltung/VerwaltungSeite";
+import { TischtennisSeite } from "./tischtennis/TischtennisSeite";
 
 /**
  * Eigene Oberflächen der Artefakte.
@@ -50,6 +51,29 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
       // Bedarf aus den Einstellungen heraus. Deshalb versteckt -- in der
       // Leiste waere es ein Eintrag, der ab dem zweiten Tag nur stoert.
       { id: "einrichten", wort: "Einrichtung", breite: "text", versteckt: true },
+    ],
+  },
+  {
+    id: "tischtennis",
+    Komponente: TischtennisSeite,
+    // Die Dashboard-Ansicht lebt von der Breite: zwei Tische nebeneinander,
+    // daneben die naechsten Spiele. Die Flaechen, bei denen das falsch
+    // waere, sagen es unten selbst.
+    breite: "weit",
+    unterseiten: [
+      // Zuerst, und das mit Absicht: diese Flaeche ist der Grund, warum das
+      // Artefakt oeffentlich ist. Wer die Kachel ohne Konto antippt, landet
+      // auf der ersten Unterseite - also hier.
+      { id: "dashboard", wort: "Dashboard", breite: "voll" },
+      // Zwanzig Namen eintippen. Ein Eingabefeld ueber die ganze
+      // Monitorbreite ist dabei nicht grosszuegig, sondern unlesbar.
+      { id: "teilnehmer", wort: "Teilnehmer", breite: "normal" },
+      { id: "auswuerfeln", wort: "Auswürfeln" },
+      // Nummer, Paarung, Tisch, Zeit, Satzstand und vier Knoepfe in einer
+      // Zeile - der Grund, warum es diese Stufe gibt.
+      { id: "spielplan", wort: "Spielplan", breite: "voll" },
+      { id: "tabellen", wort: "Tabellen" },
+      { id: "einstellungen", wort: "Einstellungen", breite: "text" },
     ],
   },
   {
