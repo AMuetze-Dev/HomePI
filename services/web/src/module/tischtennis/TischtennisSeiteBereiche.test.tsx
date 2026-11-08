@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -136,11 +136,13 @@ describe("Teilnehmer führen", () => {
     render(mitAnmeldung(<TischtennisSeite unterseite="teilnehmer" />, LEITER));
 
     await userEvent.click(await screen.findByRole("button", { name: "Anna umbenennen" }));
-    const felder = screen.getAllByLabelText("Name");
-    const zeilenfeld = felder[felder.length - 1];
+    // In der Zeile suchen und nicht auf der ganzen Flaeche: das Formular
+    // darueber hat ein Feld mit derselben Beschriftung.
+    const zeile = within(screen.getByRole("listitem"));
+    const zeilenfeld = zeile.getByLabelText("Name");
     await userEvent.clear(zeilenfeld);
     await userEvent.type(zeilenfeld, "Annemarie");
-    await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await userEvent.click(zeile.getByRole("button", { name: "Speichern" }));
 
     expect(api.aendereTeilnehmer).toHaveBeenCalledWith("p1", {
       name: "Annemarie",
