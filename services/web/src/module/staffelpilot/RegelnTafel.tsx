@@ -54,7 +54,8 @@ type Filter = keyof typeof FILTER;
 function passt(regel: Regel, filter: Filter, suche: string): boolean {
   const wort = suche.trim().toLowerCase();
   if (wort) {
-    const heuhaufen = `${regel.name} ${regel.beschreibung} ${regel.schluessel}`.toLowerCase();
+    const heuhaufen =
+      `${regel.name} ${regel.beschreibung} ${regel.schluessel}`.toLowerCase();
     if (!heuhaufen.includes(wort)) return false;
   }
   if (filter === "aktiv") return regel.aktiv;
@@ -167,8 +168,8 @@ export function RegelnTafel() {
 
       {sichtbar.length === 0 && (
         <Leerzustand titel="Keine Regel passt dazu">
-          Die Einschränkung oben nimmt alle weg. Mit „Alle" und leerer Suche
-          stehen wieder alle {regeln.length} da.
+          Die Einschränkung oben nimmt alle weg. Mit „Alle" und leerer Suche stehen wieder
+          alle {regeln.length} da.
         </Leerzustand>
       )}
 

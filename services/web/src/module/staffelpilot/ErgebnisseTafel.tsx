@@ -229,7 +229,10 @@ function Gruppe({
               )}
             </span>
             <span
-              className={[stil.auswertungBalken, BALKEN_STIL[toene?.[p.name] ?? "neutral"]]
+              className={[
+                stil.auswertungBalken,
+                BALKEN_STIL[toene?.[p.name] ?? "neutral"],
+              ]
                 .filter(Boolean)
                 .join(" ")}
               style={{ width: `${(p.anzahl / groesster) * 100}%` }}

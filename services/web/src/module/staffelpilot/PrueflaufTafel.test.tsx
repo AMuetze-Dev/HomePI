@@ -15,7 +15,7 @@ function staffel(rest: Partial<api.Staffel> = {}): api.Staffel {
     spielklasse: "3.Kreisliga (C)",
     saison: "26/27",
     spieltage: 0,
-  sportgericht: "",
+    sportgericht: "",
     aktiv: true,
     ...rest,
   };
@@ -26,6 +26,7 @@ function auftrag(rest: Partial<api.Auftrag> = {}): api.Auftrag {
     id: "a1",
     art: "pruflauf",
     staffel_id: null,
+    referenz: "",
     zustand: "angefordert",
     schritt: "",
     fortschritt: 0,
