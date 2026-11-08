@@ -33,6 +33,7 @@ export interface Stueck {
 }
 
 /** Pythons Schlüsselwörter, so weit sie in Regeldateien vorkommen. */
+// prettier-ignore
 const SCHLUESSEL = new Set([
   "and", "as", "assert", "async", "await", "break", "class", "continue", "def",
   "del", "elif", "else", "except", "finally", "for", "from", "global", "if",
@@ -48,6 +49,7 @@ const SCHLUESSEL = new Set([
  * — wer sie sucht, findet sie in keinem `import`, und genau deshalb lohnt es
  * sich, sie hervorzuheben.
  */
+// prettier-ignore
 const EINGEBAUT = new Set([
   "regel", "melde", "spiel", "ANZAHL",
   "True", "False", "None", "self",

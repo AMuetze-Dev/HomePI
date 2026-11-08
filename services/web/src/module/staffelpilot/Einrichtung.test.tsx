@@ -31,6 +31,7 @@ function auftrag(rest: Partial<api.Auftrag> = {}): api.Auftrag {
     id: "a1",
     art: "anmeldeprobe",
     staffel_id: null,
+    referenz: "",
     zustand: "angefordert",
     schritt: "",
     fortschritt: 0,
@@ -198,6 +199,10 @@ describe("Die Einrichtung", () => {
     render(<Einrichtung onFertig={vi.fn()} />);
     await userEvent.click(await screen.findByRole("button", { name: /Staffeln holen/ }));
 
-    expect(await screen.findByRole("heading")).toHaveTextContent(/Fertig/);
+    // Nach der Ueberschrift mit diesem Namen suchen und nicht nach der
+    // ersten ueberhaupt: `findByRole("heading")` liefert sofort die alte
+    // Ueberschrift, und die Zusicherung lief dann gegen den Zustand von
+    // davor. Unter Last ist dieser Test genau daran geflattert.
+    expect(await screen.findByRole("heading", { name: /Fertig/ })).toBeInTheDocument();
   });
 });

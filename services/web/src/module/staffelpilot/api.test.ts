@@ -2,36 +2,54 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../api/client";
 import {
+  aendereRegeldatei,
   aendereStaffel,
   aendereVorgang,
+  ansichtAdresse,
   brichAuftragAb,
-  fordereAuftragAn,
+  entferneBeispieldaten,
+  entferneRegeldatei,
   entscheide,
+  fordereAuftragAn,
+  formuliereRegel,
   hakeAb,
-  ladeSpiel,
-  ladeStaffeln,
-  ladeWarteschlange,
-  ladeZusammenfassung,
   ladeAlleBefunde,
-  ladeAuftrag,
+  ladeAnsichten,
   ladeAuftraege,
+  ladeAuftrag,
+  ladeBeispieldaten,
+  ladeEinrichtung,
   ladeEinstellungen,
   ladeErgebnisse,
+  ladeMailentwurf,
   ladeMannschaften,
   ladeOffenenAuftrag,
+  ladeRegeldatei,
+  ladeRegeldateien,
+  ladeRegeln,
+  ladeSpiel,
+  ladeStaffeln,
   ladeUebertragung,
-  ladeZugang,
   ladeVorgaenge,
+  ladeVorgang,
+  ladeWarteschlange,
+  ladeZugang,
+  ladeZusammenfassung,
   legeStaffelAn,
   legeVorgangAn,
   loescheStaffel,
   loescheZugang,
   loeseHaken,
+  mahnungAdresse,
+  merkeFallAn,
   nimmEntscheidungZurueck,
+  probeFallanlage,
+  schalteRegel,
   setzeUebertragungPause,
   setzeVorgangZustand,
   speichereEinstellungen,
   speichereMannschaften,
+  speichereRegeldatei,
   speichereZugang,
   verwerfeVorgang,
   wiederholeUebertragung,
@@ -516,5 +534,159 @@ describe("Die Auswertung", () => {
     await ladeErgebnisse("s1");
 
     expect(holen.mock.calls[0]?.[0]).toContain("staffel_id=s1");
+  });
+});
+
+/**
+ * Die Wege, die bis hierher kein Test angefasst hat.
+ *
+ * Eine Huelle wie diese bricht nicht laut: sie schickt still an den falschen
+ * Pfad oder mit der falschen Methode, und auffallen tut das in der Ansicht,
+ * die sie benutzt. Deshalb wird hier Pfad und Methode geprueft und sonst
+ * nichts -- was das Backend daraus macht, steht in dessen Tests.
+ */
+describe("Die uebrigen Endpunkte", () => {
+  function pfadUndMethode(aufruf: ReturnType<typeof vi.fn>): [string, string] {
+    const [adresse, init] = aufruf.mock.calls[0] as [string, RequestInit | undefined];
+    return [String(adresse), (init?.method ?? "GET").toUpperCase()];
+  }
+
+  it.each([
+    [
+      "Beispieldaten lesen",
+      () => ladeBeispieldaten(),
+      "/staffelpilot/beispieldaten",
+      "GET",
+    ],
+    [
+      "Beispieldaten wegraeumen",
+      () => entferneBeispieldaten(),
+      "/staffelpilot/beispieldaten",
+      "DELETE",
+    ],
+    ["einen Vorgang holen", () => ladeVorgang("v1"), "/staffelpilot/vorgaenge/v1", "GET"],
+    [
+      "den Mailentwurf holen",
+      () => ladeMailentwurf("v1"),
+      "/staffelpilot/vorgaenge/v1/mail",
+      "GET",
+    ],
+    ["die Regeln holen", () => ladeRegeln(), "/staffelpilot/regeln", "GET"],
+    [
+      "eine Regel schalten",
+      () => schalteRegel("r1", false),
+      "/staffelpilot/regeln/r1",
+      "PATCH",
+    ],
+    [
+      "eine Regel formulieren",
+      () => formuliereRegel("r1", { hinweis: "neu" }),
+      "/staffelpilot/regeln/r1",
+      "PATCH",
+    ],
+    [
+      "den Einrichtungsstand holen",
+      () => ladeEinrichtung(),
+      "/staffelpilot/einrichtung",
+      "GET",
+    ],
+    [
+      "einen Fall vormerken",
+      () => merkeFallAn("v1"),
+      "/staffelpilot/vorgaenge/v1/fallanlage",
+      "POST",
+    ],
+    [
+      "die Fallanlage proben",
+      () => probeFallanlage("v1"),
+      "/staffelpilot/vorgaenge/v1/fallprobe",
+      "POST",
+    ],
+    [
+      "die Ansichten eines Auftrags holen",
+      () => ladeAnsichten("a1"),
+      "/staffelpilot/auftraege/a1/ansichten",
+      "GET",
+    ],
+    [
+      "die Regeldateien holen",
+      () => ladeRegeldateien(),
+      "/staffelpilot/regeldateien",
+      "GET",
+    ],
+    [
+      "eine Regeldatei holen",
+      () => ladeRegeldatei("d1"),
+      "/staffelpilot/regeldateien/d1",
+      "GET",
+    ],
+    [
+      "eine Regeldatei speichern",
+      () => speichereRegeldatei("pruefung.py", "def regel(): ..."),
+      "/staffelpilot/regeldateien",
+      "PUT",
+    ],
+    [
+      "eine Regeldatei aendern",
+      () => aendereRegeldatei("d1", { aktiv: false }),
+      "/staffelpilot/regeldateien/d1",
+      "PATCH",
+    ],
+    [
+      "eine Regeldatei entfernen",
+      () => entferneRegeldatei("d1"),
+      "/staffelpilot/regeldateien/d1",
+      "DELETE",
+    ],
+  ])(
+    "spricht beim %s den richtigen Endpunkt an",
+    async (_was, aufrufen, pfad, methode) => {
+      const aufruf = antworteMit({});
+
+      await aufrufen();
+
+      const [adresse, gesendet] = pfadUndMethode(aufruf);
+      expect(adresse).toContain(pfad);
+      expect(gesendet).toBe(methode);
+    },
+  );
+
+  it("schickt beim Speichern einer Regeldatei Name, Inhalt und Zustand", async () => {
+    const aufruf = antworteMit({});
+
+    await speichereRegeldatei("pruefung.py", "def regel(): ...", false);
+
+    const [, init] = aufruf.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      name: "pruefung.py",
+      inhalt: "def regel(): ...",
+      aktiv: false,
+    });
+  });
+
+  it("legt eine Regeldatei standardmaessig aktiv an", async () => {
+    const aufruf = antworteMit({});
+
+    await speichereRegeldatei("pruefung.py", "def regel(): ...");
+
+    const [, init] = aufruf.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ aktiv: true });
+  });
+
+  it("nennt die Adresse der Mahnung, ohne sie zu holen", () => {
+    // Der Browser laedt das PDF selbst - hier entsteht nur die Adresse.
+    const holen = antworteMit({});
+
+    expect(mahnungAdresse("v1")).toContain("/staffelpilot/vorgaenge/v1/mahnung.pdf");
+    expect(holen).not.toHaveBeenCalled();
+  });
+
+  it("haengt an die Adresse eines Abbilds den Stand an", () => {
+    // Ohne ihn zeigt mancher Browser trotz no-store das alte Bild weiter.
+    const erste = ansichtAdresse("a1", "seite", 1000);
+    const zweite = ansichtAdresse("a1", "seite", 2000);
+
+    expect(erste).toContain("/staffelpilot/auftraege/a1/ansicht/seite?t=1000");
+    expect(erste).not.toBe(zweite);
   });
 });

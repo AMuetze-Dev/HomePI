@@ -204,7 +204,9 @@ describe("Höherklassige Mannschaften eintragen", () => {
     vi.spyOn(api, "ladeMannschaften").mockResolvedValue([
       mannschaft({ hoehere: ["FV Hafen Dresden"], vorschlaege: [] }),
     ]);
-    const speichern = vi.spyOn(api, "speichereMannschaften").mockResolvedValue([mannschaft()]);
+    const speichern = vi
+      .spyOn(api, "speichereMannschaften")
+      .mockResolvedValue([mannschaft()]);
     render(<MannschaftenListe staffelId="s1" />);
     await aufklappen("SV Loschwitz 2");
 

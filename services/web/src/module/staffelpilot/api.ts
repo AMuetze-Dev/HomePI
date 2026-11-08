@@ -146,6 +146,8 @@ export interface AuftragZeile {
   id: string;
   art: AuftragArt;
   staffel_id: string | null;
+  /** Worauf er sich sonst bezieht - bei der Fallprobe der Vorgang, sonst leer. */
+  referenz: string;
   zustand: AuftragZustand;
   schritt: string;
   fortschritt: number;

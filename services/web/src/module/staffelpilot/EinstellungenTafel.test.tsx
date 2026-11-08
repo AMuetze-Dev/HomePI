@@ -17,6 +17,7 @@ function werte(rest: Partial<api.Einstellungen> = {}): api.Einstellungen {
     uebertragung_pausiert: true,
     browser_sichtbar: false,
     beispieldaten: false,
+    einrichtung_erledigt: false,
     folgesatz: "",
     vorgabe_folgesatz: "Erfolgt ein weiterer Verstoss, so wird ein Antrag gestellt.",
     ...rest,

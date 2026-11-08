@@ -608,6 +608,10 @@ describe("Aus einem Befund einen Entwurf machen", () => {
       empfaenger: "",
       text: "",
       versandt_am: null,
+      spiel_id: null,
+      dfbnet_aktenzeichen: "",
+      anlagen: "",
+      hinweis: "",
     });
     zeige("spiele");
     await userEvent.click(await screen.findByText("SG Gittersee – SV Fortschritt"));
