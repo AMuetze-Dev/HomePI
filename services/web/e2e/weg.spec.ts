@@ -240,13 +240,23 @@ test.describe("Der Weg einer frischen Installation", () => {
     await expect(page.getByRole("heading", { name: "Geräte" })).toBeVisible();
   });
 
-  test("abmelden schließt alles wieder", async ({ page }) => {
+  test("abmelden laesst nur das oeffentliche Artefakt stehen", async ({ page }) => {
+    /* Bis zum Tischtennisturnier hiess abgemeldet: es gibt nichts zu sehen,
+       und die Startseite zeigte das Anmeldeformular. Seit es ein
+       oeffentliches Artefakt gibt, stimmt das nicht mehr - und das ist der
+       Zweck dieses Artefakts und keine Panne. Geprueft wird deshalb beides:
+       dass die internen Artefakte verschwinden, und dass das eine
+       oeffentliche bleibt. */
     await anmelden(page, NEULING.name, NEULING.eigenes);
 
     await page.getByRole("banner").getByRole("button", { name: "Abmelden" }).click();
 
-    await expect(page.getByRole("heading", { name: "Anmelden" })).toBeVisible();
-    await expect(page.getByRole("list", { name: "Artefakte" })).toHaveCount(0);
+    await expect(
+      page.getByRole("banner").getByRole("link", { name: "Anmelden" }),
+    ).toBeVisible();
+    await expect(artefakt(page, /Geräte/)).toHaveCount(0);
+    await expect(artefakt(page, /Verwaltung/)).toHaveCount(0);
+    await expect(artefakt(page, /Tischtennisturnier/)).toBeVisible();
   });
 });
 
