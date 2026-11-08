@@ -34,6 +34,14 @@ entsteht. Danach gibt es die Tabellen der Artefakte **und** die der Anmeldung
 Fehlendes an und ändert nichts Vorhandenes. Sobald sich ein Schema zum ersten
 Mal ändert, gehört dort Alembic hin.
 
+Bis dahin liegt in [`../scripts/migrationen/`](../scripts/migrationen/) je
+Schemaänderung eine SQL-Datei — von Hand geschrieben, von Hand eingespielt,
+mit Datum und den beiden Commits im Kopf. Das ist kein Ersatz für Alembic,
+sondern die Aufzeichnung dessen, was auf dem Pi wirklich lief: ohne sie steht
+beim nächsten Mal jemand vor derselben Handarbeit, ohne Vorlage. Wie eine
+solche Datei aussieht und in welcher Reihenfolge sie mit `homepi schema`
+zusammenspielt, steht im README dort.
+
 **Es vergleicht Tabellen und Spalten.** Kommt in einer vorhandenen Tabelle
 eine Spalte dazu, kann `create_all` sie nicht nachtragen — der Befehl meldet
 das und endet mit Fehler statt mit „alles gut":
