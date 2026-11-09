@@ -28,8 +28,7 @@ import {
 const EINSTELLUNGEN: Einstellungen = {
   modus: "gruppen_ko",
   tische: 2,
-  best_of: 5,
-  punkte_bis: 11,
+  best_of: 3,
   minuten_pro_spiel: 12,
   anzahl_gruppen: 2,
   weiter_pro_gruppe: 2,
@@ -173,8 +172,8 @@ describe("Tischtennis-API", () => {
       "POST",
     ],
     [
-      "Ergebnis eintragen",
-      () => trageErgebnisEin("s1", [{ heim: 11, gast: 9 }]),
+      "Sieger eintragen",
+      () => trageErgebnisEin("s1", "p1"),
       "/tischtennis/spiel/s1/ergebnis",
       "PUT",
     ],
@@ -203,21 +202,15 @@ describe("Tischtennis-API", () => {
     expect(JSON.parse(init.body as string)).toEqual({ saat: null });
   });
 
-  it("schickt die Sätze als Liste von Objekten", async () => {
+  it("schickt als Ergebnis nur den Sieger", async () => {
+    /* Das ist der ganze Umbau in einer Zusicherung: keine Saetze, keine
+       Baelle - ein Name. */
     const aufruf = antworteMit({});
 
-    await trageErgebnisEin("s1", [
-      { heim: 11, gast: 9 },
-      { heim: 11, gast: 7 },
-    ]);
+    await trageErgebnisEin("s1", "p1");
 
     const [, init] = aufruf.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(init.body as string)).toEqual({
-      saetze: [
-        { heim: 11, gast: 9 },
-        { heim: 11, gast: 7 },
-      ],
-    });
+    expect(JSON.parse(init.body as string)).toEqual({ sieger_id: "p1" });
   });
 
   it("reicht die Meldung des Backends weiter, nicht den Statuscode", async () => {

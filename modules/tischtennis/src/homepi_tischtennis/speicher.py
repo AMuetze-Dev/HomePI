@@ -280,37 +280,29 @@ async def _freier_tisch(sitzung: AsyncSession, lauf: Turnier, gefunden: Spiel) -
 async def ergebnis_eintragen(
     sitzung: AsyncSession, spiel_id: uuid.UUID, daten: ErgebnisEintragen
 ) -> Spiel:
-    """Saetze eintragen - auch unvollstaendig.
+    """Den Sieger eintragen. Das ist das ganze Ergebnis.
 
-    Ein Zwischenstand ist erlaubt und sogar der Normalfall: wer am Tisch
-    steht, traegt nach jedem Satz ein, und das Dashboard zeigt es. Erst wenn
-    die noetigen Saetze erreicht sind, ist das Spiel beendet - und dann
-    rueckt der Sieger im Raster auf.
+    Ein Tippen am Tisch, und das Spiel ist gewertet: der Sieger rueckt im
+    Raster auf, die Tabelle stimmt wieder, und wenn dabei ein Gleichstand
+    an der Grenze entsteht, steht das Entscheidungsspiel gleich im Plan.
     """
     gefunden = await ein_spiel(sitzung, spiel_id)
     lauf = await turnier(sitzung, gefunden.turnier_id)
 
     if gefunden.freilos:
         raise FalscherZustand("Ein Freilos hat kein Ergebnis")
-    if gefunden.heim_id is None or gefunden.gast_id is None:
-        raise FalscherZustand("Die Gegner stehen noch nicht fest")
 
-    saetze = [(satz.heim, satz.gast) for satz in daten.saetze]
-    stand = dienst.spielstand(saetze, lauf.best_of, lauf.punkte_bis)
+    dienst.pruefe_sieger(
+        str(daten.sieger_id),
+        heim=str(gefunden.heim_id) if gefunden.heim_id else None,
+        gast=str(gefunden.gast_id) if gefunden.gast_id else None,
+    )
 
-    gefunden.saetze = [[heim, gast] for heim, gast in saetze]
-    if stand.entschieden:
-        gefunden.zustand = "beendet"
-        gefunden.sieger_id = gefunden.heim_id if stand.sieger == "heim" else gefunden.gast_id
-        gefunden.beendet_am = jetzt()
-        if gefunden.begonnen_am is None:
-            gefunden.begonnen_am = gefunden.beendet_am
-    else:
-        gefunden.zustand = "laeuft" if saetze else "geplant"
-        gefunden.sieger_id = None
-        gefunden.beendet_am = None
-        if saetze and gefunden.begonnen_am is None:
-            gefunden.begonnen_am = jetzt()
+    gefunden.sieger_id = daten.sieger_id
+    gefunden.zustand = "beendet"
+    gefunden.beendet_am = jetzt()
+    if gefunden.begonnen_am is None:
+        gefunden.begonnen_am = gefunden.beendet_am
 
     await _sieger_weiterreichen(sitzung, lauf, gefunden)
     await _zustand_nachfuehren(sitzung, lauf)
@@ -322,7 +314,6 @@ async def ergebnis_zuruecknehmen(sitzung: AsyncSession, spiel_id: uuid.UUID) -> 
     gefunden = await ein_spiel(sitzung, spiel_id)
     lauf = await turnier(sitzung, gefunden.turnier_id)
 
-    gefunden.saetze = []
     gefunden.sieger_id = None
     gefunden.zustand = "geplant"
     gefunden.begonnen_am = None
@@ -359,8 +350,7 @@ async def _sieger_weiterreichen(sitzung: AsyncSession, lauf: Turnier, ausgangspu
                 geaendert = True
             if not geaendert:
                 continue
-            if folge.saetze or folge.zustand != "geplant":
-                folge.saetze = []
+            if folge.zustand != "geplant":
                 folge.sieger_id = None
                 folge.zustand = "geplant"
                 folge.begonnen_am = None
@@ -373,6 +363,14 @@ async def _sieger_weiterreichen(sitzung: AsyncSession, lauf: Turnier, ausgangspu
 
 async def _zustand_nachfuehren(sitzung: AsyncSession, lauf: Turnier) -> None:
     alle = await spiele(sitzung, lauf.id)
+
+    # Erst wenn nichts mehr offen ist, steht die Tabelle - und erst dann ist
+    # zu sehen, ob jemand punktgleich auf der Grenze steht.
+    alles_gewertet = not any(spiel.zustand != "beendet" for spiel in alle)
+    if alles_gewertet and await _entscheidungen_ansetzen(sitzung, lauf, alle):
+        await sitzung.flush()
+        alle = await spiele(sitzung, lauf.id)
+
     schritt = dienst.naechster_schritt(_stand(lauf, alle))
 
     if schritt == "fertig" and alle:
@@ -382,6 +380,90 @@ async def _zustand_nachfuehren(sitzung: AsyncSession, lauf: Turnier) -> None:
         # laufenden - sonst zeigte das Dashboard "beendet" und daneben ein
         # offenes Spiel.
         lauf.zustand = "laufend"
+
+
+async def _entscheidungen_ansetzen(
+    sitzung: AsyncSession, lauf: Turnier, alle: Sequence[Spiel]
+) -> bool:
+    """Setzt Entscheidungsspiele an, wo ein Gleichstand etwas entscheidet.
+
+    Von selbst und ohne Knopfdruck: wer nebenbei ein Turnier fuehrt, soll
+    nicht wissen muessen, dass es diesen Schritt gibt. Das Spiel steht
+    einfach im Plan, sobald die letzte Begegnung davor gewertet ist.
+
+    Ein Entscheidungsspiel ist dabei kein Sonderfall, sondern eine ganz
+    normale Begegnung in derselben Gruppe - damit loest der Sieg den
+    Gleichstand in der Tabelle selbst auf und niemand muss eine zweite
+    Rangregel pflegen.
+
+    Gibt zurueck, ob etwas angesetzt wurde.
+    """
+    leute = await teilnehmer(sitzung, lauf.id)
+    namen = {str(wer.id): wer for wer in leute}
+    nummer = max((spiel.nummer for spiel in alle), default=0)
+    angesetzt = False
+
+    for gruppe, grenze in await _entscheidungsgrenzen(sitzung, lauf):
+        kreis = [str(wer.id) for wer in leute if gruppe is None or wer.gruppe_id == gruppe.id]
+        zeilen = dienst.tabelle(
+            kreis,
+            _ergebnisse(alle, nur_gruppe=gruppe.id if gruppe else None),
+            freilose=None if gruppe else {str(wer.id): wer.freilose for wer in leute},
+        )
+        punktgleiche = dienst.gleichstand_an_der_grenze(zeilen, grenze)
+        if not punktgleiche:
+            continue
+
+        for heim, gast in dienst.entscheidungsspiele(punktgleiche):
+            if _schon_entschieden(alle, heim, gast):
+                # Schon einmal angesetzt und trotzdem gleichstand: bei
+                # dreien kann das Ergebnis im Kreis laufen. Ein zweiter
+                # Durchgang brachte dann dasselbe noch einmal.
+                continue
+            nummer += 1
+            sitzung.add(
+                Spiel(
+                    turnier_id=lauf.id,
+                    nummer=nummer,
+                    phase="entscheidung",
+                    runde=1,
+                    gruppe_id=gruppe.id if gruppe else None,
+                    bezeichnung=(
+                        f"{gruppe.name}, Entscheidungsspiel" if gruppe else "Entscheidungsspiel"
+                    ),
+                    heim_id=namen[heim].id,
+                    gast_id=namen[gast].id,
+                )
+            )
+            angesetzt = True
+
+    return angesetzt
+
+
+async def _entscheidungsgrenzen(
+    sitzung: AsyncSession, lauf: Turnier
+) -> list[tuple[Gruppe | None, int]]:
+    """Welche Tabelle entscheidet gerade was.
+
+    Die Grenze ist die Zahl derer, die weiterkommen. Steht das KO-Raster
+    schon oder laufen noch Schweizer Runden, entscheidet die Tabelle nichts
+    und es gibt nichts anzusetzen.
+    """
+    if lauf.modus == "gruppen_ko" and not lauf.ko_steht:
+        return [(gruppe, lauf.weiter_pro_gruppe) for gruppe in await gruppen(sitzung, lauf.id)]
+    if lauf.modus == "schweizer" and lauf.runde_angesetzt >= lauf.runden:
+        # Die letzte Runde ist durch: jetzt zaehlt nur noch, wer das Turnier
+        # gewinnt.
+        return [(None, 1)]
+    return []
+
+
+def _schon_entschieden(alle: Sequence[Spiel], heim: str, gast: str) -> bool:
+    paar = {heim, gast}
+    return any(
+        spiel.phase == "entscheidung" and {str(spiel.heim_id), str(spiel.gast_id)} == paar
+        for spiel in alle
+    )
 
 
 def _stand(lauf: Turnier, alle: Sequence[Spiel]) -> dienst.Stand:
@@ -574,7 +656,7 @@ async def _ko_ansetzen(
         dienst.platzierung(
             dienst.tabelle(
                 [str(wer.id) for wer in leute if wer.gruppe_id == gruppe.id],
-                _ergebnisse(alle, lauf.best_of, nur_gruppe=gruppe.id),
+                _ergebnisse(alle, nur_gruppe=gruppe.id),
             )
         )
         for gruppe in await gruppen(sitzung, lauf.id)
@@ -606,7 +688,7 @@ async def _schweizer_runde_ansetzen(
     reihenfolge = dienst.platzierung(
         dienst.tabelle(
             [str(wer.id) for wer in leute],
-            _ergebnisse(alle, lauf.best_of),
+            _ergebnisse(alle),
             freilose={str(wer.id): wer.freilose for wer in leute},
         )
     )
@@ -658,15 +740,14 @@ async def _schweizer_runde_ansetzen(
 
 
 def _ergebnisse(
-    alle: Sequence[Spiel], best_of: int, nur_gruppe: uuid.UUID | None = None
+    alle: Sequence[Spiel], nur_gruppe: uuid.UUID | None = None
 ) -> list[dienst.Ergebnis]:
     """Die gewerteten Spiele als Eingabe fuer die Tabelle."""
     return [
         dienst.Ergebnis(
             heim=str(spiel.heim_id),
             gast=str(spiel.gast_id),
-            saetze=tuple((satz[0], satz[1]) for satz in spiel.saetze),
-            best_of=best_of,
+            sieger=str(spiel.sieger_id) if spiel.sieger_id else None,
         )
         for spiel in alle
         if spiel.heim_id
@@ -681,30 +762,29 @@ def tabellen_daten(
     alle: Sequence[Spiel],
     leute: Sequence[Teilnehmer],
     gruppenliste: Sequence[Gruppe],
-) -> list[tuple[str, list[dienst.TabellenZeile]]]:
-    """Je Gruppe eine Tabelle, sonst eine einzige.
+) -> list[tuple[str, list[dienst.TabellenZeile], list[str]]]:
+    """Je Gruppe eine Tabelle, sonst eine einzige - und was noch offen ist.
+
+    Der dritte Wert nennt die Punktgleichen an der Grenze. Solange noch
+    gespielt wird, ist das ein Hinweis und keine Aufforderung: angesetzt
+    wird das Entscheidungsspiel von selbst, sobald die Gruppe durch ist.
 
     Rein rechnerisch und deshalb ohne ``await`` - die Daten sind schon da.
     """
     if gruppenliste:
-        return [
-            (
-                gruppe.name,
-                dienst.tabelle(
-                    [str(wer.id) for wer in leute if wer.gruppe_id == gruppe.id],
-                    _ergebnisse(alle, lauf.best_of, nur_gruppe=gruppe.id),
-                ),
+        ergebnis = []
+        for gruppe in gruppenliste:
+            zeilen = dienst.tabelle(
+                [str(wer.id) for wer in leute if wer.gruppe_id == gruppe.id],
+                _ergebnisse(alle, nur_gruppe=gruppe.id),
             )
-            for gruppe in gruppenliste
-        ]
+            offen = dienst.gleichstand_an_der_grenze(zeilen, lauf.weiter_pro_gruppe)
+            ergebnis.append((gruppe.name, zeilen, offen))
+        return ergebnis
 
-    return [
-        (
-            "Tabelle",
-            dienst.tabelle(
-                [str(wer.id) for wer in leute],
-                _ergebnisse(alle, lauf.best_of),
-                freilose={str(wer.id): wer.freilose for wer in leute},
-            ),
-        )
-    ]
+    zeilen = dienst.tabelle(
+        [str(wer.id) for wer in leute],
+        _ergebnisse(alle),
+        freilose={str(wer.id): wer.freilose for wer in leute},
+    )
+    return [("Tabelle", zeilen, dienst.gleichstand_an_der_grenze(zeilen, 1))]

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
 import { ladeDashboard, type Dashboard, type Spiel } from "./api";
 import { erlaubnisFragen, geweckte, melden, tonVorbereiten, umschalten } from "./glocke";
-import { TabellenTafel } from "./TabellenTafel";
+import { PlanGrafik } from "./PlanGrafik";
 import stil from "./TischtennisSeite.module.css";
 import { seit, uhrzeit } from "./zeit";
 
@@ -161,9 +161,7 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
                 <div className={stil.laufend}>
                   <div className={stil.paarung}>
                     <span className={stil.spielername}>{tisch.laeuft.heim}</span>
-                    <span className={stil.satzstand}>
-                      {tisch.laeuft.saetze_heim}:{tisch.laeuft.saetze_gast}
-                    </span>
+                    <span className={stil.gegen}>gegen</span>
                     <span className={stil.spielername}>{tisch.laeuft.gast}</span>
                   </div>
                   <p className={stil.nebensache}>
@@ -256,9 +254,7 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
                     >
                       {spiel.heim}
                     </span>
-                    <span className={stil.satzstandKlein}>
-                      {spiel.saetze_heim}:{spiel.saetze_gast}
-                    </span>
+                    <span className={stil.gegen}>gegen</span>
                     <span
                       className={
                         spiel.sieger_id === spiel.gast_id ? stil.sieger : undefined
@@ -306,7 +302,7 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
         </Karte>
       </section>
 
-      {daten.tabellen.length > 0 && <TabellenTafel tabellen={daten.tabellen} />}
+      <PlanGrafik tabellen={daten.tabellen} spiele={daten.spiele} />
 
       <p className={stil.stand}>
         Stand {uhrzeit(daten.stand)} · aktualisiert sich alle {TAKT / 1000} Sekunden

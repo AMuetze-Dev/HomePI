@@ -5,75 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/client";
 import * as api from "./api";
 import { DashboardTafel } from "./DashboardTafel";
-
-function turnier(rest: Partial<api.Turnier> = {}): api.Turnier {
-  return {
-    id: "t1",
-    name: "Betriebsturnier",
-    modus: "gruppen_ko",
-    zustand: "laufend",
-    tische: 2,
-    best_of: 5,
-    punkte_bis: 11,
-    minuten_pro_spiel: 12,
-    anzahl_gruppen: 2,
-    weiter_pro_gruppe: 2,
-    runden: 4,
-    saat: 7,
-    runde_angesetzt: 1,
-    ko_steht: false,
-    anzahl_teilnehmer: 4,
-    anzahl_spiele: 6,
-    offene_spiele: 5,
-    ...rest,
-  };
-}
-
-function spiel(rest: Partial<api.Spiel> = {}): api.Spiel {
-  return {
-    id: "s1",
-    nummer: 1,
-    phase: "gruppe",
-    runde: 1,
-    bezeichnung: "Gruppe A, Runde 1",
-    gruppe: "Gruppe A",
-    heim_id: "p1",
-    gast_id: "p2",
-    heim: "Anna",
-    gast: "Bernd",
-    heim_herkunft: null,
-    gast_herkunft: null,
-    zustand: "geplant",
-    tisch: 1,
-    saetze: [],
-    saetze_heim: 0,
-    saetze_gast: 0,
-    sieger_id: null,
-    freilos: false,
-    begonnen_am: null,
-    beendet_am: null,
-    erwartet_ab: "2026-11-07T18:12:00Z",
-    gleich_dran: false,
-    ...rest,
-  };
-}
-
-function dashboard(rest: Partial<api.Dashboard> = {}): api.Dashboard {
-  return {
-    turnier: turnier(),
-    stand: "2026-11-07T18:00:00Z",
-    tische: [{ tisch: 1, laeuft: null, danach: [] }],
-    naechste: [],
-    letzte: [],
-    tabellen: [],
-    teilnehmer: [
-      { id: "p1", name: "Anna", notiz: "", gruppe: "Gruppe A", freilose: 0 },
-      { id: "p2", name: "Bernd", notiz: "", gruppe: "Gruppe A", freilose: 0 },
-    ],
-    fertig: false,
-    ...rest,
-  };
-}
+import { dashboard, spiel, tabelle, turnier } from "./testdaten";
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -101,26 +33,18 @@ describe("Dashboard", () => {
     expect(await screen.findByText(/läuft kein Turnier/)).toBeInTheDocument();
   });
 
-  it("zeigt das laufende Spiel mit Satzstand am Tisch", async () => {
+  it("zeigt das laufende Spiel an seinem Tisch", async () => {
     vi.spyOn(api, "ladeDashboard").mockResolvedValue(
       dashboard({
-        tische: [
-          {
-            tisch: 1,
-            laeuft: spiel({ zustand: "laeuft", saetze_heim: 2, saetze_gast: 1 }),
-            danach: [],
-          },
-        ],
+        tische: [{ tisch: 1, laeuft: spiel({ zustand: "laeuft" }), danach: [] }],
       }),
     );
 
     render(<DashboardTafel />);
 
-    // Im Tischbereich, nicht bei den Glockenknoepfen - dort steht derselbe
-    // Name noch einmal.
     const tische = within(await screen.findByRole("region", { name: "An den Tischen" }));
     expect(tische.getByText("Anna")).toBeInTheDocument();
-    expect(tische.getByText("2:1")).toBeInTheDocument();
+    expect(tische.getByText("Bernd")).toBeInTheDocument();
     expect(tische.getByText("läuft")).toBeInTheDocument();
   });
 
@@ -136,9 +60,39 @@ describe("Dashboard", () => {
     expect(naechste.getByText(/Tisch 1/)).toBeInTheDocument();
   });
 
+  it("zeigt den Plan als Bild: Gruppen und Raster", async () => {
+    /* Die Umstellung, um die es geht: der Plan ist eine Grafik und keine
+       Liste aus achtzehn Zeilen. */
+    vi.spyOn(api, "ladeDashboard").mockResolvedValue(
+      dashboard({
+        tabellen: [tabelle()],
+        spiele: [
+          spiel(),
+          spiel({
+            id: "k1",
+            nummer: 7,
+            phase: "ko",
+            runde: 1,
+            bezeichnung: "Endspiel",
+            gruppe: null,
+            heim: null,
+            heim_id: null,
+            heim_herkunft: "Sieger aus Spiel 3",
+          }),
+        ],
+      }),
+    );
+
+    render(<DashboardTafel />);
+
+    expect(await screen.findByRole("group", { name: "KO-Raster" })).toBeInTheDocument();
+    expect(screen.getByText("Sieger aus Spiel 3")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Gruppe A" })).toBeInTheDocument();
+  });
+
   it("merkt sich die Glocke im Gerät", async () => {
-    /* Nicht auf dem Server: niemand soll ihm sagen muessen, welches Handy
-       zu welchem Kollegen gehoert. */
+    /* Nicht auf dem Server: niemand soll ihm sagen müssen, welches Handy
+       zu welchem Kollegen gehört. */
     vi.spyOn(api, "ladeDashboard").mockResolvedValue(dashboard());
     render(<DashboardTafel />);
 
@@ -184,23 +138,20 @@ describe("Dashboard", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Gateway weg");
   });
 
-  it("zeigt die letzten Ergebnisse", async () => {
+  it("hebt den Sieger in den letzten Ergebnissen hervor", async () => {
     vi.spyOn(api, "ladeDashboard").mockResolvedValue(
       dashboard({
-        letzte: [
-          spiel({
-            id: "s0",
-            zustand: "beendet",
-            saetze_heim: 3,
-            saetze_gast: 0,
-            sieger_id: "p1",
-          }),
-        ],
+        turnier: turnier({ zustand: "laufend" }),
+        letzte: [spiel({ zustand: "beendet", sieger_id: "p1" })],
       }),
     );
 
     render(<DashboardTafel />);
 
-    expect(await screen.findByText("3:0")).toBeInTheDocument();
+    const letzte = within(
+      await screen.findByRole("region", { name: "Zuletzt gespielt" }),
+    );
+    expect(letzte.getByText("Anna")).toBeInTheDocument();
+    expect(letzte.getByText("Bernd")).toBeInTheDocument();
   });
 });

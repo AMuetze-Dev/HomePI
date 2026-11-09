@@ -37,7 +37,6 @@ from .schemas import (
     ErgebnisEintragen,
     GruppeVorschau,
     PaarungVorschau,
-    SatzEingabe,
     SpielAusgabe,
     SpielBeginnen,
     TabelleAusgabe,
@@ -92,8 +91,6 @@ def _spiel_ausgabe(
     plan: dict[str, dienst.Planzeile],
 ) -> SpielAusgabe:
     zeile = plan.get(str(spiel.id))
-    saetze = [SatzEingabe(heim=satz[0], gast=satz[1]) for satz in spiel.saetze]
-    heim_saetze, gast_saetze = dienst.satzbilanz([(satz[0], satz[1]) for satz in spiel.saetze])
 
     return SpielAusgabe(
         id=spiel.id,
@@ -110,9 +107,6 @@ def _spiel_ausgabe(
         gast_herkunft=_herkunft(spiel.gast_id, spiel.gast_aus_spiel, spiel.freilos),
         zustand=spiel.zustand,  # type: ignore[arg-type]
         tisch=spiel.tisch if spiel.tisch is not None else (zeile.tisch if zeile else None),
-        saetze=saetze,
-        saetze_heim=heim_saetze,
-        saetze_gast=gast_saetze,
         sieger_id=spiel.sieger_id,
         freilos=spiel.freilos,
         begonnen_am=spiel.begonnen_am,
@@ -154,17 +148,12 @@ def _tabellen_ausgabe(
                     siege=zeile.siege,
                     niederlagen=zeile.niederlagen,
                     punkte=zeile.punkte,
-                    saetze_fuer=zeile.saetze_fuer,
-                    saetze_gegen=zeile.saetze_gegen,
-                    baelle_fuer=zeile.baelle_fuer,
-                    baelle_gegen=zeile.baelle_gegen,
-                    satzdifferenz=zeile.satzdifferenz,
-                    balldifferenz=zeile.balldifferenz,
                 )
                 for zeile in zeilen
             ],
+            entscheidung_offen=[namen.get(wer, "?") for wer in offen],
         )
-        for titel, zeilen in speicher.tabellen_daten(lauf, alle, leute, gruppenliste)
+        for titel, zeilen, offen in speicher.tabellen_daten(lauf, alle, leute, gruppenliste)
     ]
 
 
@@ -276,6 +265,7 @@ async def _dashboard(sitzung: DbSitzung, turnier_id: uuid.UUID) -> Dashboard:
         turnier=_turnier_ausgabe(lauf, leute, alle),
         stand=speicher.jetzt(),
         tische=tische,
+        spiele=ausgaben,
         naechste=offen[:8],
         letzte=sorted(
             (spiel for spiel in ausgaben if spiel.zustand == "beendet" and not spiel.freilos),
@@ -485,10 +475,10 @@ async def spiel_beginnen(
 async def ergebnis_eintragen(
     spiel_id: uuid.UUID, daten: ErgebnisEintragen, sitzung: DbSitzung
 ) -> SpielAusgabe:
-    """Saetze eintragen, auch als Zwischenstand.
+    """Den Sieger eintragen - das ist das ganze Ergebnis.
 
-    Erst wenn die noetigen Saetze erreicht sind, gilt das Spiel als beendet -
-    und dann rueckt der Sieger im Raster auf.
+    Der Sieger rueckt im Raster auf, und steht danach jemand punktgleich an
+    der Grenze, erscheint das Entscheidungsspiel von selbst im Plan.
     """
     spiel = await speicher.ergebnis_eintragen(sitzung, spiel_id, daten)
     return await _ein_spiel_ausgabe(sitzung, spiel)

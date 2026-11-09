@@ -8,28 +8,45 @@ Lies zuerst [`../../docs/06-artefakte.md`](../../docs/06-artefakte.md) — dort
 steht, warum ein Artefakt ein Modul im Gateway ist und kein eigener Container —
 und [`../../docs/12-testen.md`](../../docs/12-testen.md) für die Prüfebenen.
 
-## Stand (07.11.2026)
+## Stand (09.11.2026)
 
 Gebaut: Teilnehmerliste, Auslosung mit Vorschau und Saat, drei Spielmodi
 (Gruppen + KO, reines KO mit Freilosen, Schweizer System), Spielplan mit
-Tischen und geschätzten Zeiten, Ergebniserfassung satzweise, Tabellen mit
-direktem Vergleich, KO-Raster, das vor dem ersten Ball vollständig steht, und
-eine öffentliche Dashboard-Ansicht mit Glocke. 148 Artefakt-Tests, 94 %
-Zeilen; Oberfläche mit sechs Bereichen, 39 Tests.
+Tischen und geschätzten Zeiten, Tabellen mit geteilten Plätzen,
+Entscheidungsspiele bei Gleichstand an der Grenze, ein KO-Raster, das vor dem
+ersten Ball vollständig steht, und eine öffentliche Dashboard-Ansicht, die den
+Plan als Bild zeigt — Gruppenkarten und Raster — mit Glocke.
 
-**Drei Zusagen sind nicht verhandelbar** und gehören in jede Änderung:
+**Der Umbau vom 09.11.2026 hieß Einfachheit.** Vorher bestand ein Ergebnis aus
+bis zu sieben Sätzen mit Ballpunkten, und die Oberfläche hatte sechs Bereiche.
+Jetzt ist ein Ergebnis ein Sieger, und es sind drei Bereiche. Was dabei
+wegfiel, steht unten unter „Was bewusst nicht da ist“ — nicht aus
+Sparsamkeit, sondern weil dieses Artefakt nebenbei bedient wird.
+
+**Vier Zusagen sind nicht verhandelbar** und gehören in jede Änderung:
 
 1. **Jeder schreibende Endpunkt prüft selbst.** Dieses Artefakt ist
    `Zugang.OEFFENTLICH` — damit hängt die Prüfung *nicht* am Router. Der Test
    `test_jeder_schreibende_endpunkt_prueft_selbst` geht alle Routen durch und
    verlangt bei jeder nicht-GET-Route ein `erfordert`. Wird er je rot, ist das
    kein Testproblem.
-2. **Die Vorschau speichert nichts.** `POST …/auslosung` rechnet ein Los und
+2. **Ein Ergebnis ist ein Sieger.** Keine Sätze, keine Bälle, keine
+   Differenzen. Wer das zurückdreht, dreht den ganzen Zuschnitt zurück: die
+   zwei Knöpfe am Tisch, die geteilten Plätze und das Entscheidungsspiel
+   hängen alle daran.
+3. **Die Vorschau speichert nichts.** `POST …/auslosung` rechnet ein Los und
    legt es hin; erst `POST …/auswuerfeln` schreibt es. Nur deshalb darf
-   „nochmal würfeln" beliebig oft gedrückt werden.
-3. **Die Glocke bleibt im Gerät.** Wer sich benachrichtigen lässt, steht im
-   `localStorage` des Browsers und in keiner Tabelle. Der Server müsste sonst
-   wissen, welches Handy zu welchem Kollegen gehört.
+   „nochmal würfeln“ beliebig oft gedrückt werden.
+4. **Die Glocke bleibt im Gerät.** Wer sich benachrichtigen lässt, steht im
+   `localStorage` des Browsers und in keiner Tabelle.
+
+## Was bewusst nicht da ist
+
+| | |
+|---|---|
+| **Satz- und Ballergebnisse** | Eingetragen wird der Sieger. `best_of` steht in keinem Datensatz und sagt allein den Spielern, wie lange sie spielen — deshalb ist es auch mitten im Turnier noch änderbar |
+| **Direkter Vergleich als Rangregel** | Punktgleiche teilen sich den Platz. Kreuzt der Gleichstand die Grenze zum Weiterkommen, wird gespielt statt gerechnet |
+| **Ein Bereich je Tätigkeit** | Teilnehmer, Auswürfeln und Spielplan sind einer. Drei Reiter waren richtig, solange ein Ergebnis aus sechs Zahlen bestand |
 
 Offen, in der Reihenfolge, in der es sich lohnt:
 
@@ -38,6 +55,7 @@ Offen, in der Reihenfolge, in der es sich lohnt:
 | **Echtes Web-Push** | Die Glocke wirkt nur, solange die Seite offen ist. Für eine Meldung bei geschlossenem Tab braucht es einen Service Worker, VAPID-Schlüssel im Gateway und ein gültiges Zertifikat auf dem Pi |
 | **Platz 3** | Nach dem Halbfinale gibt es kein Spiel um den dritten Platz. Das Raster kann es, der Dienst setzt es nicht an |
 | **Doppel** | Alles ist auf Einzel gebaut: ein Teilnehmer ist eine Person. Doppel wären ein Teilnehmer aus zwei Namen — am Datenmodell eine Zeile, an der Oberfläche mehr |
+| **Gleichstand im Kreis** | Spielen drei das Entscheidungsspiel und gewinnt jeder einmal, steht der Gleichstand wieder. Ein zweiter Durchgang brächte dasselbe, deshalb bleibt er dann stehen — `speicher._schon_entschieden` |
 | **Migrationen** | `homepi schema` legt nur an. Eine neue Spalte in einer bestehenden Tabelle hält das Gateway auf `unhealthy` an |
 
 ---
@@ -72,7 +90,7 @@ modules/tischtennis/
     __init__.py    Anmeldung: modul = Modul(id=..., titel=..., router=...)
     schemas.py     Pydantic: was rein- und rausgeht
     modelle.py     Turnier, Gruppe, Teilnehmer, Spiel
-    dienst.py      REINE Regeln: Saetze, Tabelle, Zeitplan, Zustaende
+    dienst.py      REINE Regeln: Tabelle, Gleichstand, Zeitplan, Zustaende
     los.py         REIN: Gruppen, Spielfolge, KO-Raster, Schweizer Paarung
     speicher.py    DB-Zugriff - kein einziges if einer Fachregel
     router.py      HTTP: übersetzt Anfrage ↔ Fachlichkeit, sonst nichts
@@ -82,15 +100,15 @@ modules/tischtennis/
 
 services/web/src/module/tischtennis/
   api.ts                  typisierter Zugriff auf das Backend
-  TischtennisSeite.tsx    Verteiler auf die sechs Bereiche
+  TischtennisSeite.tsx    Verteiler auf die drei Bereiche
   DashboardTafel.tsx      die öffentliche Ansicht, fragt im Takt nach
-  TeilnehmerTafel.tsx     Liste und Formular
-  AuswuerfelnTafel.tsx    Würfel mit Vorschau
-  SpielplanTafel.tsx      Spiele, Ergebnisse, nächste Runde
-  TabellenTafel.tsx       Tabellen, auch im Dashboard verwendet
+  PlanGrafik.tsx          Gruppenkarten und Raster - der Plan als Bild
+  Raster.tsx              das KO-Raster, eine Spalte je Runde
+  TurnierTafel.tsx        Teilnehmer, Auswürfeln und Spielplan in einem
   EinstellungenTafel.tsx  Regeln des Turniers, Anlegen und Beenden
   glocke.ts               localStorage, Ton, Vibration, Benachrichtigung
   zeit.ts                 Uhrzeit, Dauer, „läuft seit"
+  testdaten.ts            Vorlagen für die Tests, an einer Stelle
   TischtennisSeite.module.css   eine Datei für alle Tafeln
 ```
 
@@ -109,8 +127,10 @@ eine Datenbank — und ab da wird nicht mehr getestet, sondern geklickt.
 
 | Frage | Ort |
 |---|---|
-| Gibt es den Satz 11:10? | `dienst.satz_pruefen` |
-| Wer ist Erster bei Punktgleichheit? | `dienst.tabelle` → `_direkter_vergleich` |
+| Darf dieser Sieger eingetragen werden? | `dienst.pruefe_sieger` |
+| Wer steht auf welchem Platz? | `dienst.tabelle` — Punktgleiche teilen ihn |
+| Muss noch gespielt werden? | `dienst.gleichstand_an_der_grenze` |
+| Wer spielt das Entscheidungsspiel? | `dienst.entscheidungsspiele`, angesetzt in `speicher._entscheidungen_ansetzen` |
 | Wann wird welcher Tisch frei? | `dienst.planen` |
 | Wer ist „gleich dran"? | `dienst.planen`, Feld `gleich_dran` |
 | Was kommt nach der Gruppenphase? | `dienst.naechster_schritt` |

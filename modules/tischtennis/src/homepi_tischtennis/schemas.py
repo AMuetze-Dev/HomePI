@@ -27,7 +27,7 @@ NameFeld = Annotated[str, Field(min_length=1, max_length=100)]
 Modus = Literal["gruppen_ko", "ko", "schweizer"]
 TurnierZustand = Literal["planung", "laufend", "beendet"]
 SpielZustand = Literal["geplant", "laeuft", "beendet"]
-Phase = Literal["gruppe", "ko", "runde"]
+Phase = Literal["gruppe", "ko", "runde", "entscheidung"]
 
 
 def _getrimmt(wert: object) -> object:
@@ -44,8 +44,14 @@ class TurnierEinstellungen(BaseModel):
 
     modus: Modus = "gruppen_ko"
     tische: int = Field(2, ge=1, le=12, description="Wie viele Tische gleichzeitig bespielt werden")
-    best_of: Literal[3, 5, 7] = Field(5, description="Gewinnsaetze: best of 3, 5 oder 7")
-    punkte_bis: Literal[11, 21] = Field(11, description="Punkte je Satz")
+    best_of: Literal[1, 3, 5, 7] = Field(
+        3,
+        description=(
+            "Wie lange gespielt wird. Steht in keinem Ergebnis - eingetragen "
+            "wird nur der Sieger - und sagt allein den Spielern am Tisch, "
+            "worauf sie spielen."
+        ),
+    )
     minuten_pro_spiel: int = Field(
         12, ge=1, le=120, description="Schaetzung fuer den Zeitplan, nicht mehr"
     )
@@ -74,7 +80,6 @@ class TurnierAusgabe(BaseModel):
     zustand: TurnierZustand
     tische: int
     best_of: int
-    punkte_bis: int
     minuten_pro_spiel: int
     anzahl_gruppen: int
     weiter_pro_gruppe: int
@@ -105,20 +110,16 @@ class TeilnehmerAusgabe(BaseModel):
     freilose: int = 0
 
 
-class SatzEingabe(BaseModel):
-    heim: int = Field(ge=0, le=99)
-    gast: int = Field(ge=0, le=99)
-
-
 class ErgebnisEintragen(BaseModel):
-    """Alle Saetze auf einmal.
+    """Wer gewonnen hat. Mehr wird nicht eingetragen.
 
-    Satz fuer Satz zu schicken waere naeher am Spielverlauf und in der
-    Bedienung schlechter: ein Tippfehler im zweiten Satz liesse sich dann
-    nur durch Zuruecknehmen des dritten beheben.
+    Keine Saetze, keine Baelle: wer nebenbei ein Turnier fuehrt, tippt einen
+    Namen an. Was dadurch an Rangfolge verloren geht, entscheidet bei
+    Punktgleichheit ein Entscheidungsspiel - nicht eine Differenz, die
+    niemand nachhaelt.
     """
 
-    saetze: list[SatzEingabe] = Field(max_length=9)
+    sieger_id: uuid.UUID
 
 
 class SpielBeginnen(BaseModel):
@@ -143,9 +144,6 @@ class SpielAusgabe(BaseModel):
 
     zustand: SpielZustand
     tisch: int | None = None
-    saetze: list[SatzEingabe] = Field(default_factory=list)
-    saetze_heim: int = 0
-    saetze_gast: int = 0
     sieger_id: uuid.UUID | None = None
     freilos: bool = False
 
@@ -165,17 +163,14 @@ class TabellenzeileAusgabe(BaseModel):
     siege: int
     niederlagen: int
     punkte: int
-    saetze_fuer: int
-    saetze_gegen: int
-    baelle_fuer: int
-    baelle_gegen: int
-    satzdifferenz: int
-    balldifferenz: int
 
 
 class TabelleAusgabe(BaseModel):
     titel: str
     zeilen: list[TabellenzeileAusgabe]
+    #: Namen derer, die punktgleich auf der Grenze stehen und noch
+    #: gegeneinander spielen muessen. Leer, solange nichts offen ist.
+    entscheidung_offen: list[str] = Field(default_factory=list)
 
 
 class GruppeVorschau(BaseModel):
@@ -228,6 +223,10 @@ class Dashboard(BaseModel):
     turnier: TurnierAusgabe | None = None
     stand: dt.datetime
     tische: list[TischAusgabe] = Field(default_factory=list)
+    #: Alle Spiele des Turniers - die Grundlage fuer Gruppenkarten und
+    #: KO-Raster. Die beiden Listen darunter sind Auszuege daraus, aber
+    #: gekuerzt; ein Bild des ganzen Plans laesst sich daraus nicht bauen.
+    spiele: list[SpielAusgabe] = Field(default_factory=list)
     naechste: list[SpielAusgabe] = Field(default_factory=list)
     letzte: list[SpielAusgabe] = Field(default_factory=list)
     tabellen: list[TabelleAusgabe] = Field(default_factory=list)

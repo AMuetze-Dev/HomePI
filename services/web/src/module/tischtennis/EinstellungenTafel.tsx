@@ -16,8 +16,7 @@ interface Props {
 const VORGABE: Einstellungen = {
   modus: "gruppen_ko",
   tische: 2,
-  best_of: 5,
-  punkte_bis: 11,
+  best_of: 3,
   minuten_pro_spiel: 12,
   anzahl_gruppen: 2,
   weiter_pro_gruppe: 2,
@@ -149,29 +148,18 @@ export function EinstellungenTafel({
             />
           </div>
 
-          <div className={stil.zweispaltig}>
-            <Auswahl
-              beschriftung="Gewinnsätze"
-              value={String(werte.best_of)}
-              disabled={!planung}
-              onChange={(wert) => setze("best_of", Number(wert))}
-              optionen={[
-                { wert: "3", wort: "Best of 3" },
-                { wert: "5", wort: "Best of 5" },
-                { wert: "7", wort: "Best of 7" },
-              ]}
-            />
-            <Auswahl
-              beschriftung="Punkte je Satz"
-              value={String(werte.punkte_bis)}
-              disabled={!planung}
-              onChange={(wert) => setze("punkte_bis", Number(wert))}
-              optionen={[
-                { wert: "11", wort: "bis 11" },
-                { wert: "21", wort: "bis 21" },
-              ]}
-            />
-          </div>
+          <Auswahl
+            beschriftung="Gewinnsätze"
+            hinweis="Sagt nur, wie lange gespielt wird – eingetragen wird allein der Sieger"
+            value={String(werte.best_of)}
+            onChange={(wert) => setze("best_of", Number(wert))}
+            optionen={[
+              { wert: "1", wort: "Ein Satz" },
+              { wert: "3", wort: "Best of 3" },
+              { wert: "5", wort: "Best of 5" },
+              { wert: "7", wort: "Best of 7" },
+            ]}
+          />
 
           {werte.modus === "gruppen_ko" && (
             <div className={stil.zweispaltig}>

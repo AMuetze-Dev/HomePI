@@ -13,12 +13,12 @@ Einstellungen, Logging, `/health`, `/info`, Fehlerformat, Anfrage-Kennung.
 
 | | |
 |---|---|
-| **Teilnehmer** | Namen und eine Notiz (Abteilung, Standort). Änderbar, solange der Spielplan nicht steht |
+| **Turnier** | Ein Bereich für alles: Namen eintragen, auswürfeln, Ergebnisse werten |
 | **Auswürfeln** | Vorschau zuerst, beliebig oft neu, erst dann festschreiben. Die **Saat** wird gespeichert: mit ihr entsteht dasselbe Los wieder |
 | **Drei Modi** | Gruppen + KO, reines KO, Schweizer System — der Zeitplan entscheidet, nicht die Software |
-| **Spielplan** | Tische, geschätzte Anfangszeiten, Ergebnis satzweise eintragbar; eine Korrektur nimmt die Folgespiele mit |
-| **Tabellen** | Punkte, direkter Vergleich, Satzdifferenz, Balldifferenz |
-| **Dashboard** | Ohne Anmeldung: wer gerade an welchem Tisch spielt, wer als nächstes dran ist, wie die anderen gespielt haben |
+| **Ergebnis** | Ein Tippen auf den Namen des Siegers. Mehr wird nicht eingetragen |
+| **Gleichstand** | Punktgleiche an der Grenze spielen gegeneinander — das Entscheidungsspiel steht von selbst im Plan |
+| **Dashboard** | Ohne Anmeldung: wer an welchem Tisch spielt, wer als nächstes dran ist, und der Plan als Bild mit Gruppen und KO-Raster |
 | **Glocke** | Wer seinen Namen antippt, wird benachrichtigt, sobald das Spiel vor seinem beginnt |
 
 ## Die Entscheidungen, die man kennen sollte
@@ -39,6 +39,20 @@ Routen durch und verlangt das. Siehe
 dann übernehmen. Andersherum müsste jedes Verwerfen den halben Spielplan
 wieder aufräumen — und ein Fehler dabei wäre ein Turnier mit Spielen aus zwei
 verschiedenen Losen.
+
+**Ein Ergebnis ist ein Sieger und sonst nichts.** Keine Sätze, keine Bälle,
+keine Differenzen. Wer nebenbei ein Turnier führt, tippt einen Namen an und
+nicht sechs Zahlen. Die Einstellung „Gewinnsätze“ steht in keinem Datensatz —
+sie sagt nur den Spielern am Tisch, worauf sie spielen, und darf deshalb
+abends noch gekürzt werden.
+
+**Was dabei verloren geht, entscheidet ein Spiel.** Ohne Satzdifferenz gibt es
+keinen Rechenweg, der Punktgleiche trennt; der direkte Vergleich wäre eine
+stille Entscheidung. Also teilen sich Punktgleiche in der Tabelle den Platz,
+und wenn dieser Gleichstand die Grenze zum Weiterkommen kreuzt, setzt der
+Dienst von selbst ein Entscheidungsspiel an — bei dreien eine kleine Runde
+jeder gegen jeden. Steht der Gleichstand oberhalb der Grenze und kommen
+ohnehin beide weiter, bleibt er stehen: dann entscheidet er nichts.
 
 **Das KO-Raster steht vor dem ersten Ball.** Ein Spiel, dessen Gegner noch
 nicht feststeht, verweist auf die Nummer des Spiels, dessen Sieger bei ihm

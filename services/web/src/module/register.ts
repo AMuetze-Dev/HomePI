@@ -57,22 +57,17 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
     id: "tischtennis",
     Komponente: TischtennisSeite,
     // Die Dashboard-Ansicht lebt von der Breite: zwei Tische nebeneinander,
-    // daneben die naechsten Spiele. Die Flaechen, bei denen das falsch
-    // waere, sagen es unten selbst.
+    // darunter Gruppen und Raster.
     breite: "weit",
     unterseiten: [
       // Zuerst, und das mit Absicht: diese Flaeche ist der Grund, warum das
       // Artefakt oeffentlich ist. Wer die Kachel ohne Konto antippt, landet
       // auf der ersten Unterseite - also hier.
       { id: "dashboard", wort: "Dashboard", breite: "voll" },
-      // Zwanzig Namen eintippen. Ein Eingabefeld ueber die ganze
-      // Monitorbreite ist dabei nicht grosszuegig, sondern unlesbar.
-      { id: "teilnehmer", wort: "Teilnehmer", breite: "normal" },
-      { id: "auswuerfeln", wort: "Auswürfeln" },
-      // Nummer, Paarung, Tisch, Zeit, Satzstand und vier Knoepfe in einer
-      // Zeile - der Grund, warum es diese Stufe gibt.
-      { id: "spielplan", wort: "Spielplan", breite: "voll" },
-      { id: "tabellen", wort: "Tabellen" },
+      // Teilnehmer, Auswuerfeln und Spielplan in einem. Drei Reiter waren
+      // richtig, solange ein Ergebnis aus sechs Zahlen bestand; seit es ein
+      // Name ist, sind es zwei Handgriffe und einer zu viel.
+      { id: "turnier", wort: "Turnier" },
       { id: "einstellungen", wort: "Einstellungen", breite: "text" },
     ],
   },
