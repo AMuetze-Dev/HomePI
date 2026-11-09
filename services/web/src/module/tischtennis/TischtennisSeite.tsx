@@ -21,6 +21,7 @@ import {
   nimmErgebnisZurueck,
   setzeZurueck,
   trageErgebnisEin,
+  verschiebeSpiel,
   wuerfleAus,
   beendeTurnier,
   type Einstellungen,
@@ -296,6 +297,9 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
           void mitFehlerbehandlung(() => trageErgebnisEin(spielId, siegerId))
         }
         onZuruecknehmen={(id) => void mitFehlerbehandlung(() => nimmErgebnisZurueck(id))}
+        onVerschieben={(id, richtung) =>
+          void mitFehlerbehandlung(() => verschiebeSpiel(id, richtung))
+        }
         onNaechsteRunde={() => void mitFehlerbehandlung(() => naechsteRunde(turnier.id))}
       />
     </>

@@ -311,14 +311,85 @@ def gruppen_vorschlag(anzahl_teilnehmer: int) -> int:
     return max(1, min(anzahl_teilnehmer // 2, round(anzahl_teilnehmer / 4)))
 
 
-def ko_bezeichnung(runde: int, runden_gesamt: int) -> str:
+@dataclass(frozen=True, slots=True)
+class Warteplatz:
+    """Ein Spiel, wie das Verschieben es sieht - ohne Namen, ohne Tisch.
+
+    ``haengt_an`` sind die Nummern der Spiele, deren Ausgang hier einlaeuft.
+    Mehr braucht die Entscheidung nicht, und weniger ginge nicht: ohne diese
+    Angabe liesse sich ein Halbfinale vor sein Viertelfinale ziehen.
+    """
+
+    id: str
+    nummer: int
+    zustand: str
+    haengt_an: tuple[int, ...] = ()
+
+
+def tauschpartner(reihe: Sequence[Warteplatz], spiel_id: str, richtung: str) -> str:
+    """Mit welchem Spiel getauscht wird - oder eine Begruendung, warum nicht.
+
+    Getauscht wird mit dem naechsten GEPLANTEN Nachbarn in der gewuenschten
+    Richtung. Dass Beendete und Laufende dabei uebersprungen werden, ist
+    Absicht: sie sind keine Tauschpartner, sollen aber auch keine Mauer sein,
+    hinter der sich nichts mehr bewegt.
+
+    Ein Tausch bleibt verwehrt, wenn dadurch ein Spiel vor seinen Zubringer
+    rutschen wuerde. Das ist die einzige echte Grenze - und sie laesst sich
+    hier auf die beiden Nachbarn beschraenken, weil ein Zubringer immer eine
+    kleinere Nummer hat: liegt etwas dazwischen, sind die beiden keine
+    Nachbarn mehr.
+    """
+    stellen = {platz.id: stelle for stelle, platz in enumerate(reihe)}
+    if spiel_id not in stellen:
+        raise SpielUnbekannt("Dieses Spiel steht nicht in der Warteschlange")
+
+    eigene = stellen[spiel_id]
+    platz = reihe[eigene]
+    if platz.zustand != "geplant":
+        raise FalscherZustand("Verschieben geht nur, solange ein Spiel noch nicht angepfiffen ist")
+
+    schritt = -1 if richtung == "hoch" else 1
+    stelle = eigene + schritt
+    while 0 <= stelle < len(reihe) and reihe[stelle].zustand != "geplant":
+        stelle += schritt
+    if not 0 <= stelle < len(reihe):
+        raise FalscherZustand(
+            "Weiter nach vorn geht es nicht" if schritt < 0 else "Weiter nach hinten geht es nicht"
+        )
+
+    partner = reihe[stelle]
+    frueher, spaeter = (partner, platz) if schritt < 0 else (platz, partner)
+    if frueher.nummer in spaeter.haengt_an:
+        raise FalscherZustand(
+            f"Spiel {spaeter.nummer} braucht erst das Ergebnis von Spiel "
+            f"{frueher.nummer} - vorgezogen stuende dort niemand"
+        )
+    return partner.id
+
+
+def ko_bezeichnung(runde: int, runden_gesamt: int, zweig: str = "einfach") -> str:
     """Wie die KO-Runde heisst.
 
     Sie haengt an der Rastergroesse und nicht an der Nummer: in einem Raster
     fuer vier ist Runde 1 das Halbfinale, in einem fuer sechzehn das
     Achtelfinale.
+
+    ``zweig`` unterscheidet die Straenge des Doppel-KO. Der Unterschied ist
+    keine Feinheit: im Doppel-KO ist die letzte Runde des Siegerzweigs NICHT
+    das Endspiel - wer sie verliert, spielt im Verliererzweig weiter. Stuende
+    "Endspiel" am Tisch, waere das eine falsche Zusage.
     """
-    namen = {0: "Endspiel", 1: "Halbfinale", 2: "Viertelfinale", 3: "Achtelfinale"}
+    if zweig == "finale":
+        return "Endspiel"
+    if zweig == "verlierer":
+        if runde >= runden_gesamt:
+            return "Verlierer-Finale"
+        return f"Verlierer-Runde {runde}"
+
+    namen = {1: "Halbfinale", 2: "Viertelfinale", 3: "Achtelfinale"}
+    if runden_gesamt - runde == 0:
+        return "Sieger-Finale" if zweig == "sieger" else "Endspiel"
     return namen.get(runden_gesamt - runde, f"KO-Runde {runde}")
 
 
@@ -330,7 +401,9 @@ def ko_bezeichnung(runde: int, runden_gesamt: int) -> str:
 #: Sieger ist, steht die Zahl in keinem Datensatz - sie sagt den Spielern,
 #: wie lange sie spielen, und das darf man mitten im Turnier noch kuerzen,
 #: wenn es knapp wird.
-PLANFESTE_FELDER = frozenset({"modus", "anzahl_gruppen", "weiter_pro_gruppe", "runden"})
+PLANFESTE_FELDER = frozenset(
+    {"modus", "anzahl_gruppen", "weiter_pro_gruppe", "runden", "doppel_ko"}
+)
 
 
 def darf_einstellung_aendern(zustand: str, abweichend: Iterable[str]) -> Entscheidung:
@@ -423,6 +496,7 @@ __all__ = [
     "TeilnehmerUnbekannt",
     "TurnierUnbekannt",
     "UngueltigesErgebnis",
+    "Warteplatz",
     "darf_auswuerfeln",
     "darf_einstellung_aendern",
     "darf_teilnehmer_aendern",
@@ -437,4 +511,5 @@ __all__ = [
     "pruefe_sieger",
     "runde_vollstaendig",
     "tabelle",
+    "tauschpartner",
 ]

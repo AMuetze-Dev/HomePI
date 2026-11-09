@@ -39,6 +39,7 @@ from .schemas import (
     PaarungVorschau,
     SpielAusgabe,
     SpielBeginnen,
+    SpielVerschieben,
     TabelleAusgabe,
     TabellenzeileAusgabe,
     TeilnehmerAnlegen,
@@ -103,8 +104,12 @@ def _spiel_ausgabe(
         gast_id=spiel.gast_id,
         heim=namen.get(spiel.heim_id) if spiel.heim_id else None,
         gast=namen.get(spiel.gast_id) if spiel.gast_id else None,
-        heim_herkunft=_herkunft(spiel.heim_id, spiel.heim_aus_spiel, spiel.freilos),
-        gast_herkunft=_herkunft(spiel.gast_id, spiel.gast_aus_spiel, spiel.freilos),
+        heim_herkunft=_herkunft(
+            spiel.heim_id, spiel.heim_aus_spiel, spiel.freilos, spiel.heim_aus_verlierer
+        ),
+        gast_herkunft=_herkunft(
+            spiel.gast_id, spiel.gast_aus_spiel, spiel.freilos, spiel.gast_aus_verlierer
+        ),
         zustand=spiel.zustand,  # type: ignore[arg-type]
         tisch=spiel.tisch if spiel.tisch is not None else (zeile.tisch if zeile else None),
         sieger_id=spiel.sieger_id,
@@ -116,14 +121,25 @@ def _spiel_ausgabe(
     )
 
 
-def _herkunft(teilnehmer_id: uuid.UUID | None, aus_spiel: int | None, freilos: bool) -> str | None:
-    """Was anstelle des Namens steht, solange der Gegner nicht feststeht."""
+def _herkunft(
+    teilnehmer_id: uuid.UUID | None,
+    aus_spiel: int | None,
+    freilos: bool,
+    aus_verlierer: bool = False,
+) -> str | None:
+    """Was anstelle des Namens steht, solange der Gegner nicht feststeht.
+
+    Im Doppel-KO laeuft hier auch ein Verlierer ein - und dann muss genau das
+    dastehen. "Sieger aus Spiel 7" an einem Platz, auf den der Verlierer
+    kommt, wuere das Raster an der Wand unlesbar machen.
+    """
     if teilnehmer_id is not None:
         return None
     if freilos:
         return "Freilos"
     if aus_spiel is not None:
-        return f"Sieger aus Spiel {aus_spiel}"
+        wer = "Verlierer" if aus_verlierer else "Sieger"
+        return f"{wer} aus Spiel {aus_spiel}"
     return "offen"
 
 
@@ -468,6 +484,24 @@ async def spiel_beginnen(
     spiel_id: uuid.UUID, daten: SpielBeginnen, sitzung: DbSitzung
 ) -> SpielAusgabe:
     spiel = await speicher.spiel_beginnen(sitzung, spiel_id, daten.tisch)
+    return await _ein_spiel_ausgabe(sitzung, spiel)
+
+
+@router.post(
+    "/spiel/{spiel_id}/verschieben",
+    summary="Spiel in der Warteschlange verschieben",
+    dependencies=[MITSCHREIBEN],
+)
+async def spiel_verschieben(
+    spiel_id: uuid.UUID, daten: SpielVerschieben, sitzung: DbSitzung
+) -> SpielAusgabe:
+    """Ein Spiel einen Platz nach vorn oder nach hinten.
+
+    Wer gerade nicht da ist, haelt sonst den ganzen Plan auf. Trotzdem
+    anzupfeifen waere die schlechtere Loesung: dann stimmt die Warteschlange
+    im Dashboard nicht mehr, und die Glocke laeutet beim Falschen.
+    """
+    spiel = await speicher.spiel_verschieben(sitzung, spiel_id, daten.richtung)
     return await _ein_spiel_ausgabe(sitzung, spiel)
 
 

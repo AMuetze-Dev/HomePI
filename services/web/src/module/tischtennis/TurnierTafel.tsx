@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand } from "../../ui";
-import type { Auslosung, Spiel, Teilnehmer, Turnier } from "./api";
+import type { Auslosung, Richtung, Spiel, Teilnehmer, Turnier } from "./api";
 import stil from "./TischtennisSeite.module.css";
 import { dauer, uhrzeit } from "./zeit";
 
@@ -18,6 +18,7 @@ interface Props {
   onBeginnen: (id: string) => void;
   onSieger: (spielId: string, siegerId: string) => void;
   onZuruecknehmen: (id: string) => void;
+  onVerschieben: (id: string, richtung: Richtung) => void;
   onNaechsteRunde: () => void;
 }
 
@@ -45,6 +46,7 @@ export function TurnierTafel({
   onBeginnen,
   onSieger,
   onZuruecknehmen,
+  onVerschieben,
   onNaechsteRunde,
 }: Props) {
   if (turnier.zustand === "planung") {
@@ -72,6 +74,7 @@ export function TurnierTafel({
       onBeginnen={onBeginnen}
       onSieger={onSieger}
       onZuruecknehmen={onZuruecknehmen}
+      onVerschieben={onVerschieben}
       onNaechsteRunde={onNaechsteRunde}
       onZuruecksetzen={onZuruecksetzen}
     />
@@ -102,9 +105,11 @@ function Teilnehmerliste({
 
   return (
     <section aria-labelledby="mitspieler">
-      <h2 id="mitspieler" className={stil.abschnittstitel}>
-        Wer spielt mit?
-      </h2>
+      <div className={stil.abschnittskopf}>
+        <h2 id="mitspieler" className={stil.abschnittstitel}>
+          Wer spielt mit?
+        </h2>
+      </div>
 
       <Karte>
         {/* Das Formular steht oben: hier werden zwanzig Namen hintereinander
@@ -176,9 +181,11 @@ function Wuerfel({
 
   return (
     <section aria-labelledby="auswuerfeln">
-      <h2 id="auswuerfeln" className={stil.abschnittstitel}>
-        Auswürfeln
-      </h2>
+      <div className={stil.abschnittskopf}>
+        <h2 id="auswuerfeln" className={stil.abschnittstitel}>
+          Auswürfeln
+        </h2>
+      </div>
 
       <Karte>
         <Knopf auspraegung="primaer" disabled={laeuft} onClick={() => void wuerfeln()}>
@@ -246,6 +253,7 @@ function Spielplan({
   onBeginnen,
   onSieger,
   onZuruecknehmen,
+  onVerschieben,
   onNaechsteRunde,
   onZuruecksetzen,
 }: {
@@ -255,6 +263,7 @@ function Spielplan({
   onBeginnen: (id: string) => void;
   onSieger: (spielId: string, siegerId: string) => void;
   onZuruecknehmen: (id: string) => void;
+  onVerschieben: (id: string, richtung: Richtung) => void;
   onNaechsteRunde: () => void;
   onZuruecksetzen: () => void;
 }) {
@@ -280,9 +289,11 @@ function Spielplan({
       {turnier.zustand === "beendet" && <Hinweis>Das Turnier ist durch.</Hinweis>}
 
       <section aria-labelledby="offen">
-        <h2 id="offen" className={stil.abschnittstitel}>
-          {offen.length === 0 ? "Nichts mehr offen" : `Noch ${offen.length} zu spielen`}
-        </h2>
+        <div className={stil.abschnittskopf}>
+          <h2 id="offen" className={stil.abschnittstitel}>
+            {offen.length === 0 ? "Nichts mehr offen" : `Noch ${offen.length} zu spielen`}
+          </h2>
+        </div>
 
         {offen.length === 0 ? (
           <Leerzustand titel="Alles gewertet">
@@ -302,6 +313,30 @@ function Spielplan({
                         ` · ab ${uhrzeit(spiel.erwartet_ab)}`}
                     </span>
                     {spiel.zustand === "laeuft" && <Etikett ton="warnung">läuft</Etikett>}
+                    {/* Schieben, wenn jemand gerade keine Zeit hat.
+                        Trotzdem anzupfeifen waere die schlechtere Loesung:
+                        dann stimmt die Warteschlange im Dashboard nicht
+                        mehr, und die Glocke laeutet beim Falschen. */}
+                    {spiel.zustand === "geplant" && darfEinrichten && (
+                      <span className={stil.schieben}>
+                        <Knopf
+                          groesse="sm"
+                          auspraegung="leise"
+                          onClick={() => onVerschieben(spiel.id, "hoch")}
+                          aria-label={`Spiel ${spiel.nummer} nach vorn schieben`}
+                        >
+                          ↑
+                        </Knopf>
+                        <Knopf
+                          groesse="sm"
+                          auspraegung="leise"
+                          onClick={() => onVerschieben(spiel.id, "runter")}
+                          aria-label={`Spiel ${spiel.nummer} nach hinten schieben`}
+                        >
+                          ↓
+                        </Knopf>
+                      </span>
+                    )}
                   </div>
 
                   {spiel.heim_id && spiel.gast_id ? (
@@ -347,9 +382,11 @@ function Spielplan({
 
       {gewertet.length > 0 && (
         <section aria-labelledby="gewertet">
-          <h2 id="gewertet" className={stil.abschnittstitel}>
-            Gewertet
-          </h2>
+          <div className={stil.abschnittskopf}>
+            <h2 id="gewertet" className={stil.abschnittstitel}>
+              Gewertet
+            </h2>
+          </div>
           <Karte blank>
             <ul className={stil.liste}>
               {gewertet.map((spiel) => (

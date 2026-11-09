@@ -20,6 +20,7 @@ export function turnier(rest: Partial<Turnier> = {}): Turnier {
     anzahl_gruppen: 2,
     weiter_pro_gruppe: 2,
     runden: 4,
+    doppel_ko: false,
     saat: null,
     runde_angesetzt: 0,
     ko_steht: false,

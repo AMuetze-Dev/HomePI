@@ -132,19 +132,12 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
 
   return (
     <div className={stil.dashboard}>
-      {faellig.length > 0 && (
-        <Hinweis ton="warnung" dringend>
-          Gleich dran:{" "}
-          {faellig
-            .map((spiel) => `${spiel.heim} gegen ${spiel.gast} an Tisch ${spiel.tisch}`)
-            .join(" · ")}
-        </Hinweis>
-      )}
-
       <section aria-labelledby="tische">
-        <h2 id="tische" className={stil.abschnittstitel}>
-          An den Tischen
-        </h2>
+        <div className={stil.abschnittskopf}>
+          <h2 id="tische" className={stil.abschnittstitel}>
+            An den Tischen
+          </h2>
+        </div>
         <div className={stil.tische}>
           {daten.tische.map((tisch) => (
             <Karte key={tisch.tisch}>
@@ -174,16 +167,28 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
                 <p className={stil.nebensache}>Kein Spiel angepfiffen.</p>
               )}
 
+              {/* Die Warteschlange dieses Tisches. Eine zweite, globale
+                  Liste „Als nächstes“ stand hier früher darunter und sagte
+                  bei einem Tisch genau dasselbe - zweimal dieselbe Auskunft
+                  ist eine zu viel, und sie kostete einen halben Bildschirm. */}
               {tisch.danach.length > 0 && (
                 <ol className={stil.danach}>
                   {tisch.danach.map((spiel) => (
                     <li key={spiel.id}>
-                      <span>
+                      <span className={stil.paarungZeile}>
                         {spiel.heim ?? spiel.heim_herkunft} gegen{" "}
                         {spiel.gast ?? spiel.gast_herkunft}
+                        {istGeweckt(spiel, glocken) && (
+                          <span aria-label="Glocke an" title="Glocke an">
+                            {" "}
+                            🔔
+                          </span>
+                        )}
                       </span>
                       <span className={stil.nebensache}>
-                        ab {uhrzeit(spiel.erwartet_ab)}
+                        {spiel.gleich_dran
+                          ? "gleich dran"
+                          : `ab ${uhrzeit(spiel.erwartet_ab)}`}
                       </span>
                     </li>
                   ))}
@@ -194,87 +199,21 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
         </div>
       </section>
 
-      <div className={stil.spalten}>
-        <section aria-labelledby="naechste">
-          <h2 id="naechste" className={stil.abschnittstitel}>
-            Als nächstes
-          </h2>
-          {daten.naechste.length === 0 ? (
-            <Leerzustand titel="Nichts mehr offen">
-              {daten.fertig
-                ? "Das Turnier ist durch."
-                : "Die nächste Runde ist noch nicht angesetzt."}
-            </Leerzustand>
-          ) : (
-            <Karte blank>
-              <ol className={stil.liste}>
-                {daten.naechste.map((spiel) => (
-                  <li key={spiel.id} className={stil.zeile}>
-                    <div>
-                      <div className={stil.paarungZeile}>
-                        {spiel.heim ?? spiel.heim_herkunft} gegen{" "}
-                        {spiel.gast ?? spiel.gast_herkunft}
-                        {istGeweckt(spiel, glocken) && (
-                          <span aria-label="Glocke an" title="Glocke an">
-                            {" "}
-                            🔔
-                          </span>
-                        )}
-                      </div>
-                      <div className={stil.nebensache}>
-                        {spiel.bezeichnung} · Tisch {spiel.tisch} · ab{" "}
-                        {uhrzeit(spiel.erwartet_ab)}
-                      </div>
-                    </div>
-                    {spiel.gleich_dran && <Etikett ton="warnung">gleich dran</Etikett>}
-                  </li>
-                ))}
-              </ol>
-            </Karte>
-          )}
-        </section>
+      <PlanGrafik tabellen={daten.tabellen} spiele={daten.spiele} />
 
-        <section aria-labelledby="letzte">
-          <h2 id="letzte" className={stil.abschnittstitel}>
-            Zuletzt gespielt
-          </h2>
-          {daten.letzte.length === 0 ? (
-            <Leerzustand titel="Noch kein Ergebnis">
-              Hier stehen die Spiele, sobald das erste gewertet ist.
-            </Leerzustand>
-          ) : (
-            <Karte blank>
-              <ol className={stil.liste}>
-                {daten.letzte.map((spiel) => (
-                  <li key={spiel.id} className={stil.zeile}>
-                    <span
-                      className={
-                        spiel.sieger_id === spiel.heim_id ? stil.sieger : undefined
-                      }
-                    >
-                      {spiel.heim}
-                    </span>
-                    <span className={stil.gegen}>gegen</span>
-                    <span
-                      className={
-                        spiel.sieger_id === spiel.gast_id ? stil.sieger : undefined
-                      }
-                    >
-                      {spiel.gast}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </Karte>
-          )}
-        </section>
-      </div>
-
-      <section aria-labelledby="glocke">
-        <h2 id="glocke" className={stil.abschnittstitel}>
+      {/* Zugeklappt, weil beides Nachschlagewerk ist: man braucht es, wenn
+          man es braucht, und sonst nimmt es Platz vor dem weg, was gerade
+          passiert. */}
+      <details className={stil.klappe}>
+        <summary className={stil.klappengriff}>
           Glocke
-        </h2>
-        <Karte>
+          <span className={stil.nebensache}>
+            {glocken.length > 0
+              ? ` · ${glocken.length} aktiv`
+              : " · benachrichtigt werden"}
+          </span>
+        </summary>
+        <div className={stil.klappeninhalt}>
           <p className={stil.nebensache}>
             Tippe deinen Namen an. Sobald das Spiel vor deinem beginnt, meldet sich dieses
             Gerät – mit Ton und, wenn du es erlaubst, als Benachrichtigung. Das gilt nur
@@ -299,10 +238,36 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
               Ohne erteilte Erlaubnis erscheint die Meldung nur auf dieser Seite.
             </p>
           )}
-        </Karte>
-      </section>
+        </div>
+      </details>
 
-      <PlanGrafik tabellen={daten.tabellen} spiele={daten.spiele} />
+      {daten.letzte.length > 0 && (
+        <details className={stil.klappe}>
+          <summary className={stil.klappengriff}>
+            Zuletzt gespielt
+            <span className={stil.nebensache}>
+              {` · ${daten.letzte.length} ${daten.letzte.length === 1 ? "Ergebnis" : "Ergebnisse"}`}
+            </span>
+          </summary>
+          <ol className={stil.liste}>
+            {daten.letzte.map((spiel) => (
+              <li key={spiel.id} className={stil.zeile}>
+                <span
+                  className={spiel.sieger_id === spiel.heim_id ? stil.sieger : undefined}
+                >
+                  {spiel.heim}
+                </span>
+                <span className={stil.gegen}>gegen</span>
+                <span
+                  className={spiel.sieger_id === spiel.gast_id ? stil.sieger : undefined}
+                >
+                  {spiel.gast}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
 
       <p className={stil.stand}>
         Stand {uhrzeit(daten.stand)} · aktualisiert sich alle {TAKT / 1000} Sekunden

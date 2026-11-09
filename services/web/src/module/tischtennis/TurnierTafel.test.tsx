@@ -31,6 +31,7 @@ function aufbauen(abweichend: Partial<Parameters<typeof TurnierTafel>[0]> = {}) 
     onBeginnen: vi.fn(),
     onSieger: vi.fn(),
     onZuruecknehmen: vi.fn(),
+    onVerschieben: vi.fn(),
     onNaechsteRunde: vi.fn(),
   };
 

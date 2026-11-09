@@ -54,15 +54,26 @@ class KoPlatz:
 
     teilnehmer: Kennung | None = None
     aus_spiel: int | None = None
+    #: Deutet ``aus_spiel`` auf den VERLIERER jenes Spiels? Nur im Doppel-KO,
+    #: wo die zweite Chance genau daraus besteht. Ohne dieses Feld muesste
+    #: "Verlierer aus Spiel 3" als Text irgendwo mitlaufen - und waere damit
+    #: keine Angabe, die der Speicher aufloesen kann.
+    verlierer: bool = False
+
+
+#: Welcher Strang des Rasters. Im einfachen KO gibt es nur ``sieger``.
+Zweig = str
 
 
 @dataclass(frozen=True, slots=True)
 class KoBegegnung:
     nummer: int
-    #: 1 ist die erste Runde, die hoechste das Endspiel.
+    #: 1 ist die erste Runde, die hoechste das Endspiel. Zaehlt je Zweig.
     runde: int
     heim: KoPlatz
     gast: KoPlatz
+    #: einfach (nur ein Strang) | sieger | verlierer | finale
+    zweig: Zweig = "einfach"
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +99,7 @@ def plan_auswuerfeln(
     anzahl_gruppen: int,
     saat: int,
     tische: int = 1,
+    doppel_ko: bool = False,
 ) -> Spielplan:
     """Ein Wurf, je Modus das Passende.
 
@@ -109,7 +121,7 @@ def plan_auswuerfeln(
     random.Random(saat).shuffle(gemischt)
 
     if modus == "ko":
-        return Spielplan(ko=ko_raster(gemischt))
+        return Spielplan(ko=doppel_ko_raster(gemischt) if doppel_ko else ko_raster(gemischt))
 
     if modus == "schweizer":
         paarungen, freilos = schweizer_paarung(gemischt, bisherige=set(), freilose=set())
@@ -298,6 +310,121 @@ def ko_raster(gesetzte: Sequence[Kennung]) -> list[KoBegegnung]:
         plaetze = naechste
         runde += 1
     return spiele
+
+
+def doppel_ko_raster(gesetzte: Sequence[Kennung]) -> list[KoBegegnung]:
+    """Dasselbe Raster, aber mit zweiter Chance: wer einmal verliert, spielt
+    in der Verliererrunde weiter und ist erst nach der zweiten Niederlage aus.
+
+    Das Ergebnis ist eine Liste in Spielreihenfolge, und die Reihenfolge ist
+    die eines echten Turniers: erst eine Runde im Siegerzweig, dann die
+    Verliererrunde, die deren Verlierer auffaengt. Die Nummer ist damit
+    gleichzeitig die Reihenfolge, und kein Spiel verweist nach vorn.
+
+    Drei Zahlen dazu, weil sie beim Planen gebraucht werden: es sind
+    ``2n - 2`` Spiele statt ``n - 1``, jeder spielt mindestens zwei, und der
+    Sieger des Verliererzweigs tritt im Endspiel genau einmal gegen den
+    Sieger des Siegerzweigs an.
+
+    **Kein bracket reset.** Gewinnt im Endspiel der aus dem Verliererzweig,
+    hat er den anderen einmal geschlagen und ist Turniersieger - im strengen
+    Doppel-KO waere jetzt ein zweites Endspiel faellig, weil der andere erst
+    eine Niederlage hat. Das ist richtig und hier trotzdem weggelassen: ein
+    Turnier, dessen Ende "vielleicht noch ein Spiel" ist, laesst sich nebenbei
+    nicht fuehren.
+    """
+    sieger_zweig = ko_raster(gesetzte)
+
+    nach_runde: dict[int, list[KoBegegnung]] = {}
+    for spiel in sieger_zweig:
+        nach_runde.setdefault(spiel.runde, []).append(spiel)
+
+    spiele: list[KoBegegnung] = []
+    #: Alte Nummer aus ``ko_raster`` -> neue, weil sich die Verliererrunden
+    #: dazwischenschieben.
+    umbenannt: dict[int, int] = {}
+    #: Wer im Verliererzweig noch lebt - als Platz, nicht als Name: wer das
+    #: ist, steht erst fest, wenn gespielt wurde.
+    lebend: list[KoPlatz] = []
+    lb_runde = 0
+
+    def _ansetzen(heim: KoPlatz, gast: KoPlatz, runde: int, zweig: str) -> KoPlatz:
+        nummer = len(spiele) + 1
+        spiele.append(KoBegegnung(nummer=nummer, runde=runde, heim=heim, gast=gast, zweig=zweig))
+        return KoPlatz(aus_spiel=nummer)
+
+    def _verliererrunde(feld: list[KoPlatz]) -> list[KoPlatz]:
+        """Paart das Feld und gibt zurueck, wer danach noch lebt.
+
+        Eine ungerade Zahl bedeutet ein Freilos: der Uebrige rueckt auf, ohne
+        gespielt zu haben. Ein Spiel gegen niemanden waere eines, das in jedem
+        Zeitplan erklaert werden muesste.
+        """
+        nonlocal lb_runde
+        if len(feld) < 2:
+            return feld
+        lb_runde += 1
+        weiter = [
+            _ansetzen(feld[stelle], feld[stelle + 1], lb_runde, "verlierer")
+            for stelle in range(0, len(feld) - 1, 2)
+        ]
+        if len(feld) % 2:
+            weiter.append(feld[-1])
+        return weiter
+
+    runden = sorted(nach_runde)
+    for stelle, runde in enumerate(runden):
+        for spiel in nach_runde[runde]:
+            nummer = len(spiele) + 1
+            umbenannt[spiel.nummer] = nummer
+            spiele.append(
+                KoBegegnung(
+                    nummer=nummer,
+                    runde=runde,
+                    heim=_umbenennen(spiel.heim, umbenannt),
+                    gast=_umbenennen(spiel.gast, umbenannt),
+                    zweig="sieger",
+                )
+            )
+
+        absteiger = [
+            KoPlatz(aus_spiel=umbenannt[spiel.nummer], verlierer=True)
+            for spiel in nach_runde[runde]
+        ]
+
+        # Kreuzweise: wer schon eine Niederlage hat, trifft einen gerade
+        # Abgestiegenen - und nicht sofort wieder denselben Gegner.
+        gekreuzt: list[KoPlatz] = []
+        absteiger.reverse()
+        while lebend and absteiger:
+            gekreuzt.append(lebend.pop(0))
+            gekreuzt.append(absteiger.pop(0))
+        gekreuzt.extend(lebend)
+        gekreuzt.extend(absteiger)
+        lebend = _verliererrunde(gekreuzt)
+
+        # So lange zusammenfuehren, bis gerade so viele uebrig sind, wie in
+        # der naechsten Runde von oben nachkommen. Ohne diesen Schritt
+        # staende der Verliererzweig am Ende mit zwei Leuten da.
+        nachkommend = len(nach_runde[runden[stelle + 1]]) if stelle + 1 < len(runden) else 0
+        while len(lebend) > max(1, nachkommend):
+            lebend = _verliererrunde(lebend)
+
+    hoechste = runden[-1]
+    aus_dem_siegerzweig = KoPlatz(aus_spiel=umbenannt[nach_runde[hoechste][0].nummer])
+    _ansetzen(aus_dem_siegerzweig, lebend[0], 1, "finale")
+    return spiele
+
+
+def _umbenennen(platz: KoPlatz, umbenannt: dict[int, int]) -> KoPlatz:
+    """Dasselbe Platzhalterfeld, nur mit der neuen Spielnummer."""
+    if platz.aus_spiel is None:
+        return platz
+    return KoPlatz(
+        teilnehmer=platz.teilnehmer,
+        aus_spiel=umbenannt[platz.aus_spiel],
+        verlierer=platz.verlierer,
+    )
 
 
 def ko_setzliste(

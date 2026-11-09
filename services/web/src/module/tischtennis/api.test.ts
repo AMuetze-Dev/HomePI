@@ -32,6 +32,7 @@ const EINSTELLUNGEN: Einstellungen = {
   minuten_pro_spiel: 12,
   anzahl_gruppen: 2,
   weiter_pro_gruppe: 2,
+  doppel_ko: false,
   runden: 4,
 };
 

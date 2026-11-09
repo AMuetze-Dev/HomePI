@@ -44,6 +44,10 @@ class Turnier(Base, ZeitstempelMixin):
     weiter_pro_gruppe: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
     #: nur bei schweizer
     runden: Mapped[int] = mapped_column(Integer, nullable=False, default=4)
+    #: Zweite Chance im KO: wer einmal verliert, spielt im Verliererzweig
+    #: weiter. Verdoppelt die Spielzahl im Raster fast (2n-2 statt n-1) und
+    #: haengt deshalb am Plan - mitten im Turnier nicht mehr umstellbar.
+    doppel_ko: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     #: Die Saat, mit der ausgelost wurde. Steht hier, damit "so wurde
     #: ausgewuerfelt" eine nachvollziehbare Auskunft ist und keine
@@ -128,8 +132,16 @@ class Spiel(Base, ZeitstempelMixin):
     #: Fortlaufend ab 1 und gleichzeitig die Reihenfolge des Spielplans.
     #: KO-Spiele verweisen ueber diese Nummer aufeinander.
     nummer: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: Die Stelle in der Warteschlange. Beim Anlegen gleich ``nummer``, danach
+    #: von der Turnierleitung verschiebbar.
+    #:
+    #: Eine eigene Spalte, weil ``nummer`` die Verweise des Rasters traegt:
+    #: "Sieger aus Spiel 7" darf nicht etwas anderes bedeuten, nur weil
+    #: jemand gerade keine Zeit hatte.
+    reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    #: gruppe | ko | runde (Schweizer System) | entscheidung (Gleichstand)
+    #: gruppe | ko | ko_verlierer | ko_finale | runde (Schweizer System)
+    #: | entscheidung (Gleichstand)
     phase: Mapped[str] = mapped_column(String(20), nullable=False)
     runde: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     #: "Gruppe A - Runde 1", "Halbfinale", "Runde 3". Steht in der Datenbank
@@ -160,6 +172,11 @@ class Spiel(Base, ZeitstempelMixin):
     #: nicht feststeht.
     heim_aus_spiel: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     gast_aus_spiel: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    #: Deutet der Verweis auf den VERLIERER jenes Spiels? Genau das ist die
+    #: zweite Chance im Doppel-KO. Ein eigenes Feld statt einer negativen
+    #: Nummer: ein Vorzeichen als Bedeutungstraeger findet niemand wieder.
+    heim_aus_verlierer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    gast_aus_verlierer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     #: geplant | laeuft | beendet
     zustand: Mapped[str] = mapped_column(String(10), nullable=False, default="geplant")

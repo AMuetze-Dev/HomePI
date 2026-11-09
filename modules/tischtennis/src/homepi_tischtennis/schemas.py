@@ -27,7 +27,7 @@ NameFeld = Annotated[str, Field(min_length=1, max_length=100)]
 Modus = Literal["gruppen_ko", "ko", "schweizer"]
 TurnierZustand = Literal["planung", "laufend", "beendet"]
 SpielZustand = Literal["geplant", "laeuft", "beendet"]
-Phase = Literal["gruppe", "ko", "runde", "entscheidung"]
+Phase = Literal["gruppe", "ko", "ko_verlierer", "ko_finale", "runde", "entscheidung"]
 
 
 def _getrimmt(wert: object) -> object:
@@ -60,6 +60,14 @@ class TurnierEinstellungen(BaseModel):
         2, ge=1, le=8, description="Wie viele je Gruppe ins KO-Raster kommen"
     )
     runden: int = Field(4, ge=1, le=20, description="Nur beim Schweizer System")
+    doppel_ko: bool = Field(
+        False,
+        description=(
+            "Zweite Chance im KO-Raster: wer einmal verliert, spielt im "
+            "Verliererzweig weiter und ist erst nach der zweiten Niederlage "
+            "aus. Das sind fast doppelt so viele Spiele."
+        ),
+    )
 
 
 class TurnierAnlegen(TurnierEinstellungen):
@@ -84,6 +92,7 @@ class TurnierAusgabe(BaseModel):
     anzahl_gruppen: int
     weiter_pro_gruppe: int
     runden: int
+    doppel_ko: bool
     saat: int | None
     runde_angesetzt: int
     ko_steht: bool
@@ -120,6 +129,17 @@ class ErgebnisEintragen(BaseModel):
     """
 
     sieger_id: uuid.UUID
+
+
+class SpielVerschieben(BaseModel):
+    """Einen Platz nach vorn oder nach hinten in der Warteschlange.
+
+    Nur um einen Platz, nicht an eine Zielstelle: wer jemanden spaeter
+    spielen lassen will, drueckt zweimal - und sieht dazwischen, was es mit
+    dem Plan macht.
+    """
+
+    richtung: Literal["hoch", "runter"]
 
 
 class SpielBeginnen(BaseModel):

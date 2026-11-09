@@ -15,11 +15,17 @@ import stil from "./TischtennisSeite.module.css";
  * unterschiedlich lang, und ein Raster, das bei „Maximilian“ bricht, ist
  * schlechter als eines, das mitwächst.
  */
-export function Raster({ spiele }: { spiele: Spiel[] }) {
+export function Raster({
+  spiele,
+  beschriftung = "KO-Raster",
+}: {
+  spiele: Spiel[];
+  beschriftung?: string;
+}) {
   const runden = [...new Set(spiele.map((spiel) => spiel.runde))].sort((a, b) => a - b);
 
   return (
-    <div className={stil.raster} role="group" aria-label="KO-Raster">
+    <div className={stil.raster} role="group" aria-label={beschriftung}>
       {runden.map((runde) => {
         const dieser = spiele.filter((spiel) => spiel.runde === runde);
         return (
