@@ -17,13 +17,13 @@ const { anfrage, sende } = schnittstelle("/tischtennis");
 export type Modus = "gruppen_ko" | "ko" | "schweizer";
 export type TurnierZustand = "planung" | "laufend" | "beendet";
 export type SpielZustand = "geplant" | "laeuft" | "beendet";
-export type Phase = "gruppe" | "ko" | "runde";
+export type Phase = "gruppe" | "ko" | "runde" | "entscheidung";
 
 export interface Einstellungen {
   modus: Modus;
   tische: number;
+  /** Sagt nur, wie lange gespielt wird - in keinem Ergebnis steht sie. */
   best_of: number;
-  punkte_bis: number;
   minuten_pro_spiel: number;
   anzahl_gruppen: number;
   weiter_pro_gruppe: number;
@@ -50,11 +50,6 @@ export interface Teilnehmer {
   freilose: number;
 }
 
-export interface Satz {
-  heim: number;
-  gast: number;
-}
-
 export interface Spiel {
   id: string;
   nummer: number;
@@ -70,9 +65,6 @@ export interface Spiel {
   gast_herkunft: string | null;
   zustand: SpielZustand;
   tisch: number | null;
-  saetze: Satz[];
-  saetze_heim: number;
-  saetze_gast: number;
   sieger_id: string | null;
   freilos: boolean;
   begonnen_am: string | null;
@@ -90,17 +82,13 @@ export interface Tabellenzeile {
   siege: number;
   niederlagen: number;
   punkte: number;
-  saetze_fuer: number;
-  saetze_gegen: number;
-  baelle_fuer: number;
-  baelle_gegen: number;
-  satzdifferenz: number;
-  balldifferenz: number;
 }
 
 export interface Tabelle {
   titel: string;
   zeilen: Tabellenzeile[];
+  /** Punktgleiche an der Grenze, die noch gegeneinander spielen. */
+  entscheidung_offen: string[];
 }
 
 export interface GruppeVorschau {
@@ -134,6 +122,8 @@ export interface Dashboard {
   turnier: Turnier | null;
   stand: string;
   tische: Tisch[];
+  /** Alle Spiele - die Grundlage für Gruppenkarten und KO-Raster. */
+  spiele: Spiel[];
   naechste: Spiel[];
   letzte: Spiel[];
   tabellen: Tabelle[];
@@ -235,8 +225,9 @@ export function beginneSpiel(id: string, tisch?: number): Promise<Spiel> {
   return sende<Spiel>("POST", `/spiel/${kennung(id)}/beginnen`, { tisch: tisch ?? null });
 }
 
-export function trageErgebnisEin(id: string, saetze: Satz[]): Promise<Spiel> {
-  return sende<Spiel>("PUT", `/spiel/${kennung(id)}/ergebnis`, { saetze });
+/** Das ganze Ergebnis: wer gewonnen hat. */
+export function trageErgebnisEin(id: string, siegerId: string): Promise<Spiel> {
+  return sende<Spiel>("PUT", `/spiel/${kennung(id)}/ergebnis`, { sieger_id: siegerId });
 }
 
 export function nimmErgebnisZurueck(id: string): Promise<Spiel> {

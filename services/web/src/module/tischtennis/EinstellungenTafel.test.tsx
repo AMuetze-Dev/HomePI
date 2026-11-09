@@ -12,8 +12,7 @@ function turnier(rest: Partial<Turnier> = {}): Turnier {
     modus: "gruppen_ko",
     zustand: "planung",
     tische: 2,
-    best_of: 5,
-    punkte_bis: 11,
+    best_of: 3,
     minuten_pro_spiel: 12,
     anzahl_gruppen: 2,
     weiter_pro_gruppe: 2,
@@ -106,16 +105,24 @@ describe("Einstellungen", () => {
     expect(screen.getByText(/Vorschlag für 12 Teilnehmer: 3/)).toBeInTheDocument();
   });
 
-  it("sperrt die Regeln, sobald gespielt wird – Tische aber nicht", () => {
-    /* Ein Formular, das sich abschicken laesst und dann abgelehnt wird, ist
-       eine Falle. Deshalb sagt die Flaeche es selbst. */
+  it("sperrt die Regeln, sobald gespielt wird – Tische und Sätze aber nicht", () => {
+    /* Ein Formular, das sich abschicken lässt und dann abgelehnt wird, ist
+       eine Falle. Deshalb sagt die Fläche es selbst. Die Gewinnsätze
+       bleiben offen: sie stehen in keinem Ergebnis und sagen nur, wie
+       lange gespielt wird - das darf man abends noch kürzen. */
     aufbauen({ turnier: turnier({ zustand: "laufend" }) });
 
     expect(screen.getByLabelText("Spielmodus")).toBeDisabled();
-    expect(screen.getByLabelText("Gewinnsätze")).toBeDisabled();
+    expect(screen.getByLabelText("Gewinnsätze")).toBeEnabled();
     expect(screen.getByLabelText("Tische")).toBeEnabled();
     expect(screen.getByLabelText("Minuten je Spiel")).toBeEnabled();
     expect(screen.getByText(/Der Spielplan steht/)).toBeInTheDocument();
+  });
+
+  it("bietet auch einen einzigen Satz an", () => {
+    aufbauen({});
+
+    expect(screen.getByRole("option", { name: "Ein Satz" })).toBeInTheDocument();
   });
 
   it("speichert geänderte Einstellungen", async () => {

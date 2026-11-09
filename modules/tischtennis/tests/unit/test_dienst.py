@@ -1,8 +1,12 @@
-"""Die Regeln des Turniers - Saetze, Tabelle, Zeitplan, Zustaende.
+"""Die Regeln des Turniers - Ergebnis, Tabelle, Zeitplan, Zustaende.
 
 Alles hier ist rein: keine Datenbank, kein await. Deshalb laeuft diese Datei
 in Millisekunden, und nur deshalb wird die rot-gruen-Schleife wirklich
 benutzt.
+
+Der Zuschnitt seit dem Umbau auf Einfachheit: ein Ergebnis ist ein Sieger
+und sonst nichts. Keine Saetze, keine Baelle, keine Differenzen. Was bei
+Punktgleichheit passiert, entscheidet kein Rechenweg, sondern ein Spiel.
 """
 
 from __future__ import annotations
@@ -12,93 +16,18 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from homepi_tischtennis import dienst
-from homepi_tischtennis.dienst import Ergebnis, UngueltigesErgebnis
+from homepi_tischtennis.dienst import Ergebnis
 
-JETZT = datetime(2026, 11, 7, 18, 0, tzinfo=UTC)
-
-
-class TestSatz:
-    @pytest.mark.parametrize("heim,gast", [(11, 9), (11, 0), (12, 10), (15, 13)])
-    def test_gueltige_saetze(self, heim: int, gast: int) -> None:
-        dienst.satz_pruefen((heim, gast), punkte_bis=11)
-
-    def test_bei_zehn_zu_zehn_geht_es_bis_zwei_punkte_vorsprung(self) -> None:
-        """11:10 gibt es nicht. Das ist die Regel, die am haeufigsten falsch
-        eingetippt wird - deshalb faellt sie hier auf und nicht in der
-        Tabelle."""
-        with pytest.raises(UngueltigesErgebnis):
-            dienst.satz_pruefen((11, 10), punkte_bis=11)
-
-    def test_ohne_erreichte_punktzahl_ist_der_satz_nicht_zu_ende(self) -> None:
-        with pytest.raises(UngueltigesErgebnis):
-            dienst.satz_pruefen((10, 5), punkte_bis=11)
-
-    def test_unentschieden_gibt_es_nicht(self) -> None:
-        with pytest.raises(UngueltigesErgebnis):
-            dienst.satz_pruefen((11, 11), punkte_bis=11)
-
-    def test_negative_punkte_werden_abgelehnt(self) -> None:
-        with pytest.raises(UngueltigesErgebnis):
-            dienst.satz_pruefen((11, -1), punkte_bis=11)
-
-    def test_bis_einundzwanzig_gilt_dasselbe(self) -> None:
-        dienst.satz_pruefen((21, 19), punkte_bis=21)
-        with pytest.raises(UngueltigesErgebnis):
-            dienst.satz_pruefen((21, 20), punkte_bis=21)
+JETZT = datetime(2026, 11, 8, 18, 0, tzinfo=UTC)
 
 
-class TestSpielstand:
-    def test_drei_gewonnene_saetze_entscheiden_bei_best_of_five(self) -> None:
-        stand = dienst.spielstand([(11, 9), (11, 5), (9, 11), (11, 7)], best_of=5, punkte_bis=11)
-
-        assert (stand.saetze_heim, stand.saetze_gast) == (3, 1)
-        assert stand.sieger == "heim"
-        assert stand.entschieden
-
-    def test_ein_unfertiges_spiel_hat_keinen_sieger(self) -> None:
-        stand = dienst.spielstand([(11, 9), (9, 11)], best_of=5, punkte_bis=11)
-
-        assert stand.sieger is None
-        assert not stand.entschieden
-
-    def test_der_gast_kann_auch_gewinnen(self) -> None:
-        stand = dienst.spielstand([(9, 11), (5, 11), (7, 11)], best_of=5, punkte_bis=11)
-
-        assert stand.sieger == "gast"
-
-    def test_mehr_saetze_als_moeglich_werden_abgelehnt(self) -> None:
-        with pytest.raises(UngueltigesErgebnis):
-            dienst.spielstand(
-                [(11, 9), (11, 9), (11, 9), (11, 9), (11, 9), (11, 9)], best_of=5, punkte_bis=11
-            )
-
-    def test_nach_der_entscheidung_wird_nicht_weitergespielt(self) -> None:
-        """3:0 und danach noch ein Satz: das ist kein Spielstand, sondern ein
-        Tippfehler - und er wuerde die Satzdifferenz in der Tabelle
-        verfaelschen."""
-        with pytest.raises(UngueltigesErgebnis):
-            dienst.spielstand([(11, 9), (11, 9), (11, 9), (11, 9)], best_of=5, punkte_bis=11)
-
-    def test_best_of_three_ist_nach_zwei_saetzen_entschieden(self) -> None:
-        stand = dienst.spielstand([(11, 9), (11, 9)], best_of=3, punkte_bis=11)
-
-        assert stand.entschieden
-        assert stand.sieger == "heim"
-
-    def test_ein_leeres_ergebnis_ist_kein_fehler(self) -> None:
-        """Ein Spiel ohne eingetragene Saetze ist der Normalzustand, solange
-        es nicht gespielt wurde."""
-        stand = dienst.spielstand([], best_of=5, punkte_bis=11)
-
-        assert stand.sieger is None
-        assert (stand.saetze_heim, stand.saetze_gast) == (0, 0)
+def sieg(sieger: str, verlierer: str) -> Ergebnis:
+    return Ergebnis(heim=sieger, gast=verlierer, sieger=sieger)
 
 
 class TestTabelle:
     def test_ein_sieg_zaehlt_zwei_punkte(self) -> None:
-        zeilen = dienst.tabelle(
-            ["anna", "bernd"], [Ergebnis("anna", "bernd", ((11, 9), (11, 5), (11, 7)))]
-        )
+        zeilen = dienst.tabelle(["anna", "bernd"], [sieg("anna", "bernd")])
 
         assert [(z.teilnehmer, z.punkte, z.platz) for z in zeilen] == [
             ("anna", 2, 1),
@@ -106,90 +35,160 @@ class TestTabelle:
         ]
 
     def test_wer_nicht_gespielt_hat_steht_trotzdem_in_der_tabelle(self) -> None:
-        """Eine Tabelle, in der ein Teilnehmer erst auftaucht, wenn er
-        gespielt hat, laesst beim Lesen offen, ob er fehlt oder nur noch
-        nicht dran war."""
+        """Eine Tabelle, in der jemand erst auftaucht, wenn er gespielt hat,
+        laesst beim Lesen offen, ob er fehlt oder nur noch nicht dran war."""
         zeilen = dienst.tabelle(["anna", "bernd", "cem"], [])
 
         assert len(zeilen) == 3
-        assert all(z.spiele == 0 for z in zeilen)
+        assert all(z.spiele == 0 and z.platz == 1 for z in zeilen)
 
-    def test_zaehlt_saetze_und_baelle(self) -> None:
+    def test_zaehlt_siege_und_niederlagen(self) -> None:
         zeilen = dienst.tabelle(
-            ["anna", "bernd"], [Ergebnis("anna", "bernd", ((11, 9), (9, 11), (11, 5), (11, 7)))]
+            ["anna", "bernd", "cem"],
+            [sieg("anna", "bernd"), sieg("cem", "anna")],
         )
         anna = next(z for z in zeilen if z.teilnehmer == "anna")
 
-        assert (anna.saetze_fuer, anna.saetze_gegen) == (3, 1)
-        assert (anna.baelle_fuer, anna.baelle_gegen) == (42, 32)
-        assert anna.satzdifferenz == 2
-        assert anna.balldifferenz == 10
+        assert (anna.spiele, anna.siege, anna.niederlagen) == (2, 1, 1)
 
-    def test_bei_punktgleichheit_entscheidet_der_direkte_vergleich(self) -> None:
-        """Zwei mit je einem Sieg: die Satzdifferenz ueber alle Spiele kann
-        der eine aus einem Kantersieg gegen Dritte haben. Zuerst zaehlt, wer
-        das Spiel gegeneinander gewonnen hat."""
-        ergebnisse = [
-            # bernd schlaegt anna knapp; anna raeumt dafuer gegen die beiden
-            # anderen ab und steht danach mit bernd punktgleich.
-            Ergebnis("bernd", "anna", ((11, 9), (11, 9), (11, 9))),
-            Ergebnis("anna", "cem", ((11, 0), (11, 0), (11, 0))),
-            Ergebnis("anna", "dana", ((11, 0), (11, 0), (11, 0))),
-            Ergebnis("bernd", "cem", ((11, 9), (11, 9), (11, 9))),
-            Ergebnis("dana", "bernd", ((11, 9), (11, 9), (11, 9))),
-            Ergebnis("cem", "dana", ((11, 9), (11, 9), (11, 9))),
-        ]
+    def test_ein_spiel_ohne_sieger_zaehlt_nicht(self) -> None:
+        """Ein laufendes Spiel steht in der Liste, hat aber keinen Sieger -
+        und darf die Tabelle nicht anfassen."""
+        zeilen = dienst.tabelle(
+            ["anna", "bernd"], [Ergebnis(heim="anna", gast="bernd", sieger=None)]
+        )
 
-        zeilen = dienst.tabelle(["anna", "bernd", "cem", "dana"], ergebnisse)
-        punkte = {z.teilnehmer: z.punkte for z in zeilen}
+        assert all(z.spiele == 0 for z in zeilen)
 
-        assert punkte["anna"] == punkte["bernd"] == 4
-        # Nach Balldifferenz stuende anna vorn - sie hat gegen bernd aber
-        # verloren, und das zaehlt zuerst.
-        assert [z.teilnehmer for z in zeilen] == ["bernd", "anna", "cem", "dana"]
+    def test_punktgleiche_teilen_sich_den_platz(self) -> None:
+        """Kein Rechenweg trennt sie: Satzdifferenz gibt es nicht mehr, und
+        der direkte Vergleich waere eine stille Entscheidung. Geteilter Platz
+        ist die ehrliche Auskunft - und der Anlass fuer ein Entscheidungsspiel."""
+        zeilen = dienst.tabelle(
+            ["anna", "bernd", "cem", "dana"],
+            [sieg("anna", "cem"), sieg("bernd", "dana")],
+        )
 
-    def test_ohne_direkten_vergleich_entscheidet_die_satzdifferenz(self) -> None:
-        ergebnisse = [
-            Ergebnis("anna", "cem", ((11, 0), (11, 0), (11, 0))),
-            Ergebnis("bernd", "dana", ((11, 9), (9, 11), (11, 9), (11, 9))),
-        ]
+        nach_name = {z.teilnehmer: z.platz for z in zeilen}
+        assert nach_name["anna"] == nach_name["bernd"] == 1
+        assert nach_name["cem"] == nach_name["dana"] == 3, "zwei teilen Platz 1, dann kommt 3"
 
-        zeilen = dienst.tabelle(["anna", "bernd", "cem", "dana"], ergebnisse)
-
-        assert [z.teilnehmer for z in zeilen[:2]] == ["anna", "bernd"]
-
-    def test_bei_gleicher_satzdifferenz_entscheidet_die_balldifferenz(self) -> None:
-        ergebnisse = [
-            Ergebnis("anna", "cem", ((11, 0), (11, 0), (11, 0))),
-            Ergebnis("bernd", "dana", ((11, 9), (11, 9), (11, 9))),
-        ]
-
-        zeilen = dienst.tabelle(["anna", "bernd", "cem", "dana"], ergebnisse)
-
-        assert [z.teilnehmer for z in zeilen[:2]] == ["anna", "bernd"]
-
-    def test_voellig_gleichstand_bleibt_alphabetisch(self) -> None:
-        """Irgendwann ist jedes Merkmal gleich. Dann entscheidet der Name -
-        nicht die Einfuegereihenfolge, denn die ist beim Neuladen eine
-        andere, und eine Tabelle, die bei jedem Abruf springt, wirkt
-        kaputt."""
+    def test_bei_gleichstand_bleibt_die_reihenfolge_alphabetisch(self) -> None:
+        """Irgendeine Reihenfolge muss die Liste haben. Der Name ist die
+        einzige, die bei zwei Abrufen dieselbe ist - eine Tabelle, die beim
+        Neuladen springt, wirkt kaputt."""
         zeilen = dienst.tabelle(["dana", "anna", "cem"], [])
 
         assert [z.teilnehmer for z in zeilen] == ["anna", "cem", "dana"]
 
-    def test_unfertige_spiele_zaehlen_nicht_als_sieg(self) -> None:
-        zeilen = dienst.tabelle(["anna", "bernd"], [Ergebnis("anna", "bernd", ((11, 9),))])
-
-        assert all(z.siege == 0 for z in zeilen)
-        assert all(z.spiele == 0 for z in zeilen)
-
     def test_platzierung_als_namen(self) -> None:
-        ergebnisse = [Ergebnis("anna", "bernd", ((11, 9), (11, 9), (11, 9)))]
+        zeilen = dienst.tabelle(["anna", "bernd"], [sieg("bernd", "anna")])
 
-        assert dienst.platzierung(dienst.tabelle(["anna", "bernd"], ergebnisse)) == [
-            "anna",
-            "bernd",
-        ]
+        assert dienst.platzierung(zeilen) == ["bernd", "anna"]
+
+
+class TestFreilose:
+    def test_ein_freilos_zaehlt_wie_ein_sieg(self) -> None:
+        """Im Schweizer System bei ungerader Zahl sitzt einer aus. Ohne
+        Punkte stuerzte er in der Tabelle ab, obwohl er nichts falsch
+        gemacht hat."""
+        zeilen = dienst.tabelle(["anna", "bernd"], [], freilose={"anna": 1})
+        anna = next(z for z in zeilen if z.teilnehmer == "anna")
+
+        assert (anna.punkte, anna.siege, anna.platz) == (2, 1, 1)
+
+
+class TestGleichstand:
+    def test_ohne_gleichstand_an_der_grenze_ist_nichts_zu_tun(self) -> None:
+        zeilen = dienst.tabelle(
+            ["anna", "bernd", "cem", "dana"],
+            [sieg("anna", "bernd"), sieg("anna", "cem"), sieg("bernd", "cem")],
+        )
+
+        assert dienst.gleichstand_an_der_grenze(zeilen, grenze=2) == []
+
+    def test_zwei_auf_dem_letzten_weiterkommenden_platz(self) -> None:
+        """Zwei kommen weiter, und der zweite Platz ist geteilt: genau dann
+        muss gespielt werden, denn einer von beiden faellt sonst nach dem
+        Alphabet heraus."""
+        zeilen = dienst.tabelle(
+            ["anna", "bernd", "cem", "dana"],
+            [
+                sieg("anna", "bernd"),
+                sieg("anna", "cem"),
+                sieg("bernd", "dana"),
+                sieg("cem", "dana"),
+            ],
+        )
+
+        assert dienst.gleichstand_an_der_grenze(zeilen, grenze=2) == ["bernd", "cem"]
+
+    def test_gleichstand_oberhalb_der_grenze_bleibt_stehen(self) -> None:
+        """Zwei punktgleiche auf den Plaetzen eins und zwei, und beide kommen
+        weiter: wer von ihnen vorn steht, entscheidet nichts. Dafuer laesst
+        man niemanden noch einmal antreten."""
+        zeilen = dienst.tabelle(
+            ["anna", "bernd", "cem", "dana"],
+            [
+                sieg("anna", "cem"),
+                sieg("anna", "dana"),
+                sieg("bernd", "cem"),
+                sieg("bernd", "dana"),
+            ],
+        )
+
+        assert dienst.gleichstand_an_der_grenze(zeilen, grenze=2) == []
+
+    def test_drei_punktgleiche_spielen_alle_gegeneinander(self) -> None:
+        zeilen = dienst.tabelle(["anna", "bernd", "cem", "dana"], [sieg("anna", "dana")])
+
+        assert dienst.gleichstand_an_der_grenze(zeilen, grenze=2) == ["bernd", "cem", "dana"]
+
+    def test_bei_einem_weiterkommenden_zaehlt_der_erste_platz(self) -> None:
+        zeilen = dienst.tabelle(
+            ["anna", "bernd", "cem"], [sieg("anna", "cem"), sieg("bernd", "cem")]
+        )
+
+        assert dienst.gleichstand_an_der_grenze(zeilen, grenze=1) == ["anna", "bernd"]
+
+    def test_eine_leere_tabelle_verlangt_nichts(self) -> None:
+        assert dienst.gleichstand_an_der_grenze([], grenze=2) == []
+
+    def test_wer_schon_entschieden_hat_wird_nicht_noch_einmal_gefragt(self) -> None:
+        """Nach dem Entscheidungsspiel hat einer der beiden einen Sieg mehr -
+        damit loest sich der Gleichstand von selbst auf, und es entsteht kein
+        zweites."""
+        zeilen = dienst.tabelle(
+            ["anna", "bernd", "cem", "dana"],
+            [
+                sieg("anna", "bernd"),
+                sieg("anna", "cem"),
+                sieg("bernd", "dana"),
+                sieg("cem", "dana"),
+                sieg("bernd", "cem"),
+            ],
+        )
+
+        assert dienst.gleichstand_an_der_grenze(zeilen, grenze=2) == []
+
+
+class TestEntscheidungsspiele:
+    def test_zwei_ergeben_ein_spiel(self) -> None:
+        assert dienst.entscheidungsspiele(["anna", "bernd"]) == [("anna", "bernd")]
+
+    def test_drei_ergeben_eine_kleine_runde(self) -> None:
+        paarungen = dienst.entscheidungsspiele(["anna", "bernd", "cem"])
+
+        assert len(paarungen) == 3
+        assert {frozenset(p) for p in paarungen} == {
+            frozenset(("anna", "bernd")),
+            frozenset(("anna", "cem")),
+            frozenset(("bernd", "cem")),
+        }
+
+    def test_unter_zweien_gibt_es_nichts_zu_entscheiden(self) -> None:
+        assert dienst.entscheidungsspiele(["anna"]) == []
+        assert dienst.entscheidungsspiele([]) == []
 
 
 def plan(*spiele: dienst.Spielstandzeile) -> list[dienst.Planzeile]:
@@ -219,8 +218,6 @@ class TestZeitplan:
 
         nach_spiel = {z.spiel: z for z in zeilen}
         assert nach_spiel["a"].laeuft
-        # Tisch 2 ist sofort frei, Tisch 1 erst in acht Minuten: b faengt
-        # gleich an, c wartet auf Tisch 1.
         assert nach_spiel["b"].tisch == 2
         assert nach_spiel["b"].erwartet_ab == JETZT
         assert nach_spiel["c"].tisch == 1
@@ -302,8 +299,6 @@ class TestZustaende:
         assert dienst.darf_auswuerfeln("planung").erlaubt
 
     def test_ein_laufendes_turnier_wird_nicht_neu_ausgewuerfelt(self) -> None:
-        """Sonst sind die eingetragenen Ergebnisse Ergebnisse von Spielen,
-        die es nicht mehr gibt."""
         entscheidung = dienst.darf_auswuerfeln("laufend")
 
         assert not entscheidung.erlaubt
@@ -359,20 +354,6 @@ class TestNaechsterSchritt:
         assert dienst.naechster_schritt(stand(modus="ko")) == "fertig"
 
 
-class TestFreilose:
-    def test_ein_freilos_zaehlt_punkte_aber_keine_saetze(self) -> None:
-        """Im Schweizer System bei ungerader Zahl sitzt einer aus. Ohne
-        Punkte stuerzte er in der Tabelle ab, mit Saetzen stiege er auf -
-        beides waere eine Folge des Losglueks und nicht des Spiels."""
-        zeilen = dienst.tabelle(["anna", "bernd"], [], freilose={"anna": 1})
-        anna = next(z for z in zeilen if z.teilnehmer == "anna")
-
-        assert anna.punkte == 2
-        assert anna.siege == 1
-        assert (anna.saetze_fuer, anna.baelle_fuer) == (0, 0)
-        assert anna.platz == 1
-
-
 class TestEinstellungen:
     def test_in_der_planung_ist_alles_aenderbar(self) -> None:
         assert dienst.darf_einstellung_aendern("planung", ["modus", "best_of"]).erlaubt
@@ -383,11 +364,17 @@ class TestEinstellungen:
         assert dienst.darf_einstellung_aendern("laufend", ["tische"]).erlaubt
         assert dienst.darf_einstellung_aendern("laufend", ["minuten_pro_spiel"]).erlaubt
 
-    def test_die_regeln_stehen_fest_sobald_gespielt_wird(self) -> None:
-        entscheidung = dienst.darf_einstellung_aendern("laufend", ["best_of", "tische"])
+    def test_best_of_geht_auch_spaeter_noch(self) -> None:
+        """Es steht nirgends in den Daten, seit ein Ergebnis nur noch der
+        Sieger ist - die Zahl sagt den Spielern, wie lange sie spielen, und
+        das darf man mitten im Turnier noch kuerzen."""
+        assert dienst.darf_einstellung_aendern("laufend", ["best_of"]).erlaubt
+
+    def test_die_planfesten_stehen_fest_sobald_gespielt_wird(self) -> None:
+        entscheidung = dienst.darf_einstellung_aendern("laufend", ["anzahl_gruppen", "tische"])
 
         assert not entscheidung.erlaubt
-        assert "best_of" in entscheidung.grund
+        assert "anzahl_gruppen" in entscheidung.grund
 
     def test_ohne_abweichung_ist_nichts_zu_pruefen(self) -> None:
         assert dienst.darf_einstellung_aendern("laufend", []).erlaubt
@@ -406,3 +393,17 @@ class TestKoBezeichnung:
         """Ab der Runde der letzten 32 gibt es keinen gaengigen Namen mehr -
         dann ist eine Nummer ehrlicher als ein erfundener."""
         assert dienst.ko_bezeichnung(1, 5) == "KO-Runde 1"
+
+
+class TestSieger:
+    def test_der_sieger_muss_mitgespielt_haben(self) -> None:
+        with pytest.raises(dienst.UngueltigesErgebnis):
+            dienst.pruefe_sieger("cem", heim="anna", gast="bernd")
+
+    def test_heim_oder_gast_sind_in_ordnung(self) -> None:
+        dienst.pruefe_sieger("anna", heim="anna", gast="bernd")
+        dienst.pruefe_sieger("bernd", heim="anna", gast="bernd")
+
+    def test_ohne_gegner_gibt_es_keinen_sieger_einzutragen(self) -> None:
+        with pytest.raises(dienst.UngueltigesErgebnis):
+            dienst.pruefe_sieger("anna", heim="anna", gast=None)

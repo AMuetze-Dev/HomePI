@@ -1,9 +1,9 @@
 /* Nur Tokens aus src/styles/tokens.css - kein fester Farbwert, keine feste
    Pixelzahl. Siehe docs/08-design.md.
 
-   Eine Datei für alle Tafeln dieses Artefakts: Dashboard, Spielplan und
-   Vorschau teilen Zeilen, Karten und Nebensätze. Drei Dateien mit denselben
-   vier Klassen laufen auseinander, sobald jemand eine davon ändert. */
+   Eine Datei für alle Tafeln dieses Artefakts: Dashboard, Turnier und
+   Einstellungen teilen Zeilen, Karten und Nebensätze. Drei Dateien mit
+   denselben vier Klassen laufen auseinander, sobald jemand eine ändert. */
 
 .laden {
   display: flex;
@@ -47,11 +47,6 @@
   font-size: var(--text-md);
 }
 
-.auswahl select:disabled {
-  background: var(--farbe-flaeche-gedaempft);
-  color: var(--farbe-text-leise);
-}
-
 .auswahl select:focus-visible,
 .turnierwahl select:focus-visible {
   outline: 2px solid var(--farbe-fokus);
@@ -77,6 +72,15 @@
   margin-top: var(--raum-4);
 }
 
+.gegen {
+  color: var(--farbe-text-leise);
+  font-size: var(--text-sm);
+}
+
+.sieger {
+  font-weight: var(--gewicht-halbfett);
+}
+
 /* ------------------------------------------------------------------ Listen */
 
 .liste {
@@ -99,21 +103,6 @@
   border-bottom: none;
 }
 
-.name {
-  font-weight: var(--gewicht-mittel);
-}
-
-.zeilenaktionen {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--raum-2);
-}
-
-.sieger {
-  font-weight: var(--gewicht-halbfett);
-}
-
 /* --------------------------------------------------------------- Dashboard */
 
 .dashboard {
@@ -122,8 +111,8 @@
   gap: var(--raum-8);
 }
 
-/* Mobil eine Spalte: bei 375 px steht ein Tisch unter dem anderen, und das
-   laufende Spiel bleibt groß genug, um es aus zwei Metern zu lesen. */
+/* Mobil eine Spalte: bei 375 px steht ein Tisch unter dem anderen, und die
+   Paarung bleibt groß genug, um sie aus zwei Metern zu lesen. */
 .tische {
   display: grid;
   grid-template-columns: 1fr;
@@ -166,18 +155,6 @@
 
 .paarung .spielername:last-child {
   text-align: right;
-}
-
-.satzstand {
-  flex: none;
-  font-size: var(--text-2xl);
-  font-weight: var(--gewicht-halbfett);
-  font-variant-numeric: tabular-nums;
-}
-
-.satzstandKlein {
-  font-variant-numeric: tabular-nums;
-  font-weight: var(--gewicht-halbfett);
 }
 
 .danach {
@@ -224,7 +201,169 @@
   text-align: center;
 }
 
-/* ---------------------------------------------------------------- Spielplan */
+/* ------------------------------------------------------- Plan als Bild */
+
+.plangrafik {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-8);
+}
+
+.rangliste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+.rang {
+  display: flex;
+  align-items: baseline;
+  gap: var(--raum-3);
+}
+
+.platzziffer {
+  flex: none;
+  width: 1.5rem;
+  color: var(--farbe-text-leise);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.rangname {
+  flex: 1 1 auto;
+  font-weight: var(--gewicht-mittel);
+  overflow-wrap: anywhere;
+}
+
+.begegnungen {
+  list-style: none;
+  margin: var(--raum-4) 0 0;
+  padding: var(--raum-3) 0 0;
+  border-top: 1px solid var(--farbe-rand);
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+.begegnung {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--raum-2);
+  font-size: var(--text-sm);
+}
+
+/* ------------------------------------------------------------- KO-Raster
+
+   Eine Spalte je Runde, die Paarungen gleichmäßig verteilt: damit steht das
+   Halbfinale auf der Höhe zwischen seinen beiden Viertelfinals. Die kurzen
+   Striche rechts und links sind Dekoration - sie tragen keine Aussage, die
+   nicht schon im Text steht, und fehlen deshalb auch keinem Screenreader.
+
+   Quer scrollen darf dieser Rahmen, nicht die Seite: ein Raster für sechzehn
+   hat vier Spalten, und die passen bei 375 px nicht nebeneinander. */
+.raster {
+  display: flex;
+  gap: var(--raum-8);
+  overflow-x: auto;
+  padding-bottom: var(--raum-2);
+}
+
+.rasterspalte {
+  display: flex;
+  flex: 1 0 11rem;
+  flex-direction: column;
+  gap: var(--raum-3);
+}
+
+.rundenname {
+  margin: 0;
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-sm);
+  font-weight: var(--gewicht-mittel);
+  text-align: center;
+}
+
+.rasterliste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: var(--raum-4);
+}
+
+.rasterspiel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--rundung-md);
+  overflow: hidden;
+  background: var(--farbe-rand);
+}
+
+/* Der Strich nach rechts, der zur nächsten Runde zeigt. */
+.rasterspalte:not(:last-child) .rasterspiel::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: calc(-1 * var(--raum-8));
+  width: var(--raum-8);
+  border-top: 1px solid var(--farbe-rand-stark);
+}
+
+.rasterplatz {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-2);
+  padding: var(--raum-2) var(--raum-3);
+  background: var(--farbe-flaeche-erhoben);
+}
+
+.rastersieger {
+  background: var(--signal-gut-flaeche);
+}
+
+.rasterverloren {
+  color: var(--farbe-text-leise);
+}
+
+.rastername {
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+}
+
+.rastersieger .rastername {
+  font-weight: var(--gewicht-halbfett);
+}
+
+/* ------------------------------------------------------------------ Turnier */
+
+.namen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+  margin: var(--raum-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.namenschild {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-1);
+  padding: var(--raum-1) var(--raum-2) var(--raum-1) var(--raum-3);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-voll);
+  font-size: var(--text-sm);
+}
 
 .spielzeile {
   display: flex;
@@ -242,56 +381,27 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--raum-3);
 }
 
-.spielnummer {
-  flex: none;
-  color: var(--farbe-text-leise);
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.spielkopf .name {
-  flex: 1 1 12rem;
-  overflow-wrap: anywhere;
-}
-
-.ergebnis {
+/* Zwei große Knöpfe nebeneinander: hier steht jemand mit dem Schläger in
+   der Hand und tippt einen Namen an. */
+.siegerwahl {
   display: flex;
-  flex-direction: column;
-  gap: var(--raum-4);
-  padding: var(--raum-4);
-  border-radius: var(--rundung-md);
-  background: var(--farbe-flaeche-gedaempft);
+  flex-wrap: wrap;
+  gap: var(--raum-2);
 }
-
-.saetze {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-3);
-  margin: 0;
-  padding: 0;
-  border: none;
-}
-
-.satzzeile {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--raum-3);
-}
-
-/* ------------------------------------------------------------------ Gruppen */
 
 .gruppen {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--raum-4);
-  margin-bottom: var(--raum-5);
+  margin: var(--raum-4) 0;
 }
 
 .gruppenname {
-  margin: 0 0 var(--raum-3);
+  margin: 0 0 var(--raum-2);
   font-size: var(--text-md);
   font-weight: var(--gewicht-halbfett);
 }
@@ -302,58 +412,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--raum-1);
-}
-
-/* ----------------------------------------------------------------- Tabellen */
-
-.tabellen {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-4);
-}
-
-/* Sieben Spalten passen bei 375 px nicht - also darf dieser Rahmen scrollen
-   und nicht die Seite. Quer zu wischen ist in einer Tabelle erwartbar,
-   horizontales Scrollen der ganzen Seite ist ein Fehler. */
-.tabellenrahmen {
-  overflow-x: auto;
-}
-
-.tabelle {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.tabellenkopf {
-  padding: var(--raum-3) var(--raum-4);
-  font-size: var(--text-md);
-  font-weight: var(--gewicht-halbfett);
-  text-align: left;
-}
-
-.tabelle th,
-.tabelle td {
-  padding: var(--raum-2) var(--raum-3);
-  border-bottom: 1px solid var(--farbe-rand);
-  text-align: right;
-  white-space: nowrap;
-}
-
-.tabelle thead th {
-  color: var(--farbe-text-gedaempft);
-  font-weight: var(--gewicht-mittel);
-}
-
-.tabelle tbody tr:last-child th,
-.tabelle tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.namenszelle {
-  text-align: left !important;
-  font-weight: var(--gewicht-mittel);
 }
 
 /* ---------------------------------------------------------------- Formulare */
@@ -408,7 +466,7 @@
   }
 
   .gruppen {
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   }
 }
 

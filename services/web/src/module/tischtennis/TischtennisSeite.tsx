@@ -5,9 +5,7 @@ import { useAnmeldung } from "../../anmeldung/kontext";
 import { Etikett, Hinweis, Karte, Leerzustand, Platzhalter } from "../../ui";
 import type { ModulProps } from "../typen";
 import {
-  aendereTeilnehmer,
   aendereTurnier,
-  beendeTurnier,
   beginneSpiel,
   entferneTeilnehmer,
   ladeSpiele,
@@ -24,20 +22,16 @@ import {
   setzeZurueck,
   trageErgebnisEin,
   wuerfleAus,
+  beendeTurnier,
   type Einstellungen,
-  type NeuerTeilnehmer,
-  type Satz,
   type Spiel,
   type Tabelle,
   type Teilnehmer,
   type Turnier,
 } from "./api";
-import { AuswuerfelnTafel } from "./AuswuerfelnTafel";
 import { DashboardTafel } from "./DashboardTafel";
 import { EinstellungenTafel } from "./EinstellungenTafel";
-import { SpielplanTafel } from "./SpielplanTafel";
-import { TabellenTafel } from "./TabellenTafel";
-import { TeilnehmerTafel } from "./TeilnehmerTafel";
+import { TurnierTafel } from "./TurnierTafel";
 import stil from "./TischtennisSeite.module.css";
 
 interface Daten {
@@ -72,17 +66,15 @@ const ZUSTANDSWORT: Record<Turnier["zustand"], string> = {
 };
 
 /**
- * Sechs Bereiche, und einer davon ist der eigentliche Zweck.
+ * Drei Bereiche, und einer davon ist der eigentliche Zweck.
  *
- * Welche Bereiche es gibt, steht in `src/module/register.ts`; die Hülle
- * navigiert sie. Hierher kommt nur, welcher gerade dran ist - und die Daten,
- * die alle brauchen.
+ * Dashboard für alle, Turnier für die Leitung, Einstellungen für einmal am
+ * Anfang. Vorher waren es sechs — Teilnehmer, Auswürfeln und Spielplan sind
+ * zusammengerückt, seit ein Ergebnis aus einem Namen besteht.
  *
- * Die Dashboard-Ansicht steht bewusst an erster Stelle und holt ihre Daten
- * selbst: sie ist die einzige Fläche, die auch ohne Anmeldung funktioniert,
- * und ein Besucher ohne Konto soll nicht auf Abrufe warten, die er gar nicht
- * sieht. Alles Schreibende hängt an `darf("tischtennis", …)` - und wird im
- * Backend noch einmal geprüft.
+ * Die Dashboard-Ansicht holt ihre Daten selbst und ist die einzige Fläche,
+ * die ohne Anmeldung funktioniert. Alles Schreibende hängt an
+ * `darf("tischtennis", …)` — und wird im Backend noch einmal geprüft.
  */
 export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
   const { darf, zustand: anmeldung } = useAnmeldung();
@@ -119,8 +111,7 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
 
   // Die Dashboard-Ansicht holt ihre Daten selbst, in einem Abruf. Hier
   // nichts zu laden ist kein Feinschliff: ein Besucher ohne Konto würde
-  // sonst auf Spielplan, Tabellen und Teilnehmerliste warten, die er auf
-  // dieser Fläche gar nicht sieht - vier Abfragen für nichts.
+  // sonst auf vier Abfragen warten, die er auf dieser Fläche nicht sieht.
   const nurDashboard = unterseite === "dashboard";
 
   useEffect(() => {
@@ -165,7 +156,7 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
     );
   }
 
-  const { turniere, turnier, teilnehmer, spiele, tabellen } = zustand.daten;
+  const { turniere, turnier, teilnehmer, spiele } = zustand.daten;
   const darfSchreiben = darf("tischtennis", "nutzer");
   const darfEinrichten = darf("tischtennis", "verwalter");
 
@@ -195,8 +186,7 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
             {ZUSTANDSWORT[turnier.zustand]}
           </Etikett>
           <span className={stil.nebensache}>
-            {turnier.anzahl_teilnehmer} Teilnehmer · {turnier.anzahl_spiele} Spiele ·{" "}
-            {turnier.offene_spiele} offen
+            {turnier.anzahl_teilnehmer} Teilnehmer · {turnier.offene_spiele} offen
           </span>
         </>
       )}
@@ -244,88 +234,33 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
     );
   }
 
-  if (unterseite === "teilnehmer") {
+  if (unterseite === "einstellungen") {
     return (
       <>
         {kopf}
         {fehlerband}
-        <TeilnehmerTafel
-          turnier={turnier}
-          teilnehmer={teilnehmer}
-          onAnlegen={(daten: NeuerTeilnehmer) =>
-            mitFehlerbehandlung(() => legeTeilnehmerAn(turnier.id, daten))
-          }
-          onAendern={(id, daten) =>
-            mitFehlerbehandlung(() => aendereTeilnehmer(id, daten))
-          }
-          onEntfernen={(id) => void mitFehlerbehandlung(() => entferneTeilnehmer(id))}
-        />
-      </>
-    );
-  }
-
-  if (unterseite === "auswuerfeln") {
-    if (!darfEinrichten) {
-      return (
-        <Hinweis>
-          Auswürfeln darf, wer dieses Artefakt verwaltet – damit nicht mitten im Turnier
-          jemand den Spielplan neu zieht.
-        </Hinweis>
-      );
-    }
-    return (
-      <>
-        {kopf}
-        {fehlerband}
-        <AuswuerfelnTafel
-          turnier={turnier}
-          onLosen={async (saat) => {
-            setAktionsfehler("");
-            try {
-              return await loseAus(turnier.id, saat);
-            } catch (fehler) {
-              setAktionsfehler(meldung(fehler));
-              return null;
+        {darfEinrichten ? (
+          <EinstellungenTafel
+            turnier={turnier}
+            onAnlegen={(name, einstellungen: Einstellungen) =>
+              mitFehlerbehandlung(() => legeTurnierAn({ name, ...einstellungen }))
             }
-          }}
-          onUebernehmen={(saat) =>
-            mitFehlerbehandlung(() => wuerfleAus(turnier.id, saat))
-          }
-          onZuruecksetzen={() => mitFehlerbehandlung(() => setzeZurueck(turnier.id))}
-        />
-      </>
-    );
-  }
-
-  if (unterseite === "spielplan") {
-    return (
-      <>
-        {kopf}
-        {fehlerband}
-        <SpielplanTafel
-          turnier={turnier}
-          spiele={spiele}
-          onBeginnen={(id) => void mitFehlerbehandlung(() => beginneSpiel(id))}
-          onErgebnis={(id, saetze: Satz[]) =>
-            mitFehlerbehandlung(() => trageErgebnisEin(id, saetze))
-          }
-          onZuruecknehmen={(id) =>
-            void mitFehlerbehandlung(() => nimmErgebnisZurueck(id))
-          }
-          onNaechsteRunde={() =>
-            void mitFehlerbehandlung(() => naechsteRunde(turnier.id))
-          }
-        />
-      </>
-    );
-  }
-
-  if (unterseite === "tabellen") {
-    return (
-      <>
-        {kopf}
-        {fehlerband}
-        <TabellenTafel tabellen={tabellen} />
+            onAendern={(einstellungen) =>
+              mitFehlerbehandlung(() => aendereTurnier(turnier.id, einstellungen))
+            }
+            onBeenden={() => void mitFehlerbehandlung(() => beendeTurnier(turnier.id))}
+            onLoeschen={() => {
+              void mitFehlerbehandlung(() => loescheTurnier(turnier.id));
+              setGewaehlt("");
+            }}
+          />
+        ) : (
+          <Karte>
+            <p className={stil.nebensache}>
+              Die Einstellungen ändert, wer dieses Artefakt verwaltet.
+            </p>
+          </Karte>
+        )}
       </>
     );
   }
@@ -334,28 +269,35 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
     <>
       {kopf}
       {fehlerband}
-      {darfEinrichten ? (
-        <EinstellungenTafel
-          turnier={turnier}
-          onAnlegen={(name, einstellungen: Einstellungen) =>
-            mitFehlerbehandlung(() => legeTurnierAn({ name, ...einstellungen }))
+      <TurnierTafel
+        turnier={turnier}
+        teilnehmer={teilnehmer}
+        spiele={spiele}
+        darfEinrichten={darfEinrichten}
+        onTeilnehmerAnlegen={(name) =>
+          mitFehlerbehandlung(() => legeTeilnehmerAn(turnier.id, { name }))
+        }
+        onTeilnehmerEntfernen={(id) =>
+          void mitFehlerbehandlung(() => entferneTeilnehmer(id))
+        }
+        onLosen={async () => {
+          setAktionsfehler("");
+          try {
+            return await loseAus(turnier.id);
+          } catch (fehler) {
+            setAktionsfehler(meldung(fehler));
+            return null;
           }
-          onAendern={(einstellungen) =>
-            mitFehlerbehandlung(() => aendereTurnier(turnier.id, einstellungen))
-          }
-          onBeenden={() => void mitFehlerbehandlung(() => beendeTurnier(turnier.id))}
-          onLoeschen={() => {
-            void mitFehlerbehandlung(() => loescheTurnier(turnier.id));
-            setGewaehlt("");
-          }}
-        />
-      ) : (
-        <Karte>
-          <p className={stil.nebensache}>
-            Die Einstellungen ändert, wer dieses Artefakt verwaltet.
-          </p>
-        </Karte>
-      )}
+        }}
+        onUebernehmen={(saat) => mitFehlerbehandlung(() => wuerfleAus(turnier.id, saat))}
+        onZuruecksetzen={() => void mitFehlerbehandlung(() => setzeZurueck(turnier.id))}
+        onBeginnen={(id) => void mitFehlerbehandlung(() => beginneSpiel(id))}
+        onSieger={(spielId, siegerId) =>
+          void mitFehlerbehandlung(() => trageErgebnisEin(spielId, siegerId))
+        }
+        onZuruecknehmen={(id) => void mitFehlerbehandlung(() => nimmErgebnisZurueck(id))}
+        onNaechsteRunde={() => void mitFehlerbehandlung(() => naechsteRunde(turnier.id))}
+      />
     </>
   );
 }

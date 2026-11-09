@@ -18,7 +18,7 @@ import uuid
 
 from homepi_core import Base, ZeitstempelMixin
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -34,8 +34,9 @@ class Turnier(Base, ZeitstempelMixin):
     zustand: Mapped[str] = mapped_column(String(20), nullable=False, default="planung")
 
     tische: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
-    best_of: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
-    punkte_bis: Mapped[int] = mapped_column(Integer, nullable=False, default=11)
+    #: Sagt den Spielern, wie lange sie spielen. Steht in keinem Ergebnis:
+    #: eingetragen wird nur der Sieger.
+    best_of: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     minuten_pro_spiel: Mapped[int] = mapped_column(Integer, nullable=False, default=12)
 
     #: nur bei gruppen_ko
@@ -128,8 +129,8 @@ class Spiel(Base, ZeitstempelMixin):
     #: KO-Spiele verweisen ueber diese Nummer aufeinander.
     nummer: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    #: gruppe | ko | runde (Schweizer System)
-    phase: Mapped[str] = mapped_column(String(10), nullable=False)
+    #: gruppe | ko | runde (Schweizer System) | entscheidung (Gleichstand)
+    phase: Mapped[str] = mapped_column(String(20), nullable=False)
     runde: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     #: "Gruppe A - Runde 1", "Halbfinale", "Runde 3". Steht in der Datenbank
     #: und nicht im Frontend: welche KO-Runde ein Halbfinale ist, haengt an
@@ -170,9 +171,6 @@ class Spiel(Base, ZeitstempelMixin):
         DateTime(timezone=True), nullable=True, default=None
     )
 
-    #: [[11, 9], [9, 11], ...] - Satz fuer Satz, Heim zuerst. JSONB und
-    #: keine zehn Spalten, von denen sieben leer sind.
-    saetze: Mapped[list[list[int]]] = mapped_column(JSONB, nullable=False, default=list)
     sieger_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("tischtennis_teilnehmer.id", ondelete="SET NULL"),
