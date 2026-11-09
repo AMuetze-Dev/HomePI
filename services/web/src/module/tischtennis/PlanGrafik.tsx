@@ -1,19 +1,33 @@
 import { Etikett, Hinweis, Karte, Leerzustand } from "../../ui";
-import type { Spiel, Tabelle } from "./api";
+import type { Phase, Spiel, Tabelle } from "./api";
 import { Raster } from "./Raster";
 import stil from "./TischtennisSeite.module.css";
 
 /**
  * Der Spielplan als Bild — die Ansicht, die das Dashboard zeigt.
  *
- * Oben die Gruppen: je eine Karte mit ihrer Tabelle und darunter den
- * Begegnungen, abgehakt sobald sie gewertet sind. Unten das KO-Raster,
- * sobald es steht.
- *
  * Eine Liste aus achtzehn Zeilen beantwortet die Frage „wer spielt gegen
  * wen“ auch — aber erst, nachdem man sie gelesen hat. Dieses Bild
  * beantwortet sie im Vorbeigehen, und dafür hängt es im Saal.
+ *
+ * **Tabelle oder Raster, nie beides.** Solange die Gruppen laufen, ist die
+ * Tabelle die Auskunft: sie sagt, wer weiterkommt. Sobald das Raster steht,
+ * ist sie Vergangenheit — wer im Viertelfinale steht, interessiert nicht
+ * mehr, mit welchem Punktestand er dorthin kam. Dann verschwindet sie, und
+ * das Raster bekommt den Platz.
  */
+
+/** Die drei Stränge des Rasters, in der Reihenfolge, in der sie hängen. */
+const ZWEIGE: { phase: Phase; titel: string; erklaerung?: string }[] = [
+  { phase: "ko", titel: "KO-Raster" },
+  {
+    phase: "ko_verlierer",
+    titel: "Verliererrunde",
+    erklaerung: "Zweite Chance: erst die zweite Niederlage ist das Aus.",
+  },
+  { phase: "ko_finale", titel: "Endspiel" },
+];
+
 export function PlanGrafik({
   tabellen,
   spiele,
@@ -21,11 +35,22 @@ export function PlanGrafik({
   tabellen: Tabelle[];
   spiele: Spiel[];
 }) {
-  const ko = spiele.filter((spiel) => spiel.phase === "ko");
-  const gruppen = tabellen.filter((tabelle) => tabelle.titel.startsWith("Gruppe"));
-  const einzeln = tabellen.filter((tabelle) => !tabelle.titel.startsWith("Gruppe"));
+  const zweige = ZWEIGE.map((zweig) => ({
+    ...zweig,
+    spiele: spiele.filter((spiel) => spiel.phase === zweig.phase),
+  })).filter((zweig) => zweig.spiele.length > 0);
 
-  if (tabellen.length === 0 && ko.length === 0) {
+  // Steht das Raster, trägt es die Auskunft. Dann ist die Tabelle nur noch
+  // Beiwerk, das mitscrollen muss.
+  const rasterSteht = zweige.length > 0;
+  const gruppen = rasterSteht
+    ? []
+    : tabellen.filter((tabelle) => tabelle.titel.startsWith("Gruppe"));
+  const einzeln = rasterSteht
+    ? []
+    : tabellen.filter((tabelle) => !tabelle.titel.startsWith("Gruppe"));
+
+  if (!rasterSteht && tabellen.length === 0) {
     return (
       <Leerzustand titel="Noch kein Spielplan">
         Sobald ausgewürfelt ist, steht hier, wer gegen wen spielt.
@@ -42,22 +67,54 @@ export function PlanGrafik({
           spiele={spiele.filter(
             (spiel) =>
               spiel.gruppe === tabelle.titel ||
-              (gruppen.length === 0 && spiel.phase !== "ko"),
+              (gruppen.length === 0 && !spiel.phase.startsWith("ko")),
           )}
         />
       ))}
 
-      {ko.length > 0 && (
-        <section aria-labelledby="raster">
-          <h2 id="raster" className={stil.abschnittstitel}>
-            KO-Raster
-          </h2>
-          <Karte>
-            <Raster spiele={ko} />
-          </Karte>
-        </section>
-      )}
+      {zweige.map((zweig) => (
+        <Zweigkarte
+          key={zweig.phase}
+          titel={zweig.titel}
+          erklaerung={zweig.erklaerung}
+          spiele={zweig.spiele}
+        />
+      ))}
     </div>
+  );
+}
+
+/**
+ * Ein Strang des Rasters.
+ *
+ * Eigene Karte je Zweig, weil Sieger- und Verliererrunde nichts miteinander
+ * zu tun haben: ihre Runden zählen getrennt, und in einer Spaltenreihe
+ * nebeneinander stünde das Halbfinale neben der dritten Verliererrunde, als
+ * wären sie derselbe Weg.
+ */
+function Zweigkarte({
+  titel,
+  erklaerung,
+  spiele,
+}: {
+  titel: string;
+  erklaerung?: string | undefined;
+  spiele: Spiel[];
+}) {
+  const kennung = `zweig-${titel.replace(/\s+/g, "-")}`;
+
+  return (
+    <section aria-labelledby={kennung}>
+      <div className={stil.abschnittskopf}>
+        <h2 id={kennung} className={stil.abschnittstitel}>
+          {titel}
+        </h2>
+        {erklaerung !== undefined && <p className={stil.nebensache}>{erklaerung}</p>}
+      </div>
+      <Karte>
+        <Raster spiele={spiele} beschriftung={titel} />
+      </Karte>
+    </section>
   );
 }
 
@@ -69,9 +126,11 @@ function Gruppenkarte({ tabelle, spiele }: { tabelle: Tabelle; spiele: Spiel[] }
 
   return (
     <section aria-labelledby={kennung}>
-      <h2 id={kennung} className={stil.abschnittstitel}>
-        {tabelle.titel}
-      </h2>
+      <div className={stil.abschnittskopf}>
+        <h2 id={kennung} className={stil.abschnittstitel}>
+          {tabelle.titel}
+        </h2>
+      </div>
 
       {tabelle.entscheidung_offen.length > 0 && (
         <Hinweis ton="warnung">

@@ -17,6 +17,7 @@ function turnier(rest: Partial<Turnier> = {}): Turnier {
     anzahl_gruppen: 2,
     weiter_pro_gruppe: 2,
     runden: 4,
+    doppel_ko: false,
     saat: null,
     runde_angesetzt: 0,
     ko_steht: false,
@@ -152,5 +153,36 @@ describe("Einstellungen", () => {
     aufbauen({ turnier: null });
 
     expect(screen.queryByRole("button", { name: "Löschen" })).not.toBeInTheDocument();
+  });
+
+  it("lässt die zweite Chance im KO einschalten", async () => {
+    aufbauen({ turnier: turnier({ modus: "ko" }) });
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: /Zweite Chance im KO/ }),
+    );
+
+    expect(screen.getByRole("checkbox", { name: /Zweite Chance im KO/ })).toBeChecked();
+  });
+
+  it("sagt, dass die zweite Chance die Spielzahl verdoppelt", async () => {
+    /* Fast doppelt so viele Spiele sind für einen Abend die wichtigste
+       Zahl - sie gehört neben den Schalter und nicht in eine Doku. */
+    aufbauen({ turnier: turnier({ modus: "ko", anzahl_teilnehmer: 8 }) });
+
+    const vorher = (await screen.findByText(/Ergibt etwa/)).textContent ?? "";
+    await userEvent.click(screen.getByRole("checkbox", { name: /Zweite Chance im KO/ }));
+    const nachher = screen.getByText(/Ergibt etwa/).textContent ?? "";
+
+    expect(vorher).toContain("7 Spiele");
+    expect(nachher).toContain("14 Spiele");
+  });
+
+  it("sperrt die zweite Chance, sobald gespielt wird", async () => {
+    aufbauen({ turnier: turnier({ modus: "ko", zustand: "laufend" }) });
+
+    expect(
+      await screen.findByRole("checkbox", { name: /Zweite Chance im KO/ }),
+    ).toBeDisabled();
   });
 });

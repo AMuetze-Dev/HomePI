@@ -383,3 +383,82 @@ class TestEntzerren:
         plan = los.plan_auswuerfeln("gruppen_ko", acht, anzahl_gruppen=2, saat=7, tische=1)
 
         assert self.wiederholungen(plan.begegnungen, fenster=1) == 0
+
+
+ACHT = [*VIER, "elif", "fiete", "gesa", "hanna"]
+
+
+class TestDoppelKoRaster:
+    """Die zweite Chance: wer einmal verliert, spielt in der Verliererrunde
+    weiter und ist erst nach der zweiten Niederlage draussen.
+
+    Geprueft wird nicht "es sieht richtig aus", sondern die vier Zusagen, die
+    ein solches Raster ueberhaupt erst spielbar machen.
+    """
+
+    def test_zweimal_so_viele_spiele_minus_zwei(self) -> None:
+        """Bei einfachem KO scheidet je Spiel einer aus: n-1 Spiele. Hier
+        braucht jeder zwei Niederlagen, also 2n-2 - das Endspiel eingerechnet,
+        in dem der Sieger der Verliererrunde seine zweite bekommt."""
+        raster = los.doppel_ko_raster(ACHT)
+
+        assert len(raster) == 2 * len(ACHT) - 2
+
+    def test_jeder_erste_verlierer_spielt_weiter(self) -> None:
+        """Die eigentliche Zusage des Modus. Ohne sie waere die
+        Verliererrunde Dekoration fuer einen Teil des Feldes."""
+        raster = los.doppel_ko_raster(ACHT)
+        sieger_zweig = [s for s in raster if s.zweig == "sieger"]
+
+        aufgefangen = {
+            platz.aus_spiel
+            for spiel in raster
+            for platz in (spiel.heim, spiel.gast)
+            if platz.verlierer
+        }
+
+        assert aufgefangen == {s.nummer for s in sieger_zweig}
+
+    def test_kein_spiel_verweist_nach_vorn(self) -> None:
+        """Die Nummer ist gleichzeitig die Reihenfolge des Spielplans. Ein
+        Verweis auf ein spaeteres Spiel waere ein Plan, der nicht laeuft."""
+        for spiel in los.doppel_ko_raster(ACHT):
+            for platz in (spiel.heim, spiel.gast):
+                if platz.aus_spiel is not None:
+                    assert platz.aus_spiel < spiel.nummer
+
+    def test_endspiel_ist_das_letzte_und_fuehrt_beide_zweige_zusammen(self) -> None:
+        raster = los.doppel_ko_raster(ACHT)
+        endspiel = raster[-1]
+
+        assert endspiel.zweig == "finale"
+        assert [s for s in raster if s.zweig == "finale"] == [endspiel]
+        assert endspiel.heim.aus_spiel is not None
+        assert endspiel.gast.aus_spiel is not None
+
+    def test_niemand_steht_zweimal_in_der_ersten_runde(self) -> None:
+        erste = [s for s in los.doppel_ko_raster(ACHT) if s.zweig == "sieger" and s.runde == 1]
+        besetzt = [p.teilnehmer for s in erste for p in (s.heim, s.gast)]
+
+        assert sorted(besetzt) == sorted(ACHT)
+
+    def test_auch_mit_ungerader_zahl_spielbar(self) -> None:
+        """Sieben: das Siegerraster hat ein Freilos, und die Verliererrunde
+        bekommt dadurch eine ungerade Zahl. Beides darf den Plan nicht
+        zerreissen."""
+        raster = los.doppel_ko_raster(SIEBEN)
+
+        for spiel in raster:
+            for platz in (spiel.heim, spiel.gast):
+                assert platz.teilnehmer is not None or platz.aus_spiel is not None
+                if platz.aus_spiel is not None:
+                    assert platz.aus_spiel < spiel.nummer
+        assert raster[-1].zweig == "finale"
+
+    def test_zwei_teilnehmer_sind_zwei_spiele(self) -> None:
+        """Mit zwei Leuten ist die zweite Chance ein Rueckspiel - und das
+        Endspiel ist genau das."""
+        raster = los.doppel_ko_raster(["anna", "bernd"])
+
+        assert len(raster) == 2
+        assert raster[-1].zweig == "finale"

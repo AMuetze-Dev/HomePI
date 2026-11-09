@@ -21,6 +21,7 @@ const VORGABE: Einstellungen = {
   anzahl_gruppen: 2,
   weiter_pro_gruppe: 2,
   runden: 4,
+  doppel_ko: false,
 };
 
 interface Moduswahl {
@@ -96,9 +97,11 @@ export function EinstellungenTafel({
   return (
     <>
       <Karte>
-        <h2 className={stil.abschnittstitel}>
-          {turnier === null ? "Turnier anlegen" : "Einstellungen"}
-        </h2>
+        <div className={stil.abschnittskopf}>
+          <h2 className={stil.abschnittstitel}>
+            {turnier === null ? "Turnier anlegen" : "Einstellungen"}
+          </h2>
+        </div>
 
         {!planung && (
           <Hinweis>
@@ -203,6 +206,24 @@ export function EinstellungenTafel({
             />
           )}
 
+          {werte.modus !== "schweizer" && (
+            <label className={stil.schalter}>
+              <input
+                type="checkbox"
+                checked={werte.doppel_ko}
+                disabled={!planung}
+                onChange={(e) => setze("doppel_ko", e.target.checked)}
+              />
+              <span>
+                <span className={stil.schalterwort}>Zweite Chance im KO</span>
+                <span className={stil.nebensache}>
+                  Wer einmal verliert, spielt in der Verliererrunde weiter — erst die
+                  zweite Niederlage ist das Aus. Fast doppelt so viele Spiele.
+                </span>
+              </span>
+            </label>
+          )}
+
           {spieleGeschaetzt !== null && (
             <Hinweis>
               {/* Ein Satz, ein Textknoten: so steht er auch im Test als ein
@@ -225,7 +246,9 @@ export function EinstellungenTafel({
 
       {turnier !== null && (
         <Karte>
-          <h2 className={stil.abschnittstitel}>Turnier abschließen</h2>
+          <div className={stil.abschnittskopf}>
+            <h2 className={stil.abschnittstitel}>Turnier abschließen</h2>
+          </div>
           <p className={stil.nebensache}>
             Beenden lässt den Spielplan stehen und nimmt das Turnier aus der
             Dashboard-Ansicht. Löschen entfernt Teilnehmer, Spiele und Ergebnisse.
@@ -266,9 +289,10 @@ function schaetzung(
     const je = Math.floor(teilnehmer / werte.anzahl_gruppen);
     spiele = werte.anzahl_gruppen * ((je * (je - 1)) / 2);
     const weiter = Math.min(teilnehmer, werte.anzahl_gruppen * werte.weiter_pro_gruppe);
-    spiele += Math.max(0, weiter - 1);
+    // Im Doppel-KO braucht jeder zwei Niederlagen: 2n-2 statt n-1.
+    spiele += Math.max(0, werte.doppel_ko ? 2 * weiter - 2 : weiter - 1);
   } else if (werte.modus === "ko") {
-    spiele = teilnehmer - 1;
+    spiele = werte.doppel_ko ? 2 * teilnehmer - 2 : teilnehmer - 1;
   } else {
     spiele = Math.floor(teilnehmer / 2) * werte.runden;
   }

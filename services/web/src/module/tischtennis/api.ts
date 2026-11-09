@@ -17,7 +17,16 @@ const { anfrage, sende } = schnittstelle("/tischtennis");
 export type Modus = "gruppen_ko" | "ko" | "schweizer";
 export type TurnierZustand = "planung" | "laufend" | "beendet";
 export type SpielZustand = "geplant" | "laeuft" | "beendet";
-export type Phase = "gruppe" | "ko" | "runde" | "entscheidung";
+export type Phase =
+  | "gruppe"
+  | "ko"
+  | "ko_verlierer"
+  | "ko_finale"
+  | "runde"
+  | "entscheidung";
+
+/** Einen Platz nach vorn oder nach hinten in der Warteschlange. */
+export type Richtung = "hoch" | "runter";
 
 export interface Einstellungen {
   modus: Modus;
@@ -28,6 +37,8 @@ export interface Einstellungen {
   anzahl_gruppen: number;
   weiter_pro_gruppe: number;
   runden: number;
+  /** Zweite Chance im KO: wer einmal verliert, spielt im Verliererzweig. */
+  doppel_ko: boolean;
 }
 
 export interface Turnier extends Einstellungen {
@@ -232,4 +243,14 @@ export function trageErgebnisEin(id: string, siegerId: string): Promise<Spiel> {
 
 export function nimmErgebnisZurueck(id: string): Promise<Spiel> {
   return sende<Spiel>("DELETE", `/spiel/${kennung(id)}/ergebnis`);
+}
+
+/**
+ * Ein Spiel einen Platz nach vorn oder nach hinten.
+ *
+ * Nur um einen Platz: wer jemanden deutlich später spielen lassen will,
+ * drückt mehrmals - und sieht dazwischen, was es mit dem Plan macht.
+ */
+export function verschiebeSpiel(id: string, richtung: Richtung): Promise<Spiel> {
+  return sende<Spiel>("POST", `/spiel/${kennung(id)}/verschieben`, { richtung });
 }

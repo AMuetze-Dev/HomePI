@@ -394,6 +394,19 @@ class TestKoBezeichnung:
         dann ist eine Nummer ehrlicher als ein erfundener."""
         assert dienst.ko_bezeichnung(1, 5) == "KO-Runde 1"
 
+    def test_im_doppel_ko_heisst_die_letzte_sieger_runde_anders(self) -> None:
+        """Dort ist sie nicht das Ende: der Verlierer hat noch eine Chance,
+        und "Endspiel" wuerde am Tisch das Falsche versprechen."""
+        assert dienst.ko_bezeichnung(3, 3, "sieger") == "Sieger-Finale"
+        assert dienst.ko_bezeichnung(2, 3, "sieger") == "Halbfinale"
+
+    def test_der_verliererzweig_wird_gezaehlt_und_endet_im_finale(self) -> None:
+        assert dienst.ko_bezeichnung(1, 4, "verlierer") == "Verlierer-Runde 1"
+        assert dienst.ko_bezeichnung(4, 4, "verlierer") == "Verlierer-Finale"
+
+    def test_das_endspiel_steht_allein(self) -> None:
+        assert dienst.ko_bezeichnung(1, 1, "finale") == "Endspiel"
+
 
 class TestSieger:
     def test_der_sieger_muss_mitgespielt_haben(self) -> None:
@@ -407,3 +420,60 @@ class TestSieger:
     def test_ohne_gegner_gibt_es_keinen_sieger_einzutragen(self) -> None:
         with pytest.raises(dienst.UngueltigesErgebnis):
             dienst.pruefe_sieger("anna", heim="anna", gast=None)
+
+
+class TestVerschieben:
+    """Die Turnierleitung schiebt ein Spiel in der Warteschlange.
+
+    Der Anlass ist nicht Bequemlichkeit: wer gerade nicht da ist, haelt sonst
+    den ganzen Plan auf - und wenn trotzdem angepfiffen wird, zeigt das
+    Dashboard das Falsche und die Glocke laeutet beim Falschen.
+    """
+
+    def test_ein_geplantes_spiel_tauscht_mit_dem_nachbarn(self) -> None:
+        reihe = [
+            dienst.Warteplatz(id="a", nummer=1, zustand="geplant", haengt_an=()),
+            dienst.Warteplatz(id="b", nummer=2, zustand="geplant", haengt_an=()),
+        ]
+
+        assert dienst.tauschpartner(reihe, "a", "runter") == "b"
+        assert dienst.tauschpartner(reihe, "b", "hoch") == "a"
+
+    def test_am_rand_gibt_es_keinen_partner(self) -> None:
+        reihe = [dienst.Warteplatz(id="a", nummer=1, zustand="geplant", haengt_an=())]
+
+        with pytest.raises(dienst.FalscherZustand):
+            dienst.tauschpartner(reihe, "a", "hoch")
+
+    def test_was_laeuft_oder_gewertet_ist_wird_nicht_geschoben(self) -> None:
+        reihe = [
+            dienst.Warteplatz(id="a", nummer=1, zustand="laeuft", haengt_an=()),
+            dienst.Warteplatz(id="b", nummer=2, zustand="geplant", haengt_an=()),
+        ]
+
+        with pytest.raises(dienst.FalscherZustand):
+            dienst.tauschpartner(reihe, "a", "runter")
+
+    def test_laufende_nachbarn_werden_uebersprungen(self) -> None:
+        """Ein Spiel, das schon am Tisch steht, ist kein Tauschpartner - aber
+        es soll den Tausch auch nicht blockieren."""
+        reihe = [
+            dienst.Warteplatz(id="a", nummer=1, zustand="geplant", haengt_an=()),
+            dienst.Warteplatz(id="b", nummer=2, zustand="beendet", haengt_an=()),
+            dienst.Warteplatz(id="c", nummer=3, zustand="geplant", haengt_an=()),
+        ]
+
+        assert dienst.tauschpartner(reihe, "a", "runter") == "c"
+
+    def test_kein_spiel_rutscht_vor_seinen_zubringer(self) -> None:
+        """Im KO laeuft hier der Sieger des Vorspiels ein. Vorgezogen waere
+        es ein Spiel ohne Gegner."""
+        reihe = [
+            dienst.Warteplatz(id="a", nummer=1, zustand="geplant", haengt_an=()),
+            dienst.Warteplatz(id="b", nummer=2, zustand="geplant", haengt_an=(1,)),
+        ]
+
+        with pytest.raises(dienst.FalscherZustand):
+            dienst.tauschpartner(reihe, "b", "hoch")
+        with pytest.raises(dienst.FalscherZustand):
+            dienst.tauschpartner(reihe, "a", "runter")

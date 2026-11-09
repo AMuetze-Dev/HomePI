@@ -17,13 +17,31 @@ Entscheidungsspiele bei Gleichstand an der Grenze, ein KO-Raster, das vor dem
 ersten Ball vollständig steht, und eine öffentliche Dashboard-Ansicht, die den
 Plan als Bild zeigt — Gruppenkarten und Raster — mit Glocke.
 
+Dazu seit dem zweiten Durchgang am 09.11.2026: **Doppel-KO** als zweite
+Chance, **verschiebbare Spiele** für die Turnierleitung, und ein Dashboard,
+das Tabelle und Raster nicht mehr beide zeigt.
+
 **Der Umbau vom 09.11.2026 hieß Einfachheit.** Vorher bestand ein Ergebnis aus
 bis zu sieben Sätzen mit Ballpunkten, und die Oberfläche hatte sechs Bereiche.
 Jetzt ist ein Ergebnis ein Sieger, und es sind drei Bereiche. Was dabei
 wegfiel, steht unten unter „Was bewusst nicht da ist“ — nicht aus
 Sparsamkeit, sondern weil dieses Artefakt nebenbei bedient wird.
 
-**Vier Zusagen sind nicht verhandelbar** und gehören in jede Änderung:
+**Der zweite Durchgang hieß Ruhe.** Das Dashboard war ein Stapel aus sechs
+Abschnitten; zwei davon sagten dasselbe („Als nächstes“ und die
+Warteschlange am Tisch), zwei weitere waren Nachschlagewerk und standen
+trotzdem offen zwischen dem, was gerade passiert, und dem Spielplan. Jetzt
+sind es zwei Abschnitte und zwei Klappen. Die Gestaltung folgt derselben
+Linie: Haarlinien statt Kästen, Hierarchie über Größe statt über Farbe,
+Signalfarbe nur dort, wo etwas ein Signal ist.
+
+**Eine Rechnung, die immer wieder auffällt:** 20 Teilnehmer im reinen KO
+ergeben ein 32er-Raster mit 12 Freilosen und **4** Erstrundenspielen. Das ist
+richtig und fühlt sich falsch an — 12 von 20 sehen in Runde 1 keinen Ball.
+„Jeder spielt in Runde 1“ ist mit einem Setzraster nicht erfüllbar; die
+Antwort darauf ist Gruppen + KO, nicht eine Änderung an `los.py`.
+
+**Sechs Zusagen sind nicht verhandelbar** und gehören in jede Änderung:
 
 1. **Jeder schreibende Endpunkt prüft selbst.** Dieses Artefakt ist
    `Zugang.OEFFENTLICH` — damit hängt die Prüfung *nicht* am Router. Der Test
@@ -39,11 +57,19 @@ Sparsamkeit, sondern weil dieses Artefakt nebenbei bedient wird.
    „nochmal würfeln“ beliebig oft gedrückt werden.
 4. **Die Glocke bleibt im Gerät.** Wer sich benachrichtigen lässt, steht im
    `localStorage` des Browsers und in keiner Tabelle.
+5. **`nummer` ist unantastbar, `reihenfolge` ist beweglich.** Die Verweise des
+   Rasters hängen an `nummer` — „Sieger aus Spiel 7“ darf nicht etwas anderes
+   bedeuten, nur weil jemand keine Zeit hatte. Verschoben wird deshalb
+   ausschließlich `reihenfolge`, und `speicher.spiele()` sortiert danach.
+6. **Tabelle oder Raster, nie beides.** Solange die Gruppen laufen, sagt die
+   Tabelle, wer weiterkommt. Steht das Raster, ist sie Vergangenheit und
+   verschwindet — `PlanGrafik` entscheidet das an einer Stelle.
 
 ## Was bewusst nicht da ist
 
 | | |
 |---|---|
+| **Ein zweiter Durchgang im Verliererzweig** | Steht es im Kreis, bleibt es stehen |
 | **Satz- und Ballergebnisse** | Eingetragen wird der Sieger. `best_of` steht in keinem Datensatz und sagt allein den Spielern, wie lange sie spielen — deshalb ist es auch mitten im Turnier noch änderbar |
 | **Direkter Vergleich als Rangregel** | Punktgleiche teilen sich den Platz. Kreuzt der Gleichstand die Grenze zum Weiterkommen, wird gespielt statt gerechnet |
 | **Ein Bereich je Tätigkeit** | Teilnehmer, Auswürfeln und Spielplan sind einer. Drei Reiter waren richtig, solange ein Ergebnis aus sechs Zahlen bestand |
@@ -54,6 +80,8 @@ Offen, in der Reihenfolge, in der es sich lohnt:
 |---|---|
 | **Echtes Web-Push** | Die Glocke wirkt nur, solange die Seite offen ist. Für eine Meldung bei geschlossenem Tab braucht es einen Service Worker, VAPID-Schlüssel im Gateway und ein gültiges Zertifikat auf dem Pi |
 | **Platz 3** | Nach dem Halbfinale gibt es kein Spiel um den dritten Platz. Das Raster kann es, der Dienst setzt es nicht an |
+| **Bracket reset im Doppel-KO** | Gewinnt im Endspiel der aus dem Verliererzweig, ist er Sieger — obwohl der andere erst eine Niederlage hat. Streng genommen fehlt ein zweites Endspiel. Ein Turnier, dessen Ende „vielleicht noch ein Spiel“ ist, lässt sich nebenbei nicht führen |
+| **Spiel an eine Zielstelle ziehen** | Verschoben wird um einen Platz. Wer jemanden deutlich später spielen lassen will, drückt mehrmals — und sieht dazwischen, was es mit dem Plan macht |
 | **Doppel** | Alles ist auf Einzel gebaut: ein Teilnehmer ist eine Person. Doppel wären ein Teilnehmer aus zwei Namen — am Datenmodell eine Zeile, an der Oberfläche mehr |
 | **Gleichstand im Kreis** | Spielen drei das Entscheidungsspiel und gewinnt jeder einmal, steht der Gleichstand wieder. Ein zweiter Durchgang brächte dasselbe, deshalb bleibt er dann stehen — `speicher._schon_entschieden` |
 | **Migrationen** | `homepi schema` legt nur an. Eine neue Spalte in einer bestehenden Tabelle hält das Gateway auf `unhealthy` an |

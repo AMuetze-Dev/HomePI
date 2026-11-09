@@ -225,7 +225,12 @@ def _pruefe_teilnehmer_aenderbar(gefunden: Turnier) -> None:
 
 async def spiele(sitzung: AsyncSession, turnier_id: uuid.UUID) -> list[Spiel]:
     ergebnis = await sitzung.execute(
-        select(Spiel).where(Spiel.turnier_id == turnier_id).order_by(Spiel.nummer)
+        select(Spiel)
+        .where(Spiel.turnier_id == turnier_id)
+        # Die Warteschlange, nicht die Rasternummer: verschobene Spiele
+        # stehen dort, wo sie jetzt hingehoeren. Die Nummer entscheidet nur
+        # noch den Gleichstand, damit die Reihenfolge eindeutig bleibt.
+        .order_by(Spiel.reihenfolge, Spiel.nummer)
     )
     return list(ergebnis.scalars())
 
@@ -255,6 +260,37 @@ async def spiel_beginnen(sitzung: AsyncSession, spiel_id: uuid.UUID, tisch: int 
     gefunden.tisch = tisch if tisch is not None else await _freier_tisch(sitzung, lauf, gefunden)
     gefunden.zustand = "laeuft"
     gefunden.begonnen_am = jetzt()
+    await sitzung.flush()
+    return gefunden
+
+
+async def spiel_verschieben(sitzung: AsyncSession, spiel_id: uuid.UUID, richtung: str) -> Spiel:
+    """Tauscht ein geplantes Spiel mit seinem naechsten geplanten Nachbarn.
+
+    Getauscht werden die Stellen in der Warteschlange, nicht die Nummern -
+    sonst zeigte "Sieger aus Spiel 7" plotzlich auf ein anderes Spiel.
+    """
+    gefunden = await ein_spiel(sitzung, spiel_id)
+    alle = await spiele(sitzung, gefunden.turnier_id)
+
+    reihe = [
+        dienst.Warteplatz(
+            id=str(spiel.id),
+            nummer=spiel.nummer,
+            zustand=spiel.zustand,
+            haengt_an=tuple(
+                nummer
+                for nummer in (spiel.heim_aus_spiel, spiel.gast_aus_spiel)
+                if nummer is not None
+            ),
+        )
+        for spiel in alle
+        if not spiel.freilos
+    ]
+    partner_id = dienst.tauschpartner(reihe, str(spiel_id), richtung)
+    partner = next(spiel for spiel in alle if str(spiel.id) == partner_id)
+
+    gefunden.reihenfolge, partner.reihenfolge = partner.reihenfolge, gefunden.reihenfolge
     await sitzung.flush()
     return gefunden
 
@@ -340,14 +376,20 @@ async def _sieger_weiterreichen(sitzung: AsyncSession, lauf: Turnier, ausgangspu
 
     while offen:
         aktuell = offen.pop()
+        sieger = aktuell.sieger_id
+        verlierer = _verlierer(aktuell)
         for folge in alle:
             geaendert = False
-            if folge.heim_aus_spiel == aktuell.nummer and folge.heim_id != aktuell.sieger_id:
-                folge.heim_id = aktuell.sieger_id
-                geaendert = True
-            if folge.gast_aus_spiel == aktuell.nummer and folge.gast_id != aktuell.sieger_id:
-                folge.gast_id = aktuell.sieger_id
-                geaendert = True
+            if folge.heim_aus_spiel == aktuell.nummer:
+                einlaufend = verlierer if folge.heim_aus_verlierer else sieger
+                if folge.heim_id != einlaufend:
+                    folge.heim_id = einlaufend
+                    geaendert = True
+            if folge.gast_aus_spiel == aktuell.nummer:
+                einlaufend = verlierer if folge.gast_aus_verlierer else sieger
+                if folge.gast_id != einlaufend:
+                    folge.gast_id = einlaufend
+                    geaendert = True
             if not geaendert:
                 continue
             if folge.zustand != "geplant":
@@ -359,6 +401,17 @@ async def _sieger_weiterreichen(sitzung: AsyncSession, lauf: Turnier, ausgangspu
                 # Die Nummer eines Folgespiels ist immer groesser, deshalb
                 # endet dieser Durchlauf.
                 offen.append(folge)
+
+
+def _verlierer(gefunden: Spiel) -> uuid.UUID | None:
+    """Wer das Spiel verloren hat - oder ``None``, solange nichts feststeht.
+
+    Im Doppel-KO ist das eine genauso tragende Auskunft wie der Sieger: der
+    Verliererzweig besteht vollstaendig aus diesen Namen.
+    """
+    if gefunden.sieger_id is None or gefunden.heim_id is None or gefunden.gast_id is None:
+        return None
+    return gefunden.gast_id if gefunden.sieger_id == gefunden.heim_id else gefunden.heim_id
 
 
 async def _zustand_nachfuehren(sitzung: AsyncSession, lauf: Turnier) -> None:
@@ -425,6 +478,7 @@ async def _entscheidungen_ansetzen(
                 Spiel(
                     turnier_id=lauf.id,
                     nummer=nummer,
+                    reihenfolge=nummer,
                     phase="entscheidung",
                     runde=1,
                     gruppe_id=gruppe.id if gruppe else None,
@@ -514,6 +568,7 @@ async def plan_vorschlag(
         anzahl_gruppen=lauf.anzahl_gruppen,
         saat=gezogen,
         tische=lauf.tische,
+        doppel_ko=lauf.doppel_ko,
     )
     return lauf, {str(wer.id): wer for wer in leute}, plan, gezogen
 
@@ -542,6 +597,7 @@ async def auswuerfeln(sitzung: AsyncSession, turnier_id: uuid.UUID, saat: int | 
             Spiel(
                 turnier_id=lauf.id,
                 nummer=nummer,
+                reihenfolge=nummer,
                 phase="gruppe" if zugehoerig is not None else "runde",
                 runde=begegnung.runde,
                 gruppe_id=zugehoerig.id if zugehoerig is not None else None,
@@ -563,6 +619,7 @@ async def auswuerfeln(sitzung: AsyncSession, turnier_id: uuid.UUID, saat: int | 
             Spiel(
                 turnier_id=lauf.id,
                 nummer=nummer,
+                reihenfolge=nummer,
                 phase="runde",
                 runde=1,
                 bezeichnung="Runde 1, Freilos",
@@ -584,6 +641,17 @@ async def auswuerfeln(sitzung: AsyncSession, turnier_id: uuid.UUID, saat: int | 
     return lauf
 
 
+#: Welcher ``phase``-Wert zu welchem Zweig des Rasters gehoert. Der Zweig
+#: braucht keine eigene Spalte: die Phase trug diese Unterscheidung schon
+#: immer, und das Dashboard gruppiert ohnehin danach.
+PHASE_JE_ZWEIG = {
+    "einfach": "ko",
+    "sieger": "ko",
+    "verlierer": "ko_verlierer",
+    "finale": "ko_finale",
+}
+
+
 def _ko_schreiben(
     sitzung: AsyncSession,
     lauf: Turnier,
@@ -600,19 +668,28 @@ def _ko_schreiben(
     if not raster:
         return versatz
 
-    runden = max(spiel.runde for spiel in raster)
+    # Je Zweig eigene Rundenzahl: das Halbfinale des Siegerzweigs und die
+    # vierte Verliererrunde liegen im selben Raster, haben aber nichts
+    # miteinander zu tun.
+    runden: dict[str, int] = {}
+    for spiel in raster:
+        runden[spiel.zweig] = max(runden.get(spiel.zweig, 0), spiel.runde)
+
     for spiel in raster:
         sitzung.add(
             Spiel(
                 turnier_id=lauf.id,
                 nummer=versatz + spiel.nummer,
-                phase="ko",
+                reihenfolge=versatz + spiel.nummer,
+                phase=PHASE_JE_ZWEIG[spiel.zweig],
                 runde=spiel.runde,
-                bezeichnung=dienst.ko_bezeichnung(spiel.runde, runden),
+                bezeichnung=dienst.ko_bezeichnung(spiel.runde, runden[spiel.zweig], spiel.zweig),
                 heim_id=(nach_kennung[spiel.heim.teilnehmer].id if spiel.heim.teilnehmer else None),
                 gast_id=(nach_kennung[spiel.gast.teilnehmer].id if spiel.gast.teilnehmer else None),
                 heim_aus_spiel=(versatz + spiel.heim.aus_spiel if spiel.heim.aus_spiel else None),
                 gast_aus_spiel=(versatz + spiel.gast.aus_spiel if spiel.gast.aus_spiel else None),
+                heim_aus_verlierer=spiel.heim.verlierer,
+                gast_aus_verlierer=spiel.gast.verlierer,
             )
         )
     return versatz + len(raster)
@@ -667,7 +744,7 @@ async def _ko_ansetzen(
     # Gruppensieger der Turniersieger, und ein Raster aus einem Namen waere
     # ein Spiel ohne Gegner.
     if len(setzliste) >= 2:
-        raster = los.ko_raster(setzliste)
+        raster = los.doppel_ko_raster(setzliste) if lauf.doppel_ko else los.ko_raster(setzliste)
         _ko_schreiben(
             sitzung,
             lauf,
@@ -711,6 +788,7 @@ async def _schweizer_runde_ansetzen(
             Spiel(
                 turnier_id=lauf.id,
                 nummer=nummer,
+                reihenfolge=nummer,
                 phase="runde",
                 runde=runde,
                 bezeichnung=f"Runde {runde}",
@@ -726,6 +804,7 @@ async def _schweizer_runde_ansetzen(
             Spiel(
                 turnier_id=lauf.id,
                 nummer=nummer,
+                reihenfolge=nummer,
                 phase="runde",
                 runde=runde,
                 bezeichnung=f"Runde {runde}, Freilos",

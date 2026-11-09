@@ -79,7 +79,7 @@ describe("Tischtennisturnier", () => {
        Fläche gar nicht sieht. */
     render(mitAnmeldung(<TischtennisSeite unterseite="dashboard" />, null));
 
-    await screen.findByRole("heading", { name: "Glocke" });
+    await screen.findByRole("region", { name: "An den Tischen" });
     expect(api.ladeSpiele).not.toHaveBeenCalled();
     expect(api.ladeTabellen).not.toHaveBeenCalled();
   });
@@ -149,6 +149,34 @@ describe("Der Bereich Turnier", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Anna gewinnt" }));
 
     expect(api.trageErgebnisEin).toHaveBeenCalledWith("s1", "p1");
+  });
+
+  it("schiebt ein Spiel in der Warteschlange", async () => {
+    /* Wer gerade nicht da ist, haelt sonst den ganzen Plan auf. Trotzdem
+       anzupfeifen waere die schlechtere Loesung: dann stimmt die
+       Warteschlange im Dashboard nicht, und die Glocke laeutet beim
+       Falschen. */
+    vi.spyOn(api, "ladeTurnier").mockResolvedValue(LAEUFT);
+    vi.spyOn(api, "ladeSpiele").mockResolvedValue([spiel()]);
+    vi.spyOn(api, "verschiebeSpiel").mockResolvedValue(spiel());
+    render(mitAnmeldung(<TischtennisSeite unterseite="turnier" />, LEITER));
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Spiel 1 nach hinten schieben" }),
+    );
+
+    expect(api.verschiebeSpiel).toHaveBeenCalledWith("s1", "runter");
+  });
+
+  it("lässt ohne Verwaltungsrecht nicht schieben", async () => {
+    vi.spyOn(api, "ladeTurnier").mockResolvedValue(LAEUFT);
+    vi.spyOn(api, "ladeSpiele").mockResolvedValue([spiel()]);
+    render(mitAnmeldung(<TischtennisSeite unterseite="turnier" />, NUTZER));
+
+    await screen.findByRole("button", { name: "Anna gewinnt" });
+    expect(
+      screen.queryByRole("button", { name: /nach hinten schieben/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("setzt die nächste Runde an", async () => {

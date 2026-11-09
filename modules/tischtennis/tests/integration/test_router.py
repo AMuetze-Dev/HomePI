@@ -679,3 +679,174 @@ class TestRechte:
 
         assert antwort.status_code == 200
         assert "tischtennis" in {eintrag["id"] for eintrag in antwort.json()}
+
+
+class TestDoppelKo:
+    """Die zweite Chance, durch den ganzen Stapel.
+
+    Die Rechnung dahinter steht in ``test_los.py`` und laeuft in
+    Millisekunden. Hier geht es um das, was nur die Datenbank beantwortet:
+    dass der VERLIERER eines Spiels im Verliererzweig einlaeuft - und zwar
+    derselbe, der eben verloren hat.
+    """
+
+    async def test_das_raster_ist_fast_doppelt_so_gross(self, client: AsyncClient) -> None:
+        lauf = await turnier_anlegen(client, modus="ko", doppel_ko=True)
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        alle = await spiele(client, lauf["id"])
+
+        assert len(alle) == 2 * len(ACHT) - 2
+        assert {s["phase"] for s in alle} == {"ko", "ko_verlierer", "ko_finale"}
+
+    async def test_der_verlierer_laeuft_im_verliererzweig_ein(self, client: AsyncClient) -> None:
+        lauf = await turnier_anlegen(client, modus="ko", doppel_ko=True)
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        alle = await spiele(client, lauf["id"])
+        erstes = alle[0]
+        verlierer_id = erstes["gast_id"]
+        await werte(client, erstes, erstes["heim_id"])
+
+        danach = await spiele(client, lauf["id"])
+        auffangend = [
+            s
+            for s in danach
+            if s["phase"] == "ko_verlierer" and verlierer_id in (s["heim_id"], s["gast_id"])
+        ]
+
+        assert len(auffangend) == 1, "der Verlierer muss genau einmal weiterspielen"
+
+    async def test_vor_dem_spiel_steht_verlierer_aus_spiel_da(self, client: AsyncClient) -> None:
+        """Das Raster haengt an der Wand, bevor gespielt wird. Stuende dort
+        "Sieger aus Spiel 1", waere es an jedem Platz des Verliererzweigs
+        falsch."""
+        lauf = await turnier_anlegen(client, modus="ko", doppel_ko=True)
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        alle = await spiele(client, lauf["id"])
+        erste_verliererrunde = next(s for s in alle if s["phase"] == "ko_verlierer")
+
+        assert erste_verliererrunde["heim_herkunft"].startswith("Verlierer aus Spiel")
+        assert erste_verliererrunde["gast_herkunft"].startswith("Verlierer aus Spiel")
+
+    async def test_eine_korrektur_zieht_den_verliererzweig_mit(self, client: AsyncClient) -> None:
+        """Wird ein Ergebnis gedreht, wechselt nicht nur der Sieger oben,
+        sondern auch der Verlierer unten - sonst spielt im Verliererzweig
+        jemand, der gar nicht verloren hat."""
+        lauf = await turnier_anlegen(client, modus="ko", doppel_ko=True)
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        alle = await spiele(client, lauf["id"])
+        erstes = alle[0]
+        await werte(client, erstes, erstes["heim_id"])
+        await werte(client, erstes, erstes["gast_id"])
+
+        danach = await spiele(client, lauf["id"])
+        verliererzweig = [s for s in danach if s["phase"] == "ko_verlierer"]
+        aufgefangen = {s["heim_id"] for s in verliererzweig} | {
+            s["gast_id"] for s in verliererzweig
+        }
+
+        assert erstes["heim_id"] in aufgefangen
+        assert erstes["gast_id"] not in aufgefangen
+
+    async def test_das_turnier_endet_im_endspiel(self, client: AsyncClient) -> None:
+        lauf = await turnier_anlegen(client, modus="ko", doppel_ko=True)
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        for _ in range(2 * len(ACHT)):
+            await alles_durchspielen(client, lauf["id"])
+
+        alle = await spiele(client, lauf["id"])
+        endspiel = next(s for s in alle if s["phase"] == "ko_finale")
+
+        assert [s for s in alle if s["zustand"] != "beendet"] == []
+        assert endspiel["sieger_id"] is not None
+
+    async def test_doppel_ko_laesst_sich_im_lauf_nicht_umstellen(self, client: AsyncClient) -> None:
+        """Daran haengt der halbe Spielplan. Mitten im Turnier umgestellt,
+        gehoerte die eine Haelfte zu anderen Regeln als die andere."""
+        lauf = await turnier_anlegen(client, modus="ko", doppel_ko=True)
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        antwort = await client.put(
+            f"/tischtennis/turnier/{lauf['id']}",
+            json={
+                "modus": "ko",
+                "tische": 2,
+                "best_of": 3,
+                "minuten_pro_spiel": 12,
+                "anzahl_gruppen": 2,
+                "weiter_pro_gruppe": 2,
+                "runden": 3,
+                "doppel_ko": False,
+            },
+        )
+
+        assert antwort.status_code == 409, antwort.text
+
+
+class TestVerschieben:
+    """Spiele schieben, wenn jemand gerade keine Zeit hat."""
+
+    async def test_ein_spiel_wandert_nach_hinten(self, client: AsyncClient) -> None:
+        lauf = await turnier_anlegen(client, modus="ko")
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+        vorher = await spiele(client, lauf["id"])
+
+        antwort = await client.post(
+            f"/tischtennis/spiel/{vorher[0]['id']}/verschieben", json={"richtung": "runter"}
+        )
+        assert antwort.status_code == 200, antwort.text
+
+        nachher = await spiele(client, lauf["id"])
+        assert [s["id"] for s in nachher[:2]] == [vorher[1]["id"], vorher[0]["id"]]
+
+    async def test_die_nummern_bleiben_wie_sie_waren(self, client: AsyncClient) -> None:
+        """Daran haengen die Verweise des Rasters. Wuerden sie mitwandern,
+        zeigte "Sieger aus Spiel 7" auf ein anderes Spiel."""
+        lauf = await turnier_anlegen(client, modus="ko")
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+        vorher = {s["id"]: s["nummer"] for s in await spiele(client, lauf["id"])}
+
+        erstes = next(iter(vorher))
+        await client.post(f"/tischtennis/spiel/{erstes}/verschieben", json={"richtung": "runter"})
+
+        nachher = {s["id"]: s["nummer"] for s in await spiele(client, lauf["id"])}
+        assert nachher == vorher
+
+    async def test_ein_angepfiffenes_spiel_wird_nicht_geschoben(self, client: AsyncClient) -> None:
+        lauf = await turnier_anlegen(client, modus="ko")
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+        alle = await spiele(client, lauf["id"])
+        await client.post(f"/tischtennis/spiel/{alle[0]['id']}/beginnen", json={})
+
+        antwort = await client.post(
+            f"/tischtennis/spiel/{alle[0]['id']}/verschieben", json={"richtung": "runter"}
+        )
+
+        assert antwort.status_code == 409, antwort.text
+
+    async def test_ohne_recht_geht_es_nicht(
+        self, client: AsyncClient, besucher: AsyncClient
+    ) -> None:
+        lauf = await turnier_anlegen(client, modus="ko")
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+        alle = await spiele(client, lauf["id"])
+
+        antwort = await besucher.post(
+            f"/tischtennis/spiel/{alle[0]['id']}/verschieben", json={"richtung": "runter"}
+        )
+
+        assert antwort.status_code in (401, 403), antwort.text
