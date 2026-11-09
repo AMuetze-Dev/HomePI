@@ -18,12 +18,7 @@ export type Modus = "gruppen_ko" | "ko" | "schweizer";
 export type TurnierZustand = "planung" | "laufend" | "beendet";
 export type SpielZustand = "geplant" | "laeuft" | "beendet";
 export type Phase =
-  | "gruppe"
-  | "ko"
-  | "ko_verlierer"
-  | "ko_finale"
-  | "runde"
-  | "entscheidung";
+  "gruppe" | "ko" | "ko_verlierer" | "ko_finale" | "runde" | "entscheidung";
 
 /** Einen Platz nach vorn oder nach hinten in der Warteschlange. */
 export type Richtung = "hoch" | "runter";
