@@ -1,0 +1,669 @@
+/* Nur Tokens aus src/styles/tokens.css - kein fester Farbwert, keine feste
+   Pixelzahl außer dort, wo eine Spaltenbreite eine Layoutentscheidung ist.
+   Siehe docs/08-design.md.
+
+   Eine Datei für alle Tafeln dieses Artefakts: Dashboard, Turnier und
+   Einstellungen teilen Zeilen, Karten und Nebensätze. Drei Dateien mit
+   denselben vier Klassen laufen auseinander, sobald jemand eine ändert.
+
+   ----------------------------------------------------------------------
+   Die Haltung dieser Datei in drei Sätzen:
+
+   1. **Die Hierarchie trägt, nicht die Farbe.** Was wichtig ist, ist
+      größer und ruhiger - nicht bunter. Signalfarben kommen nur dort vor,
+      wo etwas tatsächlich ein Signal ist: ein laufendes Spiel, ein Sieger.
+   2. **Haarlinien statt Kästen.** Flächen werden von 1px Rand getrennt,
+      nicht von Schatten und Rahmen. Ein Raster aus zwanzig Kästchen mit
+      Schlagschatten sieht aus wie ein Formular von 2009.
+   3. **Bewegung nur als Rückmeldung.** Ein Übergang bestätigt eine
+      Berührung. Er kündigt nichts an und führt nichts ein.
+
+   Was daraus folgt, steht an den Stellen, an denen es gilt. */
+
+.laden {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+/* ------------------------------------------------------------------ Gerüst */
+
+.kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-3);
+  margin-bottom: var(--raum-8);
+  padding-bottom: var(--raum-5);
+  border-bottom: 1px solid var(--farbe-rand);
+}
+
+.turniername {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--gewicht-halbfett);
+  /* Negative Laufweite erst ab dieser Größe - im Fließtext schadet sie. */
+  letter-spacing: var(--laufweite-enger);
+}
+
+.turnierwahl,
+.auswahl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.turnierwahl select,
+.auswahl select {
+  padding: var(--raum-2) var(--raum-3);
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  font: inherit;
+  font-size: var(--text-md);
+  transition: border-color var(--dauer-schnell) var(--verlauf);
+}
+
+.turnierwahl select:hover,
+.auswahl select:hover {
+  border-color: var(--farbe-text-leise);
+}
+
+.auswahl select:focus-visible,
+.turnierwahl select:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+/* Der Kopf eines Abschnitts: Titel und, wenn nötig, ein Nebensatz dazu.
+   Die Haarlinie darunter ist das, was die Gliederung trägt - vorher stand
+   nur ein fetter Titel da, und bei fünf Abschnitten hintereinander sah die
+   Seite aus wie eine Aufzählung. */
+.abschnittskopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--raum-2) var(--raum-4);
+  margin-bottom: var(--raum-4);
+  padding-bottom: var(--raum-2);
+  border-bottom: 1px solid var(--farbe-rand);
+}
+
+.abschnittstitel {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-halbfett);
+  letter-spacing: var(--laufweite-eng);
+}
+
+.nebensache {
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-normal);
+}
+
+.aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-3);
+  margin-top: var(--raum-5);
+}
+
+.gegen {
+  flex: none;
+  color: var(--farbe-text-leise);
+  font-size: var(--text-sm);
+}
+
+.sieger {
+  font-weight: var(--gewicht-halbfett);
+}
+
+/* ------------------------------------------------------------------ Listen */
+
+.liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+  padding: var(--raum-3) var(--raum-4);
+  border-bottom: 1px solid var(--farbe-rand);
+}
+
+.zeile:last-child {
+  border-bottom: none;
+}
+
+/* -------------------------------------------------------------- Klappen
+
+   Glocke und "zuletzt gespielt" sind Nachschlagewerk: man braucht sie,
+   wenn man sie braucht. Offen standen sie zwischen dem, was gerade
+   passiert, und dem Spielplan - und kosteten auf dem Handy zwei
+   Bildschirme Scrollweg. Zugeklappt sind sie eine Zeile.
+
+   Als <details>, nicht als eigener Zustand: der Browser kennt das Muster,
+   bedient es mit der Tastatur und sagt einem Screenreader von selbst, dass
+   hier etwas auf- und zugeht. */
+.klappe {
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-lg);
+  background: var(--farbe-flaeche);
+}
+
+.klappengriff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--raum-2);
+  padding: var(--raum-4);
+  border-radius: var(--rundung-lg);
+  font-size: var(--text-md);
+  font-weight: var(--gewicht-mittel);
+  cursor: pointer;
+  transition: background var(--dauer-schnell) var(--verlauf);
+}
+
+.klappengriff:hover {
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+.klappengriff:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: -2px;
+}
+
+.klappe[open] .klappengriff {
+  border-bottom: 1px solid var(--farbe-rand);
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.klappeninhalt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  padding: var(--raum-4);
+}
+
+/* --------------------------------------------------------------- Dashboard */
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-10);
+}
+
+/* Mobil eine Spalte: bei 375 px steht ein Tisch unter dem anderen, und die
+   Paarung bleibt groß genug, um sie aus zwei Metern zu lesen. */
+.tische {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--raum-4);
+}
+
+.tischkopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+  margin-bottom: var(--raum-4);
+}
+
+.tischname {
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-sm);
+  font-weight: var(--gewicht-mittel);
+}
+
+.laufend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+/* Die laufende Paarung ist das Größte auf der Seite. Sie ist der Grund,
+   aus dem jemand das Dashboard öffnet - alles andere ist Auskunft. */
+.paarung {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--raum-2) var(--raum-3);
+}
+
+.spielername {
+  font-size: var(--text-2xl);
+  font-weight: var(--gewicht-mittel);
+  letter-spacing: var(--laufweite-enger);
+  line-height: var(--zeile-eng);
+  overflow-wrap: anywhere;
+}
+
+/* Die Warteschlange des Tisches. Seit "Als nächstes" als eigener Abschnitt
+   weg ist, trägt sie dessen Aufgabe mit - deshalb etwas mehr Luft als eine
+   bloße Fußnote. */
+.danach {
+  list-style: none;
+  margin: var(--raum-5) 0 0;
+  padding: var(--raum-4) 0 0;
+  border-top: 1px solid var(--farbe-rand);
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  font-size: var(--text-md);
+}
+
+.danach li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--raum-2);
+}
+
+.paarungZeile {
+  font-weight: var(--gewicht-mittel);
+  overflow-wrap: anywhere;
+}
+
+.glocken {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stand {
+  color: var(--farbe-text-leise);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* ------------------------------------------------------- Plan als Bild */
+
+.plangrafik {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-10);
+}
+
+.rangliste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rang {
+  display: flex;
+  align-items: baseline;
+  gap: var(--raum-3);
+  padding: var(--raum-2) 0;
+  border-bottom: 1px solid var(--farbe-rand);
+}
+
+.rang:last-child {
+  border-bottom: none;
+}
+
+.platzziffer {
+  flex: none;
+  width: 1.5rem;
+  color: var(--farbe-text-leise);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.rangname {
+  flex: 1 1 auto;
+  font-weight: var(--gewicht-mittel);
+  overflow-wrap: anywhere;
+}
+
+.begegnungen {
+  list-style: none;
+  margin: var(--raum-5) 0 0;
+  padding: var(--raum-4) 0 0;
+  border-top: 1px solid var(--farbe-rand);
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+}
+
+.begegnung {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--raum-2);
+  font-size: var(--text-md);
+}
+
+/* ------------------------------------------------------------- KO-Raster
+
+   Eine Spalte je Runde, die Paarungen gleichmäßig verteilt: damit steht das
+   Halbfinale auf der Höhe zwischen seinen beiden Viertelfinals. Die kurzen
+   Striche rechts und links sind Dekoration - sie tragen keine Aussage, die
+   nicht schon im Text steht, und fehlen deshalb auch keinem Screenreader.
+
+   Quer scrollen darf dieser Rahmen, nicht die Seite: ein Raster für
+   sechzehn hat vier Spalten, und die passen bei 375 px nicht nebeneinander.
+   Der weiche Rand rechts sagt, dass dort noch etwas kommt - ohne eine
+   Bildlaufleiste, die auf dem Handy ohnehin niemand sieht. */
+.raster {
+  display: flex;
+  gap: var(--raum-8);
+  overflow-x: auto;
+  padding-bottom: var(--raum-2);
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+  /* Ein angedeuteter Schatten an der rechten Kante: er sagt, dass dort noch
+     etwas kommt. Eine mask-image mit einem Schwarzwert waere der naechste
+     Griff gewesen - und ein fester Farbwert, den der Schutztest in
+     styles.test.ts zu Recht findet. Als Schatten aus einem Token sagt es
+     dasselbe. */
+  box-shadow: inset calc(-1 * var(--raum-2)) 0 var(--raum-2) calc(-1 * var(--raum-2))
+    var(--farbe-rand-stark);
+}
+
+/* Passt alles hinein, ist der Hinweis auf mehr eine Lüge. */
+@media (width >= 60rem) {
+  .raster {
+    box-shadow: none;
+  }
+}
+
+.rasterspalte {
+  display: flex;
+  flex: 1 0 11rem;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+.rundenname {
+  margin: 0;
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-xs);
+  font-weight: var(--gewicht-mittel);
+  text-align: center;
+}
+
+.rasterliste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: var(--raum-4);
+}
+
+/* Die Paarung als ein Block mit Haarlinie dazwischen: zwei Zeilen, die
+   zusammengehören. Vorher trug der Zwischenraum die Randfarbe als Fläche -
+   das ergab bei zwanzig Spielen zwanzig graue Striche, die lauter waren als
+   die Namen. */
+.rasterspiel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  overflow: hidden;
+  background: var(--farbe-flaeche);
+}
+
+/* Der Strich nach rechts, der zur nächsten Runde zeigt. */
+.rasterspalte:not(:last-child) .rasterspiel::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: calc(-1 * var(--raum-8));
+  width: var(--raum-8);
+  border-top: 1px solid var(--farbe-rand);
+}
+
+.rasterplatz {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-2);
+  padding: var(--raum-2) var(--raum-3);
+}
+
+.rasterplatz + .rasterplatz {
+  border-top: 1px solid var(--farbe-rand);
+}
+
+/* Der Sieger wird markiert, nicht angestrahlt: ein Strich an der Kante und
+   halbfette Schrift. Eine grüne Fläche über die ganze Zeile stach im
+   Raster mehr heraus als das Endspiel. */
+.rastersieger {
+  box-shadow: inset 2px 0 0 0 var(--signal-gut);
+}
+
+.rasterverloren {
+  color: var(--farbe-text-leise);
+}
+
+.rastername {
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+}
+
+.rastersieger .rastername {
+  font-weight: var(--gewicht-halbfett);
+}
+
+/* ------------------------------------------------------------------ Turnier */
+
+.namen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+  margin: var(--raum-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.namenschild {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-1);
+  padding: var(--raum-1) var(--raum-2) var(--raum-1) var(--raum-3);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-voll);
+  font-size: var(--text-sm);
+  transition: border-color var(--dauer-schnell) var(--verlauf);
+}
+
+.namenschild:hover {
+  border-color: var(--farbe-rand-stark);
+}
+
+.spielzeile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  padding: var(--raum-4);
+  border-bottom: 1px solid var(--farbe-rand);
+}
+
+.spielzeile:last-child {
+  border-bottom: none;
+}
+
+.spielkopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+}
+
+/* Die beiden Pfeile zum Schieben. Leise, weil sie selten gebraucht werden -
+   aber beieinander, damit "einen weiter" ein Handgriff ist und kein
+   Suchspiel. */
+.schieben {
+  display: inline-flex;
+  gap: var(--raum-1);
+  margin-inline-start: auto;
+}
+
+/* Zwei große Knöpfe nebeneinander: hier steht jemand mit dem Schläger in
+   der Hand und tippt einen Namen an. */
+.siegerwahl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+}
+
+.gruppen {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--raum-4);
+  margin: var(--raum-4) 0;
+}
+
+.gruppenname {
+  margin: 0 0 var(--raum-2);
+  font-size: var(--text-md);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.gruppenliste {
+  margin: 0;
+  padding-left: var(--raum-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+}
+
+/* ---------------------------------------------------------------- Formulare */
+
+/* Mobil zuerst: gestapelt. Zeilenlayout erst ab genug Breite - andersherum
+   müsste die Ausnahme das flex der Kinder wieder aufheben und bräuchte
+   dafür dieselbe Spezifität. */
+.formular {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--raum-4);
+}
+
+.absenden {
+  width: 100%;
+}
+
+.einstellungen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-5);
+}
+
+.zweispaltig {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--raum-4);
+}
+
+/* Ein Schalter mit Erklärung darunter. Das Kästchen oben ausgerichtet, nicht
+   mittig: bei zwei Zeilen Erklärung rutschte es sonst in die Mitte des
+   Absatzes und zeigte auf nichts. */
+.schalter {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--raum-3);
+  padding: var(--raum-4);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  cursor: pointer;
+  transition: border-color var(--dauer-schnell) var(--verlauf);
+}
+
+.schalter:hover {
+  border-color: var(--farbe-rand-stark);
+}
+
+.schalter:has(input:focus-visible) {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+.schalter:has(input:disabled) {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.schalter input {
+  flex: none;
+  /* Auf die erste Textzeile gesetzt, damit es auf gleicher Höhe wie das
+     erste Wort steht und nicht darüber. */
+  margin-top: 0.1875rem;
+  accent-color: var(--farbe-aktion);
+}
+
+.schalter > span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+}
+
+.schalterwort {
+  font-size: var(--text-md);
+  font-weight: var(--gewicht-mittel);
+}
+
+@media (width >= 34rem) {
+  .formular {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .formular > *:first-child {
+    flex: 1 1 12rem;
+  }
+
+  .absenden {
+    flex: none;
+    width: auto;
+  }
+
+  .zweispaltig {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tische {
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  }
+
+  .gruppen {
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  }
+}
+
+/* Wer Bewegung abbestellt hat, bekommt keine. Die Übergänge hier bestätigen
+   nur Berührungen - es geht nichts verloren. */
+@media (prefers-reduced-motion: reduce) {
+  .turnierwahl select,
+  .auswahl select,
+  .klappengriff,
+  .namenschild,
+  .schalter {
+    transition: none;
+  }
+}

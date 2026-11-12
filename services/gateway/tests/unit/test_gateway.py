@@ -22,10 +22,19 @@ async def test_kein_modul_ist_defekt(angemeldet: AsyncClient) -> None:
     assert not defekt, f"Module konnten nicht geladen werden: {defekt}"
 
 
-async def test_ohne_anmeldung_ist_nichts_zu_sehen(client: AsyncClient) -> None:
-    """Auf diesem Gateway ist kein Artefakt oeffentlich. Ein Besucher ohne
-    Konto soll nicht erfahren, was hier laeuft."""
-    assert (await client.get("/module")).json() == []
+async def test_ohne_anmeldung_ist_nur_das_oeffentliche_zu_sehen(client: AsyncClient) -> None:
+    """Ein Besucher ohne Konto soll nicht erfahren, was hier sonst laeuft.
+
+    Genau ein Artefakt ist oeffentlich: das Tischtennisturnier, dessen
+    Dashboard-Ansicht ohne Anmeldung erreichbar sein soll
+    (modules/tischtennis). Deshalb steht die Liste hier namentlich und nicht
+    als "alles, was sich oeffentlich nennt" - ein zweites oeffentliches
+    Artefakt soll eine Entscheidung sein, die jemand hier bestaetigt, und
+    kein Nebeneffekt.
+    """
+    sichtbar = {eintrag["id"] for eintrag in (await client.get("/module")).json()}
+
+    assert sichtbar == {"tischtennis"}
 
 
 async def test_info_nennt_nur_die_anzahl(client: AsyncClient) -> None:

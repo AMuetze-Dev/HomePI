@@ -87,6 +87,26 @@ Verwaltung. Das Artefakt prüft dann Endpunkt für Endpunkt mit `erfordert(...)`
 Im Manifest erscheint es trotzdem nur bei Rechteinhabern; sonst wäre es über
 die Kachelliste wieder für alle sichtbar.
 
+### Das eine öffentliche Artefakt
+
+`OEFFENTLICH` ist genau einmal vergeben: **`tischtennis`**. Seine
+Dashboard-Ansicht soll jeder Kollege aufrufen können, ohne dass jemand zwanzig
+Konten anlegt — und zwar über die Kachel und nicht nur über einen
+weitergegebenen Link. Deshalb `OEFFENTLICH` und nicht `SELBST`: bei `SELBST`
+stünde das Artefakt nur bei Rechteinhabern im Manifest, und ein Besucher ohne
+Konto fände von der Startseite aus keinen Weg dorthin.
+
+Der Preis ist die fehlende Prüfung am Router. Das Artefakt trägt deshalb an
+**jedem** schreibenden Endpunkt sein eigenes `erfordert(...)`, und ein Test
+(`modules/tischtennis/tests/unit/test_anmeldung.py`) geht alle Routen durch und
+verlangt bei jeder nicht-GET-Route eine Abhängigkeit. Ohne diesen Test wäre
+der vergessene Endpunkt ein Formular, das jeder Besucher abschicken kann.
+
+Dass es bei einem bleibt, hält ein Test im Gateway fest: die Artefaktliste
+eines Besuchers ohne Konto besteht namentlich aus `tischtennis` und sonst
+nichts. Ein zweites öffentliches Artefakt soll eine Entscheidung sein, die
+jemand dort bestätigt, und kein Nebeneffekt.
+
 ### Warum die Prüfung am Router hängt und nicht am Endpunkt
 
 Ein Artefakt bekommt im Lauf der Zeit Endpunkte dazu. Hängt die Prüfung an

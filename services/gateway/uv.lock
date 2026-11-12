@@ -606,6 +606,7 @@ dependencies = [
     { name = "homepi-geraete" },
     { name = "homepi-haushaltsbuch" },
     { name = "homepi-staffelpilot" },
+    { name = "homepi-tischtennis" },
     { name = "homepi-verwaltung" },
 ]
 
@@ -627,6 +628,7 @@ requires-dist = [
     { name = "homepi-geraete", editable = "../../modules/geraete" },
     { name = "homepi-haushaltsbuch", editable = "../../modules/haushaltsbuch" },
     { name = "homepi-staffelpilot", editable = "../../modules/staffelpilot" },
+    { name = "homepi-tischtennis", editable = "../../modules/tischtennis" },
     { name = "homepi-verwaltung", editable = "../../modules/verwaltung" },
 ]
 
@@ -715,6 +717,28 @@ dev = [
     { name = "pytest-watcher", specifier = ">=0.4" },
     { name = "ruff", specifier = ">=0.9" },
     { name = "types-pyyaml", specifier = ">=6.0" },
+]
+
+[[package]]
+name = "homepi-tischtennis"
+version = "0.1.0"
+source = { editable = "../../modules/tischtennis" }
+dependencies = [
+    { name = "homepi-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "homepi-core", editable = "../../packages/homepi-core" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "mypy", specifier = ">=1.14" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.25" },
+    { name = "pytest-cov", specifier = ">=6.0" },
+    { name = "pytest-watcher", specifier = ">=0.4" },
+    { name = "ruff", specifier = ">=0.9" },
 ]
 
 [[package]]
