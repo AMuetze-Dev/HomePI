@@ -2,6 +2,7 @@ import { GeraeteSeite } from "./geraete/GeraeteSeite";
 import type { Breite, ModulOberflaeche, Unterseite } from "./typen";
 import { StaffelpilotSeite } from "./staffelpilot/StaffelpilotSeite";
 import { VerwaltungSeite } from "./verwaltung/VerwaltungSeite";
+import { HaushaltsbuchSeite } from "./haushaltsbuch/HaushaltsbuchSeite";
 import { TischtennisSeite } from "./tischtennis/TischtennisSeite";
 
 /**
@@ -22,6 +23,24 @@ import { TischtennisSeite } from "./tischtennis/TischtennisSeite";
  * Artefakte zueinander verhalten, statt verteilt auf drei Dateien.
  */
 export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
+  {
+    id: "haushaltsbuch",
+    Komponente: HaushaltsbuchSeite,
+    // Je Person eine Bilanzkarte nebeneinander, darunter Tabellen mit
+    // Rhythmus und Betrag. Bei "normal" stehen die Karten untereinander und
+    // der Vergleich, um den es geht, findet nicht mehr statt.
+    breite: "weit",
+    unterseiten: [
+      { id: "uebersicht", wort: "Monatsplan" },
+      // Ein Bild, das ganz von der Breite lebt: jede Spalte ist eine Station,
+      // und die Beschriftung steht daneben, nicht darunter.
+      { id: "fluss", wort: "Geldfluss", breite: "voll" },
+      { id: "posten", wort: "Posten" },
+      // Formulare. Ein Eingabefeld über die ganze Monitorbreite ist nicht
+      // großzügig, sondern unlesbar.
+      { id: "stammdaten", wort: "Konten & Personen", breite: "normal" },
+    ],
+  },
   {
     id: "staffelpilot",
     Komponente: StaffelpilotSeite,

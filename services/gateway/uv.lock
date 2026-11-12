@@ -604,6 +604,7 @@ source = { editable = "." }
 dependencies = [
     { name = "homepi-core" },
     { name = "homepi-geraete" },
+    { name = "homepi-haushaltsbuch" },
     { name = "homepi-staffelpilot" },
     { name = "homepi-tischtennis" },
     { name = "homepi-verwaltung" },
@@ -625,6 +626,7 @@ dev = [
 requires-dist = [
     { name = "homepi-core", editable = "../../packages/homepi-core" },
     { name = "homepi-geraete", editable = "../../modules/geraete" },
+    { name = "homepi-haushaltsbuch", editable = "../../modules/haushaltsbuch" },
     { name = "homepi-staffelpilot", editable = "../../modules/staffelpilot" },
     { name = "homepi-tischtennis", editable = "../../modules/tischtennis" },
     { name = "homepi-verwaltung", editable = "../../modules/verwaltung" },
@@ -646,6 +648,28 @@ dev = [
 name = "homepi-geraete"
 version = "0.1.0"
 source = { editable = "../../modules/geraete" }
+dependencies = [
+    { name = "homepi-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "homepi-core", editable = "../../packages/homepi-core" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "mypy", specifier = ">=1.14" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.25" },
+    { name = "pytest-cov", specifier = ">=6.0" },
+    { name = "pytest-watcher", specifier = ">=0.4" },
+    { name = "ruff", specifier = ">=0.9" },
+]
+
+[[package]]
+name = "homepi-haushaltsbuch"
+version = "0.1.0"
+source = { editable = "../../modules/haushaltsbuch" }
 dependencies = [
     { name = "homepi-core" },
 ]
