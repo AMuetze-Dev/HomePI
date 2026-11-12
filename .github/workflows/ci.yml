@@ -279,27 +279,30 @@ jobs:
         run: npm run build
 
   # -------------------------------------------------------------------------
-  # Der eigentliche Beweis, dass alles zusammenpasst: die komplette
-  # Entwicklungsumgebung hochfahren und die Rauchtests dagegen laufen lassen.
-  # Genau diese Tests laufen spaeter gegen den Pi, nur mit anderer Basis-URL.
-  stack:
+  # Die Oberflaechentests: eine Reise je Lauf.
+  #
+  # Frueher waren sie ein Schritt im stack-Job und liefen alle drei
+  # hintereinander. Das hatte zwei Folgen, und beide waren schlecht:
+  #
+  #   * Ein roter Weg eines Artefakts erschien als "stack fehlgeschlagen" -
+  #     und nahm die Rauchtests mit, die danach gar nicht mehr liefen.
+  #   * Drei Umgebungen nacheinander, dazu drei Kaltstarts der Oberflaeche.
+  #
+  # Jetzt eine Matrix: eigener Runner je Reise, eigene Umgebung, eigenes
+  # Ergebnis. fail-fast steht aus, damit ein Artefakt die anderen nicht
+  # abbricht - wer drei rote Wege hat, will alle drei sehen und nicht einen.
+  e2e:
     needs: changes
     if: needs.changes.outputs.python == 'true' || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
-    env:
-      # Wegwerfkonto in einer Datenbank, die am Ende des Jobs geloescht wird.
-      # Kein Secret: es schuetzt nichts, was den Lauf ueberlebt.
-      HOMEPI_SMOKE_BENUTZER: rauchtest
-      # Enthaelt bewusst NICHT den Benutzernamen - das lehnt die
-      # Passwortpruefung ab, und zwar zu Recht.
-      HOMEPI_SMOKE_PASSWORT: wegwerf-konto-nur-fuer-die-ci-4711
+    strategy:
+      fail-fast: false
+      matrix:
+        # "weg" ist die Huelle: Anmeldung, Konten, Passwortwechsel.
+        # Die beiden anderen gehoeren dem Artefakt staffelpilot.
+        spec: [weg, einrichtung, staffelpilot]
     steps:
       - uses: actions/checkout@v4
-
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-          cache-dependency-glob: services/gateway/uv.lock
 
       - uses: actions/setup-node@v4
         with:
@@ -307,11 +310,6 @@ jobs:
           cache: npm
           cache-dependency-path: services/web/package-lock.json
 
-      # VOR dem Hochfahren der Umgebung, und das ist kein Zufall:
-      # compose haengt ein anonymes Volume auf /app/node_modules. Docker
-      # legt den Einhaengepunkt dafuer auf dem Host an - als root. Ein
-      # spaeteres 'npm ci' liefe dann als 'runner' gegen ein Verzeichnis,
-      # das ihm nicht gehoert, und scheiterte an der Berechtigung.
       - name: Abhaengigkeiten des Frontends
         working-directory: services/web
         run: npm ci
@@ -349,10 +347,8 @@ jobs:
       #     wartete auf einen Dienst, der nicht durfte.
       #
       # Beides stand richtig im Makefile. Zwei Fassungen desselben Ablaufs
-      # laufen auseinander - deshalb jetzt nur noch eine. "make e2e" bringt je
-      # Reise eine eigene, frische Umgebung mit und raeumt danach ab; die
-      # Entwicklungsumgebung fuer die Rauchtests unten bleibt davon getrennt
-      # (eigenes Compose-Projekt, eigene Ports).
+      # laufen auseinander - deshalb jetzt nur noch eine. "make e2e" baut das
+      # Bundle, bringt eine eigene, frische Umgebung mit und raeumt danach ab.
       #
       # Bei einem Fehlschlag gehen die entscheidenden Zeilen zusaetzlich als
       # Annotation heraus. Der Testbericht liegt zwar als Artefakt bereit und
@@ -362,28 +358,54 @@ jobs:
       - name: Oberflaechentests
         run: |
           set -o pipefail
-          if make e2e 2>&1 | tee e2e.log; then
+          if make e2e E2E_SPECS=${{ matrix.spec }} 2>&1 | tee e2e.log; then
             exit 0
           fi
           grep -aE '^\s+[0-9]+\) |Error:|Timed out|expect\(|✘|gescheitert' e2e.log \
             | tail -20 \
             | while IFS= read -r zeile; do
                 # Annotationen sind einzeilig; %0A ist der Umbruch darin.
-                printf '::error::%s\n' "${zeile//$'\r'/}"
+                printf '::error::%s [${{ matrix.spec }}]\n' "${zeile//$'\r'/}"
               done
           exit 1
-
-      - name: Entwicklungsumgebung hochfahren
-        run: docker compose -f compose.dev.yml up -d --build --wait --wait-timeout 300
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: oberflaechentests
+          name: oberflaechentests-${{ matrix.spec }}
           path: |
             services/web/playwright-report/
             services/web/test-results/
           retention-days: 7
+
+  # -------------------------------------------------------------------------
+  # Der eigentliche Beweis, dass alles zusammenpasst: die komplette
+  # Entwicklungsumgebung hochfahren und die Rauchtests dagegen laufen lassen.
+  # Genau diese Tests laufen spaeter gegen den Pi, nur mit anderer Basis-URL.
+  #
+  # Laeuft unabhaengig von den Oberflaechentests oben: ein roter Weg soll
+  # nicht verdecken, ob die Umgebung ueberhaupt hochkommt.
+  stack:
+    needs: changes
+    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    env:
+      # Wegwerfkonto in einer Datenbank, die am Ende des Jobs geloescht wird.
+      # Kein Secret: es schuetzt nichts, was den Lauf ueberlebt.
+      HOMEPI_SMOKE_BENUTZER: rauchtest
+      # Enthaelt bewusst NICHT den Benutzernamen - das lehnt die
+      # Passwortpruefung ab, und zwar zu Recht.
+      HOMEPI_SMOKE_PASSWORT: wegwerf-konto-nur-fuer-die-ci-4711
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/gateway/uv.lock
+
+      - name: Entwicklungsumgebung hochfahren
+        run: docker compose -f compose.dev.yml up -d --build --wait --wait-timeout 300
 
       - name: Konto fuer die Rauchtests anlegen
         # Artefakte sind je Benutzer sichtbar. Ohne Konto waere das Manifest
@@ -505,7 +527,7 @@ jobs:
   # neue Job einzeln in den Einstellungen nachgetragen werden - und ein
   # uebersprungener Job wuerde faelschlich als Erfolg zaehlen.
   ci:
-    needs: [infra, python, web, stack, docker, secrets]
+    needs: [infra, python, web, e2e, stack, docker, secrets]
     if: always()
     runs-on: ubuntu-latest
     steps:

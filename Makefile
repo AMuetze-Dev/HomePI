@@ -243,17 +243,34 @@ DEV_API_PORT ?= 18000
 #: gehoeren. Hier ausdruecklich gesetzt und nicht dem Standard
 #: ueberlassen: eine .env in diesem Verzeichnis gilt fuer *jedes*
 #: compose-Projekt daraus, auch fuer dieses.
-E2E := DEV_PROJEKT=homepi-e2e DEV_WEB_PORT=$(E2E_WEB_PORT) DEV_API_PORT=$(E2E_API_PORT) DEV_DB_PORT=$(E2E_DB_PORT) PRUEFDIENST_LESER=demo docker compose -f compose.dev.yml
+#: OHNE DEV_WEB_PORT, und das ist Absicht: die Oberflaeche kommt hier nicht
+#: aus dem Compose-Projekt. Sie laeuft als "vite preview" auf dem gebauten
+#: Bundle, gestartet von Playwright selbst (playwright.config.ts). Der
+#: Entwicklungsserver uebersetzt beim ersten Aufruf, und das waechst mit jedem
+#: Artefakt -- auf einem ausgelasteten CI-Runner hat es die Tests gekippt,
+#: bevor einer von ihnen etwas geprueft hatte.
+E2E := DEV_PROJEKT=homepi-e2e DEV_API_PORT=$(E2E_API_PORT) DEV_DB_PORT=$(E2E_DB_PORT) PRUEFDIENST_LESER=demo docker compose -f compose.dev.yml
+
+#: Welche Reisen laufen. Einzeln aufrufbar (`make e2e E2E_SPECS=staffelpilot`),
+#: damit die CI sie auf getrennte Laeufe verteilen kann: ein roter Weg eines
+#: Artefakts soll dort als dieses Artefakt erscheinen und nicht als
+#: "Oberflaechentests kaputt" -- und er soll die anderen nicht mitnehmen.
+E2E_SPECS ?= weg einrichtung staffelpilot
 
 # Jede Reise braucht eine **frische** Installation: die eine richtet die
 # Anlage ein, die zweite geht den Weg durch die Einrichtung des Artefakts,
 # die dritte bedient es. Sie koennen sich also keine Datenbank teilen --
 # deshalb je ein eigener Durchgang.
-e2e:
-	@for spec in weg einrichtung staffelpilot; do \
+#
+# Gebaut wird einmal vorweg und nicht je Durchgang: es ist dreimal dasselbe
+# Bundle.
+e2e: e2e-bauen
+	@for spec in $(E2E_SPECS); do \
 	  echo "=== $$spec"; \
 	  $(MAKE) --no-print-directory e2e-hoch || exit 1; \
-	  ( cd services/web && E2E_URL=http://127.0.0.1:$(E2E_WEB_PORT) \
+	  ( cd $(WEB) && E2E_URL=http://127.0.0.1:$(E2E_WEB_PORT) \
+	      E2E_API_URL=http://127.0.0.1:$(E2E_API_PORT) \
+	      VITE_PROXY_TARGET=http://127.0.0.1:$(E2E_API_PORT) \
 	      E2E_EINRICHTUNGSTOKEN="$$(cd ../.. && $(MAKE) --no-print-directory e2e-token)" \
 	      npx playwright test $$spec ); \
 	  ergebnis=$$?; \
@@ -261,10 +278,23 @@ e2e:
 	  [ $$ergebnis -eq 0 ] || exit $$ergebnis; \
 	done
 
+## e2e-bauen: das Bundle, gegen das die Oberflaechentests laufen
+#
+# VITE_API_URL=/api wie in compose.dev.yml: die Anfragen gehen an den Proxy
+# der Vorschau, der sie an das Gateway der Testumgebung weiterreicht. Ohne
+# diese Variable stuende im Bundle ein leerer Pfad, und die Oberflaeche fragte
+# sich selbst nach "/module".
+e2e-bauen:
+	cd $(WEB) && VITE_API_URL=/api npm run build
+
 ## e2e-hoch: die Testumgebung starten, mit frischer Datenbank
+#
+# Nur das Backend: postgres, gateway, pruefdienst. Der Web-Container bleibt
+# aus -- er wuerde den Port der Vorschau belegen und waere ohnehin der falsche
+# Server (siehe E2E oben).
 e2e-hoch:
 	-@$(E2E) down -v >/dev/null 2>&1
-	$(E2E) up -d --build --wait --wait-timeout 300
+	$(E2E) up -d --build --wait --wait-timeout 300 postgres gateway pruefdienst
 	@# Der Pruefdienst braucht ein Konto. Die Oberflaechentests gehen sonst
 	@# bis zum Prueflauf und warten dort auf einen Dienst, der nicht darf.
 	@#
@@ -328,4 +358,4 @@ pruefdienst-zusehen:
 smoke:
 	cd services/gateway && uv run pytest -m smoke -v
 
-.PHONY: artefakt backup cert check deploy-apps dev dev-logs dev-ps dev-reset dev-stop dev-testkonto down e2e e2e-hoch e2e-runter e2e-token fmt help install lint-ci logs modul pg-tunnel ps psql pull render smoke stats tdd-api tdd-web test test-infra test-modul test-python test-web up up-apps up-core up-data up-dns up-home update verify
+.PHONY: artefakt backup cert check deploy-apps dev dev-logs dev-ps dev-reset dev-stop dev-testkonto down e2e e2e-bauen e2e-hoch e2e-runter e2e-token fmt help install lint-ci logs modul pg-tunnel ps psql pull render smoke stats tdd-api tdd-web test test-infra test-modul test-python test-web up up-apps up-core up-data up-dns up-home update verify

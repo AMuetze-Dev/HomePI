@@ -206,6 +206,12 @@ Konten an, ändern Rechte und werfen am Ende alles weg.
 make e2e          # Umgebung hoch, Tests, Umgebung samt Datenbank weg
 ```
 
+Aus dem Compose-Projekt kommt dabei nur das Backend. Die Oberfläche baut
+`make e2e` vorher und lässt Playwright sie als `vite preview` ausliefern —
+gegen das fertige Bundle also, nicht gegen den Entwicklungsserver. Warum,
+steht in [12-testen.md](12-testen.md); hier zählt die Folge:
+eine Frontend-Änderung wirkt erst nach einem erneuten `make e2e`.
+
 Bevor der erste Test etwas anfasst, fragt er nach: hat diese Installation
 schon einen Verwalter? Wenn ja, bricht der Lauf ab, statt in fremden Konten
 zu wüten:
