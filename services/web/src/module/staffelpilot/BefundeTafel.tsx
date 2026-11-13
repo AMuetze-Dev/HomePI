@@ -62,7 +62,7 @@ export function BefundeListe({ staffelId }: { staffelId?: string | undefined }) 
   }, [laden, staffelId, nurOffen, offen]);
 
   return (
-    <Karte>
+    <Karte className={stil.stapel}>
       <button
         type="button"
         className={stil.kopf}

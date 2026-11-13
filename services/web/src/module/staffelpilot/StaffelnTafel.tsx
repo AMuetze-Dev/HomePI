@@ -91,7 +91,7 @@ function StaffelKarte({
   const [fragtNach, setFragtNach] = useState(false);
 
   return (
-    <Karte>
+    <Karte className={stil.stapel}>
       <button
         type="button"
         className={stil.kopf}

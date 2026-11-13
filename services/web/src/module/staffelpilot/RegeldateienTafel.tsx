@@ -73,23 +73,27 @@ export function RegeldateienTafel() {
 
   if (fehler && dateien === null) {
     return (
-      <Hinweis ton="fehler" dringend>
-        {fehler}
-      </Hinweis>
+      <Tafel titel="Regeldateien">
+        <Hinweis ton="fehler" dringend>
+          {fehler}
+        </Hinweis>
+      </Tafel>
     );
   }
 
   if (dateien === null) {
     return (
-      <div role="status" aria-label="Regeldateien werden geladen">
-        <Platzhalter breite="100%" hoehe="10rem" />
-      </div>
+      <Tafel titel="Regeldateien">
+        <div role="status" aria-label="Regeldateien werden geladen">
+          <Platzhalter breite="100%" hoehe="10rem" />
+        </div>
+      </Tafel>
     );
   }
 
   return (
     <Tafel titel="Regeldateien">
-      <Karte>
+      <Karte className={stil.stapel}>
         <p className={stil.vorgangHinweis}>
           Der Quelltext der Prüfungen. Er wird im Prüfdienst ausgeführt — vor jedem Lauf
           schreibt er sich die Dateien von hier in seinen Ordner. Was hier steht, ist die
@@ -230,7 +234,7 @@ function DateiKarte({
   }, [offen, datei.id]);
 
   return (
-    <Karte>
+    <Karte className={stil.stapel}>
       <button
         type="button"
         className={stil.kopf}

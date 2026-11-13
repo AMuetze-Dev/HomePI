@@ -163,7 +163,7 @@ export function PrueflaufTafel({
         </Hinweis>
       )}
 
-      <Karte>
+      <Karte className={stil.stapel}>
         {offen === null ? (
           <>
             <p className={stil.vorgangHinweis}>
@@ -236,34 +236,36 @@ export function PrueflaufTafel({
         onWiederholen={() => void handeln(() => wiederholeUebertragung())}
       />
 
-      <h2 className={stil.formularTitel}>Bisherige Läufe</h2>
-      {verlauf.length === 0 ? (
-        <Leerzustand titel="Noch kein Lauf">
-          Was hier steht, sind die vergangenen Prüfläufe mit ihrem Ergebnis.
-        </Leerzustand>
-      ) : (
-        <ul className={stil.liste} aria-label="Bisherige Läufe">
-          {verlauf.map((z) => (
-            <li key={z.id}>
-              <Karte>
-                <div className={stil.zeile}>
-                  <span className={stil.paarung}>{ART_WORT[z.art]}</span>
-                  <Etikett ton={ZUSTAND_TON[z.zustand]}>
-                    {ZUSTAND_WORT[z.zustand]}
-                  </Etikett>
-                  <span className={stil.datum}>{alsZeit(z.angelegt)}</span>
-                </div>
-                <p className={stil.vorgangHinweis}>{ergebnisSatz(z)}</p>
-                {/* Auch hier das Abbild. Vorher gab es die Vorschau nur,
+      <section className={stil.unterabschnitt}>
+        <h2 className={stil.abschnitt}>Bisherige Läufe</h2>
+        {verlauf.length === 0 ? (
+          <Leerzustand titel="Noch kein Lauf">
+            Was hier steht, sind die vergangenen Prüfläufe mit ihrem Ergebnis.
+          </Leerzustand>
+        ) : (
+          <ul className={stil.liste} aria-label="Bisherige Läufe">
+            {verlauf.map((z) => (
+              <li key={z.id}>
+                <Karte className={stil.stapel}>
+                  <div className={stil.zeile}>
+                    <span className={stil.paarung}>{ART_WORT[z.art]}</span>
+                    <Etikett ton={ZUSTAND_TON[z.zustand]}>
+                      {ZUSTAND_WORT[z.zustand]}
+                    </Etikett>
+                    <span className={stil.datum}>{alsZeit(z.angelegt)}</span>
+                  </div>
+                  <p className={stil.vorgangHinweis}>{ergebnisSatz(z)}</p>
+                  {/* Auch hier das Abbild. Vorher gab es die Vorschau nur,
                     solange ein Lauf arbeitete -- und genau das Bild, das man
                     sehen will, entsteht beim Scheitern: danach war es weg,
                     und uebrig blieb das Protokoll. */}
-                <Vorschau auftrag={z} />
-              </Karte>
-            </li>
-          ))}
-        </ul>
-      )}
+                  <Vorschau auftrag={z} />
+                </Karte>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </Tafel>
   );
 }
@@ -429,7 +431,7 @@ function Uebertragungsstreifen({
   onWiederholen: () => void;
 }) {
   return (
-    <Karte>
+    <Karte className={stil.stapel}>
       <h2 className={stil.formularTitel}>Übertragung nach DFBnet</h2>
 
       {stand.pausiert ? (

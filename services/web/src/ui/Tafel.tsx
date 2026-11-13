@@ -45,7 +45,13 @@ export function Tafel({ titel, beiwort, aktionen, children }: Props) {
         {aktionen && <div className={stil.aktionen}>{aktionen}</div>}
       </div>
       <Regel className={stil.regel} />
-      {children}
+      {/* Eigener Kasten um den Inhalt, damit er den Abstand bekommt.
+          Vorher gab jede Fläche ein Fragment zurück, und ihre Abschnitte
+          waren damit direkte Kinder von `.inhalt` der Modulseite - die
+          verteilt 2 rem dazwischen. Seit die Tafel dazwischensteht, sieht
+          die Modulseite nur noch EIN Kind, und alles darunter klebte
+          aneinander. */}
+      <div className={stil.inhalt}>{children}</div>
     </section>
   );
 }

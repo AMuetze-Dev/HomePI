@@ -125,17 +125,21 @@ export function VorgaengeTafel() {
 
   if (ladefehler && zeilen === null) {
     return (
-      <Hinweis ton="fehler" dringend>
-        {ladefehler}
-      </Hinweis>
+      <Tafel titel="Vorgänge">
+        <Hinweis ton="fehler" dringend>
+          {ladefehler}
+        </Hinweis>
+      </Tafel>
     );
   }
 
   if (zeilen === null) {
     return (
-      <div role="status" aria-label="Vorgänge werden geladen">
-        <Platzhalter breite="100%" hoehe="12rem" />
-      </div>
+      <Tafel titel="Vorgänge">
+        <div role="status" aria-label="Vorgänge werden geladen">
+          <Platzhalter breite="100%" hoehe="12rem" />
+        </div>
+      </Tafel>
     );
   }
 

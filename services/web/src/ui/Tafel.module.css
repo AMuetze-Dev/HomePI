@@ -7,6 +7,16 @@
   min-width: 0;
 }
 
+/* Der Abstand zwischen den Abschnitten einer Fläche - derselbe Wert, den
+   die Modulseite ihren Kindern gibt. Hier, weil die Tafel inzwischen
+   dazwischensteht und die Modulseite nur noch sie sieht. */
+.inhalt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-8);
+  min-width: 0;
+}
+
 .kopf {
   display: flex;
   align-items: baseline;

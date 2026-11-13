@@ -109,17 +109,21 @@ export function RegelnTafel() {
 
   if (fehler && regeln === null) {
     return (
-      <Hinweis ton="fehler" dringend>
-        {fehler}
-      </Hinweis>
+      <Tafel titel="Regeln">
+        <Hinweis ton="fehler" dringend>
+          {fehler}
+        </Hinweis>
+      </Tafel>
     );
   }
 
   if (regeln === null) {
     return (
-      <div role="status" aria-label="Regeln werden geladen">
-        <Platzhalter breite="100%" hoehe="12rem" />
-      </div>
+      <Tafel titel="Regeln">
+        <div role="status" aria-label="Regeln werden geladen">
+          <Platzhalter breite="100%" hoehe="12rem" />
+        </div>
+      </Tafel>
     );
   }
 
@@ -127,10 +131,12 @@ export function RegelnTafel() {
 
   if (regeln.length === 0) {
     return (
-      <Leerzustand titel="Kein Regelkatalog">
-        Der Prüfdienst meldet über <code>PUT /staffelpilot/regeln</code>, was er prüft.
-        Solange er das nicht getan hat, gibt es hier nichts zu schalten.
-      </Leerzustand>
+      <Tafel titel="Regeln">
+        <Leerzustand titel="Kein Regelkatalog">
+          Der Prüfdienst meldet über <code>PUT /staffelpilot/regeln</code>, was er prüft.
+          Solange er das nicht getan hat, gibt es hier nichts zu schalten.
+        </Leerzustand>
+      </Tafel>
     );
   }
 
@@ -186,7 +192,7 @@ export function RegelnTafel() {
       <ul className={stil.liste} aria-label="Regeln">
         {sichtbar.map((r) => (
           <li key={r.id}>
-            <Karte>
+            <Karte className={stil.stapel}>
               <label className={stil.ankreuz}>
                 <input
                   type="checkbox"

@@ -21,7 +21,9 @@
      ohnehin auf Seitennavigation umstellt. */
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--raum-6) var(--raum-8);
-  margin: 0 0 var(--raum-12);
+  /* Keinen eigenen Abstand nach unten: Den verteilt die Tafel. Beides
+     zusammen waren 5 rem zwischen den Zahlen und dem, was darunter steht. */
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -133,8 +135,11 @@
 .liste {
   display: flex;
   flex-direction: column;
-  gap: var(--raum-3);
-  margin: var(--raum-4) 0;
+  /* 1 rem zwischen zwei Karten: Bei 0,75 rem standen sie so dicht, dass
+     die Raender zweier Karten als Doppellinie gelesen wurden. */
+  gap: var(--raum-4);
+  /* Keinen eigenen Abstand: Den verteilt die Tafel um sie herum. */
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -333,10 +338,24 @@
 
 /* ── Formular ────────────────────────────────────────────────────────── */
 
+/*
+ * Ein Formular ist eine Lesespalte, kein Block.
+ *
+ * Der Abstand zwischen zwei Feldern war derselbe wie der INNERHALB eines
+ * Feldes (Beschriftung, Eingabe, Hinweis) -- 0,75 rem ueberall. Damit stand
+ * der Hinweis eines Feldes genauso nah am naechsten Feld wie an seinem
+ * eigenen, und die Gruppen loesten sich auf. Jetzt traegt `Feld` seine
+ * 0,5 rem nach innen und das Formular 1,25 rem nach aussen.
+ *
+ * Die Breite deckelt es selbst: Die Tafel "Staffeln" bekommt 68 rem, weil
+ * die Liste darueber sie braucht -- ein Namensfeld von 1088 px ist deshalb
+ * noch lange nicht grosszuegig.
+ */
 .formular {
   display: flex;
   flex-direction: column;
-  gap: var(--raum-3);
+  gap: var(--raum-5);
+  max-width: var(--breite-text);
 }
 
 .formularTitel {
@@ -351,12 +370,27 @@
    zweite Ebene aufzumachen - dafuer waere `formularTitel` da, das ueber
    einem Formular steht und dort wie eine Ueberschrift wirken soll. */
 .abschnitt {
-  margin: var(--raum-10) 0 var(--raum-4);
+  margin: 0;
   font-size: var(--text-xs);
   font-weight: var(--gewicht-normal);
   letter-spacing: var(--laufweite-weit);
   text-transform: uppercase;
   color: var(--farbe-text-leise);
+}
+
+/*
+ * Ueberschrift und ihr Inhalt als EIN Kind der Tafel.
+ *
+ * Die Tafel verteilt 2 rem zwischen ihren Abschnitten. Zwischen einer
+ * Zwischenueberschrift und dem, was sie ueberschreibt, sind 2 rem aber zu
+ * viel -- dann gehoert die Zeile optisch zu nichts mehr. Zusammengefasst
+ * gilt nach aussen der Abstand der Tafel und nach innen dieser hier.
+ */
+.unterabschnitt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  min-width: 0;
 }
 
 /* ── Vorgänge ────────────────────────────────────────────────────────── */
@@ -368,8 +402,13 @@
   margin-bottom: var(--raum-4);
 }
 
+/* Den Abstand gibt der Stapel darum herum, nicht dieser Satz selbst. Die
+   Breite deckelt er dagegen schon: ueber die volle Tafelbreite gelesen sind
+   das 150 Zeichen je Zeile, und der Blick findet den Anfang der naechsten
+   nicht mehr. */
 .vorgangHinweis {
-  margin: var(--raum-2) 0 0;
+  margin: 0;
+  max-width: var(--breite-text);
   font-size: var(--text-sm);
   line-height: var(--zeile-weit);
   color: var(--farbe-text-gedaempft);
@@ -1033,4 +1072,43 @@
    Lader sie stellt. Genau deshalb lohnt es sich, sie zu zeigen. */
 .tkEingebaut {
   color: var(--signal-fehler);
+}
+
+/* ── Der Stapel in einer Karte ───────────────────────────────────────── */
+
+/*
+ * Jede Karte dieses Artefakts stapelt ihren Inhalt mit demselben Abstand.
+ *
+ * Vorher trug jeder Block seinen eigenen `margin-top` -- mal 0,5 rem, mal
+ * 0,75 rem, mal gar keinen. In einer Karte mit Text, Auswahlfeld und
+ * Knopfzeile sass damit alles aneinander, und zwar in drei verschiedenen
+ * Abstaenden. Das ist der Unterschied, den man als "unfertig" liest, ohne
+ * sagen zu koennen, woran es liegt.
+ *
+ * Die Regel darunter raeumt die alten Abstaende weg: Sie gelten weiter,
+ * wo ein Block ALLEIN steht, aber nicht mehr innerhalb eines Stapels -
+ * sonst addierte sich beides.
+ */
+.stapel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-5);
+}
+
+.stapel > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Enger, wo die Teile zusammengehoeren: Ueberschrift und ihr Satz, Zahl
+   und ihre Beschriftung. */
+.stapelEng {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+.stapelEng > * {
+  margin-top: 0;
+  margin-bottom: 0;
 }

@@ -41,17 +41,21 @@ export function EinstellungenTafel() {
 
   if (fehler && werte === null) {
     return (
-      <Hinweis ton="fehler" dringend>
-        {fehler}
-      </Hinweis>
+      <Tafel titel="Einstellungen">
+        <Hinweis ton="fehler" dringend>
+          {fehler}
+        </Hinweis>
+      </Tafel>
     );
   }
 
   if (werte === null) {
     return (
-      <div role="status" aria-label="Einstellungen werden geladen">
-        <Platzhalter breite="100%" hoehe="14rem" />
-      </div>
+      <Tafel titel="Einstellungen">
+        <div role="status" aria-label="Einstellungen werden geladen">
+          <Platzhalter breite="100%" hoehe="14rem" />
+        </div>
+      </Tafel>
     );
   }
 

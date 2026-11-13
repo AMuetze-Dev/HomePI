@@ -82,9 +82,11 @@ export function ZugangKarte() {
     // war, tippte seinen Namen ins Nichts und fand danach einen Knopf, der
     // sich nicht drücken ließ.
     return (
-      <div role="status" aria-label="DFBnet-Zugang wird geladen">
-        <Platzhalter breite="100%" hoehe="12rem" />
-      </div>
+      <Tafel titel="DFBnet-Zugang">
+        <div role="status" aria-label="DFBnet-Zugang wird geladen">
+          <Platzhalter breite="100%" hoehe="12rem" />
+        </div>
+      </Tafel>
     );
   }
 

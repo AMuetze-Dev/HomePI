@@ -74,18 +74,22 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
 
   if (fehler && werte === null) {
     return (
-      <Hinweis ton="fehler" dringend>
-        {fehler}
-      </Hinweis>
+      <Tafel titel="Übersicht">
+        <Hinweis ton="fehler" dringend>
+          {fehler}
+        </Hinweis>
+      </Tafel>
     );
   }
 
   if (werte === null || uebertragung === null) {
     return (
-      <div role="status" aria-label="Übersicht wird geladen">
-        <Platzhalter breite="100%" hoehe="6rem" />
-        <Platzhalter breite="100%" hoehe="12rem" />
-      </div>
+      <Tafel titel="Übersicht">
+        <div role="status" aria-label="Übersicht wird geladen">
+          <Platzhalter breite="100%" hoehe="6rem" />
+          <Platzhalter breite="100%" hoehe="12rem" />
+        </div>
+      </Tafel>
     );
   }
 
@@ -123,7 +127,7 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
       </ul>
 
       {auftrag !== null && (
-        <Karte>
+        <Karte className={stil.stapel}>
           <div className={stil.zeile}>
             <span className={stil.paarung}>
               {auftrag.art === "pruflauf" ? "Prüflauf" : "Initialisierung"}
@@ -165,39 +169,41 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
         </Leerzustand>
       )}
 
-      <h2 className={stil.abschnitt}>Als Nächstes</h2>
-      {naechste.length === 0 ? (
-        <Leerzustand titel="Nichts fällig">
-          Kein Spielbericht im Prüfzeitraum wartet auf eine Entscheidung.
-        </Leerzustand>
-      ) : (
-        <Tabelle
-          beschriftung="Als Nächstes"
-          raster="1.8fr 1fr 0.8fr"
-          spalten={["Paarung", "Befunde", "Angesetzt"]}
-        >
-          {naechste.map((z) => (
-            <Reihe key={z.id} onKlick={() => onWechsel("spiele")}>
-              <Zelle>
-                {z.heim} – {z.gast}
-              </Zelle>
-              <Zelle>
-                {z.kritische_befunde > 0 ? (
-                  <Etikett ton="fehler">{z.kritische_befunde} kritisch</Etikett>
-                ) : z.offene_befunde > 0 ? (
-                  <>
-                    <Statuspunkt ton="akzent" />
-                    {`${z.offene_befunde} offen`}
-                  </>
-                ) : (
-                  <span className={stil.ohneBefund}>ohne Befund</span>
-                )}
-              </Zelle>
-              <Zelle leise>{alsDatum(z.datum)}</Zelle>
-            </Reihe>
-          ))}
-        </Tabelle>
-      )}
+      <section className={stil.unterabschnitt}>
+        <h2 className={stil.abschnitt}>Als Nächstes</h2>
+        {naechste.length === 0 ? (
+          <Leerzustand titel="Nichts fällig">
+            Kein Spielbericht im Prüfzeitraum wartet auf eine Entscheidung.
+          </Leerzustand>
+        ) : (
+          <Tabelle
+            beschriftung="Als Nächstes"
+            raster="1.8fr 1fr 0.8fr"
+            spalten={["Paarung", "Befunde", "Angesetzt"]}
+          >
+            {naechste.map((z) => (
+              <Reihe key={z.id} onKlick={() => onWechsel("spiele")}>
+                <Zelle>
+                  {z.heim} – {z.gast}
+                </Zelle>
+                <Zelle>
+                  {z.kritische_befunde > 0 ? (
+                    <Etikett ton="fehler">{z.kritische_befunde} kritisch</Etikett>
+                  ) : z.offene_befunde > 0 ? (
+                    <>
+                      <Statuspunkt ton="akzent" />
+                      {`${z.offene_befunde} offen`}
+                    </>
+                  ) : (
+                    <span className={stil.ohneBefund}>ohne Befund</span>
+                  )}
+                </Zelle>
+                <Zelle leise>{alsDatum(z.datum)}</Zelle>
+              </Reihe>
+            ))}
+          </Tabelle>
+        )}
+      </section>
     </Tafel>
   );
 }
