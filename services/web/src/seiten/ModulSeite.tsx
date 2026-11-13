@@ -1,15 +1,9 @@
-import { NavLink, Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 
-import type { ModulEintrag } from "../api/client";
 import { Anmeldeformular } from "../anmeldung/Anmeldeformular";
 import { useAnmeldung } from "../anmeldung/kontext";
 import { GenerischeAnsicht } from "../module/GenerischeAnsicht";
-import {
-  breiteFuer,
-  ersteUnterseite,
-  oberflaecheFuer,
-  sichtbareUnterseiten,
-} from "../module/register";
+import { breiteFuer, ersteUnterseite, oberflaecheFuer } from "../module/register";
 import { useModule } from "../module/useModule";
 import {
   Etikett,
@@ -114,12 +108,6 @@ export function ModulSeite() {
         />
       )}
 
-      {/* sichtbareUnterseiten und nicht `bereiche`: Eine versteckte
-          Unterseite ist eine echte Adresse, aber kein Reiter. Solange die
-          Leiste nur auf Telefonen erschien, fiel nicht auf, dass hier die
-          ungefilterte Liste stand. */}
-      <Bereichsleiste modul={modul} bereiche={sichtbareUnterseiten(modul.id)} />
-
       {/* Bewusst OHNE key auf den Bereich: Ein wechselnder key montierte die
           Modulkomponente bei jedem Bereichswechsel neu - und damit wären die
           geladenen Daten weg, also genau der Nachteil, wegen dessen es hier
@@ -132,42 +120,5 @@ export function ModulSeite() {
         )}
       </div>
     </Inhaltsbreite>
-  );
-}
-
-/**
- * Die Bereiche als Leiste über dem Inhalt - auf jeder Breite.
- *
- * Bis zum Umbau der Hülle stand sie nur auf Telefonen: Auf dem Monitor
- * trug die Navigationsleiste am Rand dieselben Wörter dauerhaft, und
- * zweimal dieselbe Navigation wäre eine zu viel gewesen.
- *
- * Diese Leiste gibt es nicht mehr; die Navigation ist eine Fläche, die man
- * ruft. Der Bereichswechsel ist aber die häufigste Bewegung innerhalb eines
- * Artefakts - bei StaffelPilot zwischen zehn Flächen. Jedes Mal erst ein
- * Overlay zu öffnen wären zwei Handgriffe statt einem, und zwar genau dort,
- * wo man am häufigsten greift.
- */
-function Bereichsleiste({
-  modul,
-  bereiche,
-}: {
-  modul: ModulEintrag;
-  bereiche: readonly { id: string; wort: string }[];
-}) {
-  if (bereiche.length === 0) return null;
-
-  return (
-    <div className={stil.bereichsleiste} role="navigation" aria-label="Bereiche">
-      {bereiche.map((bereich) => (
-        <NavLink
-          key={bereich.id}
-          to={`/modul/${modul.id}/${bereich.id}`}
-          className={({ isActive }) => (isActive ? stil.bereichAktiv : stil.bereich)}
-        >
-          {bereich.wort}
-        </NavLink>
-      ))}
-    </div>
   );
 }

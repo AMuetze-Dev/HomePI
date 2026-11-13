@@ -1,10 +1,10 @@
 /* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
    Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
 
+/* Kleben und Hintergrund tragen inzwischen der Block darum herum
+   (`kopfblock` in Huelle.module.css) - sonst haette jede der beiden Zeilen
+   ihren eigenen Schleier, und an der Kante dazwischen saehe man ihn. */
 .leiste {
-  position: sticky;
-  top: 0;
-  z-index: var(--ebene-klebend);
   display: flex;
   align-items: center;
   gap: var(--raum-4);
@@ -13,8 +13,6 @@
   padding-inline: var(--raum-rand);
   /* Eine Linie statt eines Randes: Sie endet nicht hart an der Ecke,
      sondern blendet aus wie jede andere Trennung in diesem Entwurf. */
-  background: color-mix(in srgb, var(--farbe-grund) 86%, transparent);
-  backdrop-filter: saturate(140%) blur(14px);
   box-shadow: 0 1px 0 var(--farbe-linie);
 }
 

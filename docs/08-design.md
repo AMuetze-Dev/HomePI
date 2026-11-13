@@ -244,17 +244,27 @@ Ein Artefakt ohne Bereiche hat schlicht keine zweite Ebene. Kein leerer
 Platzhalter, keine Spalte, die aussieht, als fehle etwas — **derselbe Stil,
 unterschiedlicher Umfang.**
 
-### Die Bereiche stehen über dem Inhalt — auf jeder Breite
+### Die Bereiche stehen in der Hülle, nicht im Inhalt
 
-Solange die Dauerleiste die Bereiche trug, erschien die Leiste über dem Inhalt
-nur auf Telefonen: zweimal dieselbe Navigation wäre eine zu viel gewesen.
+Solange die Dauerleiste die Bereiche trug, erschien eine Leiste über dem
+Inhalt nur auf Telefonen: zweimal dieselbe Navigation wäre eine zu viel
+gewesen.
 
 Diese Leiste gibt es nicht mehr. Der Bereichswechsel ist aber die häufigste
 Bewegung innerhalb eines Artefakts — bei StaffelPilot zwischen zehn Flächen.
-Jedes Mal erst ein Overlay zu öffnen wären zwei Handgriffe statt einem, und
-zwar genau dort, wo man am häufigsten greift. Die Leiste zeigt dabei nur die
-**sichtbaren** Unterseiten: Eine versteckte ist eine echte Adresse, aber kein
-Reiter.
+Jedes Mal erst die Navigationsfläche zu rufen wären zwei Handgriffe statt
+einem, und zwar genau dort, wo man am häufigsten greift.
+
+Sie steht deshalb **direkt unter der Brotkrume und klebt mit ihr am oberen
+Rand** — nicht im Inhalt. Im Inhalt lag sie in dessen Spalte, und die ist je
+Bereich verschieden breit: Ein Bereich mit `text` ist 40 rem breit, einer mit
+`voll` nimmt den ganzen Monitor. Die Leiste wanderte also bei jedem Wechsel
+mit, sprang in der Breite und saß auf einem breiten Monitor mitten im Bild
+statt an einer Kante. Navigation gehört zur Hülle.
+
+Sie zeigt nur die **sichtbaren** Unterseiten: Eine versteckte ist eine echte
+Adresse, aber kein Reiter. Ein Artefakt ohne zweite Ebene bekommt gar keine
+Leiste — ein leerer Streifen sähe aus, als fehle etwas.
 
 ### Die Breite meldet das Artefakt an, nicht die Hülle
 
@@ -274,6 +284,13 @@ Jetzt meldet jedes Artefakt seinen Bedarf in `src/module/register.ts` an:
 
 Vier Stufen, mehr nicht. Eine fünfte wäre schon eine, bei der niemand mehr
 sagen könnte, wann man sie nimmt.
+
+**Jede Stufe hängt an der linken Kante**, nicht in der Mitte. Zentriert war
+es, solange links eine Navigationsleiste stand; ohne sie schwamm eine Spalte
+von 40 rem auf einem breiten Monitor in der Mitte, während Brotkrume,
+Bereichsleiste und Titel links standen — und beim Wechsel zwischen zwei
+verschieden breiten Bereichen sprang sie seitwärts. Was eine Stufe nicht
+braucht, bleibt rechts frei.
 
 **Auch ein einzelner Bereich darf abweichen.** Das ist kein Feinschliff,
 sondern ein Fehler, den man sofort sieht: Bei StaffelPilot braucht die
