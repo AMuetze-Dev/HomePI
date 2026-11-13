@@ -58,6 +58,20 @@ export interface Unterseite {
    */
   breite?: Breite | undefined;
   /**
+   * Der Bereich bringt seine Überschrift selbst mit.
+   *
+   * Ohne Angabe setzt die Modulseite den Bereichsnamen als `h1` darüber —
+   * das genügt, solange über dem Inhalt nur ein Wort stehen muss.
+   *
+   * Sobald daneben etwas gehört, das nur der Bereich kennt — „9 Berichte
+   * warten · 3 fällig", ein Filter, die eine Handlung dieser Fläche —, geht
+   * das nicht mehr: Die Modulseite kennt diese Zahlen nicht, und der Bereich
+   * kann sie nicht nach oben reichen. Dann baut der Bereich den ganzen Kopf
+   * selbst (`<Tafel>`), und die Modulseite hält sich heraus. Zwei
+   * Überschriften mit demselben Wort untereinander wären sonst die Folge.
+   */
+  eigenerTitel?: boolean | undefined;
+  /**
    * Nicht in der Navigation, aber eine echte Adresse.
    *
    * Für Wege statt Flächen: die Einrichtung wird einmal durchlaufen und

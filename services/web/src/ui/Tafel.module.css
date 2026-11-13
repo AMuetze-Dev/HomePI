@@ -1,0 +1,58 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
+.tafel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.kopf {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--raum-2) var(--raum-6);
+}
+
+.titel {
+  font-size: var(--text-2xl);
+  letter-spacing: var(--laufweite-enger);
+  margin: 0;
+}
+
+/* Auf der Grundlinie des Titels, nicht darunter: Der Satz gehoert zum
+   Titel. Eine zweite Zeile daraus zu machen hiesse, ihn als Beschreibung zu
+   lesen - er ist aber eine Zahl. */
+.beiwort {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.aktionen {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+  margin-left: auto;
+}
+
+.regel {
+  margin: var(--raum-5) 0 var(--raum-6);
+}
+
+/* Auf einem Telefon stehen Knoepfe nicht neben einem Titel, der schon die
+   halbe Zeile fuellt - sie bekommen ihre eigene. */
+@media (width < 40rem) {
+  .aktionen {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+
+  .titel {
+    font-size: var(--text-xl);
+  }
+
+  .regel {
+    margin: var(--raum-4) 0 var(--raum-5);
+  }
+}

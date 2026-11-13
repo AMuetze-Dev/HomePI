@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { Hinweis, Karte, Leerzustand, Platzhalter } from "../../ui";
+import { Hinweis, Karte, Leerzustand, Platzhalter, Tafel } from "../../ui";
 import { type Auswertung, type Posten, type Staffel, ladeErgebnisse } from "./api";
 import { BefundeListe } from "./BefundeTafel";
 import stil from "./StaffelpilotSeite.module.css";
@@ -81,7 +81,7 @@ export function ErgebnisseTafel({ staffeln }: { staffeln: Staffel[] }) {
   }
 
   return (
-    <>
+    <Tafel titel="Ergebnisse">
       {staffeln.length > 1 && (
         <Karte>
           <label className={stil.wahl}>
@@ -146,7 +146,7 @@ export function ErgebnisseTafel({ staffeln }: { staffeln: Staffel[] }) {
           <BefundeListe staffelId={staffelId || undefined} />
         </>
       )}
-    </>
+    </Tafel>
   );
 }
 

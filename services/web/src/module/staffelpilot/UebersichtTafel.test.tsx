@@ -161,3 +161,29 @@ describe("Die Übersicht", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("kein Zugriff");
   });
 });
+
+describe("Wohin die Kennzahlen führen", () => {
+  it("schickt die Befundzahlen dorthin, wo die Befunde stehen", async () => {
+    // "befunde" gibt es als Bereich nicht. Beide Zahlen landeten damit auf
+    // der Übersicht zurück - also auf der Fläche, von der man kam.
+    const wechsel = vi.fn();
+    render(<UebersichtTafel onWechsel={wechsel} />);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /kritische Befunde/ }),
+    );
+
+    expect(wechsel).toHaveBeenCalledWith("ergebnisse");
+  });
+
+  it("trägt den Bereichstitel selbst", async () => {
+    // Die Modulseite setzt für diesen Bereich keine Überschrift mehr: Hier
+    // steht neben dem Wort noch eine Zahl, die nur diese Fläche kennt.
+    render(<UebersichtTafel onWechsel={() => {}} />);
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Übersicht" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2 von 3 Berichten offen")).toBeInTheDocument();
+  });
+});

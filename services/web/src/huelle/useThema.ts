@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 
-export type Thema = "system" | "hell" | "dunkel";
+import { THEMA_SCHLUESSEL as SCHLUESSEL } from "./darstellung";
 
-const SCHLUESSEL = "homepi.thema";
+export type Thema = "system" | "hell" | "dunkel";
 
 function gespeichertesThema(): Thema {
   try {

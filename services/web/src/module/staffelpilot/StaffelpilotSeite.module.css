@@ -20,8 +20,8 @@
      Eine gerade Zahl geht immer auf. Der Umbruch liegt dort, wo die Huelle
      ohnehin auf Seitennavigation umstellt. */
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--raum-3);
-  margin: 0 0 var(--raum-5);
+  gap: var(--raum-6) var(--raum-8);
+  margin: 0 0 var(--raum-12);
   padding: 0;
   list-style: none;
 }
@@ -32,24 +32,25 @@
   }
 }
 
+/* Ohne Kasten. Vier Zahlen in vier Rahmen sind vier Kanten, die man
+   mitliest; die Zahl traegt sich selbst, wenn sie gross genug ist. Was die
+   Kacheln vorher leisteten - "hier endet die eine, da beginnt die naechste" -
+   macht jetzt der Abstand. */
 .kennzahl {
   display: flex;
   flex-direction: column;
-  gap: var(--raum-1);
-  padding: var(--raum-3) var(--raum-4);
-  border: 1px solid var(--farbe-rand);
-  border-radius: var(--rundung-md);
-  background: var(--farbe-flaeche);
+  min-width: 0;
 }
 
 .zahl,
 .zahlWarnend,
 .zahlLeer {
-  font-size: var(--text-2xl);
-  font-weight: var(--gewicht-halbfett);
+  font-size: var(--text-3xl);
+  font-weight: var(--gewicht-mittel);
   letter-spacing: var(--laufweite-enger);
   font-variant-numeric: tabular-nums;
   line-height: var(--zeile-eng);
+  transition: color var(--dauer-schnell) var(--verlauf);
 }
 
 .zahl {
@@ -77,31 +78,54 @@
 
 /* ── Auswahl ─────────────────────────────────────────────────────────── */
 
+/* Steht in der Titelzeile neben den uebrigen Filtern und nicht mehr als
+   eigene Karte darueber. Die Beschriftung traegt das Feld selbst: "Alle
+   Staffeln" bzw. der gewaehlte Name sagen, worum es geht - ein Woertchen
+   "Staffel" davor waere eine Zeile fuer nichts. */
 .wahl {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-1);
+  display: block;
+  min-width: 0;
 }
 
+/* Die Beschriftung ueber einem Auswahlfeld - dort, wo eines im Formular
+   steht und nicht als Filter in der Titelzeile. */
 .wahlName {
+  display: block;
+  margin-bottom: var(--raum-1);
   font-size: var(--text-xs);
   color: var(--farbe-text-leise);
 }
 
 .auswahl {
-  width: 100%;
-  padding: var(--raum-2) var(--raum-3);
+  max-width: 14rem;
+  min-height: 1.875rem;
+  padding: var(--raum-1) var(--raum-2);
   font: inherit;
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+  background: transparent;
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-md);
+  cursor: pointer;
+  transition:
+    border-color var(--dauer-schnell) var(--verlauf),
+    color var(--dauer-schnell) var(--verlauf);
+}
+
+.auswahl:hover {
+  border-color: var(--farbe-text-leise);
   color: var(--farbe-text);
-  background: var(--farbe-flaeche);
-  border: 1px solid var(--farbe-rand);
-  border-radius: var(--rundung-sm);
 }
 
 .auswahl:focus-visible {
   outline: 2px solid var(--farbe-fokus);
   outline-offset: 1px;
+}
+
+@media (pointer: coarse) {
+  .auswahl {
+    min-height: 2.75rem;
+  }
 }
 
 /* ── Liste der Spielberichte ─────────────────────────────────────────── */
@@ -178,15 +202,50 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Stand und Befunde in der Zeile ──────────────────────────────────── */
+
+/* "fällig" ist die eine Auskunft, wegen der man die Liste aufmacht - sie
+   traegt deshalb den Akzent. Als Schrift und nicht als Flaeche: Bei zehn
+   faelligen Spielen waeren das zehn Farbfelder in einer Spalte. */
+.standFaellig {
+  color: var(--farbe-akzent-schrift);
+}
+
+.standLeise {
+  color: var(--farbe-text-leise);
+}
+
+.ohneBefund {
+  color: var(--farbe-text-leise);
+}
+
 /* ── Aufgeklappter Bericht ───────────────────────────────────────────── */
 
+/* Eingerueckt und mit einer Akzentkante links: Sie sagt, wozu das hier
+   gehoert. Ohne sie stuende der Bericht in derselben Spalte wie die Liste
+   und saehe aus wie ein weiterer Eintrag. */
 .detail {
   display: flex;
   flex-direction: column;
   gap: var(--raum-3);
-  margin-top: var(--raum-4);
-  padding-top: var(--raum-4);
-  border-top: 1px solid var(--farbe-rand);
+  margin: var(--raum-2) 0 var(--raum-5) var(--raum-2);
+  padding: var(--raum-1) 0 0 var(--raum-5);
+  border-left: 2px solid color-mix(in srgb, var(--farbe-akzent) 45%, transparent);
+  animation: aufklappen var(--dauer-normal) var(--verlauf-eintritt);
+}
+
+@keyframes aufklappen {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+@media (width < 48rem) {
+  .detail {
+    margin-left: 0;
+    padding-left: var(--raum-4);
+  }
 }
 
 .sauber {
@@ -283,9 +342,21 @@
 .formularTitel {
   margin: 0;
   font-size: var(--text-lg);
-  font-weight: var(--gewicht-halbfett);
   letter-spacing: var(--laufweite-eng);
   color: var(--farbe-text);
+}
+
+/* Die Zwischenueberschrift innerhalb einer Tafel: gesperrte Kapitaelchen,
+   wie ueber jedem Abschnitt dieser Oberflaeche. Sie ordnet, ohne eine
+   zweite Ebene aufzumachen - dafuer waere `formularTitel` da, das ueber
+   einem Formular steht und dort wie eine Ueberschrift wirken soll. */
+.abschnitt {
+  margin: var(--raum-10) 0 var(--raum-4);
+  font-size: var(--text-xs);
+  font-weight: var(--gewicht-normal);
+  letter-spacing: var(--laufweite-weit);
+  text-transform: uppercase;
+  color: var(--farbe-text-leise);
 }
 
 /* ── Vorgänge ────────────────────────────────────────────────────────── */
@@ -415,6 +486,14 @@
 
 .kennzahlKnopf:hover .zahlName {
   color: var(--farbe-text);
+}
+
+/* Beim Zeigen nimmt die Zahl den Akzent an - das ist die Rueckmeldung, die
+   vorher der Rahmen gab. Die leere Null bleibt still: Sie fuehrt zwar auch
+   irgendwohin, aber dort gibt es nichts zu tun. */
+.kennzahlKnopf:hover .zahl,
+.kennzahlKnopf:hover .zahlWarnend {
+  color: var(--farbe-akzent-schrift);
 }
 
 .kennzahlKnopf:focus-visible {
@@ -578,47 +657,6 @@
 }
 
 /* ── Spalten in einer Listenzeile ────────────────────────────────────── */
-/*
- * Datum, Ergebnis und Etiketten standen einfach nebeneinander. Weil die
- * Etiketten je Zeile verschieden breit sind ("2 offen" gegen "1 kritisch
- * 5 offen"), sass das Datum in jeder Zeile woanders -- und die Kante, wegen
- * der die Liste ueberhaupt einzeilig wurde, gab es gar nicht.
- *
- * Feste Mindestbreiten statt eines Rasters: die Zahl der Etiketten wechselt
- * je Zeile, ein Raster braeuchte dafuer eine feste Spaltenzahl.
- */
-.spalteDatum,
-.spalteErgebnis {
-  font-size: var(--text-sm);
-  color: var(--farbe-text-leise);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  flex: 0 0 auto;
-}
-
-/* "18.10.2026" -- breit genug fuer jedes Datum, nicht breiter.
- *
- * `order` schiebt es ans Ende der Zeile, hinter die Etiketten. Feste Breiten
- * allein genuegten nicht: gemessen am 22.10.2026 sass das Datum bei vier
- * Zeilen auf 752 px und bei zweien auf 677 -- die laengeren Etiketten
- * ("1 kritisch" und "5 offen") schoben die ganze rechtsbuendige Gruppe nach
- * links. Ganz rechts steht es immer an derselben Stelle, und die Etiketten
- * wachsen nach links weg.
- *
- * Im DOM bleibt es vorn: vorgelesen gehoert das Datum vor die Etiketten.
- */
-.spalteDatum {
-  min-width: 5.5rem;
-  order: 2;
-}
-
-/* "10 : 0" -- und leer, solange kein Ergebnis da ist. Die Spalte bleibt
-   trotzdem stehen, sonst ruecken die Etiketten der ungespielten Zeilen
-   gegenueber den gespielten nach links. */
-.spalteErgebnis {
-  min-width: 3.2rem;
-  order: 1;
-}
 
 /* Das Zeichen vor "Text fuers Schreiben". Es dreht sich beim Aufklappen --
    daran sieht man, dass da etwas aufgeht, ohne es gelesen zu haben. */

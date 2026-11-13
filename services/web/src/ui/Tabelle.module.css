@@ -1,0 +1,179 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
+.tabelle {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.kopfzeile,
+.kopfzeileRechts {
+  display: grid;
+  gap: 0 var(--raum-6);
+  padding: 0 var(--raum-2) var(--raum-3);
+  font-size: var(--text-xs);
+  letter-spacing: var(--laufweite-weit);
+  text-transform: uppercase;
+  color: var(--farbe-text-leise);
+}
+
+/* Nur wo die letzte Spalte wirklich rechts steht - sonst haengt der Name
+   ueber der falschen Kante und die Zeile sieht verrutscht aus. */
+.kopfzeileRechts > span:last-child {
+  text-align: right;
+}
+
+.reihen {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.eintrag {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ── Eine Reihe ─────────────────────────────────────────────────────── */
+
+.reihe,
+.betont,
+.leise {
+  display: grid;
+  gap: 0 var(--raum-6);
+  align-items: center;
+  width: 100%;
+  /* 44 px Trefferflaeche: Die Reihe ist dicht, das Ziel darf es nicht sein. */
+  min-height: 2.75rem;
+  padding: var(--raum-3) var(--raum-2);
+  border: 0;
+  border-radius: var(--rundung-md);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  color: inherit;
+  background: none;
+  transition: background var(--dauer-schnell) var(--verlauf);
+}
+
+button.reihe,
+button.betont,
+button.leise {
+  cursor: pointer;
+}
+
+/* Der Verlauf laeuft nach rechts aus. Eine Flaeche mit Kante waere bei
+   zwanzig Reihen untereinander ein Streifenmuster. */
+button.reihe:hover,
+button.leise:hover {
+  background: linear-gradient(to right, var(--farbe-akzent-spur), transparent 70%);
+}
+
+/* Was dran ist, traegt den Akzent - und zwar dauerhaft, nicht erst beim
+   Zeigen. Das ist die eine Information, die man aus drei Metern sehen soll. */
+.betont {
+  background: linear-gradient(to right, var(--farbe-akzent-fuellung), transparent 60%);
+}
+
+button.betont:hover {
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--farbe-akzent) 16%, transparent),
+    transparent 60%
+  );
+}
+
+/* Erledigt tritt zurueck, verschwindet aber nicht: Wer nachsehen will, was
+   letzte Woche war, findet es noch. */
+.leise {
+  color: var(--farbe-text-leise);
+}
+
+.reihe:focus-visible,
+.betont:focus-visible,
+.leise:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: -2px;
+}
+
+/* ── Zellen ─────────────────────────────────────────────────────────── */
+
+.zelle {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+  min-width: 0;
+  color: var(--farbe-text);
+}
+
+/* Die erste Zelle traegt die Reihe - sie ist der Name, nach dem gesucht wird. */
+.reihe > .zelle:first-child,
+.betont > .zelle:first-child,
+.leise > .zelle:first-child {
+  font-size: var(--text-md);
+}
+
+.zelleLeise {
+  color: var(--farbe-text-gedaempft);
+  font-variant-numeric: tabular-nums;
+}
+
+.rechts {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.leise .zelle,
+.leise .zelleLeise {
+  color: inherit;
+}
+
+/* ── Unter 48 rem: aus der Reihe wird ein Block ─────────────────────── */
+
+/* Eine Tabelle, die auf einem Telefon waagerecht scrollt, versteckt
+   ausgerechnet die rechte Spalte - also meist den Zustand, wegen dessen man
+   hinsieht. Stattdessen wird die erste Zelle zur Ueberschrift und der Rest
+   zu einer Zeile dahinter, mit Mittelpunkten getrennt. */
+@media (width < 48rem) {
+  .kopfzeile,
+  .kopfzeileRechts {
+    display: none;
+  }
+
+  .reihe,
+  .betont,
+  .leise {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--raum-1) var(--raum-2);
+    padding-block: var(--raum-4);
+  }
+
+  .reihe > .zelle:first-child,
+  .betont > .zelle:first-child,
+  .leise > .zelle:first-child {
+    flex-basis: 100%;
+    font-size: var(--text-lg);
+    letter-spacing: var(--laufweite-eng);
+  }
+
+  /* Ab der dritten Zelle ein Mittelpunkt davor: Die zweite braucht keinen,
+     sie ist die erste der Zeile. */
+  .reihe > .zelle:nth-child(n + 3)::before,
+  .betont > .zelle:nth-child(n + 3)::before,
+  .leise > .zelle:nth-child(n + 3)::before {
+    content: "·";
+    margin-right: var(--raum-2);
+    color: var(--farbe-text-leise);
+  }
+
+  .rechts {
+    justify-content: flex-start;
+    text-align: left;
+  }
+}

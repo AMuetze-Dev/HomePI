@@ -1,0 +1,139 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
+/* Linksbuendig und NICHT zentriert - anders als eine Modulansicht gleicher
+   Breite. Der Grund steht in derselben Zeile wie die Startseite darueber:
+   Diese Oberflaeche haengt am linken Rand, mit Luft rechts. Eine zentrierte
+   Spalte zwischen einer linksbuendigen Kopfleiste und einer linksbuendigen
+   Startseite saehe aus, als sei sie verrutscht. */
+.seite {
+  max-width: var(--breite-text);
+  animation: eintreten var(--dauer-normal) var(--verlauf-eintritt);
+}
+
+.titel {
+  font-size: var(--text-2xl);
+  letter-spacing: var(--laufweite-enger);
+  margin-bottom: var(--raum-1);
+}
+
+.unterzeile {
+  margin-bottom: var(--raum-12);
+  font-size: var(--text-md);
+  color: var(--farbe-text-gedaempft);
+}
+
+/* ── Abschnitte ─────────────────────────────────────────────────────── */
+
+.abschnitt {
+  margin-bottom: var(--raum-12);
+}
+
+.abschnittstitel {
+  font-size: var(--text-xs);
+  font-weight: var(--gewicht-normal);
+  letter-spacing: var(--laufweite-weit);
+  text-transform: uppercase;
+  color: var(--farbe-text-leise);
+}
+
+.regel {
+  margin: var(--raum-3) 0 var(--raum-6);
+}
+
+/* ── Eine Zeile: Satz links, Bedienelement rechts ───────────────────── */
+
+.zeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-6);
+  margin-bottom: var(--raum-6);
+}
+
+.text {
+  min-width: 0;
+}
+
+.wort {
+  margin-bottom: var(--raum-1);
+  font-size: var(--text-md);
+  color: var(--farbe-text);
+}
+
+.erklaerung {
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-gedaempft);
+}
+
+/* ── Konto ──────────────────────────────────────────────────────────── */
+
+.felder {
+  display: flex;
+  gap: var(--raum-5);
+  margin-bottom: var(--raum-3);
+}
+
+.felder > * {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Die Kennung ist technisch und soll auch so aussehen - sie wird getippt,
+   nicht gelesen. */
+.kennung input {
+  font-family: var(--schrift-mono);
+  color: var(--farbe-text-gedaempft);
+}
+
+.nachtrag {
+  margin-bottom: var(--raum-8);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-leise);
+}
+
+.passwortformular {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-5);
+  margin-bottom: var(--raum-6);
+}
+
+.knoepfe {
+  display: flex;
+  gap: var(--raum-3);
+}
+
+/* ── Rechte ─────────────────────────────────────────────────────────── */
+
+.rechte {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+  margin: 0;
+  padding: 0;
+}
+
+@media (width < 40rem) {
+  /* Zwei Felder nebeneinander waeren auf 375 px zwei halbe Felder. */
+  .felder {
+    flex-direction: column;
+    gap: var(--raum-4);
+  }
+
+  /* Der Schalter rutscht unter den Satz statt ihn zu quetschen. */
+  .zeile {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--raum-3);
+  }
+}
+
+@keyframes eintreten {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}

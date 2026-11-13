@@ -55,18 +55,30 @@
   }
 }
 
-/* --- Auspraegungen --- */
+/* --- Auspraegungen ---
+
+   Die Primaeraktion ist ein AKZENTRAND auf fast nichts, keine gefuellte
+   Flaeche. Das ist nicht Geschmack: Bei dieser Dichte ist ein
+   geschlossener Farbblock das erste, was auf einer Seite laut wird - und
+   auf einer Tabellenzeile mit drei Knoepfen stuenden drei davon. Der Rand
+   traegt die Hierarchie genauso, ohne den Ton zu heben. */
 .primaer {
-  background: var(--farbe-aktion);
-  color: var(--farbe-aktion-schrift);
+  background: var(--farbe-akzent-fuellung);
+  border-color: var(--farbe-akzent);
+  /* Rand und Schrift sind ZWEI Tokens: Der Rand darf die Akzentfarbe
+     tragen, die Beschriftung braucht auf hellem Grund eine tiefere Stufe -
+     das Paar Akzent/Grund ist auf 3:1 gestimmt und damit nicht auf Text in
+     Lesegroesse. */
+  color: var(--farbe-akzent-schrift);
 }
 
 .primaer:hover:not(:disabled) {
-  background: var(--farbe-aktion-hover);
+  background: color-mix(in srgb, var(--farbe-akzent) 18%, transparent);
+  border-color: var(--farbe-akzent-hell);
 }
 
 .sekundaer {
-  background: var(--farbe-flaeche);
+  background: transparent;
   border-color: var(--farbe-rand-stark);
   color: var(--farbe-text);
 }

@@ -11,6 +11,13 @@
  * Hell und Dunkel stehen dank light-dark() in einer einzigen Deklaration
  * nebeneinander. Die Alternative wäre, jeden Wert zweimal zu pflegen - und
  * genau dort entstehen die Abweichungen, die man später nicht mehr findet.
+ *
+ * ── Woher die Werte kommen ─────────────────────────────────────────────
+ * Die Stufen stammen aus dem Entwurf „Nocturne": ein ruhiger, dichter Grund
+ * in Blaugrau, ein einziger Akzent in Blauviolett, Kontrast aus den
+ * Tonleitern statt aus Sättigung. Dunkel ist die Fassung, für die der
+ * Entwurf gezeichnet wurde; die hellen Werte sind in derselben Farbfamilie
+ * daraus abgeleitet, damit der Umschalter weiter etwas zu schalten hat.
  */
 
 :root {
@@ -19,81 +26,117 @@
   color-scheme: light dark;
 
   /* ---------------------------------------------------------------- Palette
-   * Neutrale Skala, bewusst eng gestuft: die Wertigkeit entsteht aus feinen
-   * Abstufungen, nicht aus Kontrastsprüngen.
+   * Eine Tonleiter von hell nach dunkel, auf einer gemeinsamen
+   * Helligkeitsachse erzeugt: dieselbe Stufe zweier Leitern wiegt optisch
+   * gleich schwer. Die Sättigung bleibt außerhalb des Akzents niedrig -
+   * Tiefe entsteht hier aus Abstufung, nicht aus Farbe.
    */
-  --neutral-0: #ffffff;
-  --neutral-25: #fcfcfd;
-  --neutral-50: #f7f7f8;
-  --neutral-100: #f0f0f2;
-  --neutral-150: #e7e7ea;
-  --neutral-200: #dedee2;
-  --neutral-300: #c6c6cd;
-  --neutral-400: #9b9ba4;
-  --neutral-500: #74747e;
-  --neutral-600: #55555e;
-  --neutral-700: #3b3b43;
-  --neutral-800: #26262b;
-  --neutral-900: #18181b;
-  --neutral-950: #0b0b0d;
+  --ton-50: #fafbff;
+  --ton-100: #f3f5fe;
+  --ton-200: #e4e7f5;
+  --ton-300: #cfd3e5;
+  --ton-400: #b2b6ca;
+  --ton-500: #9397ab;
+  --ton-600: #75798c;
+  --ton-700: #595d6c;
+  --ton-800: #3f424d;
+  --ton-900: #292b31;
+  /* Der Grund des Dunkelmodus. Kein Schwarz: eine Spur Blau darin nimmt dem
+   * Bild die Härte, ohne dass es jemand als Farbe liest. */
+  --ton-950: #161826;
 
-  --dunkel-flaeche: #141417;
-  --dunkel-flaeche-erhoben: #1b1b1f;
-  --dunkel-flaeche-gedaempft: #18181b;
-  --dunkel-rand: #27272d;
-  --dunkel-rand-stark: #35353d;
+  /* Der eine Akzent. Es gibt keinen zweiten - zwei Akzente heißen in der
+   * Praxis, dass keiner mehr etwas bedeutet. */
+  --akzent-100: #f5f4ff;
+  --akzent-200: #e7e5fe;
+  --akzent-300: #d2cefd;
+  --akzent-400: #b5abfc;
+  --akzent-500: #968ae0;
+  --akzent-600: #796cbf;
+  --akzent-700: #5d5294;
+  --akzent-800: #423a6a;
+  --akzent-900: #2b2741;
+
+  /* Dunkle Zwischenstufen für Flächen. Sie liegen zwischen --ton-950 und
+   * --ton-900 und sind der Grund, warum der Dunkelmodus Ebenen hat. */
+  --dunkel-flaeche: #1e2031;
+  --dunkel-flaeche-erhoben: #232532;
+  --dunkel-flaeche-gedaempft: #1b1d2c;
+  --dunkel-rand: #2d3042;
+  --dunkel-rand-stark: #3f424d;
 
   /* ------------------------------------------------------------- Flächen */
-  --farbe-grund: light-dark(var(--neutral-25), var(--neutral-950));
-  --farbe-flaeche: light-dark(var(--neutral-0), var(--dunkel-flaeche));
-  --farbe-flaeche-erhoben: light-dark(var(--neutral-0), var(--dunkel-flaeche-erhoben));
-  --farbe-flaeche-gedaempft: light-dark(
-    var(--neutral-50),
-    var(--dunkel-flaeche-gedaempft)
+  --farbe-grund: light-dark(var(--ton-100), var(--ton-950));
+  --farbe-flaeche: light-dark(var(--ton-50), var(--dunkel-flaeche));
+  --farbe-flaeche-erhoben: light-dark(#ffffff, var(--dunkel-flaeche-erhoben));
+  --farbe-flaeche-gedaempft: light-dark(var(--ton-200), var(--dunkel-flaeche-gedaempft));
+
+  --farbe-rand: light-dark(var(--ton-300), var(--dunkel-rand));
+  --farbe-rand-stark: light-dark(var(--ton-400), var(--dunkel-rand-stark));
+
+  /* Die Linie, die in diesem Entwurf die Arbeit der Kästen macht: an beiden
+   * Enden ausblendend statt sauber abgeschnitten. Den Verlauf baut
+   * <Regel>, die Farbe steht hier. */
+  --farbe-linie: light-dark(
+    color-mix(in srgb, var(--ton-900) 18%, transparent),
+    color-mix(in srgb, #e9e9ed 16%, transparent)
   );
 
-  --farbe-rand: light-dark(var(--neutral-150), var(--dunkel-rand));
-  --farbe-rand-stark: light-dark(var(--neutral-200), var(--dunkel-rand-stark));
-
   /* --------------------------------------------------------------- Schrift */
-  --farbe-text: light-dark(var(--neutral-950), #f2f2f4);
-  --farbe-text-gedaempft: light-dark(var(--neutral-600), #a6a6ae);
-  --farbe-text-leise: light-dark(var(--neutral-500), #7c7c85);
+  --farbe-text: light-dark(var(--ton-900), #e9e9ed);
+  --farbe-text-gedaempft: light-dark(var(--ton-700), #9095a8);
+  --farbe-text-leise: light-dark(var(--ton-600), #74798f);
 
-  /* Die Primäraktion ist schlicht die kontrastreichste Fläche. Ein bunter
-   * Knopf wäre hier das erste, was billig wirkt. */
-  --farbe-aktion: light-dark(var(--neutral-950), #f2f2f4);
-  --farbe-aktion-schrift: light-dark(var(--neutral-0), var(--neutral-950));
-  --farbe-aktion-hover: light-dark(var(--neutral-800), #ffffff);
+  /* ---------------------------------------------------------------- Akzent
+   * Er tritt als Linie, Punkt und Rand auf, nie als Fläche. Auf hellem
+   * Grund muss er dafür zwei Stufen dunkler sein als auf dunklem - sonst
+   * verschwindet er im Papier.
+   */
+  --farbe-akzent: light-dark(var(--akzent-600), #9184d9);
+  --farbe-akzent-hell: light-dark(var(--akzent-500), var(--akzent-400));
+  /* Derselbe Akzent als FLIESSTEXT. Das Paar Akzent/Grund ist auf 3:1
+   * gestimmt - genug für Symbole, große Schrift und Bedienränder, nicht für
+   * einen Absatz. Dafür geht es eine tiefe Stufe weiter. */
+  --farbe-akzent-schrift: light-dark(var(--akzent-700), var(--akzent-300));
+  /* Die einzige Fläche, die der Akzent bekommt: ein Hauch, kein Feld. */
+  --farbe-akzent-fuellung: color-mix(in srgb, var(--farbe-akzent) 10%, transparent);
+  --farbe-akzent-spur: color-mix(in srgb, var(--farbe-akzent) 7%, transparent);
 
-  --farbe-fokus: light-dark(#3b6ee0, #6a93f0);
-  /* Dieselbe Farbe als SCHRIFT, eine Spur dunkler. Als Rand oder Ring reicht
-   * --farbe-fokus; als Text auf heller Flaeche kommt sie auf 4.37:1 und
-   * bleibt damit unter den 4.5:1, die AA fuer normalen Text verlangt.
-   * Gemessen, nicht geschaetzt -- siehe docs/08-design.md. */
-  --farbe-fokus-schrift: light-dark(#3464d6, #6a93f0);
-  /* Markierter Text. Aus der Fokusfarbe, nur durchscheinend - beides meint
-   * "hier bist du gerade". */
-  --farbe-auswahl: light-dark(rgb(59 110 224 / 16%), rgb(106 147 240 / 28%));
+  /* Die Primäraktion ist ein Akzentrand auf nichts, keine gefüllte Fläche -
+   * ein geschlossener Farbblock wäre in diesem Entwurf das erste, was laut
+   * wird. Die Aktions-Tokens bleiben trotzdem bestehen: Artefakte benutzen
+   * sie für Marken, Unterstreichungen und aktive Kanten. */
+  --farbe-aktion: var(--farbe-akzent);
+  --farbe-aktion-schrift: light-dark(var(--ton-50), var(--ton-950));
+  --farbe-aktion-hover: var(--farbe-akzent-hell);
+
+  /* Fokus ist der Akzent. Ein zweiter Blauton daneben wäre eine Farbe, die
+   * nichts Eigenes zu sagen hat. */
+  --farbe-fokus: var(--farbe-akzent);
+  --farbe-fokus-schrift: var(--farbe-akzent-schrift);
+  --farbe-auswahl: color-mix(in srgb, var(--farbe-akzent) 30%, transparent);
 
   /* -------------------------------------------------------------- Signale
    * Entsättigt: sie sollen etwas mitteilen, nicht um Aufmerksamkeit kämpfen.
+   * Die dunklen Flächen sind auf den neuen Grund gestimmt - auf #161826 saß
+   * das frühere Grünbraun wie ein Fleck.
    */
   --signal-gut: light-dark(#1a7f52, #45b884);
-  --signal-gut-flaeche: light-dark(#e9f5ef, #112420);
+  --signal-gut-flaeche: light-dark(#e9f5ef, #12241f);
   --signal-warnung: light-dark(#8a6212, #d2a44e);
-  --signal-warnung-flaeche: light-dark(#fbf3e2, #292114);
+  --signal-warnung-flaeche: light-dark(#fbf3e2, #272014);
   --signal-fehler: light-dark(#a32b21, #e0736a);
-  --signal-fehler-flaeche: light-dark(#fbecea, #2a1817);
+  --signal-fehler-flaeche: light-dark(#fbecea, #2a1a1d);
 
   /* ------------------------------------------------------------ Typografie
-   * Kein Webfont: der Systemstapel rendert auf jeder Plattform nativ
-   * optimiert, lädt in null Millisekunden und braucht keine Verbindung nach
-   * außen - auf einem Pi ohne Internetzwang die richtige Wahl. Wie man
-   * stattdessen Inter einbindet, steht in docs/08-design.md.
+   * Inter steht zuerst, wird aber NICHT geladen: ein Webfont von einem
+   * fremden Server widerspricht dem Zweck dieser Installation, und lokal
+   * eingebunden kostet er den ersten Seitenaufbau. Wer Inter hat, sieht
+   * Inter; alle anderen den Systemstapel, der auf jeder Plattform nativ
+   * optimiert rendert. Begründung: docs/08-design.md.
    */
   --schrift:
-    ui-sans-serif, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto,
+    "Inter", ui-sans-serif, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   --schrift-mono:
     ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
@@ -105,18 +148,26 @@
   --text-xl: 1.1875rem;
   --text-2xl: 1.5rem;
   --text-3xl: 2rem;
+  /* Die Begrüßung auf der Startseite und sonst nichts. */
+  --text-4xl: 2.5rem;
 
-  --zeile-eng: 1.25;
+  --zeile-eng: 1.2;
   --zeile-normal: 1.5;
   --zeile-weit: 1.65;
 
   /* Negative Laufweite erst ab Überschriftengröße - im Fließtext macht sie
    * die Zeile schlechter lesbar, nicht besser. */
-  --laufweite-eng: -0.011em;
+  --laufweite-eng: -0.012em;
   --laufweite-enger: -0.022em;
+  /* Positiv, für die gesperrten Kapitälchen über einem Abschnitt. */
+  --laufweite-weit: 0.1em;
+  --laufweite-marke: 0.14em;
 
   --gewicht-normal: 400;
+  /* Überschriften gehen NICHT darüber hinaus: die Hierarchie entsteht hier
+   * aus Größe und Abstand. */
   --gewicht-mittel: 500;
+  /* Bleibt für Etiketten, Tabellenköpfe und Zahlen, die hervorstehen. */
   --gewicht-halbfett: 600;
 
   /* ------------------------------------------------------------------- Maß
@@ -134,20 +185,20 @@
   --raum-16: 4rem;
   --raum-20: 5rem;
 
-  --rundung-sm: 6px;
+  --rundung-sm: 4px;
   --rundung-md: 8px;
-  --rundung-lg: 12px;
+  --rundung-lg: 14px;
   --rundung-voll: 999px;
 
   /* Schatten sind hier fast unsichtbar. Sie trennen Ebenen, sie inszenieren
-   * nichts. Im Dunkeln trägt die Fläche, nicht der Schatten. */
-  --schatten-sm: 0 1px 2px light-dark(rgb(0 0 0 / 4%), rgb(0 0 0 / 30%));
+   * nichts. Im Dunkeln trägt die Kante, nicht der Schatten. */
+  --schatten-sm: 0 0 0 1px light-dark(var(--ton-200), var(--dunkel-rand));
   --schatten-md:
-    0 1px 2px light-dark(rgb(0 0 0 / 4%), rgb(0 0 0 / 30%)),
-    0 4px 12px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 25%));
+    0 0 0 1px light-dark(var(--ton-300), var(--dunkel-rand-stark)),
+    0 6px 18px light-dark(rgb(41 43 49 / 7%), rgb(0 0 0 / 55%));
   --schatten-lg:
-    0 1px 2px light-dark(rgb(0 0 0 / 5%), rgb(0 0 0 / 35%)),
-    0 12px 32px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 35%));
+    0 0 0 1px light-dark(var(--ton-300), var(--ton-700)),
+    0 16px 40px light-dark(rgb(41 43 49 / 10%), rgb(0 0 0 / 65%));
 
   /* ------------------------------------------------------------- Breiten
    * Eine Skala, keine einzelne Zahl. Vorher gab es nur --breite-inhalt, und
@@ -155,17 +206,19 @@
    * Eintraegen genauso wie eine Spielprueftabelle. Auf einem breiten Monitor
    * war ueber die Haelfte Rand.
    *
-   * Welche Breite gilt, entscheidet jetzt das Modul (src/module/typen.ts),
-   * nicht die Huelle. Die Huelle stellt nur die Stufen bereit.
+   * Welche Breite gilt, entscheidet das Modul (src/module/typen.ts), nicht
+   * die Huelle. Die Huelle stellt nur die Stufen bereit.
    */
   --breite-text: 40rem; /* Fliesstext, Formulare - eine Spalte zum Lesen */
   --breite-inhalt: 68rem; /* Voreinstellung: Karten, mittlere Listen */
   --breite-weit: 100rem; /* dichte Listen, mehrspaltige Raster */
   /* "voll" bekommt gar keine Begrenzung - nur den Seitenrand. */
 
-  --raum-rand: var(--raum-6); /* Seitenrand des Inhalts */
-  --breite-navigation: 15rem;
-  --hoehe-kopf: 3.5rem;
+  --raum-rand: var(--raum-8); /* Seitenrand des Inhalts */
+  /* Die Kopfleiste ist eine Zeile hoch und sonst nichts: 48 px, in denen
+   * Marke, Weg und Konto Platz haben. Die frühere Dauerleiste am linken
+   * Rand kostete 15 rem Breite auf jeder Seite, dauerhaft. */
+  --hoehe-kopf: 3rem;
 
   /* ------------------------------------------------------------- Ebenen
    * Eine Leiter statt geratener Zahlen. Wer irgendwo z-index: 9999 schreibt,
@@ -197,4 +250,11 @@
 
 :root[data-thema="dunkel"] {
   color-scheme: dark;
+}
+
+/* Auf schmalen Geräten zählt jeder Millimeter Randbreite. */
+@media (width < 48rem) {
+  :root {
+    --raum-rand: var(--raum-5);
+  }
 }

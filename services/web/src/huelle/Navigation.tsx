@@ -1,179 +1,267 @@
-import type { ReactNode } from "react";
-import { NavLink, useMatch } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { NavLink, useMatch, useNavigate } from "react-router-dom";
 
 import type { ModulEintrag } from "../api/client";
+import { useAnmeldung } from "../anmeldung/kontext";
 import { sichtbareUnterseiten } from "../module/register";
 import { useModule } from "../module/useModule";
-import { Platzhalter } from "../ui";
+import { Marke, Monogramm, Platzhalter, Regel } from "../ui";
 import stil from "./Navigation.module.css";
 
 interface Props {
-  /** Nach einem Klick auf schmalen Geräten: Schublade zu. */
-  beiAuswahl?: () => void;
+  beiSchliessen: () => void;
 }
 
 /**
- * Die Navigation: Artefakte, und darunter die Bereiche des geöffneten.
+ * Die Navigation als Fläche über der Seite - beide Ebenen nebeneinander.
  *
- * Beide Ebenen in EINER Spalte. Die naheliegende Alternative wäre eine
- * zweite Leiste für die Bereiche gewesen - wie in manchen Editoren. Sie
- * kostet dauerhaft rund 200 px, und zwar ausgerechnet bei den Modulen, die
- * Breite brauchen: Ein Modul mit neun Bereichen ist meist auch eins mit
- * breiten Tabellen.
+ * Vorher standen Artefakte und ihre Bereiche eingerückt untereinander in
+ * einer Leiste am Rand. Das funktionierte, solange ein Artefakt drei
+ * Bereiche hatte; bei neun wurde aus der Leiste eine Liste, in der man
+ * sucht statt findet - und sie stand dabei dauerhaft im Bild.
  *
- * Die Bereiche erscheinen deshalb eingerückt unter ihrem Artefakt und nur
- * dann, wenn es geöffnet ist. Ein Artefakt ohne Bereiche hat schlicht keine
- * zweite Ebene - kein leerer Platzhalter, keine Leiste, die aussieht, als
- * fehle etwas.
+ * Hier liegen links die Artefakte und rechts die Bereiche des geöffneten.
+ * Beide Ebenen sind gleichzeitig zu sehen, und zwar in Wortgrößen, die man
+ * aus zwei Metern liest. Der Preis ist, dass die Fläche gerufen werden
+ * muss - mit Escape oder dem Zeichen oben links.
+ *
+ * Die Seite darunter bleibt schemenhaft sichtbar. Nicht als Effekt: Sie ist
+ * die Antwort auf „wohin komme ich zurück, wenn ich das hier wegklicke".
  */
-export function Navigation({ beiAuswahl }: Props) {
+export function Navigation({ beiSchliessen }: Props) {
   const zustand = useModule();
-  // useMatch und nicht useParams: Die Leiste steht in der Hülle und damit
-  // AUSSERHALB von <Routes>. Dort liefert useParams immer ein leeres
-  // Objekt, und die Bereiche klappten nie auf. useMatch liest die Adresse
-  // selbst und funktioniert überall innerhalb des Routers.
+  const { benutzer, abmelden } = useAnmeldung();
+  const navigate = useNavigate();
   const treffer = useMatch("/modul/:id/*");
   const offenesModul = treffer?.params.id ?? "";
 
+  const flaeche = useRef<HTMLDivElement>(null);
+  const vorherFokussiert = useRef<Element | null>(null);
+
+  // Fokus hinein und am Ende zurück. Ohne das steht der Schreibpunkt
+  // weiterhin auf der Seite DAHINTER: Tabulator wandert dann durch Dinge,
+  // die gerade niemand sieht.
+  useEffect(() => {
+    vorherFokussiert.current = document.activeElement;
+    flaeche.current?.focus();
+
+    return () => {
+      if (vorherFokussiert.current instanceof HTMLElement) {
+        vorherFokussiert.current.focus();
+      }
+    };
+  }, []);
+
+  const module = zustand.phase === "fertig" ? zustand.module : [];
+  const offen = module.find((m) => m.id === offenesModul);
+  const bereiche = offen ? sichtbareUnterseiten(offen.id) : [];
+
   return (
-    // "Hauptnavigation" und nicht "Artefakte": Die Startseite hat bereits
-    // eine Liste dieses Namens. Zwei gleichnamige Bereiche auf derselben
-    // Seite sagt ein Screenreader zweimal an, und jede Suche nach der
-    // Kachel trifft doppelt - die Oberflächentests sind daran gescheitert.
-    <nav className={stil.navigation} aria-label="Hauptnavigation">
-      <NavLink
-        to="/"
-        end
-        className={({ isActive }) => (isActive ? stil.eintragAktiv : stil.eintrag)}
-        onClick={beiAuswahl}
+    <div className={stil.schleier}>
+      {/* Der Hintergrund schliesst, ist aber kein Ziel fuer die Tastatur -
+          dafuer gibt es Escape und den Knopf. Ein fokussierbarer, leerer
+          Bereich waere eine Station auf dem Weg, die nichts sagt. */}
+      <div
+        className={stil.hinterklick}
+        aria-hidden="true"
+        onClick={beiSchliessen}
+        role="presentation"
+      />
+
+      <div
+        ref={flaeche}
+        className={stil.flaeche}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation"
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key === "Tab") halteFokus(e, flaeche.current);
+        }}
       >
-        <Zeichen>
-          <UebersichtSymbol />
-        </Zeichen>
-        Übersicht
-      </NavLink>
-
-      {zustand.phase === "laedt" && (
-        <div className={stil.laden} aria-hidden="true">
-          <Platzhalter breite="100%" hoehe="1.75rem" />
-          <Platzhalter breite="100%" hoehe="1.75rem" />
-          <Platzhalter breite="100%" hoehe="1.75rem" />
+        <div className={stil.kopf}>
+          <Marke aktiv />
+          <span className={stil.wortmarke}>Navigation</span>
+          {/* Der Name steht im aria-label und nicht im Text: Sichtbar steht
+              hier auf einer Tastatur „Esc schließt" und auf einem Telefon
+              „Schließen" - zwei Beschriftungen für eine Handlung, weil es
+              auf einem Telefon keine Escape-Taste gibt. Für einen
+              Screenreader wäre beides zusammen ein Satz ohne Sinn. */}
+          <button
+            type="button"
+            className={stil.schliessen}
+            aria-label="Navigation schließen"
+            onClick={beiSchliessen}
+          >
+            <span className={stil.mitTaste} aria-hidden="true">
+              <span className={stil.taste}>Esc</span>
+              schließt
+            </span>
+            <span className={stil.ohneTaste} aria-hidden="true">
+              Schließen
+            </span>
+          </button>
         </div>
-      )}
 
-      {zustand.phase === "fertig" && zustand.module.length > 0 && (
+        <div className={stil.spalten}>
+          <div className={stil.artefakte}>
+            <NavLink
+              to="/"
+              end
+              className={({ isActive }) =>
+                isActive ? stil.uebersichtHier : stil.uebersicht
+              }
+            >
+              <span className={stil.uebersichtzeichen} aria-hidden="true">
+                <Marke />
+              </span>
+              Übersicht
+            </NavLink>
+
+            <Regel className={stil.regel} />
+
+            <p className={stil.gruppe}>Artefakte</p>
+
+            {zustand.phase === "laedt" && (
+              <div className={stil.laden} aria-hidden="true">
+                <Platzhalter breite="60%" hoehe="2rem" />
+                <Platzhalter breite="45%" hoehe="2rem" />
+                <Platzhalter breite="55%" hoehe="2rem" />
+              </div>
+            )}
+
+            {zustand.phase === "fehler" && (
+              <p className={stil.leer} role="alert">
+                Das Gateway hat das Verzeichnis nicht geliefert: {zustand.nachricht}
+              </p>
+            )}
+
+            {zustand.phase === "fertig" && module.length === 0 && (
+              <p className={stil.leer}>
+                Hier steht nur, wofür du berechtigt bist — und das ist im Moment nichts.
+              </p>
+            )}
+
+            {/* Die Liste bleibt bewusst OHNE aria-label: Die Startseite
+                darunter hat bereits eine namens „Artefakte". Zwei
+                gleichnamige Listen sagt ein Screenreader zweimal an, und
+                jede Suche nach einem Eintrag trifft doppelt. Den Namen
+                trägt hier der Dialog darum herum. */}
+            {module.length > 0 && (
+              <ul className={stil.liste}>
+                {module.map((modul) => (
+                  <li key={modul.id}>
+                    <Artefakt modul={modul} offen={modul.id === offenesModul} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className={stil.bereichsspalte}>
+            {offen && bereiche.length > 0 && (
+              <>
+                <p className={stil.gruppe}>Bereiche in {offen.titel}</p>
+                <ul className={stil.bereiche} aria-label={`Bereiche von ${offen.titel}`}>
+                  {bereiche.map((bereich) => (
+                    <li key={bereich.id}>
+                      <NavLink
+                        to={`/modul/${offen.id}/${bereich.id}`}
+                        className={({ isActive }) =>
+                          isActive ? stil.bereichHier : stil.bereich
+                        }
+                      >
+                        {bereich.wort}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+                <Regel kurz className={stil.regel} />
+              </>
+            )}
+
+            <div className={stil.konto}>
+              <NavLink
+                to="/einstellungen"
+                className={({ isActive }) => (isActive ? stil.bereichHier : stil.bereich)}
+              >
+                Einstellungen
+              </NavLink>
+              {benutzer && (
+                <button
+                  type="button"
+                  className={stil.bereich}
+                  onClick={() => {
+                    void abmelden().then(() => navigate("/"));
+                  }}
+                >
+                  Abmelden
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Artefakt({ modul, offen }: { modul: ModulEintrag; offen: boolean }) {
+  return (
+    <NavLink
+      to={`/modul/${modul.id}`}
+      className={(offen ? stil.artefaktHier : stil.artefakt) ?? ""}
+    >
+      <Monogramm name={einWort(modul.titel)} form="feld" betont={offen} />
+      <span className={stil.titel}>{modul.titel}</span>
+      {/* Der Punkt ist Dekoration, das Wort traegt die Bedeutung. Nur farbig
+          markiert kaeme die Stoerung weder bei einem Screenreader noch bei
+          Farbenblindheit an. */}
+      {modul.status === "fehler" && (
         <>
-          {/* Die Beschriftung ist sichtbar, benennt die Liste aber bewusst
-              NICHT - aus demselben Grund wie oben. Innerhalb der
-              Hauptnavigation ist ohnehin klar, was die Liste enthält. */}
-          <p className={stil.gruppe}>Artefakte</p>
-          <ul className={stil.liste}>
-            {zustand.module.map((modul) => (
-              <li key={modul.id}>
-                <Eintrag
-                  modul={modul}
-                  offen={modul.id === offenesModul}
-                  beiAuswahl={beiAuswahl}
-                />
-              </li>
-            ))}
-          </ul>
+          <span className={stil.stoerung} aria-hidden="true" />
+          <span className="nur-vorlesen">Nicht erreichbar</span>
         </>
       )}
-    </nav>
-  );
-}
-
-function Eintrag({
-  modul,
-  offen,
-  beiAuswahl,
-}: {
-  modul: ModulEintrag;
-  offen: boolean;
-  beiAuswahl?: (() => void) | undefined;
-}) {
-  const bereiche = sichtbareUnterseiten(modul.id);
-
-  return (
-    <>
-      <NavLink
-        to={`/modul/${modul.id}`}
-        className={({ isActive }) => (isActive ? stil.eintragAktiv : stil.eintrag)}
-        onClick={beiAuswahl}
-      >
-        <Zeichen>{monogramm(modul.titel)}</Zeichen>
-        <span className={stil.wort}>{modul.titel}</span>
-        {/* Der Punkt ist Dekoration, das Wort trägt die Bedeutung. Nur
-            farbig markiert käme die Störung weder bei einem Screenreader
-            noch bei Farbenblindheit an. */}
-        {modul.status === "fehler" && (
-          <>
-            <span className={stil.stoerung} aria-hidden="true" />
-            <span className="nur-vorlesen">Nicht erreichbar</span>
-          </>
-        )}
-      </NavLink>
-
-      {/* Nur beim geoeffneten Artefakt. Alle Bereiche aller Artefakte
-          untereinander waeren eine Liste, in der man sucht statt findet. */}
-      {offen && bereiche.length > 0 && (
-        <ul className={stil.bereiche} aria-label={`Bereiche von ${modul.titel}`}>
-          {bereiche.map((bereich) => (
-            <li key={bereich.id}>
-              <NavLink
-                to={`/modul/${modul.id}/${bereich.id}`}
-                className={({ isActive }) =>
-                  isActive ? stil.bereichAktiv : stil.bereich
-                }
-                onClick={beiAuswahl}
-              >
-                {bereich.wort}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
+    </NavLink>
   );
 }
 
 /**
- * Der Anfangsbuchstabe des Titels, nicht das Feld "icon" aus dem Manifest.
- *
- * "icon" enthält einen Symbolnamen wie "steckdose" oder "schluessel" - für
- * eine Symbolbibliothek gedacht, die es in dieser Oberfläche nicht gibt. Als
- * Text in das Kästchen gesetzt, lief das Wort heraus und lag über dem Titel.
- * Der Anfangsbuchstabe passt immer, und er ist für jedes Artefakt gleich
- * gebaut - kein Artefakt sieht anders aus, nur weil es ein Feld befüllt hat.
+ * Ein Artefakt bekommt EINEN Buchstaben, auch wenn sein Titel zwei Wörter
+ * hat: „Nutzerverwaltung" und „Haushaltsbuch" stehen hier nebeneinander,
+ * und zwei Buchstaben machten aus dem Feld ein Etikett.
  */
-function monogramm(titel: string): string {
-  return (titel.trim()[0] ?? "?").toLocaleUpperCase("de");
+function einWort(titel: string): string {
+  return titel.trim().split(/\s+/)[0] ?? titel;
 }
 
 /**
- * Vier Felder - die Kacheln der Startseite im Kleinen.
+ * Tabulator bleibt in der Fläche.
  *
- * Vorher stand hier "◆" als Schriftzeichen. Wie groß und wie fett das
- * erscheint, entscheidet die Systemschrift: unter Windows ein Punkt, unter
- * macOS eine Raute, die über den Rand des Feldes ragte. Eine Zeichnung sieht
- * überall gleich aus und übernimmt die Farbe des Feldes.
+ * Ohne das wandert der Fokus hinter die Fläche und bedient eine Seite, die
+ * niemand sieht - für Tastatur- und Screenreader-Benutzer ist das Overlay
+ * dann nur eine Farbe, kein Zustand.
  */
-function UebersichtSymbol() {
-  return (
-    <svg viewBox="0 0 12 12" width="10" height="10" fill="currentColor">
-      <rect x="0" y="0" width="5" height="5" rx="1" />
-      <rect x="7" y="0" width="5" height="5" rx="1" />
-      <rect x="0" y="7" width="5" height="5" rx="1" />
-      <rect x="7" y="7" width="5" height="5" rx="1" />
-    </svg>
-  );
-}
+function halteFokus(ereignis: React.KeyboardEvent, flaeche: HTMLElement | null) {
+  if (!flaeche) return;
 
-function Zeichen({ children }: { children: ReactNode }) {
-  return (
-    <span className={stil.zeichen} aria-hidden="true">
-      {children}
-    </span>
+  const ziele = flaeche.querySelectorAll<HTMLElement>(
+    'a[href], button:not(:disabled), input:not(:disabled), [tabindex]:not([tabindex="-1"])',
   );
+  if (ziele.length === 0) return;
+
+  const erstes = ziele[0];
+  const letztes = ziele[ziele.length - 1];
+  if (!erstes || !letztes) return;
+
+  const aktiv = document.activeElement;
+
+  if (ereignis.shiftKey && (aktiv === erstes || aktiv === flaeche)) {
+    ereignis.preventDefault();
+    letztes.focus();
+  } else if (!ereignis.shiftKey && aktiv === letztes) {
+    ereignis.preventDefault();
+    erstes.focus();
+  }
 }

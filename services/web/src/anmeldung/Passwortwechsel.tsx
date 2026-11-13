@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { aenderePasswort, holeIch } from "../api/anmeldung";
-import { Feld, Hinweis, Karte, Knopf } from "../ui";
+import { Feld, Hinweis, Knopf, Marke, Regel } from "../ui";
 import { useAnmeldung } from "./kontext";
 import stil from "./Anmeldeformular.module.css";
 
@@ -50,67 +50,74 @@ export function Passwortwechsel() {
   }
 
   return (
-    <Karte className={stil.karte}>
-      <form className={stil.formular} onSubmit={absenden}>
-        <div className={stil.kopf}>
-          <h1 className={stil.titel}>Eigenes Passwort wählen</h1>
-          <p className={stil.beschreibung}>
-            Dein Konto benutzt noch das Startpasswort, das jemand anders vergeben hat.
-            Wähle ein eigenes — danach geht es weiter, ohne dass du dich neu anmelden
-            musst.
-          </p>
-        </div>
+    <div className={stil.buehne}>
+      <div className={stil.schein} aria-hidden="true" />
 
-        <Feld
-          beschriftung="Startpasswort"
-          name="altes"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={altes}
-          hinweis="Das, mit dem du dich gerade angemeldet hast."
-          onChange={(e) => setAltes(e.target.value)}
-        />
+      <div className={`${stil.saeule} ${stil.breit}`}>
+        <span className={stil.zeichen}>
+          <Marke gross />
+        </span>
 
-        <Feld
-          beschriftung="Neues Passwort"
-          name="neues"
-          type="password"
-          autoComplete="new-password"
-          required
-          value={neues}
-          hinweis="Mindestens 12 Zeichen. Länge zählt, nicht Sonderzeichen."
-          onChange={(e) => setNeues(e.target.value)}
-        />
+        <h1 className={stil.titel}>Eigenes Passwort wählen</h1>
+        <p className={stil.beschreibung}>
+          Dein Konto benutzt noch das Startpasswort, das jemand anders vergeben hat. Wähle
+          ein eigenes — danach geht es weiter, ohne dass du dich neu anmelden musst.
+        </p>
 
-        <Feld
-          beschriftung="Neues Passwort wiederholen"
-          name="wiederholung"
-          type="password"
-          autoComplete="new-password"
-          required
-          value={wiederholung}
-          onChange={(e) => setWiederholung(e.target.value)}
-        />
+        <form className={stil.formular} onSubmit={absenden}>
+          <Feld
+            beschriftung="Startpasswort"
+            name="altes"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={altes}
+            hinweis="Das, mit dem du dich gerade angemeldet hast."
+            onChange={(e) => setAltes(e.target.value)}
+          />
 
-        {wiederholung !== "" && !gleich && (
-          <Hinweis ton="warnung">Die beiden Passwörter stimmen nicht überein.</Hinweis>
-        )}
+          <Feld
+            beschriftung="Neues Passwort"
+            name="neues"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={neues}
+            hinweis="Mindestens 12 Zeichen. Länge zählt, nicht Sonderzeichen."
+            onChange={(e) => setNeues(e.target.value)}
+          />
 
-        {fehler && (
-          <Hinweis ton="fehler" dringend>
-            {fehler}
-          </Hinweis>
-        )}
+          <Feld
+            beschriftung="Neues Passwort wiederholen"
+            name="wiederholung"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={wiederholung}
+            onChange={(e) => setWiederholung(e.target.value)}
+          />
 
-        <Knopf
-          type="submit"
-          auspraegung="primaer"
-          className={stil.knopf}
-          disabled={laeuft || !vollstaendig}
-        >
-          {laeuft ? "Einen Moment …" : "Passwort setzen"}
-        </Knopf>
+          {wiederholung !== "" && !gleich && (
+            <Hinweis ton="warnung">Die beiden Passwörter stimmen nicht überein.</Hinweis>
+          )}
+
+          {fehler && (
+            <Hinweis ton="fehler" dringend>
+              {fehler}
+            </Hinweis>
+          )}
+
+          <Knopf
+            type="submit"
+            auspraegung="primaer"
+            className={stil.knopf}
+            disabled={laeuft || !vollstaendig}
+          >
+            {laeuft ? "Einen Moment …" : "Passwort setzen"}
+          </Knopf>
+        </form>
+
+        <Regel kurz className={stil.trenner} />
 
         <p className={stil.fuss}>
           Angemeldet als <strong>{benutzer?.name}</strong>. Falsches Konto?{" "}
@@ -118,7 +125,7 @@ export function Passwortwechsel() {
             Abmelden
           </button>
         </p>
-      </form>
-    </Karte>
+      </div>
+    </div>
   );
 }

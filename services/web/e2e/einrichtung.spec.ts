@@ -40,18 +40,21 @@ const STAFFEL = "Stadtliga C";
  */
 const DIENST_WARTET = 45_000;
 
-/** Die Navigationsleiste — die Artefakte. */
+/** Ein Artefakt in der Liste der Startseite. */
 function artefakt(page: Page, name: string | RegExp) {
-  return page
-    .getByRole("navigation", { name: "Hauptnavigation" })
-    .getByRole("link", { name });
+  return page.getByRole("list", { name: "Artefakte" }).getByRole("link", { name });
 }
 
-/** Ein Bereich innerhalb des geöffneten Artefakts. */
+/** Ein Bereich innerhalb des geöffneten Artefakts - die Leiste über dem Inhalt. */
 function bereich(page: Page, name: string) {
   return page
-    .getByRole("list", { name: /^Bereiche von/ })
+    .getByRole("navigation", { name: "Bereiche" })
     .getByRole("link", { name, exact: true });
+}
+
+/** Das Kürzel in der Kopfzeile - es erscheint nur bei bestehender Sitzung. */
+function konto(page: Page) {
+  return page.getByRole("banner").getByRole("link", { name: /^Einstellungen für / });
 }
 
 /** Die Schrittleiste des Weges. Sie ist das Versprechen "so viel kommt noch". */
@@ -75,9 +78,7 @@ test.describe("Eine Staffelleiterin richtet ein", () => {
     await page.getByLabel("Passwort wiederholen").fill(VERWALTERIN.passwort);
     await page.getByRole("button", { name: /Einrichten|Anlegen|Konto/ }).click();
 
-    await expect(
-      page.getByRole("banner").getByRole("button", { name: "Abmelden" }),
-    ).toBeVisible();
+    await expect(konto(page)).toBeVisible();
   });
 
   test("sie gibt sich selbst das Recht auf StaffelPilot", async ({ page }) => {
@@ -245,9 +246,7 @@ async function anmelden(page: Page): Promise<void> {
   await page.getByLabel("Benutzername").fill(VERWALTERIN.name);
   await page.getByLabel("Passwort").fill(VERWALTERIN.passwort);
   await page.getByRole("button", { name: "Anmelden" }).click();
-  await expect(
-    page.getByRole("banner").getByRole("button", { name: "Abmelden" }),
-  ).toBeVisible();
+  await expect(konto(page)).toBeVisible();
 }
 
 /**

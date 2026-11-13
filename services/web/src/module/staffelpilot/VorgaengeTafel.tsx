@@ -4,11 +4,15 @@ import {
   Etikett,
   Feld,
   Hinweis,
-  Karte,
   Knopf,
   KnopfVerweis,
   Leerzustand,
   Platzhalter,
+  Reihe,
+  Segmentwahl,
+  Tabelle,
+  Tafel,
+  Zelle,
 } from "../../ui";
 import {
   type Mailentwurf,
@@ -60,6 +64,14 @@ const NAECHSTE: Record<VorgangZustand, VorgangZustand[]> = {
  * wird er im Mailprogramm, von einem Menschen. „Versandt“ hält fest, was
  * draußen passiert ist — es löst nichts aus.
  */
+/** "Alle" plus die drei Zustaende - dieselbe Reihenfolge wie im Backend. */
+const ZUSTAENDE = [
+  { wert: "alle", wort: "Alle" },
+  { wert: "entwurf", wort: "Entwurf" },
+  { wert: "versandt", wort: "Versandt" },
+  { wert: "erledigt", wort: "Erledigt" },
+] as const;
+
 export function VorgaengeTafel() {
   const [zeilen, setZeilen] = useState<VorgangZeile[] | null>(null);
   const [filter, setFilter] = useState<VorgangZustand | "">("");
@@ -128,24 +140,25 @@ export function VorgaengeTafel() {
   }
 
   return (
-    <>
-      <div className={stil.filterZeile} role="group" aria-label="Nach Zustand filtern">
-        {(["", "entwurf", "versandt", "erledigt"] as const).map((z) => (
-          <Knopf
-            key={z || "alle"}
-            groesse="sm"
-            auspraegung={filter === z ? "primaer" : "leise"}
-            aria-pressed={filter === z}
-            onClick={() => {
-              setOffen(null);
-              setFilter(z);
-            }}
-          >
-            {z === "" ? "Alle" : ZUSTAND_WORT[z]}
-          </Knopf>
-        ))}
-      </div>
-
+    <Tafel
+      titel="Vorgänge"
+      beiwort={
+        zeilen.length === 0
+          ? undefined
+          : `${zeilen.length} ${zeilen.length === 1 ? "Vorgang" : "Vorgänge"}`
+      }
+      aktionen={
+        <Segmentwahl
+          beschriftung="Nach Zustand filtern"
+          optionen={ZUSTAENDE}
+          wert={filter === "" ? "alle" : filter}
+          beiWahl={(wahl) => {
+            setOffen(null);
+            setFilter(wahl === "alle" ? "" : wahl);
+          }}
+        />
+      }
+    >
       {fehler && (
         <Hinweis ton="fehler" dringend>
           {fehler}
@@ -159,26 +172,30 @@ export function VorgaengeTafel() {
           gemeldet hat, bekommen einen.
         </Leerzustand>
       ) : (
-        <ul className={stil.liste} aria-label="Vorgänge">
+        <Tabelle
+          beschriftung="Vorgänge"
+          raster="2fr 0.9fr 0.8fr 0.8fr"
+          spalten={["Betreff", "Aktenzeichen", "Weg", "Zustand"]}
+          rechtsBuendig
+        >
           {zeilen.map((zeile) => (
-            <li key={zeile.id}>
-              <VorgangKarte
-                zeile={zeile}
-                offen={offen?.id === zeile.id ? offen : null}
-                onOeffnen={() => void oeffnen(zeile)}
-                onSpeichern={(daten) => handeln(() => aendereVorgang(zeile.id, daten))}
-                onZustand={(z) => handeln(() => setzeVorgangZustand(zeile.id, z))}
-                onVerwerfen={() => handeln(() => verwerfeVorgang(zeile.id))}
-              />
-            </li>
+            <VorgangReihe
+              key={zeile.id}
+              zeile={zeile}
+              offen={offen?.id === zeile.id ? offen : null}
+              onOeffnen={() => void oeffnen(zeile)}
+              onSpeichern={(daten) => handeln(() => aendereVorgang(zeile.id, daten))}
+              onZustand={(z) => handeln(() => setzeVorgangZustand(zeile.id, z))}
+              onVerwerfen={() => handeln(() => verwerfeVorgang(zeile.id))}
+            />
           ))}
-        </ul>
+        </Tabelle>
       )}
-    </>
+    </Tafel>
   );
 }
 
-function VorgangKarte({
+function VorgangReihe({
   zeile,
   offen,
   onOeffnen,
@@ -200,27 +217,26 @@ function VorgangKarte({
   onVerwerfen: () => Promise<boolean>;
 }) {
   return (
-    <Karte>
-      <button
-        type="button"
-        className={stil.kopf}
-        onClick={onOeffnen}
-        aria-expanded={offen !== null}
-      >
-        <span className={stil.paarung}>{zeile.betreff}</span>
-        <span className={stil.zeile}>
-          <Etikett mono>{zeile.aktenzeichen}</Etikett>
-          <Etikett>{ART_WORT[zeile.art]}</Etikett>
-          <Etikett ton={ZUSTAND_TON[zeile.zustand]}>
-            {ZUSTAND_WORT[zeile.zustand]}
-          </Etikett>
-        </span>
-      </button>
-
-      {offen !== null && (
-        <VorgangInhalt {...{ offen, onSpeichern, onZustand, onVerwerfen }} />
-      )}
-    </Karte>
+    <Reihe
+      betont={zeile.zustand === "entwurf"}
+      leise={zeile.zustand === "erledigt"}
+      onKlick={onOeffnen}
+      offen={offen !== null}
+      ausklappung={
+        offen !== null ? (
+          <div className={stil.detail}>
+            <VorgangInhalt {...{ offen, onSpeichern, onZustand, onVerwerfen }} />
+          </div>
+        ) : null
+      }
+    >
+      <Zelle>{zeile.betreff}</Zelle>
+      <Zelle leise>{zeile.aktenzeichen}</Zelle>
+      <Zelle leise>{ART_WORT[zeile.art]}</Zelle>
+      <Zelle rechts>
+        <Etikett ton={ZUSTAND_TON[zeile.zustand]}>{ZUSTAND_WORT[zeile.zustand]}</Etikett>
+      </Zelle>
+    </Reihe>
   );
 }
 

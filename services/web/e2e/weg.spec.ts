@@ -1,18 +1,25 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Die Navigationsleiste - Artefakte und, beim geöffneten, dessen Bereiche.
+ * Die Artefaktliste der Startseite.
  *
- * Ohne diese beiden Helfer wird jeder Verweis mehrdeutig: Seit die Leiste
- * dauerhaft danebensteht, heißt "Verwaltung" sowohl die Kachel auf der
- * Startseite als auch der Eintrag in der Leiste. Playwright bricht solche
- * Treffer streng ab - zu Recht, denn welcher gemeint ist, weiß der Test
- * sonst selbst nicht.
+ * Seit die Dauerleiste weg ist, steht jedes Artefakt an genau einer Stelle
+ * gleichzeitig: hier, oder - wenn jemand sie gerufen hat - in der
+ * Navigationsfläche. Der Helfer greift bewusst die Startseite ab, weil die
+ * Schritte unten nach dem Anmelden dort stehen.
  */
+function startliste(page: Page) {
+  return page.getByRole("list", { name: "Artefakte" });
+}
+
 function artefakt(page: Page, name: string | RegExp) {
-  return page
-    .getByRole("navigation", { name: "Hauptnavigation" })
-    .getByRole("link", { name });
+  return startliste(page).getByRole("link", { name });
+}
+
+/** Die Navigationsfläche rufen - mit der Taste, die auch der Benutzer hat. */
+async function navigation(page: Page) {
+  await page.getByRole("button", { name: "Navigation öffnen" }).click();
+  return page.getByRole("dialog", { name: "Navigation" });
 }
 
 /**
@@ -82,37 +89,37 @@ test.describe("Der Weg einer frischen Installation", () => {
     await page.getByRole("button", { name: "Einrichten" }).click();
 
     // Sie ist damit angemeldet - ohne zweiten Schritt.
-    await expect(page.getByRole("heading", { name: "Übersicht" })).toBeVisible();
-    await expect(page.getByText(VERWALTERIN.anzeige)).toBeVisible();
+    await expect(startliste(page)).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: `Einstellungen für ${VERWALTERIN.anzeige}` }),
+    ).toBeVisible();
   });
 
   test("sie sieht die Verwaltung und sonst nichts", async ({ page }) => {
     await anmelden(page, VERWALTERIN.name, VERWALTERIN.passwort);
 
-    const kacheln = page.getByRole("list", { name: "Artefakte" });
-    await expect(kacheln.getByRole("link", { name: /Verwaltung/ })).toBeVisible();
+    await expect(artefakt(page, /Verwaltung/)).toBeVisible();
     // Auf "geraete" hat sie kein Recht - das Artefakt existiert für sie nicht.
-    await expect(kacheln.getByRole("link", { name: /Geräte/ })).toHaveCount(0);
+    await expect(artefakt(page, /Geräte/)).toHaveCount(0);
   });
 
-  test("in der Leiste liegt nichts über etwas anderem", async ({ page }) => {
+  test("in der Navigationsfläche liegt nichts über etwas anderem", async ({ page }) => {
     // Auf dem Pi stand in der Leiste "steckdose" über "Geräte" und
     // "schluessel" über "Verwaltung": Das Manifest liefert Symbolnamen, die
     // Leiste setzte sie als Text in ein 20-px-Feld, und das Wort lief heraus.
     // Kein Komponententest hat das gesehen - dort gibt es kein Layout, und
     // die Testdaten hatten kein Symbol.
     //
-    // Deshalb hier, im echten Browser mit dem echten Manifest, zwei Fragen
-    // an jeden Verweis der Leiste:
+    // Die Leiste ist weg, die Monogramme sind geblieben - und mit ihnen die
+    // Falle. Deshalb hier, im echten Browser mit dem echten Manifest, zwei
+    // Fragen an jeden Verweis der Fläche:
     //   1. Überschneiden sich zwei seiner Bestandteile?
     //   2. Ragt der Inhalt eines Bestandteils aus dessen eigenem Kasten -
     //      ohne dass das gewollt ist? Gewollt ist es nur mit Auslassungs-
     //      zeichen, also bei einem zu langen Namen.
     await anmelden(page, VERWALTERIN.name, VERWALTERIN.passwort);
 
-    const verweise = page
-      .getByRole("navigation", { name: "Hauptnavigation" })
-      .getByRole("link");
+    const verweise = (await navigation(page)).getByRole("link");
     await expect(verweise.first()).toBeVisible();
 
     const funde = await verweise.evaluateAll((links) =>
@@ -193,7 +200,7 @@ test.describe("Der Weg einer frischen Installation", () => {
     await expect(
       page.getByRole("heading", { name: "Eigenes Passwort wählen" }),
     ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Übersicht" })).toHaveCount(0);
+    await expect(startliste(page)).toHaveCount(0);
   });
 
   test("auch nicht, wenn er die Adresse von Hand eintippt", async ({ page }) => {
@@ -215,12 +222,10 @@ test.describe("Der Weg einer frischen Installation", () => {
     await page.getByRole("button", { name: "Passwort setzen" }).click();
 
     // Ohne erneutes Anmelden: die laufende Sitzung bleibt.
-    await expect(page.getByRole("heading", { name: "Übersicht" })).toBeVisible();
-
-    const kacheln = page.getByRole("list", { name: "Artefakte" });
-    await expect(kacheln.getByRole("link", { name: /Geräte/ })).toBeVisible();
+    await expect(startliste(page)).toBeVisible();
+    await expect(artefakt(page, /Geräte/)).toBeVisible();
     // Die Verwaltung darf er nicht - sie steht nicht da.
-    await expect(kacheln.getByRole("link", { name: /Verwaltung/ })).toHaveCount(0);
+    await expect(artefakt(page, /Verwaltung/)).toHaveCount(0);
   });
 
   test("das Startpasswort gilt danach nicht mehr", async ({ page }) => {
@@ -249,7 +254,10 @@ test.describe("Der Weg einer frischen Installation", () => {
        oeffentliche bleibt. */
     await anmelden(page, NEULING.name, NEULING.eigenes);
 
-    await page.getByRole("banner").getByRole("button", { name: "Abmelden" }).click();
+    // "Abmelden" steht in der Navigationsfläche, nicht mehr in der
+    // Kopfzeile: Es ist die seltenste Handlung dieser Oberfläche und stand
+    // dort dauerhaft neben einer, die man ständig braucht.
+    await (await navigation(page)).getByRole("button", { name: "Abmelden" }).click();
 
     await expect(
       page.getByRole("banner").getByRole("link", { name: "Anmelden" }),
@@ -263,21 +271,17 @@ test.describe("Der Weg einer frischen Installation", () => {
 /**
  * Meldet sich an und wartet, bis die Sitzung wirklich steht.
  *
- * Gewartet wird auf "Abmelden" in der Kopfzeile - das erscheint nur bei einer
- * bestehenden Sitzung. Auf die Marke zu warten wäre wertlos: die steht auch
- * da, während die Anmeldung noch läuft, und der nächste `goto` fände dann
- * einen abgemeldeten Zustand vor.
+ * Gewartet wird auf das Kürzel in der Kopfzeile - das erscheint nur bei
+ * einer bestehenden Sitzung. Auf das Zeichen zu warten wäre wertlos: das
+ * steht auch da, während die Anmeldung noch läuft, und der nächste `goto`
+ * fände dann einen abgemeldeten Zustand vor.
  */
-async function anmelden(
-  page: import("@playwright/test").Page,
-  name: string,
-  passwort: string,
-): Promise<void> {
+async function anmelden(page: Page, name: string, passwort: string): Promise<void> {
   await page.goto("/anmelden");
   await page.getByLabel("Benutzername").fill(name);
   await page.getByLabel("Passwort").fill(passwort);
   await page.getByRole("button", { name: "Anmelden" }).click();
   await expect(
-    page.getByRole("banner").getByRole("button", { name: "Abmelden" }),
+    page.getByRole("banner").getByRole("link", { name: /^Einstellungen für / }),
   ).toBeVisible();
 }

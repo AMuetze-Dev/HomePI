@@ -5,7 +5,10 @@ import { Statuspunkt, type Ton } from "./Statuspunkt";
 
 interface Props {
   children: ReactNode;
-  ton?: Extract<Ton, "fehler" | "warnung" | "neutral">;
+  /** „gut" ist die Bestätigung, dass etwas geklappt hat - sie ist selten
+   *  und soll es bleiben: Eine Rückmeldung nach jeder gelungenen Handlung
+   *  wäre eine Zeile, die man wegklickt statt liest. */
+  ton?: Extract<Ton, "gut" | "fehler" | "warnung" | "neutral">;
   /** role="alert" meldet die Nachricht sofort an Screenreader. */
   dringend?: boolean;
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand } from "../../ui";
+import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand, Tafel } from "../../ui";
 import { type Altersklasse, type NeueStaffel, type Staffel } from "./api";
 import { MannschaftenListe } from "./MannschaftenTafel";
 import stil from "./StaffelpilotSeite.module.css";
@@ -36,7 +36,7 @@ export function StaffelnTafel({
   onLoeschen: (id: string) => Promise<boolean>;
 }) {
   return (
-    <>
+    <Tafel titel="Staffeln">
       {staffeln.length === 0 ? (
         <Leerzustand titel="Noch keine Staffel angelegt">
           Eine Staffel ist der Ort, an dem Spielberichte ankommen. Leg die erste an — Name
@@ -58,7 +58,7 @@ export function StaffelnTafel({
       )}
 
       <StaffelAnlegen onAnlegen={onAnlegen} />
-    </>
+    </Tafel>
   );
 }
 

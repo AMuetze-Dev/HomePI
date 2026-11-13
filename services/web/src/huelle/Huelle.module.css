@@ -1,236 +1,33 @@
 /* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
-   Erscheinungsbild auseinanderzulaufen (docs/08-design.md).
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
 
-   Mobil zuerst: Stapel als Grundregel, Leiste ab genug Breite. Andersherum
-   müsste die Ausnahme das Feste der Leiste wieder aufheben - und dafür
-   bräuchte sie dieselbe Spezifität. */
-
-.huelle,
-.huelleSchlicht {
-  min-height: 100dvh;
-}
-
-/* ── Navigationsleiste ──────────────────────────────────────────────── */
-
-/* Auf schmalen Geraeten eine Schublade: eine dauerhaft sichtbare Navigation
-   waere hier der halbe Bildschirm. */
-.leiste,
-.leisteOffen {
-  position: fixed;
-  inset-block: 0;
-  left: 0;
-  z-index: var(--ebene-navigation);
-  display: flex;
-  flex-direction: column;
-  width: min(var(--breite-navigation), 82vw);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  /* Duenn und erst beim Zeigen sichtbar. Der Standardbalken von Windows -
-     grau, breit, mit Pfeil oben - stand dauerhaft neben der Leiste, sobald
-     neun Bereiche nicht mehr in die Hoehe passten, und sah aus wie ein
-     Fehler. Gescrollt wird trotzdem wie immer; nur der Balken haelt sich
-     zurueck, bis jemand die Leiste benutzt. */
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  transition:
-    scrollbar-color var(--dauer-schnell) var(--verlauf),
-    transform var(--dauer-normal) var(--verlauf),
-    visibility var(--dauer-normal) var(--verlauf);
-  background: var(--farbe-flaeche);
-  border-right: 1px solid var(--farbe-rand);
-  transform: translateX(-100%);
-  visibility: hidden;
-}
-
-/* Beim Zeigen, beim Scrollen mit Tastatur oder Rad: dann soll man sehen,
-   wo man ist. */
-.leiste:hover,
-.leiste:focus-within,
-.leisteOffen:hover,
-.leisteOffen:focus-within {
-  scrollbar-color: var(--farbe-rand-stark) transparent;
-}
-
-.leisteOffen {
-  transform: none;
-  visibility: visible;
-  box-shadow: var(--schatten-lg);
-}
-
-.leistenkopf {
-  display: flex;
-  align-items: center;
-  height: var(--hoehe-kopf);
-  padding-inline: var(--raum-5);
-  flex: 0 0 auto;
-}
-
-.leistenfuss {
-  margin: auto 0 0;
-  padding: var(--raum-6) var(--raum-5) var(--raum-5);
-  font-size: var(--text-xs);
-  line-height: var(--zeile-weit);
-  color: var(--farbe-text-leise);
-  text-wrap: pretty;
-}
-
-.schleier {
-  position: fixed;
-  inset: 0;
-  z-index: var(--ebene-schleier);
-  /* Ein Knopf, weil er anklickbar ist - aber ohne jedes Knopf-Aussehen. */
-  padding: 0;
-  border: 0;
-  cursor: default;
-  background: color-mix(in srgb, var(--neutral-950) 40%, transparent);
-  animation: schleierEin var(--dauer-schnell) var(--verlauf);
-}
-
-@keyframes schleierEin {
-  from {
-    opacity: 0;
-  }
-}
-
-/* ── Inhaltsspalte ──────────────────────────────────────────────────── */
-
-.spalte {
+.huelle {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
-  /* min-width: 0 verhindert, dass eine breite Tabelle das Raster aufdrueckt
-     und die Leiste aus dem Bild schiebt. */
+}
+
+.inhalt,
+.inhaltSchlicht {
+  flex: 1;
+  /* min-width: 0 verhindert, dass eine breite Tabelle die Spalte aufdrueckt
+     und die Seite waagerecht scrollen laesst. */
   min-width: 0;
-}
-
-.kopf {
-  position: sticky;
-  top: 0;
-  z-index: var(--ebene-klebend);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--raum-4);
-  height: var(--hoehe-kopf);
-  flex: 0 0 auto;
-  padding-inline: var(--raum-rand);
-  border-bottom: 1px solid var(--farbe-rand);
-  /* Leicht durchscheinend: der Inhalt darunter bleibt spuerbar, ohne dass
-     die Kopfzeile ihre Ruhe verliert. */
-  background: color-mix(in srgb, var(--farbe-grund) 82%, transparent);
-  backdrop-filter: saturate(180%) blur(12px);
-}
-
-.schubladenknopf {
-  display: grid;
-  place-items: center;
-  /* 44 px Trefferflaeche - darunter wird das Ziel auf einem Telefon zur
-     Gluecksache. */
-  width: 2.75rem;
-  height: 2.75rem;
-  margin-left: calc(var(--raum-2) * -1);
-  border: 0;
-  border-radius: var(--rundung-md);
-  background: none;
-  color: var(--farbe-text-gedaempft);
-  cursor: pointer;
-  transition: color var(--dauer-schnell) var(--verlauf);
-}
-
-.schubladenknopf svg {
-  width: 1.125rem;
-  height: 1.125rem;
-}
-
-.schubladenknopf:hover {
-  color: var(--farbe-text);
-}
-
-.schubladenknopf:focus-visible {
-  outline: 2px solid var(--farbe-fokus);
-  outline-offset: 2px;
-}
-
-.werkzeuge {
-  display: flex;
-  align-items: center;
-  gap: var(--raum-2);
-  margin-left: auto;
 }
 
 .inhalt {
-  flex: 1;
-  min-width: 0;
-  padding: var(--raum-8) var(--raum-rand) var(--raum-16);
+  padding: var(--raum-10) var(--raum-rand) var(--raum-16);
 }
 
-/* ── Marke ──────────────────────────────────────────────────────────── */
-
-.marke {
-  display: inline-flex;
+/* Die Ersteinrichtung bringt ihre eigene Mitte mit. */
+.inhaltSchlicht {
+  display: flex;
   align-items: center;
-  gap: var(--raum-3);
-  font-size: var(--text-md);
-  font-weight: var(--gewicht-halbfett);
-  letter-spacing: var(--laufweite-eng);
-  color: var(--farbe-text);
+  justify-content: center;
+  padding: var(--raum-8) var(--raum-rand);
 }
 
-.markenzeichen {
-  display: grid;
-  place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: var(--rundung-sm);
-  background: var(--farbe-aktion);
-  color: var(--farbe-aktion-schrift);
-  font-size: var(--text-xs);
-  font-weight: var(--gewicht-halbfett);
-  letter-spacing: 0;
-}
-
-/* ── Ab Tablet: Leiste steht fest, Schublade entfällt ───────────────── */
-
-@media (width >= 60rem) {
-  .huelle {
-    display: grid;
-    grid-template-columns: var(--breite-navigation) minmax(0, 1fr);
-  }
-
-  .leiste,
-  .leisteOffen {
-    position: sticky;
-    top: 0;
-    height: 100dvh;
-    width: auto;
-    transform: none;
-    visibility: visible;
-    box-shadow: none;
-  }
-
-  .schubladenknopf,
-  .schleier {
-    display: none;
-  }
-
-  .kopf {
-    /* Ohne Schubladenknopf steht links nichts mehr - die Werkzeuge
-       rutschen ohnehin per margin-left: auto nach rechts. */
-    justify-content: flex-end;
-  }
-
-  .inhalt {
-    padding-top: var(--raum-10);
-  }
-}
-
-/* Auf schmalen Geraeten zaehlt jeder Millimeter Randbreite. */
-@media (width < 40rem) {
-  .huelle,
-  .huelleSchlicht {
-    --raum-rand: var(--raum-4);
-  }
-
+@media (width < 48rem) {
   .inhalt {
     padding-block: var(--raum-6) var(--raum-12);
   }
@@ -245,8 +42,9 @@
   z-index: var(--ebene-sprung);
   padding: var(--raum-2) var(--raum-3);
   border-radius: var(--rundung-md);
-  background: var(--farbe-aktion);
-  color: var(--farbe-aktion-schrift);
+  background: var(--farbe-flaeche-erhoben);
+  box-shadow: inset 0 0 0 1px var(--farbe-akzent);
+  color: var(--farbe-akzent);
   font-size: var(--text-sm);
   font-weight: var(--gewicht-mittel);
   transform: translateY(-200%);

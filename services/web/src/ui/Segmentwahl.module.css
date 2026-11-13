@@ -1,0 +1,67 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
+.gruppe {
+  display: inline-flex;
+  gap: var(--raum-1);
+  flex: 0 0 auto;
+}
+
+.segment {
+  display: block;
+  cursor: pointer;
+}
+
+/* Unsichtbar, aber vorhanden: ein `display: none` nähme dem Feld die
+   Tastaturfolge und die Ansage, und übrig bliebe ein Wort, das aussieht wie
+   ein Knopf und keiner ist. */
+.feld {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.wort {
+  display: grid;
+  place-items: center;
+  min-height: 2rem;
+  padding-inline: var(--raum-4);
+  border-radius: var(--rundung-md);
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+  box-shadow: inset 0 0 0 1px transparent;
+  transition:
+    box-shadow var(--dauer-schnell) var(--verlauf),
+    color var(--dauer-schnell) var(--verlauf);
+}
+
+.segment:hover .wort {
+  color: var(--farbe-text);
+}
+
+/* Gewählt heißt: Akzentrand UND Akzentschrift. Nur die Farbe zu ändern
+   bliebe bei jeder zweiten Sehschwäche unsichtbar - der Rand trägt den
+   Unterschied auch ohne Farbsehen. */
+.feld:checked + .wort {
+  box-shadow: inset 0 0 0 1px var(--farbe-akzent);
+  color: var(--farbe-akzent-schrift);
+}
+
+.feld:focus-visible + .wort {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+/* Mit dem Finger sind 32 px ein Glücksspiel. 44 px ist die Untergrenze, die
+   das W3C nennt (WCAG 2.5.5) - aber nur bei grobem Zeiger, sonst wird die
+   Zeile daneben auseinandergedrückt. */
+@media (pointer: coarse) {
+  .wort {
+    min-height: 2.75rem;
+  }
+}

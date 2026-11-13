@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import {
+  Etikett,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Platzhalter,
+  Tafel,
+} from "../../ui";
 import {
   type Regeldatei,
   aendereRegeldatei,
@@ -80,9 +88,8 @@ export function RegeldateienTafel() {
   }
 
   return (
-    <>
+    <Tafel titel="Regeldateien">
       <Karte>
-        <h2 className={stil.formularTitel}>Regeldateien</h2>
         <p className={stil.vorgangHinweis}>
           Der Quelltext der Prüfungen. Er wird im Prüfdienst ausgeführt — vor jedem Lauf
           schreibt er sich die Dateien von hier in seinen Ordner. Was hier steht, ist die
@@ -130,7 +137,7 @@ export function RegeldateienTafel() {
           ))}
         </ul>
       )}
-    </>
+    </Tafel>
   );
 }
 

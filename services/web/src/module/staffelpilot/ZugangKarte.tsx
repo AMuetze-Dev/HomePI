@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { Feld, Hinweis, Karte, Knopf, Platzhalter } from "../../ui";
+import { Feld, Hinweis, Karte, Knopf, Platzhalter, Tafel } from "../../ui";
 import { type ZugangStand, ladeZugang, loescheZugang, speichereZugang } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
 
@@ -89,72 +89,72 @@ export function ZugangKarte() {
   }
 
   return (
-    <Karte>
-      <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
-        <h2 className={stil.formularTitel}>DFBnet-Zugang</h2>
+    <Tafel titel="DFBnet-Zugang">
+      <Karte>
+        <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
+          <p className={stil.vorgangHinweis}>
+            Damit meldet sich der Prüfdienst an. Das Passwort wird verschlüsselt abgelegt
+            und kommt nie wieder heraus — auch nicht in dieses Formular.
+          </p>
 
-        <p className={stil.vorgangHinweis}>
-          Damit meldet sich der Prüfdienst an. Das Passwort wird verschlüsselt abgelegt
-          und kommt nie wieder heraus — auch nicht in dieses Formular.
-        </p>
-
-        {stand !== null && !stand.schluessel_vorhanden && (
-          <Hinweis ton="warnung" dringend>
-            Es ist kein Schlüssel hinterlegt (<code>STAFFELPILOT_SCHLUESSEL</code>). Ohne
-            ihn wird hier nichts gespeichert — lieber gar nicht als im Klartext.
-          </Hinweis>
-        )}
-
-        {stand?.gespeichert && (
-          <Hinweis ton="neutral">
-            Hinterlegt für <strong>{stand.benutzer}</strong>.
-          </Hinweis>
-        )}
-
-        <Feld
-          beschriftung="DFBnet-Benutzername"
-          value={benutzer}
-          autoComplete="off"
-          onChange={(e) => {
-            setBenutzer(e.target.value);
-            setGespeichert(false);
-          }}
-        />
-        <Feld
-          beschriftung="DFBnet-Passwort"
-          type="password"
-          value={passwort}
-          autoComplete="new-password"
-          hinweis={
-            stand?.gespeichert ? "Leer lassen ändert nichts am Passwort." : undefined
-          }
-          onChange={(e) => {
-            setPasswort(e.target.value);
-            setGespeichert(false);
-          }}
-        />
-
-        {fehler && (
-          <Hinweis ton="fehler" dringend>
-            {fehler}
-          </Hinweis>
-        )}
-        {gespeichert && !fehler && <Hinweis ton="neutral">Zugang hinterlegt.</Hinweis>}
-
-        <div className={stil.knoepfe}>
-          <Knopf
-            type="submit"
-            disabled={!benutzer || !passwort || stand?.schluessel_vorhanden === false}
-          >
-            Zugang hinterlegen
-          </Knopf>
-          {stand?.gespeichert && (
-            <Knopf auspraegung="leise" onClick={() => void entfernen()}>
-              Entfernen
-            </Knopf>
+          {stand !== null && !stand.schluessel_vorhanden && (
+            <Hinweis ton="warnung" dringend>
+              Es ist kein Schlüssel hinterlegt (<code>STAFFELPILOT_SCHLUESSEL</code>).
+              Ohne ihn wird hier nichts gespeichert — lieber gar nicht als im Klartext.
+            </Hinweis>
           )}
-        </div>
-      </form>
-    </Karte>
+
+          {stand?.gespeichert && (
+            <Hinweis ton="neutral">
+              Hinterlegt für <strong>{stand.benutzer}</strong>.
+            </Hinweis>
+          )}
+
+          <Feld
+            beschriftung="DFBnet-Benutzername"
+            value={benutzer}
+            autoComplete="off"
+            onChange={(e) => {
+              setBenutzer(e.target.value);
+              setGespeichert(false);
+            }}
+          />
+          <Feld
+            beschriftung="DFBnet-Passwort"
+            type="password"
+            value={passwort}
+            autoComplete="new-password"
+            hinweis={
+              stand?.gespeichert ? "Leer lassen ändert nichts am Passwort." : undefined
+            }
+            onChange={(e) => {
+              setPasswort(e.target.value);
+              setGespeichert(false);
+            }}
+          />
+
+          {fehler && (
+            <Hinweis ton="fehler" dringend>
+              {fehler}
+            </Hinweis>
+          )}
+          {gespeichert && !fehler && <Hinweis ton="neutral">Zugang hinterlegt.</Hinweis>}
+
+          <div className={stil.knoepfe}>
+            <Knopf
+              type="submit"
+              disabled={!benutzer || !passwort || stand?.schluessel_vorhanden === false}
+            >
+              Zugang hinterlegen
+            </Knopf>
+            {stand?.gespeichert && (
+              <Knopf auspraegung="leise" onClick={() => void entfernen()}>
+                Entfernen
+              </Knopf>
+            )}
+          </div>
+        </form>
+      </Karte>
+    </Tafel>
   );
 }

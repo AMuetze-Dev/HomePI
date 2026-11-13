@@ -25,19 +25,28 @@
   }
 }
 
-/* ── Bereiche auf schmalen Geräten ──────────────────────────────────── */
+/* ── Bereiche ───────────────────────────────────────────────────────── */
 
-/* Waagerecht scrollbar statt umbrechend: Auf einem Telefon brechen neun
-   Wörter sonst in drei Zeilen um, und der Inhalt darunter rutscht bei jedem
+/* Waagerecht scrollbar statt umbrechend: Zehn Woerter brechen auf einem
+   Telefon in drei Zeilen um, und der Inhalt darunter rutscht bei jedem
    Wechsel hoch und runter. */
 .bereichsleiste {
   display: flex;
-  gap: var(--raum-1);
-  margin-bottom: var(--raum-5);
-  padding-bottom: var(--raum-1);
+  gap: var(--raum-2);
+  margin-bottom: var(--raum-8);
+  padding-bottom: var(--raum-4);
   overflow-x: auto;
-  border-bottom: 1px solid var(--farbe-rand);
   scrollbar-width: none;
+  /* Dieselbe ausblendende Linie wie ueberall - als Hintergrund, weil ein
+     Rand an der Kante hart abschneiden wuerde. */
+  background: linear-gradient(
+      to right,
+      transparent,
+      var(--farbe-linie) 3rem,
+      var(--farbe-linie) calc(100% - 3rem),
+      transparent
+    )
+    bottom / 100% 1px no-repeat;
 }
 
 .bereichsleiste::-webkit-scrollbar {
@@ -47,14 +56,17 @@
 .bereich,
 .bereichAktiv {
   flex: 0 0 auto;
-  padding: var(--raum-2) var(--raum-3);
-  border-bottom: 2px solid transparent;
-  border-radius: var(--rundung-sm) var(--rundung-sm) 0 0;
+  min-height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--raum-1) var(--raum-3);
+  border-radius: var(--rundung-md);
   font-size: var(--text-sm);
   color: var(--farbe-text-gedaempft);
-  /* Ein Bereichswechsel ist die häufigste Bewegung im Modul. Was man
-     hundertmal am Tag tut, darf nicht animiert sein - es fühlt sich sonst
-     zäh an. Nur die Farbe blendet, die Markierung springt. */
+  box-shadow: inset 0 0 0 1px transparent;
+  /* Ein Bereichswechsel ist die haeufigste Bewegung im Modul. Was man
+     hundertmal am Tag tut, darf nicht animiert sein - es fuehlt sich sonst
+     zaeh an. Nur die Farbe blendet, die Markierung springt. */
   transition: color var(--dauer-schnell) var(--verlauf);
 }
 
@@ -62,12 +74,11 @@
   color: var(--farbe-text);
 }
 
-/* Aktiv ist halbfett UND unterstrichen. Wäre nur die Farbe anders, bliebe
-   der Unterschied bei jeder zweiten Sehschwäche unsichtbar. */
+/* Aktiv traegt Akzentschrift UND Akzentrand. Waere nur die Farbe anders,
+   bliebe der Unterschied bei jeder zweiten Sehschwaeche unsichtbar. */
 .bereichAktiv {
-  color: var(--farbe-text);
-  font-weight: var(--gewicht-halbfett);
-  border-bottom-color: var(--farbe-aktion);
+  color: var(--farbe-akzent-schrift);
+  box-shadow: inset 0 0 0 1px var(--farbe-akzent);
 }
 
 .bereich:focus-visible,
@@ -76,10 +87,9 @@
   outline-offset: 2px;
 }
 
-/* Ab hier steht die Navigationsleiste fest und trägt die Bereiche bereits.
-   Zweimal dieselbe Navigation wäre eine zu viel. */
-@media (width >= 60rem) {
-  .bereichsleiste {
-    display: none;
+@media (pointer: coarse) {
+  .bereich,
+  .bereichAktiv {
+    min-height: 2.75rem;
   }
 }

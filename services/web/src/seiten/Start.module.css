@@ -1,128 +1,195 @@
-.statuskarte {
-  margin-bottom: var(--raum-10);
-  animation: eintreten var(--dauer-normal) var(--verlauf-eintritt) 40ms backwards;
-}
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
 
-.bereich {
-  animation: eintreten var(--dauer-normal) var(--verlauf-eintritt) 80ms backwards;
-}
-
-.bereichskopf {
-  display: flex;
-  align-items: baseline;
-  gap: var(--raum-3);
-  margin-bottom: var(--raum-5);
-}
-
-.bereichstitel {
-  font-size: var(--text-lg);
-  font-weight: var(--gewicht-halbfett);
-}
-
-.anzahl {
-  font-size: var(--text-sm);
-  color: var(--farbe-text-leise);
-  font-variant-numeric: tabular-nums;
-}
-
-/* auto-fill statt auto-fit: eine einzelne Kachel bleibt damit schmal, statt
-   sich ueber die ganze Breite zu ziehen. */
-.gitter {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
-  gap: var(--raum-4);
-}
-
-.eintrag {
-  animation: eintreten var(--dauer-normal) var(--verlauf-eintritt) backwards;
-}
-
-.verweis {
-  display: block;
-  height: 100%;
-  border-radius: var(--rundung-lg);
-}
-
-.kachel {
+/* Die Seite fuellt, was die Huelle uebriglaesst: Begruessung und Liste
+   sitzen in der Mitte, die Fusszeile unten. Ohne das klebte bei vier
+   Artefakten alles oben und darunter waere ein halber Monitor leer. */
+.buehne {
   display: flex;
   flex-direction: column;
-  gap: var(--raum-3);
-  height: 100%;
+  justify-content: center;
+  /* Was die Huelle oben und unten schon verbraucht hat, muss hier abgezogen
+     werden - sonst reicht die Seite um genau diesen Betrag ueber den Rand
+     und scrollt, obwohl nichts zu scrollen ist. */
+  min-height: calc(100dvh - var(--hoehe-kopf) - var(--raum-10) - var(--raum-16));
 }
 
-.klickbar {
-  transition:
-    border-color var(--dauer-normal) var(--verlauf),
-    box-shadow var(--dauer-normal) var(--verlauf),
-    transform var(--dauer-normal) var(--verlauf);
+.mitte {
+  width: 100%;
+  max-width: 62rem;
+  margin-bottom: auto;
 }
 
-.verweis:hover .klickbar {
-  border-color: var(--farbe-rand-stark);
-  box-shadow: var(--schatten-md);
-  transform: translateY(-2px);
+.gruss {
+  font-size: var(--text-4xl);
+  letter-spacing: var(--laufweite-enger);
+  margin-bottom: var(--raum-2);
 }
 
-.verweis:active .klickbar {
-  transform: translateY(0);
-  transition-duration: var(--dauer-sofort);
-}
-
-.kachelkopf {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--raum-3);
-}
-
-.kacheltitel {
-  font-size: var(--text-md);
-  font-weight: var(--gewicht-halbfett);
-  letter-spacing: var(--laufweite-eng);
-}
-
-.kacheltext {
-  flex: 1;
-  font-size: var(--text-sm);
-  line-height: var(--zeile-weit);
+.unterzeile {
+  max-width: 46ch;
+  margin-bottom: var(--raum-12);
+  font-size: var(--text-lg);
   color: var(--farbe-text-gedaempft);
 }
 
-.kachelfuss {
+.liste {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--raum-3);
-  margin-top: var(--raum-1);
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
 }
 
-.pfad {
+/* ── Eine Zeile je Artefakt ─────────────────────────────────────────── */
+
+.zeile,
+.zeileGestoert {
+  display: flex;
+  align-items: baseline;
+  gap: var(--raum-5);
+  padding: var(--raum-5) var(--raum-4);
+  /* Der Verlauf laeuft nach rechts aus: Eine Flaeche mit Kante waere bei
+     fuenf Zeilen untereinander ein Streifenmuster. */
+  background: linear-gradient(to right, transparent, transparent 70%);
+  border-radius: var(--rundung-md);
+  transition: background var(--dauer-schnell) var(--verlauf);
+}
+
+.zeile:hover,
+.zeileGestoert:hover {
+  background: linear-gradient(to right, var(--farbe-akzent-spur), transparent 70%);
+}
+
+.zeile:focus-visible,
+.zeileGestoert:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: -2px;
+}
+
+.nummer {
+  flex: 0 0 auto;
+  width: 1.5rem;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--farbe-text-leise);
+  transition: color var(--dauer-schnell) var(--verlauf);
+}
+
+.zeile:hover .nummer {
+  color: var(--farbe-akzent);
+}
+
+/* Der Name traegt die Zeile. Das ist der ganze Umbau dieser Seite. */
+.name {
+  font-size: var(--text-3xl);
+  font-weight: var(--gewicht-mittel);
+  letter-spacing: var(--laufweite-enger);
+  line-height: var(--zeile-eng);
+  color: var(--farbe-text);
+}
+
+.meldung {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+  margin-left: auto;
+}
+
+/* Ein gestoertes Artefakt steht in der Reihe, aber leiser: Der Blick soll
+   zuerst auf das fallen, was geht. */
+.zeileGestoert {
+  flex-wrap: wrap;
+  cursor: default;
+}
+
+.zeileGestoert .name {
+  color: var(--farbe-text-gedaempft);
+}
+
+/* Die Meldung des Gateways, woertlich, unter dem Namen. Rechts neben ihm
+   waere sie bei einem Stapeltrace von 200 Zeichen der Grund, warum die
+   ganze Zeile umbricht. */
+.grund {
+  flex-basis: 100%;
+  margin-top: var(--raum-2);
+  padding-left: calc(1.5rem + var(--raum-5));
   font-family: var(--schrift-mono);
+  font-size: var(--text-xs);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-leise);
+}
+
+/* ── Fusszeile ──────────────────────────────────────────────────────── */
+
+.fuss {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-3);
+  margin-top: var(--raum-12);
+  padding-left: var(--raum-4);
   font-size: var(--text-xs);
   color: var(--farbe-text-leise);
 }
 
-.ladezeile {
-  display: flex;
-  flex: 1;
-  align-items: center;
+.taste {
+  padding: 2px var(--raum-2);
+  border-radius: var(--rundung-sm);
+  box-shadow: inset 0 0 0 1px var(--farbe-linie);
+  font-family: var(--schrift-mono);
+  font-size: var(--text-xs);
 }
 
-@keyframes eintreten {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
+/* Ohne Tastatur ist der Hinweis auf eine Taste ein Hinweis ins Leere. */
+@media (pointer: coarse) {
+  .fuss {
+    display: none;
   }
 }
 
-/* Solange unklar ist, ob hier eine Übersicht oder ein Anmeldeformular steht:
-   ein neutraler Platzhalter statt einer Überschrift, die gleich wieder weg ist. */
+/* ── Ladezustand ────────────────────────────────────────────────────── */
+
 .laden {
   display: flex;
   flex-direction: column;
-  gap: var(--raum-8);
+  gap: var(--raum-4);
+  width: 100%;
+  max-width: 62rem;
+}
+
+.ladeliste {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-6);
+  margin-top: var(--raum-10);
+}
+
+/* ── Schmal ─────────────────────────────────────────────────────────── */
+
+@media (width < 48rem) {
+  .gruss {
+    font-size: var(--text-3xl);
+  }
+
+  .unterzeile {
+    margin-bottom: var(--raum-8);
+    font-size: var(--text-md);
+  }
+
+  .zeile,
+  .zeileGestoert {
+    gap: var(--raum-4);
+    padding: var(--raum-4) var(--raum-2);
+  }
+
+  .nummer {
+    width: 1.125rem;
+  }
+
+  .name {
+    font-size: var(--text-2xl);
+  }
+
+  .grund {
+    padding-left: calc(1.125rem + var(--raum-4));
+  }
 }

@@ -1,7 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import * as api from "../api/anmeldung";
 import * as client from "../api/client";
 import { sichtbareUnterseiten } from "../module/register";
 import { mitAnmeldung, TESTBENUTZER } from "../testhilfen";
@@ -26,23 +28,38 @@ function modul(rest: Partial<client.ModulEintrag> = {}): client.ModulEintrag {
 }
 
 /**
- * Rendert die Leiste so, als stünde sie auf der angegebenen Adresse.
+ * Rendert die Fläche so, als stünde sie auf der angegebenen Adresse.
  *
  * Bewusst OHNE <Routes> darum herum - genau so steht sie in der Hülle. Ein
  * Test, der sie in eine Route einpackt, prüft eine Lage, die es nicht gibt,
  * und übersieht dabei, dass useParams dort leer bliebe.
  */
-function zeige(pfad = "/", module: client.ModulEintrag[] = [modul()]) {
+function zeige(
+  pfad = "/",
+  module: client.ModulEintrag[] = [modul()],
+  beiSchliessen = () => {},
+) {
   vi.spyOn(client, "fetchModule").mockResolvedValue(module);
 
   return render(
     <MemoryRouter initialEntries={[pfad]}>
-      {mitAnmeldung(<Navigation />, TESTBENUTZER)}
+      {mitAnmeldung(<Navigation beiSchliessen={beiSchliessen} />, TESTBENUTZER)}
     </MemoryRouter>,
   );
 }
 
-describe("Die Navigationsleiste", () => {
+describe("Die Navigationsfläche", () => {
+  it("ist ein Dialog über der Seite und nicht Teil von ihr", async () => {
+    // aria-modal sagt dem Screenreader, dass die Seite dahinter gerade
+    // nicht gemeint ist. Ohne das liest er munter weiter, was unter der
+    // Flaeche liegt.
+    zeige("/");
+
+    const dialog = await screen.findByRole("dialog", { name: "Navigation" });
+
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+  });
+
   it("führt zur Übersicht und zu jedem Artefakt", async () => {
     zeige("/", [modul(), modul({ id: "geraete", titel: "Geräte" })]);
 
@@ -54,8 +71,8 @@ describe("Die Navigationsleiste", () => {
     expect(screen.getByRole("link", { name: /Übersicht/ })).toHaveAttribute("href", "/");
   });
 
-  it("klappt die Bereiche nur beim geöffneten Artefakt auf", async () => {
-    // Alle Bereiche aller Artefakte untereinander wären eine Liste, in der
+  it("zeigt die Bereiche nur beim geöffneten Artefakt", async () => {
+    // Alle Bereiche aller Artefakte nebeneinander wären eine Liste, in der
     // man sucht statt findet.
     zeige("/", [modul()]);
     await screen.findByRole("link", { name: /StaffelPilot/ });
@@ -73,10 +90,10 @@ describe("Die Navigationsleiste", () => {
       "href",
       "/modul/staffelpilot/spiele",
     );
-    // So viele Bereiche, wie im Register stehen -- die Leiste erfindet keine
-    // dazu und laesst keinen weg. Die Zahl kommt aus dem Register und nicht
-    // aus dieser Datei: sonst scheitert dieser Test bei jedem neuen Bereich,
-    // ohne dass an der Leiste etwas falsch waere.
+    // So viele Bereiche, wie im Register stehen -- die Flaeche erfindet
+    // keine dazu und laesst keinen weg. Die Zahl kommt aus dem Register und
+    // nicht aus dieser Datei: sonst scheitert dieser Test bei jedem neuen
+    // Bereich, ohne dass an der Flaeche etwas falsch waere.
     expect(within(bereiche).getAllByRole("link")).toHaveLength(
       sichtbareUnterseiten("staffelpilot").length,
     );
@@ -92,8 +109,7 @@ describe("Die Navigationsleiste", () => {
   it("zeigt den Symbolnamen aus dem Manifest nicht als Text", async () => {
     // Das Manifest liefert in "icon" einen NAMEN ("steckdose", "pfeife"),
     // keinen einzelnen Buchstaben. Als Text gesetzt, lief das Wort aus dem
-    // 20-px-Kästchen heraus und lag über dem Titel des Artefakts. Die
-    // früheren Testdaten hatten icon: "" - genau deshalb fiel es nie auf.
+    // Kästchen heraus und lag über dem Titel des Artefakts.
     zeige("/", [
       modul({ id: "geraete", titel: "Geräte", icon: "steckdose" }),
       modul({ icon: "pfeife" }),
@@ -108,18 +124,16 @@ describe("Die Navigationsleiste", () => {
     expect(screen.getByRole("link", { name: "Geräte" })).toBeInTheDocument();
   });
 
-  it("benennt keine Liste so wie die Kachelliste der Startseite", async () => {
-    // Die Startseite hat eine Liste "Artefakte". Trägt die Leiste denselben
-    // Namen, stehen zwei gleichnamige Listen auf der Seite: Ein Screenreader
-    // sagt zweimal "Artefakte, Liste" an, und jede Suche nach der Kachel
-    // trifft zweimal. Die Oberflächentests sind genau daran gescheitert.
+  it("benennt keine Liste so wie die Artefaktliste der Startseite", async () => {
+    // Die Startseite hat eine Liste "Artefakte" - und sie liegt UNTER
+    // dieser Flaeche, nicht hinter einer geschlossenen Tuer. Traegt die
+    // Flaeche denselben Namen, stehen zwei gleichnamige Listen im Dokument:
+    // Ein Screenreader sagt zweimal "Artefakte, Liste" an, und jede Suche
+    // trifft doppelt.
     zeige("/");
     await screen.findByRole("link", { name: /StaffelPilot/ });
 
     expect(screen.queryByRole("list", { name: "Artefakte" })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("navigation", { name: "Artefakte" }),
-    ).not.toBeInTheDocument();
   });
 
   it("sagt eine Störung auch dort, wo keine Farbe ankommt", async () => {
@@ -130,5 +144,40 @@ describe("Die Navigationsleiste", () => {
     expect(
       await screen.findByRole("link", { name: /StaffelPilot.*Nicht erreichbar/s }),
     ).toBeInTheDocument();
+  });
+
+  it("trägt Einstellungen und Abmelden", async () => {
+    // Beides stand vorher in der Kopfzeile und war dort dauerhaft im Bild,
+    // obwohl man es selten braucht.
+    zeige("/");
+
+    expect(await screen.findByRole("link", { name: "Einstellungen" })).toHaveAttribute(
+      "href",
+      "/einstellungen",
+    );
+    expect(screen.getByRole("button", { name: "Abmelden" })).toBeInTheDocument();
+  });
+
+  it("meldet ab", async () => {
+    const abmelden = vi.spyOn(api, "abmelden").mockResolvedValue(undefined);
+    zeige("/");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Abmelden" }));
+
+    expect(abmelden).toHaveBeenCalled();
+  });
+
+  it("lässt sich über den Knopf schließen", async () => {
+    const beiSchliessen = vi.fn();
+    zeige("/", [modul()], beiSchliessen);
+
+    // Der zugängliche Name ist "Navigation schließen" und nicht das, was
+    // sichtbar dasteht: Sichtbar steht auf einer Tastatur "Esc schließt"
+    // und auf einem Telefon "Schließen".
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Navigation schließen" }),
+    );
+
+    expect(beiSchliessen).toHaveBeenCalled();
   });
 });

@@ -1,18 +1,147 @@
 /* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
    Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
 
-.navigation {
+.schleier {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ebene-schleier);
+  /* Durchscheinend und unscharf: Die Seite darunter bleibt als Schemen
+     stehen. Sie ist die Antwort auf „wohin komme ich zurueck". */
+  background: color-mix(in srgb, var(--farbe-grund) 84%, transparent);
+  backdrop-filter: blur(10px);
+  animation: aufziehen var(--dauer-schnell) var(--verlauf);
+}
+
+.hinterklick {
+  position: absolute;
+  inset: 0;
+}
+
+.flaeche {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--raum-1);
-  padding: var(--raum-4) var(--raum-3) var(--raum-8);
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.flaeche:focus {
+  outline: none;
+}
+
+/* ── Kopf der Flaeche ───────────────────────────────────────────────── */
+
+.kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-4);
+  height: var(--hoehe-kopf);
+  flex: 0 0 auto;
+  padding-inline: var(--raum-rand);
+}
+
+.wortmarke {
+  font-size: var(--text-xs);
+  letter-spacing: var(--laufweite-marke);
+  text-transform: uppercase;
+  color: var(--farbe-text-leise);
+}
+
+.schliessen {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+  margin-left: auto;
+  padding: var(--raum-2);
+  border: 0;
+  border-radius: var(--rundung-sm);
+  background: none;
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+  transition: color var(--dauer-schnell) var(--verlauf);
+}
+
+.schliessen:hover {
+  color: var(--farbe-text);
+}
+
+.schliessen:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+.mitTaste {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+}
+
+/* Die Taste als Taste gezeichnet - sonst liest man „Esc" als Wort und
+   sucht einen Knopf, der so heisst. */
+.taste {
+  padding: 2px var(--raum-2);
+  border-radius: var(--rundung-sm);
+  box-shadow: inset 0 0 0 1px var(--farbe-linie);
+  font-family: var(--schrift-mono);
+  font-size: var(--text-xs);
+}
+
+/* Auf einem Telefon gibt es keine Escape-Taste. Ein Hinweis auf sie waere
+   dort nicht nur nutzlos, sondern falsch: Er benennt einen Weg, den das
+   Geraet nicht hat. */
+.ohneTaste {
+  display: none;
+  font-size: var(--text-sm);
+}
+
+@media (pointer: coarse) {
+  .mitTaste {
+    display: none;
+  }
+
+  .ohneTaste {
+    display: block;
+  }
+
+  .schliessen {
+    /* 44 px Trefferflaeche - mit dem Finger ist alles darunter Gluecksache. */
+    min-height: 2.75rem;
+    padding-inline: var(--raum-3);
+  }
+}
+
+/* ── Die beiden Ebenen ──────────────────────────────────────────────── */
+
+.spalten {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--raum-8);
+  flex: 1;
+  width: 100%;
+  /* Enger als der Inhalt: Die beiden Spalten sollen nebeneinander lesbar
+     bleiben. Auf einem 27-Zoll-Monitor stuenden sie sonst einen halben
+     Meter auseinander, und der Blick muesste zwischen ihnen wandern. */
+  max-width: 70rem;
+  padding: var(--raum-8) var(--raum-rand) var(--raum-12);
+}
+
+.artefakte,
+.bereichsspalte {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.regel {
+  margin-block: var(--raum-5);
 }
 
 .gruppe {
-  margin: var(--raum-5) 0 var(--raum-1);
-  padding-inline: var(--raum-3);
+  margin-bottom: var(--raum-4);
   font-size: var(--text-xs);
-  font-weight: var(--gewicht-mittel);
+  letter-spacing: var(--laufweite-weit);
+  text-transform: uppercase;
   color: var(--farbe-text-leise);
 }
 
@@ -20,92 +149,74 @@
 .bereiche {
   display: flex;
   flex-direction: column;
-  gap: var(--raum-1);
   margin: 0;
   padding: 0;
 }
 
-.eintrag,
-.eintragAktiv {
+/* ── Uebersicht und Artefakte ───────────────────────────────────────── */
+
+.uebersicht,
+.uebersichtHier,
+.artefakt,
+.artefaktHier {
   display: flex;
   align-items: center;
-  gap: var(--raum-3);
-  /* 2.25rem plus Innenabstand ergibt die 44 px Trefferflaeche, unter denen
-     ein Ziel auf einem Telefon zur Gluecksache wird. */
-  min-height: 2.25rem;
-  padding: var(--raum-2) var(--raum-3);
-  border-radius: var(--rundung-md);
-  font-size: var(--text-md);
-  color: var(--farbe-text-gedaempft);
-  /* Kein "transition: all": nur was sich wirklich aendert. */
-  transition:
-    background-color var(--dauer-schnell) var(--verlauf),
-    color var(--dauer-schnell) var(--verlauf);
+  gap: var(--raum-4);
+  min-height: 2.75rem;
+  padding-block: var(--raum-2);
+  color: var(--farbe-text-leise);
+  transition: color var(--dauer-schnell) var(--verlauf);
 }
 
-.eintrag:hover {
-  background: var(--farbe-flaeche-gedaempft);
+.uebersicht:hover,
+.artefakt:hover {
   color: var(--farbe-text);
 }
 
-/* Die aktive Zeile traegt Flaeche UND Gewicht. Waere nur die Farbe anders,
-   bliebe der Unterschied bei jeder zweiten Sehschwaeche unsichtbar. */
-.eintragAktiv {
-  background: var(--farbe-flaeche-gedaempft);
-  color: var(--farbe-text);
-  font-weight: var(--gewicht-mittel);
-}
-
-.eintrag:focus-visible,
-.eintragAktiv:focus-visible {
+.uebersicht:focus-visible,
+.uebersichtHier:focus-visible,
+.artefakt:focus-visible,
+.artefaktHier:focus-visible {
   outline: 2px solid var(--farbe-fokus);
-  outline-offset: 1px;
+  outline-offset: 2px;
+  border-radius: var(--rundung-sm);
 }
 
-/* Ein kleines Feld mit dem Anfangsbuchstaben - dieselbe Form wie das "H"
-   im Markenzeichen, nur leiser. Ein nackter Buchstabe neben dem Titel
-   wirkte wie ein Rest; ein gefasstes Feld wie ein Zeichen.
+.uebersicht,
+.uebersichtHier {
+  font-size: var(--text-xl);
+  letter-spacing: var(--laufweite-eng);
+}
 
-   Breite und Hoehe sind fest und overflow ist zu: Was hier hineinkommt,
-   darf das Feld nicht verlassen. Genau das war der Fehler, als hier der
-   Symbolname aus dem Manifest stand und ueber dem Titel lag. */
-.zeichen {
+.uebersichtHier {
+  color: var(--farbe-text);
+}
+
+.uebersichtzeichen {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 1.375rem;
-  height: 1.375rem;
-  overflow: hidden;
-  /* Konzentrisch zur Zeile: 8 px Rundung minus 2 px Abstand. */
-  border-radius: var(--rundung-sm);
-  border: 1px solid var(--farbe-rand);
-  background: var(--farbe-flaeche-gedaempft);
-  font-size: var(--text-xs);
-  font-weight: var(--gewicht-halbfett);
-  line-height: 1;
-  color: var(--farbe-text-gedaempft);
-  transition:
-    background-color var(--dauer-schnell) var(--verlauf),
-    border-color var(--dauer-schnell) var(--verlauf),
-    color var(--dauer-schnell) var(--verlauf);
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: var(--rundung-md);
+  box-shadow: inset 0 0 0 1px var(--farbe-linie);
 }
 
-.eintrag:hover .zeichen {
-  border-color: var(--farbe-rand-stark);
+/* Die Artefaktnamen sind der groesste Text dieser Flaeche. Das ist der
+   Grund, warum es sie gibt: Aus zwei Metern liest man ein Wort, keine
+   Zeile. */
+.artefakt,
+.artefaktHier {
+  font-size: var(--text-2xl);
+  letter-spacing: var(--laufweite-enger);
+}
+
+.artefaktHier {
   color: var(--farbe-text);
 }
 
-/* Aktiv traegt das Feld die Aktionsfarbe - wie das Markenzeichen. Damit
-   steht neben Flaeche und Gewicht der Zeile ein drittes Merkmal, das auch
-   bei eingeschraenktem Farbsehen klar ist: hell auf dunkel statt grau. */
-.eintragAktiv .zeichen {
-  border-color: var(--farbe-aktion);
-  background: var(--farbe-aktion);
-  color: var(--farbe-aktion-schrift);
-}
-
-.wort {
-  flex: 1;
+.titel {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -119,47 +230,87 @@
   background: var(--signal-fehler);
 }
 
-/* ── Bereiche eines Artefakts ───────────────────────────────────────── */
+.laden {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+}
+
+.leer {
+  max-width: var(--breite-text);
+  font-size: var(--text-md);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-leise);
+}
+
+/* ── Bereiche und Konto ─────────────────────────────────────────────── */
 
 .bereiche {
-  /* Eingerueckt auf Hoehe der Beschriftung, nicht des Zeichens - die Kante
-     laeuft dadurch mit den Woertern darueber und nicht dazwischen. */
-  margin: var(--raum-1) 0 var(--raum-2) var(--raum-6);
-  padding-left: var(--raum-3);
-  border-left: 1px solid var(--farbe-rand);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0 var(--raum-8);
 }
 
 .bereich,
-.bereichAktiv {
+.bereichHier {
   display: block;
-  min-height: 1.75rem;
-  padding: var(--raum-1) var(--raum-2);
-  border-radius: var(--rundung-sm);
-  font-size: var(--text-sm);
-  color: var(--farbe-text-leise);
-  transition:
-    background-color var(--dauer-schnell) var(--verlauf),
-    color var(--dauer-schnell) var(--verlauf);
+  width: 100%;
+  min-height: 2.5rem;
+  padding: var(--raum-2) 0;
+  border: 0;
+  background: none;
+  font-size: var(--text-md);
+  text-align: left;
+  color: var(--farbe-text-gedaempft);
+  transition: color var(--dauer-schnell) var(--verlauf);
 }
 
 .bereich:hover {
   color: var(--farbe-text);
 }
 
-.bereichAktiv {
-  color: var(--farbe-text);
-  font-weight: var(--gewicht-mittel);
+/* Der aktive Bereich traegt den Akzent - die einzige farbige Stelle dieser
+   Flaeche ausser dem Zeichen oben links. */
+.bereichHier {
+  color: var(--farbe-akzent-schrift);
 }
 
 .bereich:focus-visible,
-.bereichAktiv:focus-visible {
+.bereichHier:focus-visible {
   outline: 2px solid var(--farbe-fokus);
-  outline-offset: 1px;
+  outline-offset: 2px;
+  border-radius: var(--rundung-sm);
 }
 
-.laden {
+/* Direkt unter den Bereichen und NICHT am Fuss der Spalte: Ohne geoeffnetes
+   Artefakt ist die rechte Spalte sonst leer, und „Einstellungen" und
+   „Abmelden" schwebten allein in ihrer unteren Haelfte - zwei Woerter, die
+   aussehen, als haette man sie vergessen. */
+.konto {
   display: flex;
   flex-direction: column;
-  gap: var(--raum-2);
-  padding: var(--raum-4) var(--raum-3);
+  align-items: flex-start;
+}
+
+/* ── Ab Tablet: beide Ebenen nebeneinander ──────────────────────────── */
+
+@media (width >= 60rem) {
+  .spalten {
+    grid-template-columns: 1fr 1fr;
+    gap: 0 var(--raum-16);
+    padding-block: var(--raum-10) var(--raum-16);
+  }
+
+  /* Die rechte Spalte setzt eine Zeile tiefer an als die linke: So steht
+     „Bereiche in X" auf Hoehe der Artefaktliste und nicht neben dem
+     Uebersicht-Eintrag, zu dem es nicht gehoert. */
+  .bereichsspalte {
+    padding-top: var(--raum-10);
+  }
+}
+
+@keyframes aufziehen {
+  from {
+    opacity: 0;
+  }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Feld, Hinweis, Karte, Knopf, Platzhalter } from "../../ui";
+import { Feld, Hinweis, Karte, Knopf, Platzhalter, Tafel } from "../../ui";
 import {
   type Beispieldatenstand,
   type Einstellungen,
@@ -78,11 +78,9 @@ export function EinstellungenTafel() {
   }
 
   return (
-    <>
+    <Tafel titel="Einstellungen">
       <Karte>
         <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
-          <h2 className={stil.formularTitel}>Einstellungen</h2>
-
           <Feld
             beschriftung="Staffelleiter"
             hinweis="Steht unter jedem Schreiben."
@@ -177,7 +175,7 @@ export function EinstellungenTafel() {
       </Karte>
 
       <Einrichtungsweg />
-    </>
+    </Tafel>
   );
 }
 

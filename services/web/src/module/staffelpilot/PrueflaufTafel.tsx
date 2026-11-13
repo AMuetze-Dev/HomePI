@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import {
+  Etikett,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Platzhalter,
+  Tafel,
+} from "../../ui";
 import {
   type Auftrag,
   type AuftragArt,
@@ -139,14 +147,16 @@ export function PrueflaufTafel({
 
   if (verlauf === null || uebertragung === null) {
     return (
-      <div role="status" aria-label="Prüfläufe werden geladen">
-        <Platzhalter breite="100%" hoehe="12rem" />
-      </div>
+      <Tafel titel="Prüflauf">
+        <div role="status" aria-label="Prüfläufe werden geladen">
+          <Platzhalter breite="100%" hoehe="12rem" />
+        </div>
+      </Tafel>
     );
   }
 
   return (
-    <>
+    <Tafel titel="Prüflauf">
       {fehler && (
         <Hinweis ton="fehler" dringend>
           {fehler}
@@ -154,7 +164,6 @@ export function PrueflaufTafel({
       )}
 
       <Karte>
-        <h2 className={stil.formularTitel}>Prüflauf</h2>
         {offen === null ? (
           <>
             <p className={stil.vorgangHinweis}>
@@ -255,7 +264,7 @@ export function PrueflaufTafel({
           ))}
         </ul>
       )}
-    </>
+    </Tafel>
   );
 }
 

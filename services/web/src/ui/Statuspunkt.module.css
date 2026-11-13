@@ -29,6 +29,13 @@
   color: color-mix(in srgb, var(--farbe-text-leise) 14%, transparent);
 }
 
+/* Keine Meldung, eine Auszeichnung: hier laeuft gerade etwas, das ist das
+   Gewaehlte. */
+.akzent {
+  background: var(--farbe-akzent);
+  color: color-mix(in srgb, var(--farbe-akzent) 16%, transparent);
+}
+
 /* Nur der Wartezustand pulsiert - und selbst der kaum wahrnehmbar. Ein
    dauerhaft blinkendes Element zieht den Blick permanent auf sich. */
 .laedt {

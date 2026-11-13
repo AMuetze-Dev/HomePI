@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import {
+  Etikett,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Platzhalter,
+  Reihe,
+  Statuspunkt,
+  Tabelle,
+  Tafel,
+  Zelle,
+} from "../../ui";
 import {
   type Auftrag,
   type SpielZeile,
@@ -78,19 +90,30 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
   }
 
   return (
-    <>
+    <Tafel
+      titel="Übersicht"
+      beiwort={
+        werte.offen === 0
+          ? "nichts zu prüfen"
+          : `${werte.offen} von ${werte.spiele} ${werte.spiele === 1 ? "Bericht" : "Berichten"} offen`
+      }
+    >
       <ul className={stil.kennzahlen} aria-label="Überblick">
         <Zahl wert={werte.offen} name="zu prüfen" onKlick={() => onWechsel("spiele")} />
+        {/* "befunde" gibt es als Bereich nicht - das Register kennt ihn
+            nicht, und die Modulseite leitete beide Zahlen deshalb stumm auf
+            die Uebersicht zurueck, also auf die Flaeche, von der man kam.
+            Die Befundliste steht unter "Ergebnisse". */}
         <Zahl
           wert={werte.befunde_kritisch}
           name="kritische Befunde"
           warnend
-          onKlick={() => onWechsel("befunde")}
+          onKlick={() => onWechsel("ergebnisse")}
         />
         <Zahl
           wert={werte.befunde_offen}
           name="offene Befunde"
-          onKlick={() => onWechsel("befunde")}
+          onKlick={() => onWechsel("ergebnisse")}
         />
         <Zahl
           wert={werte.vorgaenge_entwurf}
@@ -142,42 +165,40 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
         </Leerzustand>
       )}
 
-      <h2 className={stil.formularTitel}>Als Nächstes</h2>
+      <h2 className={stil.abschnitt}>Als Nächstes</h2>
       {naechste.length === 0 ? (
         <Leerzustand titel="Nichts fällig">
           Kein Spielbericht im Prüfzeitraum wartet auf eine Entscheidung.
         </Leerzustand>
       ) : (
-        <ul className={stil.liste} aria-label="Als Nächstes">
+        <Tabelle
+          beschriftung="Als Nächstes"
+          raster="1.8fr 1fr 0.8fr"
+          spalten={["Paarung", "Befunde", "Angesetzt"]}
+        >
           {naechste.map((z) => (
-            <li key={z.id}>
-              <Karte>
-                <button
-                  type="button"
-                  className={stil.kopf}
-                  onClick={() => onWechsel("spiele")}
-                >
-                  <span className={stil.paarung}>
-                    {z.heim} – {z.gast}
-                  </span>
-                  <span className={stil.zeile}>
-                    {/* Feste Spalte, damit das Datum unter dem Datum steht --
-                        siehe `spalteDatum`. */}
-                    <span className={stil.spalteDatum}>{alsDatum(z.datum)}</span>
-                    {z.kritische_befunde > 0 && (
-                      <Etikett ton="fehler">{z.kritische_befunde} kritisch</Etikett>
-                    )}
-                    {z.offene_befunde > 0 && (
-                      <Etikett ton="warnung">{z.offene_befunde} offen</Etikett>
-                    )}
-                  </span>
-                </button>
-              </Karte>
-            </li>
+            <Reihe key={z.id} onKlick={() => onWechsel("spiele")}>
+              <Zelle>
+                {z.heim} – {z.gast}
+              </Zelle>
+              <Zelle>
+                {z.kritische_befunde > 0 ? (
+                  <Etikett ton="fehler">{z.kritische_befunde} kritisch</Etikett>
+                ) : z.offene_befunde > 0 ? (
+                  <>
+                    <Statuspunkt ton="akzent" />
+                    {`${z.offene_befunde} offen`}
+                  </>
+                ) : (
+                  <span className={stil.ohneBefund}>ohne Befund</span>
+                )}
+              </Zelle>
+              <Zelle leise>{alsDatum(z.datum)}</Zelle>
+            </Reihe>
           ))}
-        </ul>
+        </Tabelle>
       )}
-    </>
+    </Tafel>
   );
 }
 

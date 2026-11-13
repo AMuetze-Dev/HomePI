@@ -1,0 +1,104 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
+.leiste {
+  position: sticky;
+  top: 0;
+  z-index: var(--ebene-klebend);
+  display: flex;
+  align-items: center;
+  gap: var(--raum-4);
+  height: var(--hoehe-kopf);
+  flex: 0 0 auto;
+  padding-inline: var(--raum-rand);
+  /* Eine Linie statt eines Randes: Sie endet nicht hart an der Ecke,
+     sondern blendet aus wie jede andere Trennung in diesem Entwurf. */
+  background: color-mix(in srgb, var(--farbe-grund) 86%, transparent);
+  backdrop-filter: saturate(140%) blur(14px);
+  box-shadow: 0 1px 0 var(--farbe-linie);
+}
+
+.zeichenknopf {
+  display: grid;
+  place-items: center;
+  /* 44 px Trefferflaeche um ein 20 px grosses Zeichen - das Zeichen ist
+     klein, das Ziel ist es nicht. */
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-left: calc(var(--raum-3) * -1);
+  border: 0;
+  border-radius: var(--rundung-md);
+  background: none;
+  color: inherit;
+}
+
+.zeichenknopf:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: -4px;
+}
+
+.wortmarke {
+  font-size: var(--text-xs);
+  letter-spacing: var(--laufweite-marke);
+  text-transform: uppercase;
+  color: var(--farbe-text-leise);
+}
+
+/* ── Brotkrume ──────────────────────────────────────────────────────── */
+
+.weg {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+.glied {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.trenner {
+  padding-inline: var(--raum-2);
+  color: var(--farbe-text-leise);
+}
+
+.vorher,
+.hier {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vorher {
+  color: var(--farbe-text-leise);
+}
+
+/* Wo man steht, steht in voller Schriftfarbe. Das ist der einzige
+   Unterschied, den diese Zeile macht - und er genuegt. */
+.hier {
+  color: var(--farbe-text);
+}
+
+/* ── Rechte Seite ───────────────────────────────────────────────────── */
+
+.rechts {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-4);
+  margin-left: auto;
+}
+
+.datum {
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+}
+
+/* Auf einem Telefon ist das Datum das erste, was weichen darf: Es steht
+   ohnehin in der Statuszeile des Geraets darueber. */
+@media (width < 40rem) {
+  .datum {
+    display: none;
+  }
+}

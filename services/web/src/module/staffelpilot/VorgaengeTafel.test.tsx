@@ -93,7 +93,11 @@ describe("Die Liste", () => {
     render(<VorgaengeTafel />);
     await screen.findByRole("list", { name: "Vorgänge" });
 
-    await userEvent.click(screen.getByRole("button", { name: "Versandt" }));
+    // Der Filter ist eine Segmentwahl auf echten Optionsfeldern - dasselbe
+    // Bauteil wie in der Spielprüfung und in den Einstellungen. Vorher waren
+    // es Knöpfe mit `aria-pressed`, also dieselbe Bedeutung von Hand
+    // nachgebaut: ohne Pfeiltasten, ohne Gruppenansage.
+    await userEvent.click(screen.getByRole("radio", { name: "Versandt" }));
 
     await waitFor(() =>
       expect(api.ladeVorgaenge).toHaveBeenCalledWith("versandt", expect.anything()),

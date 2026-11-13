@@ -1,7 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import {
+  Etikett,
+  Feld,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Platzhalter,
+  Reihe,
+  Segmentwahl,
+  Statuspunkt,
+  Tabelle,
+  Tafel,
+  Zelle,
+} from "../../ui";
 import {
   entscheide,
   hakeAb,
@@ -56,6 +70,11 @@ const SCHWERE_WORT: Record<Schwere, string> = {
   warnung: "Warnung",
   hinweis: "Hinweis",
 };
+
+const WELCHE = [
+  { wert: "alle", wort: "Alle" },
+  { wert: "faellig", wort: "Nur fällige" },
+] as const;
 
 function meldung(fehler: unknown): string {
   return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
@@ -263,15 +282,9 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
     return <VorgaengeTafel />;
   }
 
-  return (
-    <>
-      {aktionsfehler && (
-        <Hinweis ton="fehler" dringend>
-          {aktionsfehler}
-        </Hinweis>
-      )}
-
-      {staffeln.length === 0 ? (
+  if (staffeln.length === 0) {
+    return (
+      <Tafel titel="Spielprüfung">
         <Leerzustand
           titel="Noch keine Staffel angelegt"
           aktion={<Knopf onClick={() => gehe("staffeln")}>Staffeln verwalten</Knopf>}
@@ -279,7 +292,22 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
           Eine Staffel ist der Ort, an dem Spielberichte ankommen. Leg die erste an — Name
           und Spielklasse genau so, wie sie in DFBnet heißen.
         </Leerzustand>
-      ) : (
+      </Tafel>
+    );
+  }
+
+  const wartend = spiele.filter((s) => !s.abgehakt).length;
+  const faellige = spiele.filter((s) => s.faellig && !s.abgehakt).length;
+
+  return (
+    <Tafel
+      titel="Spielprüfung"
+      beiwort={
+        spiele.length === 0
+          ? undefined
+          : `${wartend} ${wartend === 1 ? "Bericht wartet" : "Berichte warten"} · ${faellige} fällig`
+      }
+      aktionen={
         <>
           {staffeln.length > 1 && (
             <StaffelWahl
@@ -292,65 +320,68 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
             />
           )}
 
-          {/* Zwei Knoepfe statt eines Schalters.
-              Vorher stand "Nur fällige" allein da und war im Aus-Zustand
-              ("leise") von Fliesstext nicht zu unterscheiden -- man sah ihm
-              weder an, dass man ihn druecken kann, noch ob er an ist. Zu
-              zweit liest sich die Zeile als Auswahl, und welche gilt, steht
-              da. Genauso machen es die Vorgaenge schon. */}
-          <div className={stil.filterZeile} role="group" aria-label="Welche Spiele">
-            {([false, true] as const).map((nur) => (
-              <Knopf
-                key={String(nur)}
-                groesse="sm"
-                auspraegung={nurFaellig === nur ? "primaer" : "leise"}
-                aria-pressed={nurFaellig === nur}
-                onClick={() => {
-                  setOffenesSpiel(null);
-                  setNurFaellig(nur);
-                }}
-              >
-                {nur ? "Nur fällige" : "Alle"}
-              </Knopf>
-            ))}
-          </div>
-
-          {spiele.length === 0 ? (
-            <Leerzustand titel="Keine Spielberichte">
-              Geprüfte Spielberichte kommen über <code>POST /staffelpilot/import</code>{" "}
-              herein. Die DFBnet-Automation läuft als eigener Dienst und schiebt sie
-              dorthin.
-            </Leerzustand>
-          ) : (
-            <ul className={stil.liste} aria-label="Spielberichte">
-              {spiele.map((zeile) => (
-                <li key={zeile.id}>
-                  <SpielKarte
-                    zeile={zeile}
-                    offen={offenesSpiel?.id === zeile.id ? offenesSpiel : null}
-                    onOeffnen={() => void oeffnen(zeile)}
-                    onEntscheiden={(befundId, art, grund) =>
-                      nachAktion(zeile.id, () => entscheide(befundId, art, grund))
-                    }
-                    onAbhaken={() =>
-                      void nachAktion(zeile.id, () =>
-                        zeile.abgehakt ? loeseHaken(zeile.id) : hakeAb(zeile.id),
-                      )
-                    }
-                    onEntwurf={(befundId) =>
-                      nachAktion(zeile.id, () => legeVorgangAn(befundId))
-                    }
-                    onZuruecknehmen={(befundId) =>
-                      nachAktion(zeile.id, () => nimmEntscheidungZurueck(befundId))
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
+          {/* Eine Auswahl, kein Schalter.
+              "Nur fällige" stand hier einmal allein und war im Aus-Zustand
+              von Fliesstext nicht zu unterscheiden -- man sah ihm weder an,
+              dass man ihn druecken kann, noch ob er an ist. Danach standen
+              hier zwei Knoepfe mit `aria-pressed`, was dasselbe meinte wie
+              die Segmentwahl der Einstellungen, es aber von Hand nachbaute:
+              ohne Pfeiltasten, ohne Gruppenansage. Jetzt dasselbe Bauteil. */}
+          <Segmentwahl
+            beschriftung="Welche Spiele"
+            optionen={WELCHE}
+            wert={nurFaellig ? "faellig" : "alle"}
+            beiWahl={(wahl) => {
+              setOffenesSpiel(null);
+              setNurFaellig(wahl === "faellig");
+            }}
+          />
         </>
+      }
+    >
+      {aktionsfehler && (
+        <Hinweis ton="fehler" dringend>
+          {aktionsfehler}
+        </Hinweis>
       )}
-    </>
+
+      {spiele.length === 0 ? (
+        <Leerzustand titel="Keine Spielberichte">
+          Geprüfte Spielberichte kommen über <code>POST /staffelpilot/import</code>{" "}
+          herein. Die DFBnet-Automation läuft als eigener Dienst und schiebt sie dorthin.
+        </Leerzustand>
+      ) : (
+        <Tabelle
+          beschriftung="Spielberichte"
+          raster="1.7fr 0.6fr 1.2fr 0.8fr 0.7fr"
+          spalten={["Paarung", "Ergebnis", "Befunde", "Angesetzt", "Stand"]}
+          rechtsBuendig
+        >
+          {spiele.map((zeile) => (
+            <SpielReihe
+              key={zeile.id}
+              zeile={zeile}
+              offen={offenesSpiel?.id === zeile.id ? offenesSpiel : null}
+              onOeffnen={() => void oeffnen(zeile)}
+              onEntscheiden={(befundId, art, grund) =>
+                nachAktion(zeile.id, () => entscheide(befundId, art, grund))
+              }
+              onAbhaken={() =>
+                void nachAktion(zeile.id, () =>
+                  zeile.abgehakt ? loeseHaken(zeile.id) : hakeAb(zeile.id),
+                )
+              }
+              onEntwurf={(befundId) =>
+                nachAktion(zeile.id, () => legeVorgangAn(befundId))
+              }
+              onZuruecknehmen={(befundId) =>
+                nachAktion(zeile.id, () => nimmEntscheidungZurueck(befundId))
+              }
+            />
+          ))}
+        </Tabelle>
+      )}
+    </Tafel>
   );
 }
 
@@ -363,28 +394,39 @@ function StaffelWahl({
   gewaehlt: string;
   onWahl: (id: string) => void;
 }) {
+  // Keine Karte mehr drumherum: Der Filter gehoert in die Titelzeile, zu den
+  // anderen Filtern. Als eigene Karte darueber war er eine Flaeche fuer ein
+  // Auswahlfeld - und stand dabei zwischen Titel und Liste.
   return (
-    <Karte>
-      <label className={stil.wahl}>
-        <span className={stil.wahlName}>Staffel</span>
-        <select
-          className={stil.auswahl}
-          value={gewaehlt}
-          onChange={(e) => onWahl(e.target.value)}
-        >
-          <option value="">Alle Staffeln</option>
-          {staffeln.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
-    </Karte>
+    <label className={stil.wahl}>
+      <span className="nur-vorlesen">Staffel</span>
+      <select
+        className={stil.auswahl}
+        value={gewaehlt}
+        onChange={(e) => onWahl(e.target.value)}
+      >
+        <option value="">Alle Staffeln</option>
+        {staffeln.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
-function SpielKarte({
+/**
+ * Eine Zeile der Spielprüfung — und darunter, aufgeklappt, der Bericht.
+ *
+ * Aufklappen und nicht wegnavigieren: Ein Staffelleiter arbeitet die Liste
+ * von oben nach unten ab, und jeder Sprung auf eine eigene Seite kostet den
+ * Platz in der Liste. Dass die Reihe dabei schmal bleibt und der Bericht
+ * darunter aufgeht, ist der Unterschied zu einer Karte je Zeile: Zwanzig
+ * zugeklappte Karten sind zwanzig Kästen, zwanzig zugeklappte Reihen sind
+ * eine Liste.
+ */
+function SpielReihe({
   zeile,
   offen,
   onOeffnen,
@@ -406,45 +448,20 @@ function SpielKarte({
   onZuruecknehmen: (befundId: string) => Promise<boolean>;
 }) {
   return (
-    <Karte>
-      <button
-        type="button"
-        className={stil.kopf}
-        onClick={onOeffnen}
-        aria-expanded={!!offen}
-      >
-        <span className={stil.paarung}>
-          {zeile.heim} – {zeile.gast}
-        </span>
-        <span className={stil.zeile}>
-          {/* Feste Spalten. Vorher standen Datum, Ergebnis und Etiketten
-              einfach nebeneinander -- und weil die Etiketten je Zeile
-              verschieden breit sind, sass das Datum jedes Mal woanders. Eine
-              Liste, die man herunterscannt, braucht eine Kante. */}
-          <span className={stil.spalteDatum}>{alsDatum(zeile.datum)}</span>
-          <span className={stil.spalteErgebnis}>{zeile.ergebnis}</span>
-          {zeile.abgehakt && <Etikett ton="gut">abgehakt</Etikett>}
-          {!zeile.faellig && !zeile.abgehakt && (
-            <Etikett>außerhalb des Prüfzeitraums</Etikett>
-          )}
-          {zeile.kritische_befunde > 0 && (
-            <Etikett ton="fehler">{zeile.kritische_befunde} kritisch</Etikett>
-          )}
-          {zeile.offene_befunde > 0 && (
-            <Etikett ton="warnung">{zeile.offene_befunde} offen</Etikett>
-          )}
-        </span>
-      </button>
-
-      {offen && (
+    <Reihe
+      betont={zeile.faellig && !zeile.abgehakt}
+      leise={zeile.abgehakt || !zeile.faellig}
+      onKlick={onOeffnen}
+      offen={!!offen}
+      ausklappung={
         <div className={stil.detail}>
-          {offen.befunde.length === 0 ? (
+          {offen?.befunde.length === 0 ? (
             <p className={stil.sauber}>
               Keine Befunde — alle Prüfschritte sind sauber gelaufen.
             </p>
           ) : (
             <ul className={stil.befunde} aria-label="Befunde">
-              {offen.befunde.map((b) => (
+              {offen?.befunde.map((b) => (
                 <li key={b.id}>
                   <BefundZeile
                     befund={b}
@@ -472,8 +489,55 @@ function SpielKarte({
             </Knopf>
           </div>
         </div>
-      )}
-    </Karte>
+      }
+    >
+      <Zelle>
+        {zeile.heim} – {zeile.gast}
+      </Zelle>
+
+      <Zelle leise>{zeile.ergebnis}</Zelle>
+
+      {/* Schwere UND Stand, beides nebeneinander.
+          Zwischendurch stand hier nur das eine von beiden: bei einem
+          kritischen Befund verschwand damit die Auskunft, ob er schon
+          entschieden ist - und das ist genau die Frage, mit der man die
+          Zeile ansieht. Die Zahl steht jeweils im Text und nicht nur in der
+          Farbe: "2 offen" sagt auch dann etwas, wenn weder Punkt noch
+          Etikett ankommt. */}
+      <Zelle>
+        {zeile.kritische_befunde > 0 && (
+          <Etikett ton="fehler">{`${zeile.kritische_befunde} kritisch`}</Etikett>
+        )}
+        {zeile.offene_befunde > 0 && (
+          <>
+            <Statuspunkt ton="akzent" />
+            {`${zeile.offene_befunde} offen`}
+          </>
+        )}
+        {zeile.kritische_befunde === 0 && zeile.offene_befunde === 0 && (
+          <span className={stil.ohneBefund}>ohne Befund</span>
+        )}
+      </Zelle>
+
+      <Zelle leise>{alsDatum(zeile.datum)}</Zelle>
+
+      <Zelle rechts>
+        {zeile.abgehakt ? (
+          <span className={stil.standLeise}>abgehakt</span>
+        ) : zeile.faellig ? (
+          <span className={stil.standFaellig}>fällig</span>
+        ) : (
+          /* Sichtbar ein Wort, vorgelesen der ganze Satz. "außerhalb des
+             Prüfzeitraums" ist in einer Spalte von 80 px entweder abgeschnitten
+             oder dreizeilig; "außerhalb" allein sagt einem Screenreader
+             dagegen nicht, wovon. Beides getrennt kostet nichts. */
+          <span className={stil.standLeise} title="außerhalb des Prüfzeitraums">
+            <span aria-hidden="true">außerhalb</span>
+            <span className="nur-vorlesen">außerhalb des Prüfzeitraums</span>
+          </span>
+        )}
+      </Zelle>
+    </Reihe>
   );
 }
 

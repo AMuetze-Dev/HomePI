@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 
-import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import {
+  Etikett,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Platzhalter,
+  Segmentwahl,
+  Tafel,
+} from "../../ui";
 import { type Regel, formuliereRegel, ladeRegeln, schalteRegel } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
 
@@ -64,6 +73,11 @@ function passt(regel: Regel, filter: Filter, suche: string): boolean {
   return true;
 }
 
+const FILTERWAHL = (Object.keys(FILTER) as Filter[]).map((wert) => ({
+  wert,
+  wort: FILTER[wert],
+}));
+
 export function RegelnTafel() {
   const [regeln, setRegeln] = useState<Regel[] | null>(null);
   const [fehler, setFehler] = useState("");
@@ -121,7 +135,22 @@ export function RegelnTafel() {
   }
 
   return (
-    <>
+    <Tafel
+      titel="Regeln"
+      beiwort={
+        sichtbar.length === regeln.length
+          ? `${regeln.length} Regeln`
+          : `${sichtbar.length} von ${regeln.length}`
+      }
+      aktionen={
+        <Segmentwahl
+          beschriftung="Regeln einschränken"
+          optionen={FILTERWAHL}
+          wert={filter}
+          beiWahl={setFilter}
+        />
+      }
+    >
       {fehler && (
         <Hinweis ton="fehler" dringend>
           {fehler}
@@ -130,26 +159,13 @@ export function RegelnTafel() {
 
       {/* Vierundvierzig Regeln als vierundvierzig Karten waren fünf
           Bildschirme ohne jeden Griff: keine Suche, kein Filter, und die
-          eine, die man sucht, findet man durch Scrollen. */}
-      {/* Alles in einer Zeile. Untereinander waren Filter, Beschriftung,
-          Feld, Hinweis und Zaehler zusammen ein Viertel des Bildschirms --
-          bevor eine einzige Regel kam. Der Hinweis steckt jetzt im
-          Platzhalter, wo man ihn liest, wenn man das Feld ansieht. */}
-      <div className={stil.werkzeugleiste}>
-        <div className={stil.filterZeile} role="group" aria-label="Regeln einschränken">
-          {(Object.keys(FILTER) as Filter[]).map((f) => (
-            <Knopf
-              key={f}
-              groesse="sm"
-              auspraegung={filter === f ? "primaer" : "leise"}
-              aria-pressed={filter === f}
-              onClick={() => setFilter(f)}
-            >
-              {FILTER[f]}
-            </Knopf>
-          ))}
-        </div>
+          eine, die man sucht, findet man durch Scrollen.
 
+          Filter und Zähler stehen inzwischen in der Titelzeile, wo jede
+          Tafel dieser Oberfläche ihre Griffe trägt. Übrig bleibt das
+          Suchfeld; sein Hinweis steckt im Platzhalter, wo man ihn liest,
+          wenn man das Feld ansieht. */}
+      <div className={stil.werkzeugleiste}>
         <input
           type="search"
           className={stil.suchfeld}
@@ -158,12 +174,6 @@ export function RegelnTafel() {
           value={suche}
           onChange={(e) => setSuche(e.target.value)}
         />
-
-        <span className={stil.zaehler}>
-          {sichtbar.length === regeln.length
-            ? `${regeln.length} Regeln`
-            : `${sichtbar.length} von ${regeln.length}`}
-        </span>
       </div>
 
       {sichtbar.length === 0 && (
@@ -201,7 +211,7 @@ export function RegelnTafel() {
           </li>
         ))}
       </ul>
-    </>
+    </Tafel>
   );
 }
 

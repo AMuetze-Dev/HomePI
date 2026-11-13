@@ -42,6 +42,21 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--farbe-fokus) 18%, transparent);
 }
 
+/* Nur zum Nachsehen: Ein Feld, in dem man tippen kann und dessen Eingabe
+   beim Verlassen verfaellt, ist ein Versprechen, das niemand haelt. Deshalb
+   sieht es anders aus als eines, in das etwas gehoert - markieren und
+   kopieren bleibt moeglich, denn genau dafuer steht es da. */
+.eingabe:read-only {
+  background: var(--farbe-flaeche-gedaempft);
+  border-color: var(--farbe-rand);
+  color: var(--farbe-text-gedaempft);
+  cursor: default;
+}
+
+.eingabe:read-only:hover {
+  border-color: var(--farbe-rand);
+}
+
 .eingabe:disabled {
   background: var(--farbe-flaeche-gedaempft);
   color: var(--farbe-text-leise);

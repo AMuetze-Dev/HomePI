@@ -14,6 +14,12 @@
   margin-top: 0.4375rem;
 }
 
+.gut {
+  background: var(--signal-gut-flaeche);
+  border-color: color-mix(in srgb, var(--signal-gut) 24%, transparent);
+  color: color-mix(in srgb, var(--signal-gut) 82%, var(--farbe-text));
+}
+
 .fehler {
   background: var(--signal-fehler-flaeche);
   border-color: color-mix(in srgb, var(--signal-fehler) 24%, transparent);

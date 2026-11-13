@@ -1,31 +1,33 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Die Navigationsleiste - Artefakte und, beim geöffneten, dessen Bereiche.
+ * Ein Artefakt in der Liste der Startseite.
  *
- * Ohne diese beiden Helfer wird jeder Verweis mehrdeutig: Seit die Leiste
- * dauerhaft danebensteht, heißt "Verwaltung" sowohl die Kachel auf der
- * Startseite als auch der Eintrag in der Leiste. Playwright bricht solche
- * Treffer streng ab - zu Recht, denn welcher gemeint ist, weiß der Test
- * sonst selbst nicht.
+ * Seit die Dauerleiste weg ist, steht jeder Name an genau einer Stelle
+ * gleichzeitig. Trotzdem ein eigener Helfer: Er sagt, WO gegriffen wird,
+ * und scheitert deutlich, wenn die Schritte unten einmal nicht mehr auf der
+ * Startseite stehen.
  */
 function artefakt(page: Page, name: string | RegExp) {
-  return page
-    .getByRole("navigation", { name: "Hauptnavigation" })
-    .getByRole("link", { name });
+  return page.getByRole("list", { name: "Artefakte" }).getByRole("link", { name });
 }
 
 /**
- * Ein Bereich innerhalb des geöffneten Artefakts.
+ * Ein Bereich innerhalb des geöffneten Artefakts - die Leiste über dem
+ * Inhalt.
  *
- * Eigene Liste statt der ganzen Leiste, weil "Übersicht" zweimal vorkommt:
- * einmal als Startseite ganz oben, einmal als erste Fläche von
- * StaffelPilot. Die Liste trägt dafür einen eigenen Namen.
+ * Eigene Leiste statt der ganzen Seite, weil "Übersicht" mehrfach vorkommt:
+ * als Bereich von StaffelPilot und als Eintrag in der Navigationsfläche.
  */
 function bereich(page: Page, name: string) {
   return page
-    .getByRole("list", { name: /^Bereiche von/ })
+    .getByRole("navigation", { name: "Bereiche" })
     .getByRole("link", { name, exact: true });
+}
+
+/** Wartet, bis die Sitzung wirklich steht: das Kürzel in der Kopfzeile. */
+function konto(page: Page) {
+  return page.getByRole("banner").getByRole("link", { name: /^Einstellungen für / });
 }
 
 /**
@@ -71,9 +73,7 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
     await page.getByLabel("Passwort wiederholen").fill(VERWALTER.passwort);
     await page.getByRole("button", { name: /Einrichten|Anlegen|Konto/ }).click();
 
-    await expect(
-      page.getByRole("banner").getByRole("button", { name: "Abmelden" }),
-    ).toBeVisible();
+    await expect(konto(page)).toBeVisible();
   });
 
   test("StaffelPilot sieht sie erst mit dem Recht darauf", async ({ page }) => {
@@ -302,9 +302,7 @@ async function anmelden(page: import("@playwright/test").Page): Promise<void> {
   await page.getByLabel("Benutzername").fill(VERWALTER.name);
   await page.getByLabel("Passwort").fill(VERWALTER.passwort);
   await page.getByRole("button", { name: "Anmelden" }).click();
-  await expect(
-    page.getByRole("banner").getByRole("button", { name: "Abmelden" }),
-  ).toBeVisible();
+  await expect(konto(page)).toBeVisible();
 }
 
 async function zuStaffelpilot(page: import("@playwright/test").Page): Promise<void> {

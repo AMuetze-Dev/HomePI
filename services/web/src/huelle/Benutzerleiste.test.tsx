@@ -1,5 +1,4 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -21,11 +20,14 @@ function zeige(benutzer: api.Benutzer | null, pfad = "/") {
 }
 
 describe("Benutzerleiste", () => {
-  it("zeigt den Anzeigenamen und einen Weg hinaus", async () => {
+  it("führt mit dem Kürzel zu den Einstellungen", async () => {
+    // Der volle Name stand hier vorher und wurde bei jedem zweiten Konto
+    // abgeschnitten. Ausgeschrieben steht er dort, wohin das Kuerzel fuehrt.
     zeige(TESTBENUTZER);
 
-    expect(await screen.findByText("Prüfer")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Abmelden" })).toBeInTheDocument();
+    const verweis = await screen.findByRole("link", { name: /Prüfer/ });
+
+    expect(verweis).toHaveAttribute("href", "/einstellungen");
   });
 
   it("bietet den Weg hinein, wenn niemand angemeldet ist", async () => {
@@ -57,17 +59,16 @@ describe("Benutzerleiste", () => {
     );
 
     expect(screen.queryByRole("link", { name: "Anmelden" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Abmelden" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Prüfer/ })).not.toBeInTheDocument();
   });
 
-  it("meldet ab", async () => {
-    const abmelden = vi.spyOn(api, "abmelden").mockResolvedValue(undefined);
+  it("trägt das Abmelden nicht mehr in der Kopfzeile", async () => {
+    // Es ist die seltenste Handlung dieser Oberflaeche und stand als Knopf
+    // dauerhaft neben einer, die man staendig braucht. Sein Platz ist die
+    // Navigation.
     zeige(TESTBENUTZER);
-    const knopf = await screen.findByRole("button", { name: "Abmelden" });
+    await screen.findByRole("link", { name: /Prüfer/ });
 
-    await userEvent.click(knopf);
-
-    expect(abmelden).toHaveBeenCalled();
-    expect(await screen.findByRole("link", { name: "Anmelden" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Abmelden" })).not.toBeInTheDocument();
   });
 });

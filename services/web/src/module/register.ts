@@ -47,29 +47,38 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
     // Grundmaß für die Flächen, die Listen zeigen. Die Bereiche, bei denen
     // das falsch wäre, sagen es unten selbst.
     breite: "voll",
+    // Jeder Bereich baut seinen Kopf selbst: Neben dem Namen steht hier
+    // ueberall etwas, das nur der Bereich kennt - eine Zahl, ein Filter, die
+    // eine Handlung dieser Flaeche. Siehe `eigenerTitel` in typen.ts.
     unterseiten: [
       // Kennzahlen und die Liste des Tages - lebt von der Breite.
-      { id: "uebersicht", wort: "Übersicht" },
+      { id: "uebersicht", wort: "Übersicht", eigenerTitel: true },
       // Paarung, Datum, Befunde, Aktionen in einer Zeile. Der Grund, warum
       // dieses Modul überhaupt "voll" bekommt.
-      { id: "spiele", wort: "Spielprüfung" },
-      { id: "prueflauf", wort: "Prüflauf", breite: "normal" },
-      { id: "ergebnisse", wort: "Ergebnisse", breite: "weit" },
+      { id: "spiele", wort: "Spielprüfung", eigenerTitel: true },
+      { id: "prueflauf", wort: "Prüflauf", breite: "normal", eigenerTitel: true },
+      { id: "ergebnisse", wort: "Ergebnisse", breite: "weit", eigenerTitel: true },
       // Formulare. Ein Eingabefeld über die ganze Monitorbreite ist nicht
       // großzügig, sondern unlesbar: Der Blick findet den Anfang der
       // nächsten Zeile nicht mehr.
-      { id: "staffeln", wort: "Staffeln", breite: "normal" },
-      { id: "vorgaenge", wort: "Vorgänge", breite: "weit" },
-      { id: "regeln", wort: "Regeln", breite: "normal" },
+      { id: "staffeln", wort: "Staffeln", breite: "normal", eigenerTitel: true },
+      { id: "vorgaenge", wort: "Vorgänge", breite: "weit", eigenerTitel: true },
+      { id: "regeln", wort: "Regeln", breite: "normal", eigenerTitel: true },
       // Quelltext. Breiter als ein Formular, denn hier steht Python mit
       // Einrückung -- in einer Textspalte bricht jede zweite Zeile um.
-      { id: "regeldateien", wort: "Regeldateien", breite: "normal" },
-      { id: "einstellungen", wort: "Einstellungen", breite: "text" },
-      { id: "zugang", wort: "DFBnet-Zugang", breite: "text" },
+      { id: "regeldateien", wort: "Regeldateien", breite: "normal", eigenerTitel: true },
+      { id: "einstellungen", wort: "Einstellungen", breite: "text", eigenerTitel: true },
+      { id: "zugang", wort: "DFBnet-Zugang", breite: "text", eigenerTitel: true },
       // Ein Weg, keine Flaeche: einmal durchlaufen, danach nur noch bei
       // Bedarf aus den Einstellungen heraus. Deshalb versteckt -- in der
       // Leiste waere es ein Eintrag, der ab dem zweiten Tag nur stoert.
-      { id: "einrichten", wort: "Einrichtung", breite: "text", versteckt: true },
+      {
+        id: "einrichten",
+        wort: "Einrichtung",
+        breite: "text",
+        versteckt: true,
+        eigenerTitel: true,
+      },
     ],
   },
   {

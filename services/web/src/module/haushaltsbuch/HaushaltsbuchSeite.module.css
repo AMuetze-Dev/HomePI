@@ -89,7 +89,7 @@
 }
 
 .teilFest {
-  background: var(--neutral-400);
+  background: var(--ton-400);
 }
 
 .teilSparen {
@@ -368,11 +368,11 @@
 }
 
 .band_kategorie {
-  fill: var(--neutral-400);
+  fill: var(--ton-400);
 }
 
 .band_posten {
-  fill: var(--neutral-400);
+  fill: var(--ton-400);
 }
 
 .knoten_einnahme {
@@ -384,11 +384,11 @@
 }
 
 .knoten_kategorie {
-  fill: var(--neutral-500);
+  fill: var(--ton-500);
 }
 
 .knoten_posten {
-  fill: var(--neutral-400);
+  fill: var(--ton-400);
 }
 
 .knotenname {

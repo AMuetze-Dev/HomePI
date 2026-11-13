@@ -38,6 +38,20 @@ function zeige(id: string, angemeldet = true) {
   );
 }
 
+/** Dasselbe, aber auf einem Bereich - dort entscheidet sich, wer die
+ *  Überschrift setzt. */
+function zeigeBereich(id: string, unterseite: string) {
+  render(
+    <MemoryRouter initialEntries={[`/modul/${id}/${unterseite}`]}>
+      {mitAnmeldung(
+        <Routes>
+          <Route path="/modul/:id/:unterseite" element={<ModulSeite />} />
+        </Routes>,
+      )}
+    </MemoryRouter>,
+  );
+}
+
 describe("Modulseite", () => {
   it("zeigt die generische Ansicht, wenn es keine eigene Oberfläche gibt", async () => {
     vi.spyOn(client, "fetchModule").mockResolvedValue([ohneOberflaeche]);
@@ -131,5 +145,34 @@ describe("Modulseite", () => {
     zeige("messwerte");
 
     expect(await screen.findByText(/Noch keine Oberfläche/)).toBeInTheDocument();
+  });
+
+  it("setzt den Bereichsnamen als Überschrift über den Inhalt", async () => {
+    vi.spyOn(client, "fetchModule").mockResolvedValue([ohneOberflaeche]);
+    vi.spyOn(register, "oberflaecheFuer").mockReturnValue({
+      id: "messwerte",
+      Komponente: () => <p>Meine eigene Ansicht</p>,
+      unterseiten: [{ id: "tag", wort: "Heute" }],
+    });
+
+    zeigeBereich("messwerte", "tag");
+
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Heute");
+  });
+
+  it("hält sich heraus, wo der Bereich seinen Titel selbst mitbringt", async () => {
+    // Sonst stünde dasselbe Wort zweimal untereinander: einmal von hier,
+    // einmal aus der Tafel, die daneben noch eine Zahl und einen Filter
+    // trägt - beides kennt diese Seite nicht.
+    vi.spyOn(client, "fetchModule").mockResolvedValue([ohneOberflaeche]);
+    vi.spyOn(register, "oberflaecheFuer").mockReturnValue({
+      id: "messwerte",
+      Komponente: () => <h1>Heute</h1>,
+      unterseiten: [{ id: "tag", wort: "Heute", eigenerTitel: true }],
+    });
+
+    zeigeBereich("messwerte", "tag");
+
+    expect(await screen.findAllByRole("heading", { name: "Heute" })).toHaveLength(1);
   });
 });
