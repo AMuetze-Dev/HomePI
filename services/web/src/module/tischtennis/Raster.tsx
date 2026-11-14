@@ -1,4 +1,3 @@
-import { Etikett } from "../../ui";
 import type { Spiel } from "./api";
 import stil from "./TischtennisSeite.module.css";
 
@@ -73,7 +72,14 @@ function Seite({ spiel, wer }: { spiel: Spiel; wer: "heim" | "gast" }) {
         .join(" ")}
     >
       <span className={stil.rastername}>{name ?? herkunft ?? "offen"}</span>
-      {gewonnen && <Etikett ton="gut">weiter</Etikett>}
+      {/* Sichtbar trägt das die Zeile selbst: halbfett, mit einem Strich an
+          der Kante, und der Verlierer tritt zurück. Ein Etikett „weiter"
+          dahinter sagte dasselbe ein zweites Mal -- und zwar in jeder
+          entschiedenen Paarung des Rasters, also am Ende in der Hälfte
+          aller Zeilen.
+          Vorgelesen bleibt es stehen: Schriftschnitt und Strich kommen bei
+          einem Screenreader nicht an. */}
+      {gewonnen && <span className="nur-vorlesen">weiter</span>}
     </div>
   );
 }

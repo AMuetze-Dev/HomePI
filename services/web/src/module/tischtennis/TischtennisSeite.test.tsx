@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -238,8 +238,15 @@ describe("Der Bereich Einstellungen", () => {
 
     await userEvent.selectOptions(await screen.findByLabelText("Turnier"), "t2");
 
-    expect(
-      await screen.findByRole("heading", { name: "Weihnachtsturnier" }),
-    ).toBeInTheDocument();
+    // Der Turniername steht jetzt neben dem Titel der Fläche und nicht
+    // mehr als eigene Überschrift darüber: Die Fläche heißt "Turnier", und
+    // welches gemeint ist, gehört daneben.
+    // Der Name steht zweimal: einmal als gewaehlte Option im Auswahlfeld,
+    // einmal neben dem Titel der Flaeche. Gemeint ist der zweite.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Turnier" }).parentElement,
+      ).toHaveTextContent("Weihnachtsturnier"),
+    );
   });
 });

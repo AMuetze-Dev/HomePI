@@ -170,6 +170,7 @@ erscheinende Elemente. Beide ohne Überschwingen.
 | `Karte`         | abgegrenzte Fläche; `blank` für Inhalte mit eigenem Innenabstand |
 | `Feld`          | Eingabe mit verbundener Beschriftung                             |
 | `Tafel`         | der Kopf einer Fläche: Titel, Zahl daneben, Handlungen rechts    |
+| `Abschnitt`     | Kapitälchen-Überschrift und ihr Inhalt als ein Block             |
 | `Tabelle` + `Reihe` + `Zelle` | dichte Liste in Spalten, Reihen klappen auf       |
 | `Regel`         | die ausblendende Trennlinie; `kurz` für schmale Spalten          |
 | `Marke`         | vier Felder, eines im Akzent — Zeichen und Navigationsknopf      |
@@ -227,6 +228,20 @@ der Reihe, die übrigen zu einer Zeile dahinter, mit Mittelpunkten getrennt.
 Eine Tabelle, die auf einem Telefon waagerecht scrollt, versteckt
 ausgerechnet die rechte Spalte — also meist den Zustand, wegen dessen man
 hinsieht.
+
+### Ein Zustand steht im Text, auch wenn die Farbe ihn schon sagt
+
+Im KO-Raster trug jeder Sieger ein Etikett „weiter". Bei einem Raster für
+sechzehn ist das in der Hälfte aller Zeilen dasselbe Wort — und es sagt
+nichts, was die Zeile nicht schon sagt: Der Sieger steht halbfett mit einem
+Strich an der Kante, der Verlierer tritt zurück, und in der nächsten Runde
+steht sein Name statt „Sieger aus Spiel 13".
+
+Sichtbar ist es deshalb weg. **Vorgelesen bleibt es stehen** — als
+`nur-vorlesen`-Text. Schriftschnitt und Strich kommen bei einem Screenreader
+nicht an, und die Regel „kein Zustand nur über Farbe" gilt weiter. Das ist
+die allgemeine Form: Wo eine visuelle Auszeichnung ein Wort überflüssig
+macht, verschwindet das Wort aus dem Bild, nicht aus dem Dokument.
 
 ### Wer die Überschrift setzt
 

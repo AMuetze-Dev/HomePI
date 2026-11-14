@@ -1,4 +1,5 @@
 /** Sammelstelle der Bausteine - Ansichten importieren nur von hier. */
+export { Abschnitt } from "./Abschnitt";
 export { Etikett } from "./Etikett";
 export { Farbwahl, type Farbe } from "./Farbwahl";
 export { Feld } from "./Feld";

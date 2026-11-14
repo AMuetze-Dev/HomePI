@@ -87,16 +87,19 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
     // Die Dashboard-Ansicht lebt von der Breite: zwei Tische nebeneinander,
     // darunter Gruppen und Raster.
     breite: "weit",
+    // Jeder Bereich baut seinen Kopf selbst: Neben dem Namen steht hier
+    // ueberall etwas, das nur der Bereich kennt - das Turnier, sein Zustand,
+    // seine Zahlen. Siehe `eigenerTitel` in typen.ts.
     unterseiten: [
       // Zuerst, und das mit Absicht: diese Flaeche ist der Grund, warum das
       // Artefakt oeffentlich ist. Wer die Kachel ohne Konto antippt, landet
       // auf der ersten Unterseite - also hier.
-      { id: "dashboard", wort: "Dashboard", breite: "voll" },
+      { id: "dashboard", wort: "Dashboard", breite: "voll", eigenerTitel: true },
       // Teilnehmer, Auswuerfeln und Spielplan in einem. Drei Reiter waren
       // richtig, solange ein Ergebnis aus sechs Zahlen bestand; seit es ein
       // Name ist, sind es zwei Handgriffe und einer zu viel.
-      { id: "turnier", wort: "Turnier" },
-      { id: "einstellungen", wort: "Einstellungen", breite: "text" },
+      { id: "turnier", wort: "Turnier", eigenerTitel: true },
+      { id: "einstellungen", wort: "Einstellungen", breite: "text", eigenerTitel: true },
     ],
   },
   {

@@ -9,12 +9,12 @@ import { useGrund } from "../huelle/useGrund";
 import { useThema, type Thema } from "../huelle/useThema";
 import { useModule } from "../module/useModule";
 import {
+  Abschnitt,
   Etikett,
   Farbwahl,
   Feld,
   Hinweis,
   Knopf,
-  Regel,
   Schalter,
   Segmentwahl,
 } from "../ui";
@@ -56,7 +56,7 @@ export function Einstellungen() {
         Gilt für dieses Konto, nicht für die Installation.
       </p>
 
-      <Abschnitt titel="Darstellung">
+      <Abschnitt regel titel="Darstellung">
         <Zeile wort="Farbschema" erklaerung="Folgt dem Gerät, bis du es hier festlegst.">
           <Segmentwahl
             beschriftung="Farbschema"
@@ -90,7 +90,7 @@ export function Einstellungen() {
         </Zeile>
       </Abschnitt>
 
-      <Abschnitt titel="Konto">
+      <Abschnitt regel titel="Konto">
         <div className={stil.felder}>
           <Feld beschriftung="Anzeigename" value={benutzer?.anzeigename ?? ""} readOnly />
           <Feld
@@ -109,24 +109,14 @@ export function Einstellungen() {
         <Passwortzeile />
       </Abschnitt>
 
-      <Abschnitt titel="Rechte">
+      <Abschnitt regel titel="Rechte">
         <Rechte rechte={benutzer?.rechte ?? {}} />
       </Abschnitt>
 
-      <Abschnitt titel="System">
+      <Abschnitt regel titel="System">
         <SystemStatus />
       </Abschnitt>
     </div>
-  );
-}
-
-function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) {
-  return (
-    <section className={stil.abschnitt}>
-      <h2 className={stil.abschnittstitel}>{titel}</h2>
-      <Regel kurz className={stil.regel} />
-      {children}
-    </section>
   );
 }
 

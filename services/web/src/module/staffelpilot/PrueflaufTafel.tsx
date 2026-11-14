@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  Abschnitt,
   Etikett,
   Hinweis,
   Karte,
@@ -236,8 +237,7 @@ export function PrueflaufTafel({
         onWiederholen={() => void handeln(() => wiederholeUebertragung())}
       />
 
-      <section className={stil.unterabschnitt}>
-        <h2 className={stil.abschnitt}>Bisherige Läufe</h2>
+      <Abschnitt titel="Bisherige Läufe">
         {verlauf.length === 0 ? (
           <Leerzustand titel="Noch kein Lauf">
             Was hier steht, sind die vergangenen Prüfläufe mit ihrem Ergebnis.
@@ -265,7 +265,7 @@ export function PrueflaufTafel({
             ))}
           </ul>
         )}
-      </section>
+      </Abschnitt>
     </Tafel>
   );
 }

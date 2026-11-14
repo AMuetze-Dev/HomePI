@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand } from "../../ui";
+import { Abschnitt, Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand } from "../../ui";
 import type { Auslosung, Richtung, Spiel, Teilnehmer, Turnier } from "./api";
 import stil from "./TischtennisSeite.module.css";
 import { dauer, uhrzeit } from "./zeit";
@@ -104,13 +104,7 @@ function Teilnehmerliste({
   }
 
   return (
-    <section aria-labelledby="mitspieler">
-      <div className={stil.abschnittskopf}>
-        <h2 id="mitspieler" className={stil.abschnittstitel}>
-          Wer spielt mit?
-        </h2>
-      </div>
-
+    <Abschnitt titel="Wer spielt mit?" id="mitspieler">
       <Karte>
         {/* Das Formular steht oben: hier werden zwanzig Namen hintereinander
             eingetippt, und nach jedem rutschte es sonst eine Zeile tiefer. */}
@@ -155,7 +149,7 @@ function Teilnehmerliste({
           </ul>
         )}
       </Karte>
-    </section>
+    </Abschnitt>
   );
 }
 
@@ -180,13 +174,7 @@ function Wuerfel({
   if (turnier.anzahl_teilnehmer < 2) return null;
 
   return (
-    <section aria-labelledby="auswuerfeln">
-      <div className={stil.abschnittskopf}>
-        <h2 id="auswuerfeln" className={stil.abschnittstitel}>
-          Auswürfeln
-        </h2>
-      </div>
-
+    <Abschnitt titel="Auswürfeln" id="auswuerfeln">
       <Karte>
         <Knopf auspraegung="primaer" disabled={laeuft} onClick={() => void wuerfeln()}>
           {laeuft ? "Würfelt …" : vorschau ? "Nochmal würfeln" : "Würfeln"}
@@ -242,7 +230,7 @@ function Wuerfel({
           </>
         )}
       </Karte>
-    </section>
+    </Abschnitt>
   );
 }
 
@@ -288,13 +276,12 @@ function Spielplan({
 
       {turnier.zustand === "beendet" && <Hinweis>Das Turnier ist durch.</Hinweis>}
 
-      <section aria-labelledby="offen">
-        <div className={stil.abschnittskopf}>
-          <h2 id="offen" className={stil.abschnittstitel}>
-            {offen.length === 0 ? "Nichts mehr offen" : `Noch ${offen.length} zu spielen`}
-          </h2>
-        </div>
-
+      <Abschnitt
+        titel={
+          offen.length === 0 ? "Nichts mehr offen" : `Noch ${offen.length} zu spielen`
+        }
+        id="offen"
+      >
         {offen.length === 0 ? (
           <Leerzustand titel="Alles gewertet">
             Setze die nächste Runde an, oder sieh im Dashboard nach, wie es steht.
@@ -378,15 +365,10 @@ function Spielplan({
             </ul>
           </Karte>
         )}
-      </section>
+      </Abschnitt>
 
       {gewertet.length > 0 && (
-        <section aria-labelledby="gewertet">
-          <div className={stil.abschnittskopf}>
-            <h2 id="gewertet" className={stil.abschnittstitel}>
-              Gewertet
-            </h2>
-          </div>
+        <Abschnitt titel="Gewertet" id="gewertet">
           <Karte blank>
             <ul className={stil.liste}>
               {gewertet.map((spiel) => (
@@ -420,7 +402,7 @@ function Spielplan({
               ))}
             </ul>
           </Karte>
-        </section>
+        </Abschnitt>
       )}
 
       {darfEinrichten && (

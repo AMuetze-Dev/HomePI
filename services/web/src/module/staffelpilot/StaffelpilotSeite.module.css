@@ -365,34 +365,6 @@
   color: var(--farbe-text);
 }
 
-/* Die Zwischenueberschrift innerhalb einer Tafel: gesperrte Kapitaelchen,
-   wie ueber jedem Abschnitt dieser Oberflaeche. Sie ordnet, ohne eine
-   zweite Ebene aufzumachen - dafuer waere `formularTitel` da, das ueber
-   einem Formular steht und dort wie eine Ueberschrift wirken soll. */
-.abschnitt {
-  margin: 0;
-  font-size: var(--text-xs);
-  font-weight: var(--gewicht-normal);
-  letter-spacing: var(--laufweite-weit);
-  text-transform: uppercase;
-  color: var(--farbe-text-leise);
-}
-
-/*
- * Ueberschrift und ihr Inhalt als EIN Kind der Tafel.
- *
- * Die Tafel verteilt 2 rem zwischen ihren Abschnitten. Zwischen einer
- * Zwischenueberschrift und dem, was sie ueberschreibt, sind 2 rem aber zu
- * viel -- dann gehoert die Zeile optisch zu nichts mehr. Zusammengefasst
- * gilt nach aussen der Abstand der Tafel und nach innen dieser hier.
- */
-.unterabschnitt {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-4);
-  min-width: 0;
-}
-
 /* ── Vorgänge ────────────────────────────────────────────────────────── */
 
 .filterZeile {

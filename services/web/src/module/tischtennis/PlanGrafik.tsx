@@ -1,4 +1,4 @@
-import { Etikett, Hinweis, Karte, Leerzustand } from "../../ui";
+import { Abschnitt, Etikett, Hinweis, Karte, Leerzustand } from "../../ui";
 import type { Phase, Spiel, Tabelle } from "./api";
 import { Raster } from "./Raster";
 import stil from "./TischtennisSeite.module.css";
@@ -104,17 +104,11 @@ function Zweigkarte({
   const kennung = `zweig-${titel.replace(/\s+/g, "-")}`;
 
   return (
-    <section aria-labelledby={kennung}>
-      <div className={stil.abschnittskopf}>
-        <h2 id={kennung} className={stil.abschnittstitel}>
-          {titel}
-        </h2>
-        {erklaerung !== undefined && <p className={stil.nebensache}>{erklaerung}</p>}
-      </div>
+    <Abschnitt titel={titel} id={kennung} beiwort={erklaerung}>
       <Karte>
         <Raster spiele={spiele} beschriftung={titel} />
       </Karte>
-    </section>
+    </Abschnitt>
   );
 }
 
@@ -125,13 +119,7 @@ function Gruppenkarte({ tabelle, spiele }: { tabelle: Tabelle; spiele: Spiel[] }
   const kennung = `gruppe-${tabelle.titel.replace(/\s+/g, "-")}`;
 
   return (
-    <section aria-labelledby={kennung}>
-      <div className={stil.abschnittskopf}>
-        <h2 id={kennung} className={stil.abschnittstitel}>
-          {tabelle.titel}
-        </h2>
-      </div>
-
+    <Abschnitt titel={tabelle.titel} id={kennung}>
       {tabelle.entscheidung_offen.length > 0 && (
         <Hinweis ton="warnung">
           {`Punktgleich an der Grenze: ${tabelle.entscheidung_offen.join(" und ")}. ` +
@@ -176,6 +164,6 @@ function Gruppenkarte({ tabelle, spiele }: { tabelle: Tabelle; spiele: Spiel[] }
           </ul>
         )}
       </Karte>
-    </section>
+    </Abschnitt>
   );
 }

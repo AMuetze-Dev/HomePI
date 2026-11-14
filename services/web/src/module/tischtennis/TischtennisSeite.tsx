@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Anmeldeformular } from "../../anmeldung/Anmeldeformular";
 import { useAnmeldung } from "../../anmeldung/kontext";
-import { Etikett, Hinweis, Karte, Leerzustand, Platzhalter } from "../../ui";
+import { Hinweis, Karte, Leerzustand, Platzhalter, Tafel } from "../../ui";
 import type { ModulProps } from "../typen";
 import {
   aendereTurnier,
@@ -114,6 +114,10 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
   // nichts zu laden ist kein Feinschliff: ein Besucher ohne Konto würde
   // sonst auf vier Abfragen warten, die er auf dieser Fläche nicht sieht.
   const nurDashboard = unterseite === "dashboard";
+  // Der Titel der Fläche ist das Wort des Bereichs, wie überall. Was das
+  // Turnier gerade ist, steht daneben im Beiwort -- das kennt nur dieser
+  // Bereich, und die Modulseite könnte es nicht setzen.
+  const titel = unterseite === "einstellungen" ? "Einstellungen" : "Turnier";
 
   useEffect(() => {
     if (nurDashboard) return;
@@ -142,18 +146,21 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
 
   if (zustand.phase === "laedt") {
     return (
-      <div className={stil.laden} role="status" aria-label="Turnier wird geladen">
-        <Platzhalter breite="14rem" hoehe="1.75rem" />
-        <Platzhalter breite="100%" hoehe="12rem" />
-      </div>
+      <Tafel titel={titel}>
+        <div className={stil.laden} role="status" aria-label="Turnier wird geladen">
+          <Platzhalter breite="100%" hoehe="12rem" />
+        </div>
+      </Tafel>
     );
   }
 
   if (zustand.phase === "fehler") {
     return (
-      <Hinweis ton="fehler" dringend>
-        {zustand.nachricht}
-      </Hinweis>
+      <Tafel titel={titel}>
+        <Hinweis ton="fehler" dringend>
+          {zustand.nachricht}
+        </Hinweis>
+      </Tafel>
     );
   }
 
@@ -163,7 +170,7 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
 
   if (!darfSchreiben) {
     return (
-      <>
+      <Tafel titel={titel}>
         <Hinweis>
           Diesen Bereich führt die Turnierleitung. Der aktuelle Stand steht unter
           „Dashboard“ – dafür braucht niemand ein Konto.
@@ -174,36 +181,45 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
             beschreibung="Zum Eintragen von Ergebnissen brauchst du ein Recht auf diesem Artefakt."
           />
         )}
-      </>
+      </Tafel>
     );
   }
 
-  const kopf = (
-    <div className={stil.kopf}>
-      {turnier !== null && (
-        <>
-          <h2 className={stil.turniername}>{turnier.name}</h2>
-          <Etikett ton={turnier.zustand === "laufend" ? "gut" : "neutral"}>
-            {ZUSTANDSWORT[turnier.zustand]}
-          </Etikett>
-          <span className={stil.nebensache}>
-            {turnier.anzahl_teilnehmer} Teilnehmer · {turnier.offene_spiele} offen
-          </span>
-        </>
-      )}
-      {turniere.length > 1 && (
-        <label className={stil.turnierwahl}>
-          Turnier
-          <select value={turnier?.id ?? ""} onChange={(e) => setGewaehlt(e.target.value)}>
-            {turniere.map((eintrag) => (
-              <option key={eintrag.id} value={eintrag.id}>
-                {eintrag.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-    </div>
+  /* Was neben dem Titel steht: welches Turnier, wie es steht, wie viel
+     noch offen ist. Früher war das ein eigener Kopf über dem Inhalt --
+     dieselbe Zeile, nur von Hand gebaut und in jedem Bereich anders weit
+     vom Inhalt entfernt. */
+  const beiwort = turnier !== null && (
+    <>
+      {turnier.name}
+      <span className={stil.beiwortTrenner} aria-hidden="true">
+        ·
+      </span>
+      {ZUSTANDSWORT[turnier.zustand]}
+      <span className={stil.beiwortTrenner} aria-hidden="true">
+        ·
+      </span>
+      {turnier.anzahl_teilnehmer} Teilnehmer
+      <span className={stil.beiwortTrenner} aria-hidden="true">
+        ·
+      </span>
+      {turnier.offene_spiele} offen
+    </>
+  );
+
+  /* Nur wenn es etwas zu wählen gibt. Ein Auswahlfeld mit einem Eintrag
+     ist ein Knopf, der nichts tut. */
+  const turnierwahl = turniere.length > 1 && (
+    <label className={stil.turnierwahl}>
+      <span className="nur-vorlesen">Turnier</span>
+      <select value={turnier?.id ?? ""} onChange={(e) => setGewaehlt(e.target.value)}>
+        {turniere.map((eintrag) => (
+          <option key={eintrag.id} value={eintrag.id}>
+            {eintrag.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 
   const fehlerband = aktionsfehler && (
@@ -214,7 +230,7 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
 
   if (turnier === null) {
     return (
-      <>
+      <Tafel titel={titel} aktionen={turnierwahl || undefined}>
         {fehlerband}
         {darfEinrichten ? (
           <EinstellungenTafel
@@ -231,14 +247,17 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
             Ein Turnier legt an, wer dieses Artefakt verwaltet.
           </Leerzustand>
         )}
-      </>
+      </Tafel>
     );
   }
 
   if (unterseite === "einstellungen") {
     return (
-      <>
-        {kopf}
+      <Tafel
+        titel={titel}
+        beiwort={beiwort || undefined}
+        aktionen={turnierwahl || undefined}
+      >
         {fehlerband}
         {darfEinrichten ? (
           <EinstellungenTafel
@@ -262,13 +281,16 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
             </p>
           </Karte>
         )}
-      </>
+      </Tafel>
     );
   }
 
   return (
-    <>
-      {kopf}
+    <Tafel
+      titel={titel}
+      beiwort={beiwort || undefined}
+      aktionen={turnierwahl || undefined}
+    >
       {fehlerband}
       <TurnierTafel
         turnier={turnier}
@@ -302,6 +324,6 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
         }
         onNaechsteRunde={() => void mitFehlerbehandlung(() => naechsteRunde(turnier.id))}
       />
-    </>
+    </Tafel>
   );
 }

@@ -1,0 +1,41 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
+.abschnitt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  min-width: 0;
+}
+
+/* Ueberschrift und Beiwort auf einer Zeile und auf derselben Grundlinie -
+   wie im Kopf der Tafel. */
+.kopf {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--raum-1) var(--raum-4);
+}
+
+.beiwort {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.titel {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--gewicht-normal);
+  letter-spacing: var(--laufweite-weit);
+  text-transform: uppercase;
+  color: var(--farbe-text-leise);
+}
+
+/* Enger an die Ueberschrift als an den Inhalt: Die Linie gehoert zu ihr. */
+.regel {
+  margin-top: calc(var(--raum-4) * -1 + var(--raum-1));
+  margin-bottom: var(--raum-1);
+}

@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import {
+  Abschnitt,
+  Etikett,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Platzhalter,
+  Tafel,
+} from "../../ui";
 import { ladeDashboard, type Dashboard, type Spiel } from "./api";
 import { erlaubnisFragen, geweckte, melden, tonVorbereiten, umschalten } from "./glocke";
 import { PlanGrafik } from "./PlanGrafik";
@@ -104,18 +113,22 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
 
   if (zustand.phase === "laedt") {
     return (
-      <div className={stil.laden} role="status" aria-label="Turnierstand wird geladen">
-        <Platzhalter breite="100%" hoehe="9rem" />
-        <Platzhalter breite="100%" hoehe="14rem" />
-      </div>
+      <Tafel titel="Dashboard">
+        <div className={stil.laden} role="status" aria-label="Turnierstand wird geladen">
+          <Platzhalter breite="100%" hoehe="9rem" />
+          <Platzhalter breite="100%" hoehe="14rem" />
+        </div>
+      </Tafel>
     );
   }
 
   if (zustand.phase === "fehler") {
     return (
-      <Hinweis ton="fehler" dringend>
-        {zustand.nachricht}
-      </Hinweis>
+      <Tafel titel="Dashboard">
+        <Hinweis ton="fehler" dringend>
+          {zustand.nachricht}
+        </Hinweis>
+      </Tafel>
     );
   }
 
@@ -123,21 +136,23 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
 
   if (daten.turnier === null) {
     return (
-      <Leerzustand titel="Gerade läuft kein Turnier">
-        Sobald der Spielplan ausgewürfelt ist, steht hier, wer an welchem Tisch spielt und
-        wer als nächstes dran ist.
-      </Leerzustand>
+      <Tafel titel="Dashboard">
+        <Leerzustand titel="Gerade läuft kein Turnier">
+          Sobald der Spielplan ausgewürfelt ist, steht hier, wer an welchem Tisch spielt
+          und wer als nächstes dran ist.
+        </Leerzustand>
+      </Tafel>
     );
   }
 
   return (
-    <div className={stil.dashboard}>
-      <section aria-labelledby="tische">
-        <div className={stil.abschnittskopf}>
-          <h2 id="tische" className={stil.abschnittstitel}>
-            An den Tischen
-          </h2>
-        </div>
+    /* Der Titel ist hier das TURNIER und nicht das Wort „Dashboard".
+       Diese Fläche ist eine Anzeigetafel: Wer sie im Saal auf dem Telefon
+       aufmacht, will zuerst wissen, welches Turnier er da sieht und wie
+       frisch der Stand ist. Welcher Bereich das ist, steht ohnehin in der
+       Kopfleiste darüber. */
+    <Tafel titel={daten.turnier.name} beiwort={`Stand ${uhrzeit(daten.stand)}`}>
+      <Abschnitt titel="An den Tischen" id="tische">
         <div className={stil.tische}>
           {daten.tische.map((tisch) => (
             <Karte key={tisch.tisch}>
@@ -197,7 +212,7 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
             </Karte>
           ))}
         </div>
-      </section>
+      </Abschnitt>
 
       <PlanGrafik tabellen={daten.tabellen} spiele={daten.spiele} />
 
@@ -269,9 +284,7 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
         </details>
       )}
 
-      <p className={stil.stand}>
-        Stand {uhrzeit(daten.stand)} · aktualisiert sich alle {TAKT / 1000} Sekunden
-      </p>
-    </div>
+      <p className={stil.stand}>Aktualisiert sich alle {TAKT / 1000} Sekunden</p>
+    </Tafel>
   );
 }

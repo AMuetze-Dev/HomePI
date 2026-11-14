@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
+  Abschnitt,
   Etikett,
   Hinweis,
   Karte,
@@ -169,8 +170,7 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
         </Leerzustand>
       )}
 
-      <section className={stil.unterabschnitt}>
-        <h2 className={stil.abschnitt}>Als Nächstes</h2>
+      <Abschnitt titel="Als Nächstes">
         {naechste.length === 0 ? (
           <Leerzustand titel="Nichts fällig">
             Kein Spielbericht im Prüfzeitraum wartet auf eine Entscheidung.
@@ -203,7 +203,7 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
             ))}
           </Tabelle>
         )}
-      </section>
+      </Abschnitt>
     </Tafel>
   );
 }
