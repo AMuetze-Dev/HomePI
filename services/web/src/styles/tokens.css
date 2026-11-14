@@ -241,6 +241,93 @@
   --verlauf-eintritt: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* ───────────────────────────────────────────────────────────── Grundfarbe
+ *
+ * Der Stich des Grundes ist wählbar. „Nocturne" ist der Entwurf, wie er
+ * gezeichnet wurde: ein Blauviolett-Stich, der auf einem Monitor warm wirkt
+ * und auf einem anderen kalt. Wer ihn nicht will, nimmt Schiefer - oder
+ * einen anderen.
+ *
+ * Geändert wird dabei NUR der Grund samt seiner Flächen und Ränder, nicht
+ * der Akzent: Der trägt Bedeutung und soll nicht mit dem Geschmack wandern.
+ *
+ * Die Wähler sind absichtlich nicht auf `:root` festgenagelt. Dadurch kann
+ * ein einzelnes Element dasselbe Attribut tragen und zeigt dann diese Farbe
+ * - genau das macht der Farbtupfen in den Einstellungen, und zwar aus
+ * derselben Quelle wie die Oberfläche. Eine zweite Liste von Hexwerten für
+ * die Vorschau wäre die erste, die veraltet.
+ */
+
+/*
+ * Die Rollen, die ein Grund neu ergibt, werden hier NOCH EINMAL deklariert.
+ *
+ * Das ist kein Versehen: `var()` in einer Custom Property wird dort
+ * aufgelöst, wo die Eigenschaft DEKLARIERT ist, nicht dort, wo sie geerbt
+ * wird. `--farbe-grund` oben rechnet also mit dem `--ton-950` von `:root`,
+ * und das Ergebnis erben alle Kinder fertig ausgerechnet. Ein Element, das
+ * `--ton-950` selbst überschreibt, ändert daran nichts mehr -- die fünf
+ * Farbtupfen in den Einstellungen waren deshalb alle gleich.
+ *
+ * Hier stehen sie an einem Wähler, der sowohl auf `:root` passt als auch
+ * auf den Tupfen: Beide rechnen damit mit ihren eigenen Stufen.
+ */
+[data-grund] {
+  --farbe-grund: light-dark(var(--ton-100), var(--ton-950));
+  --farbe-flaeche-erhoben: light-dark(#ffffff, var(--dunkel-flaeche-erhoben));
+}
+
+[data-grund="schiefer"] {
+  --ton-50: #fbfbfb;
+  --ton-100: #f4f4f5;
+  --ton-200: #e6e6e7;
+  --ton-300: #d2d2d4;
+  --ton-950: #18191b;
+  --dunkel-flaeche: #202124;
+  --dunkel-flaeche-erhoben: #25262a;
+  --dunkel-flaeche-gedaempft: #1d1e21;
+  --dunkel-rand: #2f3034;
+  --dunkel-rand-stark: #414348;
+}
+
+[data-grund="glut"] {
+  --ton-50: #fffafa;
+  --ton-100: #fef3f3;
+  --ton-200: #f7e5e5;
+  --ton-300: #e8d0d0;
+  --ton-950: #241619;
+  --dunkel-flaeche: #2d1e21;
+  --dunkel-flaeche-erhoben: #322326;
+  --dunkel-flaeche-gedaempft: #291b1e;
+  --dunkel-rand: #3d2d30;
+  --dunkel-rand-stark: #4f3f42;
+}
+
+[data-grund="moos"] {
+  --ton-50: #f9fdfa;
+  --ton-100: #f1f8f3;
+  --ton-200: #e2efe5;
+  --ton-300: #cedbd1;
+  --ton-950: #15211a;
+  --dunkel-flaeche: #1d2922;
+  --dunkel-flaeche-erhoben: #222e27;
+  --dunkel-flaeche-gedaempft: #1a261f;
+  --dunkel-rand: #2c3833;
+  --dunkel-rand-stark: #3e4a45;
+}
+
+[data-grund="bernstein"] {
+  --ton-50: #fffcf7;
+  --ton-100: #fdf6ec;
+  --ton-200: #f4ecdd;
+  --ton-300: #e3d9c6;
+  --ton-950: #221c14;
+  --dunkel-flaeche: #2a241c;
+  --dunkel-flaeche-erhoben: #2f2921;
+  --dunkel-flaeche-gedaempft: #272119;
+  --dunkel-rand: #3a342c;
+  --dunkel-rand-stark: #4c463e;
+}
+
 /* Ausdrückliche Wahl des Benutzers. Weil sämtliche Werte über light-dark()
  * laufen, genügt das Umstellen von color-scheme - es gibt keinen zweiten
  * Satz Farben, der auseinanderlaufen könnte. */

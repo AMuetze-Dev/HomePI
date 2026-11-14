@@ -181,3 +181,50 @@ describe("Die Navigationsfläche", () => {
     expect(beiSchliessen).toHaveBeenCalled();
   });
 });
+
+describe("Die Bereiche beim Zeigen", () => {
+  it("schlägt rechts das Artefakt auf, auf das man zeigt", async () => {
+    // Vorher führte der Weg zu "Haushaltsbuch · Posten" über drei Schritte:
+    // Artefakt anklicken, warten, Fläche noch einmal aufziehen, Bereich
+    // anklicken. Dabei stand die Liste der Bereiche die ganze Zeit daneben.
+    zeige("/", [modul(), modul({ id: "haushaltsbuch", titel: "Haushaltsbuch" })]);
+    const haushalt = await screen.findByRole("link", { name: /Haushaltsbuch/ });
+
+    await userEvent.hover(haushalt);
+
+    const bereiche = await screen.findByRole("list", {
+      name: "Bereiche von Haushaltsbuch",
+    });
+    expect(within(bereiche).getByRole("link", { name: "Monatsplan" })).toHaveAttribute(
+      "href",
+      "/modul/haushaltsbuch/uebersicht",
+    );
+  });
+
+  it("tut dasselbe mit der Tastatur", async () => {
+    zeige("/", [modul(), modul({ id: "haushaltsbuch", titel: "Haushaltsbuch" })]);
+    const haushalt = await screen.findByRole("link", { name: /Haushaltsbuch/ });
+
+    haushalt.focus();
+
+    expect(
+      await screen.findByRole("list", { name: "Bereiche von Haushaltsbuch" }),
+    ).toBeInTheDocument();
+  });
+
+  it("fällt auf das geöffnete Artefakt zurück, sobald der Zeiger die Liste verlässt", async () => {
+    zeige("/modul/staffelpilot/spiele", [
+      modul(),
+      modul({ id: "haushaltsbuch", titel: "Haushaltsbuch" }),
+    ]);
+    const haushalt = await screen.findByRole("link", { name: /Haushaltsbuch/ });
+
+    await userEvent.hover(haushalt);
+    await screen.findByRole("list", { name: "Bereiche von Haushaltsbuch" });
+    await userEvent.unhover(haushalt);
+
+    expect(
+      await screen.findByRole("list", { name: "Bereiche von StaffelPilot" }),
+    ).toBeInTheDocument();
+  });
+});

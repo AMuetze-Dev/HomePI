@@ -3,7 +3,6 @@ import { useLocation } from "react-router-dom";
 
 import { useAnmeldung } from "../anmeldung/kontext";
 import stil from "./Huelle.module.css";
-import { Bereichsleiste } from "./Bereichsleiste";
 import { Kopfleiste } from "./Kopfleiste";
 import { Navigation } from "./Navigation";
 
@@ -101,19 +100,12 @@ export function Huelle({ children, schlicht = false }: Props) {
         Zum Inhalt springen
       </a>
 
-      {/* Kopfleiste und Bereichsleiste kleben zusammen am oberen Rand:
-          Beides ist Navigation, und beides soll beim Blättern durch eine
-          lange Tabelle stehen bleiben. Zwei getrennt klebende Zeilen
-          würden übereinander rutschen, sobald eine davon fehlt. */}
       {!schlicht && (
-        <div className={stil.kopfblock}>
-          <Kopfleiste
-            navigierbar={navigierbar}
-            navOffen={navOffen}
-            beiNavigation={() => setNavOffen((offen) => !offen)}
-          />
-          <Bereichsleiste />
-        </div>
+        <Kopfleiste
+          navigierbar={navigierbar}
+          navOffen={navOffen}
+          beiNavigation={() => setNavOffen((offen) => !offen)}
+        />
       )}
 
       <main id="inhalt" className={schlicht ? stil.inhaltSchlicht : stil.inhalt}>

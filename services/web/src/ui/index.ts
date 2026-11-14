@@ -1,5 +1,6 @@
 /** Sammelstelle der Bausteine - Ansichten importieren nur von hier. */
 export { Etikett } from "./Etikett";
+export { Farbwahl, type Farbe } from "./Farbwahl";
 export { Feld } from "./Feld";
 export { Hinweis } from "./Hinweis";
 export { Inhaltsbreite } from "./Inhaltsbreite";

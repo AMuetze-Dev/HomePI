@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as anmeldungApi from "../api/anmeldung";
 import type { Benutzer } from "../api/anmeldung";
 import * as client from "../api/client";
+import { GRUENDE } from "../huelle/darstellung";
 import { mitAnmeldung, TESTBENUTZER } from "../testhilfen";
 import { Einstellungen } from "./Einstellungen";
 
@@ -13,6 +14,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   document.documentElement.removeAttribute("data-thema");
   document.documentElement.removeAttribute("data-bewegung");
+  document.documentElement.removeAttribute("data-grund");
 });
 
 beforeEach(() => {
@@ -68,6 +70,37 @@ describe("Einstellungen", () => {
 
     expect(within(gruppe).getByRole("radio", { name: "System" })).toBeChecked();
     expect(document.documentElement).not.toHaveAttribute("data-thema");
+  });
+
+  it("lässt die Grundfarbe wählen und merkt sie sich", async () => {
+    zeige();
+
+    await userEvent.click(await screen.findByRole("radio", { name: "Glut" }));
+
+    expect(document.documentElement).toHaveAttribute("data-grund", "glut");
+    expect(localStorage.getItem("homepi.grund")).toBe("glut");
+  });
+
+  it("setzt für Nocturne gar kein Attribut", async () => {
+    // Es ist der Entwurf, wie er gezeichnet wurde, und steht so in
+    // tokens.css. Ein Attribut dafür wäre eine Ausnahme, die nichts ändert.
+    zeige();
+    await userEvent.click(await screen.findByRole("radio", { name: "Glut" }));
+
+    await userEvent.click(screen.getByRole("radio", { name: "Nocturne" }));
+
+    expect(document.documentElement).not.toHaveAttribute("data-grund");
+    expect(localStorage.getItem("homepi.grund")).toBeNull();
+  });
+
+  it("zeigt zu jeder Grundfarbe ihren Farbton", async () => {
+    // "Glut" und "Moos" sagen einem nichts, bevor man sie gesehen hat. Der
+    // Tupfen trägt dasselbe Attribut wie die Oberfläche und holt seine Farbe
+    // damit aus derselben Quelle.
+    zeige();
+    const gruppe = await screen.findByRole("radiogroup", { name: "Grundfarbe" });
+
+    expect(gruppe.querySelectorAll("[data-grund]")).toHaveLength(GRUENDE.length);
   });
 
   it("bestellt Bewegung ab", async () => {

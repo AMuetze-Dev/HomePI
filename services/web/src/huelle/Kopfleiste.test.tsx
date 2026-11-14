@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -53,16 +53,23 @@ describe("Kopfleiste", () => {
     expect(screen.queryByRole("navigation", { name: "Pfad" })).not.toBeInTheDocument();
   });
 
-  it("zeigt Artefakt und Bereich, wenn einer offen ist", async () => {
+  it("nennt im Pfad nur das Artefakt - den Bereich zeigen die Bereiche", async () => {
+    // Zweimal dasselbe Wort in einer Zeile ist eines zu viel: Welcher
+    // Bereich gilt, steht an der Markierung daneben.
     zeige("/modul/staffelpilot/spiele");
 
     // Erst warten, bis das Verzeichnis da ist: Bis dahin steht die Kennung
     // aus der Adresse im Weg, und genau das prueft der naechste Test.
     await screen.findByText("StaffelPilot");
-    const pfad = screen.getByRole("navigation", { name: "Pfad" });
 
-    expect(pfad).toHaveTextContent("StaffelPilot");
-    expect(pfad).toHaveTextContent("Spielprüfung");
+    expect(screen.getByRole("navigation", { name: "Pfad" })).toHaveTextContent(
+      "StaffelPilot",
+    );
+    expect(
+      within(screen.getByRole("navigation", { name: "Bereiche" })).getByRole("link", {
+        name: "Spielprüfung",
+      }),
+    ).toHaveAttribute("aria-current", "page");
   });
 
   it("nennt die Kennung, solange der Titel noch unterwegs ist", async () => {

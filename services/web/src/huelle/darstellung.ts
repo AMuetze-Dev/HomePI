@@ -14,6 +14,33 @@
 
 export const THEMA_SCHLUESSEL = "homepi.thema";
 export const BEWEGUNG_SCHLUESSEL = "homepi.bewegung";
+export const GRUND_SCHLUESSEL = "homepi.grund";
+
+/**
+ * Die wählbaren Grundfarben.
+ *
+ * Die Werte dazu stehen in `styles/tokens.css` unter `[data-grund="…"]`;
+ * hier stehen nur Kennung und Wort. Eine zweite Liste von Hexwerten für die
+ * Vorschau wäre die erste, die veraltet — der Farbtupfen in den
+ * Einstellungen trägt deshalb dasselbe Attribut und zeigt damit genau die
+ * Farbe, die die Oberfläche annehmen wird.
+ *
+ * „nocturne" ist die Voreinstellung und setzt kein Attribut: Es ist der
+ * Entwurf, wie er gezeichnet wurde.
+ */
+export const GRUENDE = [
+  { wert: "nocturne", wort: "Nocturne" },
+  { wert: "schiefer", wort: "Schiefer" },
+  { wert: "glut", wort: "Glut" },
+  { wert: "moos", wort: "Moos" },
+  { wert: "bernstein", wort: "Bernstein" },
+] as const;
+
+export type Grund = (typeof GRUENDE)[number]["wert"];
+
+export function istGrund(wert: string | null): wert is Grund {
+  return GRUENDE.some((g) => g.wert === wert);
+}
 
 export function wendeDarstellungAn(): void {
   const wurzel = document.documentElement;
@@ -26,6 +53,11 @@ export function wendeDarstellungAn(): void {
 
     if (localStorage.getItem(BEWEGUNG_SCHLUESSEL) === "reduziert") {
       wurzel.setAttribute("data-bewegung", "reduziert");
+    }
+
+    const grund = localStorage.getItem(GRUND_SCHLUESSEL);
+    if (istGrund(grund) && grund !== "nocturne") {
+      wurzel.setAttribute("data-grund", grund);
     }
   } catch {
     // Privates Fenster oder blockierte Speicherung: dann gilt das System.

@@ -79,6 +79,30 @@ Das ist kein Schönheitsgewinn, sondern der Grund, warum die beiden Schemata
 nicht auseinanderlaufen können: es gibt keinen zweiten Satz Farben, den man
 vergessen könnte mitzupflegen. Der Umschalter setzt nur `color-scheme`.
 
+### Der Stich des Grundes ist wählbar
+
+„Nocturne" ist der Entwurf, wie er gezeichnet wurde: ein Blauviolett-Stich,
+der auf einem Monitor warm wirkt und auf einem anderen kalt. Wer ihn nicht
+will, nimmt **Schiefer** (ohne Stich), **Glut**, **Moos** oder
+**Bernstein** — die Auswahl steht in den Einstellungen.
+
+Geändert wird dabei nur der Grund samt seiner Flächen und Ränder, **nicht der
+Akzent**: Der trägt Bedeutung und soll nicht mit dem Geschmack wandern.
+
+Die Werte stehen in `tokens.css` unter `[data-grund="…"]`, und zwar
+ausdrücklich **nicht** an `:root` festgenagelt. Dadurch kann ein einzelnes
+Element dasselbe Attribut tragen und zeigt dann diese Farbe — genau das macht
+der Farbtupfen in den Einstellungen. Eine zweite Liste von Hexwerten für die
+Vorschau wäre die erste, die veraltet.
+
+Dabei eine Falle, die einen kostet, wenn man sie nicht kennt: **`var()` in
+einer Custom Property wird dort aufgelöst, wo die Eigenschaft deklariert
+ist**, nicht dort, wo sie geerbt wird. `--farbe-grund` rechnet also mit dem
+`--ton-950` von `:root`, und das Ergebnis erben alle Kinder fertig
+ausgerechnet; ein Element, das `--ton-950` selbst überschreibt, ändert daran
+nichts mehr. Die Rollen, die ein Grund neu ergibt, werden deshalb am Wähler
+`[data-grund]` noch einmal deklariert.
+
 Der Dunkelmodus ist **kein invertierter Hellmodus**. Im Dunkeln braucht es
 weniger Kontrast, nicht denselben; Flächen werden angehoben statt Schatten
 verstärkt. Gezeichnet wurde der Entwurf für Dunkel; die hellen Werte sind in
@@ -151,6 +175,7 @@ erscheinende Elemente. Beide ohne Überschwingen.
 | `Marke`         | vier Felder, eines im Akzent — Zeichen und Navigationsknopf      |
 | `Monogramm`     | Kürzel für ein Konto (zwei Buchstaben) oder ein Artefakt (einer) |
 | `Segmentwahl`   | zwei bis vier Möglichkeiten, auf echten Optionsfeldern           |
+| `Farbwahl`      | dasselbe, aber man sieht die Farbe statt nur ihren Namen         |
 | `Schalter`      | ein Zustand, der sofort gilt, auf einem echten Kästchen          |
 | `Etikett`       | kompakter Zustand oder Kennung; `mono` für Technisches           |
 | `Statuspunkt`   | reine Dekoration, Bedeutung steht im Text daneben                |
@@ -240,6 +265,14 @@ die Taste in ihrer Fußzeile — außer auf Geräten, die keine haben.
 Die Seite darunter bleibt schemenhaft sichtbar. Nicht als Effekt: Sie ist die
 Antwort auf „wohin komme ich zurück, wenn ich das hier wegklicke".
 
+**Wer auf ein Artefakt zeigt, sieht dessen Bereiche.** Die rechte Spalte
+folgt dem Zeiger (und dem Tastaturfokus), nicht nur dem geöffneten Artefakt.
+Vorher führte der Weg zu „Haushaltsbuch · Posten" über drei Schritte:
+Artefakt anklicken, warten, Fläche noch einmal aufziehen, Bereich anklicken —
+während die Liste der Bereiche die ganze Zeit zwei Zentimeter daneben stand.
+Das Monogramm im Akzent bleibt dabei dem **geöffneten** Artefakt: Sonst sähen
+zwei Zeilen gleich aus und keine sagte mehr, wo man wirklich ist.
+
 Ein Artefakt ohne Bereiche hat schlicht keine zweite Ebene. Kein leerer
 Platzhalter, keine Spalte, die aussieht, als fehle etwas — **derselbe Stil,
 unterschiedlicher Umfang.**
@@ -255,12 +288,18 @@ Bewegung innerhalb eines Artefakts — bei StaffelPilot zwischen zehn Flächen.
 Jedes Mal erst die Navigationsfläche zu rufen wären zwei Handgriffe statt
 einem, und zwar genau dort, wo man am häufigsten greift.
 
-Sie steht deshalb **direkt unter der Brotkrume und klebt mit ihr am oberen
-Rand** — nicht im Inhalt. Im Inhalt lag sie in dessen Spalte, und die ist je
-Bereich verschieden breit: Ein Bereich mit `text` ist 40 rem breit, einer mit
-`voll` nimmt den ganzen Monitor. Die Leiste wanderte also bei jedem Wechsel
-mit, sprang in der Breite und saß auf einem breiten Monitor mitten im Bild
-statt an einer Kante. Navigation gehört zur Hülle.
+Sie steht deshalb **in der Kopfleiste selbst**, hinter dem Namen des
+Artefakts — nicht im Inhalt und auch nicht als zweite Zeile darunter. Im
+Inhalt lag sie in dessen Spalte, und die ist je Bereich verschieden breit:
+Ein Bereich mit `text` ist 40 rem breit, einer mit `voll` nimmt den ganzen
+Monitor. Die Leiste wanderte also bei jedem Wechsel mit, sprang in der
+Breite und saß auf einem breiten Monitor mitten im Bild statt an einer
+Kante. Als eigene Zeile wiederum waren es zwei Zeilen für eine Aufgabe: eine,
+die sagt wo man ist, und eine, mit der man sich bewegt.
+
+Das letzte Glied der Brotkrume entfällt dafür. Welcher Bereich gilt, steht an
+der Markierung in der Leiste daneben — zweimal dasselbe Wort in einer Zeile
+ist eines zu viel.
 
 Sie zeigt nur die **sichtbaren** Unterseiten: Eine versteckte ist eine echte
 Adresse, aber kein Reiter. Ein Artefakt ohne zweite Ebene bekommt gar keine

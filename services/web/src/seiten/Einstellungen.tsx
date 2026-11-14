@@ -3,10 +3,21 @@ import { useState, type ReactNode } from "react";
 import { aenderePasswort, type Rolle } from "../api/anmeldung";
 import { useAnmeldung } from "../anmeldung/kontext";
 import { SystemStatus } from "../components/SystemStatus";
+import { GRUENDE } from "../huelle/darstellung";
 import { useBewegung } from "../huelle/useBewegung";
+import { useGrund } from "../huelle/useGrund";
 import { useThema, type Thema } from "../huelle/useThema";
 import { useModule } from "../module/useModule";
-import { Etikett, Feld, Hinweis, Knopf, Regel, Schalter, Segmentwahl } from "../ui";
+import {
+  Etikett,
+  Farbwahl,
+  Feld,
+  Hinweis,
+  Knopf,
+  Regel,
+  Schalter,
+  Segmentwahl,
+} from "../ui";
 import stil from "./Einstellungen.module.css";
 
 const THEMEN = [
@@ -36,6 +47,7 @@ export function Einstellungen() {
   const { benutzer } = useAnmeldung();
   const { thema, setzeThema } = useThema();
   const { reduziert, setzeReduziert } = useBewegung();
+  const { grund, setzeGrund } = useGrund();
 
   return (
     <div className={stil.seite}>
@@ -51,6 +63,18 @@ export function Einstellungen() {
             optionen={THEMEN}
             wert={thema}
             beiWahl={setzeThema}
+          />
+        </Zeile>
+
+        <Zeile
+          wort="Grundfarbe"
+          erklaerung="Der Stich des Hintergrunds. Der Akzent bleibt, wie er ist."
+        >
+          <Farbwahl
+            beschriftung="Grundfarbe"
+            optionen={GRUENDE}
+            wert={grund}
+            beiWahl={setzeGrund}
           />
         </Zeile>
 

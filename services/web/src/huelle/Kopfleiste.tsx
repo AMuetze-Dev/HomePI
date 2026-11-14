@@ -1,8 +1,8 @@
 import { Link, useMatch } from "react-router-dom";
 
-import { sichtbareUnterseiten } from "../module/register";
 import { useModule } from "../module/useModule";
 import { Marke } from "../ui";
+import { Bereichsleiste } from "./Bereichsleiste";
 import { Benutzerleiste } from "./Benutzerleiste";
 import stil from "./Kopfleiste.module.css";
 
@@ -14,12 +14,17 @@ interface Props {
 }
 
 /**
- * Eine Zeile über allem: Zeichen, Weg, Konto.
+ * Eine Zeile über allem: Zeichen, Weg, Bereiche, Konto.
  *
- * Sie beantwortet genau eine Frage - wo bin ich gerade - und hält sich
- * sonst heraus. Die frühere Kopfzeile trug Umschalter und Knöpfe; die
- * stehen jetzt dort, wo sie hingehören, nämlich in den Einstellungen und in
- * der Navigation.
+ * Sie beantwortet, wo man ist — und lässt einen dort weitergehen. Die
+ * Bereiche des geöffneten Artefakts stehen in **dieser** Zeile und nicht in
+ * einer zweiten darunter: Eine Leiste, die nur sagt, wo man ist, und eine
+ * zweite, mit der man sich bewegt, sind zwei Zeilen für eine Aufgabe. Das
+ * letzte Glied der Brotkrume entfällt dafür — welcher Bereich gilt, steht
+ * schon an der Markierung in den Bereichen daneben.
+ *
+ * Die frühere Kopfzeile trug Umschalter und Knöpfe; die stehen jetzt dort,
+ * wo sie hingehören, nämlich in den Einstellungen und in der Navigation.
  *
  * Auf der Startseite sieht sie anders aus: Dort gibt es keinen Weg zu
  * zeigen, also steht statt der Brotkrume der Name der Installation und das
@@ -72,6 +77,8 @@ export function Kopfleiste({ navigierbar, navOffen, beiNavigation }: Props) {
         </nav>
       )}
 
+      <Bereichsleiste />
+
       <div className={stil.rechts}>
         {weg.length === 0 && <span className={stil.datum}>{heute()}</span>}
         <Benutzerleiste />
@@ -97,18 +104,16 @@ function useWeg(): string[] {
   if (!modulTreffer) return [];
 
   const id = modulTreffer.params.id ?? "";
-  const rest = modulTreffer.params["*"] ?? "";
   const modul =
     zustand.phase === "fertig" ? zustand.module.find((m) => m.id === id) : undefined;
 
-  // Solange das Manifest unterwegs ist, steht die Kennung da - und nicht
-  // ein Platzhalter, der eine Zeile später durch etwas anderes ersetzt wird.
-  const weg = [modul?.titel ?? id];
-
-  const bereich = sichtbareUnterseiten(id).find((b) => b.id === rest);
-  if (bereich) weg.push(bereich.wort);
-
-  return weg;
+  // Nur das Artefakt. Der Bereich steht nicht hier, sondern als markierter
+  // Eintrag in der Bereichsleiste daneben -- zweimal dasselbe Wort in einer
+  // Zeile ist eines zu viel.
+  //
+  // Solange das Manifest unterwegs ist, steht die Kennung da und nicht ein
+  // Platzhalter, der eine Zeile später durch etwas anderes ersetzt wird.
+  return [modul?.titel ?? id];
 }
 
 /** „Dienstag, 12. November" - ohne Jahr, weil es niemanden interessiert,

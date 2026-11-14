@@ -7,18 +7,6 @@
   min-height: 100dvh;
 }
 
-/* Der klebende Block am oberen Rand: Brotkrume und, wenn ein Artefakt
-   offen ist, seine Bereiche. Die Kopfleiste klebte frueher selbst; seit
-   die Bereichsleiste darunter dazugehoert, klebt der Block. */
-.kopfblock {
-  position: sticky;
-  top: 0;
-  z-index: var(--ebene-klebend);
-  flex: 0 0 auto;
-  background: color-mix(in srgb, var(--farbe-grund) 86%, transparent);
-  backdrop-filter: saturate(140%) blur(14px);
-}
-
 .inhalt,
 .inhaltSchlicht {
   flex: 1;

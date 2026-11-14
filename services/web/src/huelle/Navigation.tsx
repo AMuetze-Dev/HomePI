@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, useMatch, useNavigate } from "react-router-dom";
 
 import type { ModulEintrag } from "../api/client";
@@ -53,8 +53,20 @@ export function Navigation({ beiSchliessen }: Props) {
   }, []);
 
   const module = zustand.phase === "fertig" ? zustand.module : [];
-  const offen = module.find((m) => m.id === offenesModul);
-  const bereiche = offen ? sichtbareUnterseiten(offen.id) : [];
+
+  /*
+   * Welches Artefakt rechts aufgeschlagen ist.
+   *
+   * Voreinstellung ist das geöffnete. Zeigt man aber auf ein anderes, zeigt
+   * die rechte Spalte dessen Bereiche — und man kann von hier aus direkt
+   * dorthin springen. Vorher führte der Weg zu „Haushaltsbuch · Posten"
+   * über drei Schritte: Artefakt anklicken, warten, Fläche noch einmal
+   * aufziehen, Bereich anklicken. Dabei stand die Liste der Bereiche die
+   * ganze Zeit zwei Zentimeter daneben.
+   */
+  const [vorschau, setVorschau] = useState<string | null>(null);
+  const gezeigt = module.find((m) => m.id === (vorschau ?? offenesModul));
+  const bereiche = gezeigt ? sichtbareUnterseiten(gezeigt.id) : [];
 
   return (
     <div className={stil.schleier}>
@@ -148,10 +160,23 @@ export function Navigation({ beiSchliessen }: Props) {
                 jede Suche nach einem Eintrag trifft doppelt. Den Namen
                 trägt hier der Dialog darum herum. */}
             {module.length > 0 && (
-              <ul className={stil.liste}>
+              <ul
+                className={stil.liste}
+                /* Zurück auf das geöffnete Artefakt, sobald der Zeiger die
+                   Liste verlässt. Bei der Tastatur passiert das nicht --
+                   dort bleibt stehen, was zuletzt den Fokus hatte, und das
+                   ist richtig so: Von dort geht es mit dem Tabulator in die
+                   Bereiche daneben. */
+                onMouseLeave={() => setVorschau(null)}
+              >
                 {module.map((modul) => (
                   <li key={modul.id}>
-                    <Artefakt modul={modul} offen={modul.id === offenesModul} />
+                    <Artefakt
+                      modul={modul}
+                      offen={modul.id === offenesModul}
+                      gezeigt={modul.id === gezeigt?.id}
+                      beiVorschau={() => setVorschau(modul.id)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -159,14 +184,17 @@ export function Navigation({ beiSchliessen }: Props) {
           </div>
 
           <div className={stil.bereichsspalte}>
-            {offen && bereiche.length > 0 && (
+            {gezeigt && bereiche.length > 0 && (
               <>
-                <p className={stil.gruppe}>Bereiche in {offen.titel}</p>
-                <ul className={stil.bereiche} aria-label={`Bereiche von ${offen.titel}`}>
+                <p className={stil.gruppe}>Bereiche in {gezeigt.titel}</p>
+                <ul
+                  className={stil.bereiche}
+                  aria-label={`Bereiche von ${gezeigt.titel}`}
+                >
                   {bereiche.map((bereich) => (
                     <li key={bereich.id}>
                       <NavLink
-                        to={`/modul/${offen.id}/${bereich.id}`}
+                        to={`/modul/${gezeigt.id}/${bereich.id}`}
                         className={({ isActive }) =>
                           isActive ? stil.bereichHier : stil.bereich
                         }
@@ -206,12 +234,29 @@ export function Navigation({ beiSchliessen }: Props) {
   );
 }
 
-function Artefakt({ modul, offen }: { modul: ModulEintrag; offen: boolean }) {
+function Artefakt({
+  modul,
+  offen,
+  gezeigt,
+  beiVorschau,
+}: {
+  modul: ModulEintrag;
+  /** Dieses Artefakt ist gerade aufgeschlagen. */
+  offen: boolean;
+  /** Seine Bereiche stehen gerade rechts. */
+  gezeigt: boolean;
+  beiVorschau: () => void;
+}) {
   return (
     <NavLink
       to={`/modul/${modul.id}`}
-      className={(offen ? stil.artefaktHier : stil.artefakt) ?? ""}
+      className={(offen || gezeigt ? stil.artefaktHier : stil.artefakt) ?? ""}
+      onMouseEnter={beiVorschau}
+      onFocus={beiVorschau}
     >
+      {/* Das Monogramm im Akzent bleibt dem GEOEFFNETEN Artefakt. Wer nur
+          darauf zeigt, bekommt die volle Schriftfarbe - sonst sehen zwei
+          Zeilen gleich aus und keine sagt mehr, wo man wirklich ist. */}
       <Monogramm name={einWort(modul.titel)} form="feld" betont={offen} />
       <span className={stil.titel}>{modul.titel}</span>
       {/* Der Punkt ist Dekoration, das Wort traegt die Bedeutung. Nur farbig

@@ -1,26 +1,26 @@
 /* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
    Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
 
-/* Waagerecht scrollbar statt umbrechend: Zehn Woerter brechen auf einem
-   Telefon in drei Zeilen um, und der Inhalt darunter rutscht bei jedem
-   Wechsel hoch und runter. */
+/*
+ * Die Bereiche stehen IN der Kopfleiste, nicht als zweite Zeile darunter.
+ * Sie nimmt deshalb den Platz zwischen Brotkrume und Konto und bringt
+ * keinen eigenen Rand, keine eigene Linie und keinen eigenen Abstand mit -
+ * das alles traegt die Zeile um sie herum.
+ *
+ * Waagerecht scrollbar statt umbrechend: Zehn Woerter brechen auf einem
+ * Telefon in drei Zeilen um, und die Kopfleiste ist eine Zeile hoch.
+ * `min-width: 0` ist dafuer noetig - ohne das waechst ein Flex-Kind auf
+ * seinen Inhalt und schiebt das Konto aus dem Bild, statt zu scrollen.
+ */
 .leiste {
   display: flex;
-  gap: var(--raum-2);
-  flex: 0 0 auto;
-  padding: var(--raum-3) var(--raum-rand);
+  align-items: center;
+  gap: var(--raum-1);
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: var(--raum-2);
   overflow-x: auto;
   scrollbar-width: none;
-  /* Dieselbe ausblendende Linie wie ueberall - als Hintergrund, weil ein
-     Rand an der Kante hart abschneiden wuerde. */
-  background: linear-gradient(
-      to right,
-      transparent,
-      var(--farbe-linie) 3rem,
-      var(--farbe-linie) calc(100% - 3rem),
-      transparent
-    )
-    bottom / 100% 1px no-repeat;
 }
 
 .leiste::-webkit-scrollbar {
@@ -32,11 +32,12 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  min-height: 2rem;
-  padding: var(--raum-1) var(--raum-3);
+  min-height: 1.75rem;
+  padding: 0 var(--raum-3);
   border-radius: var(--rundung-md);
   font-size: var(--text-sm);
-  color: var(--farbe-text-gedaempft);
+  white-space: nowrap;
+  color: var(--farbe-text-leise);
   box-shadow: inset 0 0 0 1px transparent;
   /* Ein Bereichswechsel ist die haeufigste Bewegung im Artefakt. Was man
      hundertmal am Tag tut, darf nicht animiert sein - es fuehlt sich sonst
@@ -58,12 +59,15 @@
 .bereich:focus-visible,
 .bereichAktiv:focus-visible {
   outline: 2px solid var(--farbe-fokus);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
+/* Mit dem Finger braucht das Ziel 44 px. Die Kopfleiste ist 48 px hoch -
+   es passt gerade, und der Rahmen des aktiven Eintrags bleibt dabei
+   kleiner als die Zeile. */
 @media (pointer: coarse) {
   .bereich,
   .bereichAktiv {
-    min-height: 2.75rem;
+    min-height: 2.5rem;
   }
 }
