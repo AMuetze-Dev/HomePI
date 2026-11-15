@@ -255,7 +255,10 @@ function Spielplan({
   onNaechsteRunde: () => void;
   onZuruecksetzen: () => void;
 }) {
-  const offen = spiele.filter((spiel) => spiel.zustand !== "beendet");
+  // Ein Freilos ist kein Spiel: niemand steht dafuer am Tisch. Es steht im
+  // Raster, wo es erklaert, warum einer durch ist - aber nicht in der
+  // Liste dessen, was noch zu spielen ist.
+  const offen = spiele.filter((spiel) => spiel.zustand !== "beendet" && !spiel.freilos);
   const gewertet = spiele.filter(
     (spiel) => spiel.zustand === "beendet" && !spiel.freilos,
   );

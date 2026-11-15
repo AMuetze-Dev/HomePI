@@ -11,7 +11,7 @@ und [`../../docs/12-testen.md`](../../docs/12-testen.md) für die Prüfebenen.
 ## Stand (09.11.2026)
 
 Gebaut: Teilnehmerliste, Auslosung mit Vorschau und Saat, drei Spielmodi
-(Gruppen + KO, reines KO mit Freilosen, Schweizer System), Spielplan mit
+(Gruppen + KO, reines KO mit Freilos, Schweizer System), Spielplan mit
 Tischen und geschätzten Zeiten, Tabellen mit geteilten Plätzen,
 Entscheidungsspiele bei Gleichstand an der Grenze, ein KO-Raster, das vor dem
 ersten Ball vollständig steht, und eine öffentliche Dashboard-Ansicht, die den
@@ -35,11 +35,30 @@ sind es zwei Abschnitte und zwei Klappen. Die Gestaltung folgt derselben
 Linie: Haarlinien statt Kästen, Hierarchie über Größe statt über Farbe,
 Signalfarbe nur dort, wo etwas ein Signal ist.
 
-**Eine Rechnung, die immer wieder auffällt:** 20 Teilnehmer im reinen KO
-ergeben ein 32er-Raster mit 12 Freilosen und **4** Erstrundenspielen. Das ist
-richtig und fühlt sich falsch an — 12 von 20 sehen in Runde 1 keinen Ball.
-„Jeder spielt in Runde 1“ ist mit einem Setzraster nicht erfüllbar; die
-Antwort darauf ist Gruppen + KO, nicht eine Änderung an `los.py`.
+**Der dritte Durchgang galt dem Raster.** 19 Teilnehmer im reinen KO ergaben
+ein 32er-Raster mit 13 Freilosen und **3** Erstrundenspielen. Das ist
+turniergerecht und war trotzdem falsch: 16 von 19 kamen am Feierabend vorbei
+und sahen in Runde 1 keinen Ball. Seitdem gibt es zwei Raster, und die Frage,
+welches gilt, ist die Frage, ob hier schon gespielt wurde:
+
+* `los.ausgelostes_ko_raster` - **reines KO ohne zweite Chance.** Jeder
+  spielt in Runde 1; bei ungerader Zahl bekommt genau einer ein Freilos, und
+  zwar **ausgelost**. Eine Setzliste gibt es vor dem ersten Ball nicht, also
+  darf sie auch nicht entscheiden, wer zusieht. 19 ergeben damit neun Spiele
+  und ein Freilos.
+* `los.ko_raster` - **nach der Gruppenphase und im Doppel-KO.** Hier hat
+  jeder schon gespielt beziehungsweise spielt ohnehin noch einmal. Dann ist
+  ein Freilos kein verlorener Abend, und das Setzraster ist das bessere: Es
+  haelt die Staerksten auseinander, und die Freilose gehen an die Gesetzten
+  statt an das Los.
+
+Ein Freilos ist ein `Spiel` mit `freilos=True` - dieselbe Form wie im
+Schweizer System. Es belegt keinen Tisch (`speicher.planzeilen`), zaehlt in
+keine Tabelle (`speicher._ergebnisse`), steht nicht in der Liste der offenen
+Spiele der Oberflaeche, und im Raster steht neben dem Namen "Freilos". Steht
+sein Mann noch nicht fest - in einer spaeteren Runde laeuft dort ein Sieger
+ein -, bleibt es `geplant` und entscheidet sich in
+`speicher._sieger_weiterreichen`, sobald er eintrifft.
 
 **Sechs Zusagen sind nicht verhandelbar** und gehören in jede Änderung:
 
@@ -163,7 +182,8 @@ eine Datenbank — und ab da wird nicht mehr getestet, sondern geklickt.
 | Wer ist „gleich dran"? | `dienst.planen`, Feld `gleich_dran` |
 | Was kommt nach der Gruppenphase? | `dienst.naechster_schritt` |
 | Wer kommt gegen wen im Raster? | `los.ko_setzliste` und `los.ko_raster` |
-| Wer bekommt ein Freilos? | `los.ko_raster` (die Gesetzten) bzw. `los.schweizer_paarung` |
+| Wer kommt gegen wen ohne Gruppen? | `los.ausgelostes_ko_raster` |
+| Wer bekommt ein Freilos? | `los.ausgelostes_ko_raster` (das Los), `los.ko_raster` (die Gesetzten), `los.schweizer_paarung` |
 
 ---
 

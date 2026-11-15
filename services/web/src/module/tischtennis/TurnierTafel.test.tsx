@@ -137,6 +137,34 @@ describe("Turnier: während gespielt wird", () => {
     expect(onSieger).toHaveBeenCalledWith("s1", "p2");
   });
 
+  it("stellt ein Freilos nicht in die Liste der offenen Spiele", () => {
+    /* Ein Freilos ist kein Spiel: niemand steht dafuer am Tisch, und
+       solange sein Platz noch nicht feststeht, steht es trotzdem auf
+       "geplant". In der Zaehlung "noch X zu spielen" waere es eine zu viel,
+       und ein "gewinnt"-Knopf daran waere eine Handlung ins Leere. Im
+       Raster steht es weiter - dort erklaert es, warum einer durch ist. */
+    aufbauen({
+      turnier: LAEUFT,
+      spiele: [
+        spiel(),
+        spiel({
+          id: "s2",
+          nummer: 2,
+          bezeichnung: "Halbfinale, Freilos",
+          freilos: true,
+          gast: null,
+          gast_id: null,
+          gast_herkunft: "Freilos",
+        }),
+      ],
+    });
+
+    expect(
+      screen.getByRole("heading", { name: /Noch 1 zu spielen/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Halbfinale, Freilos")).not.toBeInTheDocument();
+  });
+
   it("pfeift ein Spiel an", async () => {
     const { onBeginnen } = aufbauen({ turnier: LAEUFT, spiele: [spiel()] });
 
