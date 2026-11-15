@@ -7,18 +7,37 @@ hier gearbeitet wird und was noch aussteht.
 Lies zuerst [`../../docs/06-artefakte.md`](../../docs/06-artefakte.md) — dort
 steht, warum ein Artefakt ein Modul im Gateway ist und kein eigener Container.
 
-## Stand (02.11.2026)
+## Stand (15.11.2026)
 
 Gebaut: Personen, Konten, Kategorien und Posten mit vollem CRUD; der
 Monatsplan mit Aufteilung nach Gewichten, Rücklagen und Sparquote je Person;
-das Flussbild als Sankey; vier Flächen in der Oberfläche. 64 Artefakt-Tests
-(95 % Zeilen), 68 Tests der Oberfläche.
+die **Anlage aus dem Überschuss**; das Flussbild als Sankey; vier Flächen in
+der Oberfläche. 86 Artefakt-Tests (96 % Zeilen), 82 Tests der Oberfläche.
+
+**Die Anlage ist die jüngste Entscheidung und die mit den meisten Fallen.**
+Ein Posten mit `anlage_gewicht` hat keinen eigenen Betrag: Er bekommt seinen
+Anteil an dem, was seiner Person nach allen Kosten und nach ihrem `sockel`
+übrig bleibt. Daraus folgt dreierlei, und wer eines davon übersieht, baut
+einen stillen Fehler ein:
+
+* **Zwei Durchgänge, nicht einer.** `dienst.anlagebetraege` rechnet den
+  Haushalt zuerst *ohne* die Anlageposten durch — ihr Topf ist das Ergebnis.
+  Mit ihnen liefe die Rechnung im Kreis. Beide Durchgänge teilen sich
+  `_durchrechnen`; wer dort etwas ändert, ändert beide.
+* **Wer den Betrag braucht, muss ihn erfragen.** `posten.betrag` ist null.
+  Monatsplan *und* Flussbild holen sich die Zahl aus `anlagebetraege` — ein
+  dritter Ort, der `monatsrate` direkt aufruft, zeigt stillschweigend null.
+* **Ein Anlageposten gehört zu einer Person.** Auf einem gemeinschaftlichen
+  Konto gibt es keinen Überschuss, aus dem er schöpfen könnte;
+  `speicher._anlage_ordnen` weist das ab und setzt Betrag und Rhythmus
+  zurück. Die Regel steht dort und nicht im Schema, weil beide Wege hinein —
+  Anlegen und Ändern — dort zusammenlaufen.
 
 Offen, in der Reihenfolge, in der es sich lohnt:
 
 | | |
 |---|---|
-| **Migrationen** | `homepi schema` legt nur an. Eine neue Spalte in einer bestehenden Tabelle hält das Gateway in Produktion auf `unhealthy` an — gilt für jedes Artefakt, hier aber ab der ersten Änderung am Modell |
+| **Migrationen** | `homepi schema` legt nur an. Eine neue Spalte in einer bestehenden Tabelle hält das Gateway in Produktion auf `unhealthy` an. Zwei gibt es inzwischen (`personen.sockel`, `posten.anlage_gewicht`), eingespielt mit `scripts/migrationen/2026-11-15-haushaltsbuch-anlage.sql` — die nächste gehört genauso dorthin |
 | **Ist gegen Soll** | Das Artefakt kennt keine Kontostände. Ob die Rücklage tatsächlich so hoch ist wie gerechnet, muss man im Online-Banking nachsehen. Ein Feld „Stand am" je Rücklagenkonto wäre der kleinste nützliche Schritt — eine Buchhaltung ausdrücklich nicht |
 | **Jahresansicht** | Welcher Monat welche Abbuchungen trägt, steht heute nur je Monat. Eine Zeile über zwölf Monate würde zeigen, wo sich Jahresbeträge häufen |
 | **Beispielhaushalt** | `POST /kategorien/grundgeruest` legt die Kategorien an. Ein vollständiger Beispielhaushalt zum Durchklicken fehlt |

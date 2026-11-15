@@ -15,8 +15,8 @@ const MIETE = "55555555-5555-5555-5555-555555555555";
 
 function personen(): api.Person[] {
   return [
-    { id: AARON, name: "Aaron", reihenfolge: 0 },
-    { id: JESSI, name: "Jessi", reihenfolge: 1 },
+    { id: AARON, name: "Aaron", reihenfolge: 0, sockel: "0.00" },
+    { id: JESSI, name: "Jessi", reihenfolge: 1, sockel: "0.00" },
   ];
 }
 
@@ -50,6 +50,7 @@ function posten(rest: Partial<api.Posten> = {}): api.Posten {
     kategorie_id: WOHNEN,
     variabel: false,
     aktiv: true,
+    anlage_gewicht: null,
     anteile: [
       { person_id: JESSI, gewicht: 1 },
       { person_id: AARON, gewicht: 2 },
@@ -57,6 +58,16 @@ function posten(rest: Partial<api.Posten> = {}): api.Posten {
     ...rest,
   };
 }
+
+/** Ein Konto mit Inhaber - nur dort gibt es einen Überschuss einer Person. */
+const EIGENES: api.Konto = {
+  id: "77777777-7777-4777-8777-777777777777",
+  name: "CON1",
+  art: "verteiler",
+  inhaber_id: AARON,
+  notiz: "",
+  reihenfolge: 1,
+};
 
 function zeile(): api.PostenZeile {
   return {
@@ -93,6 +104,8 @@ function bilanz(name: string, einzahlung: string): api.PersonBilanz {
     rest: "2400.00",
     sparquote: "0.0",
     moegliche_sparquote: "80.0",
+    anlage: "0.00",
+    sockel: "0.00",
     nach_kategorie: [
       { kategorie: "Wohnen", betrag: einzahlung, zaehlt_als_sparen: false },
     ],
@@ -429,6 +442,7 @@ describe("Posten", () => {
         { person_id: AARON, gewicht: 1 },
         { person_id: JESSI, gewicht: 1 },
       ],
+      anlage_gewicht: null,
     });
   });
 
@@ -626,7 +640,11 @@ describe("Stammdaten", () => {
     await userEvent.type(feld, "Aaron M.");
     await userEvent.click(abschnitt.getByRole("button", { name: /umbenennen/ }));
 
-    expect(api.aenderePerson).toHaveBeenCalledWith(AARON, { name: "Aaron M." });
+    expect(api.aenderePerson).toHaveBeenCalledWith(AARON, {
+      name: "Aaron M.",
+      // Steht schon da und wird unveraendert mitgeschickt.
+      sockel: "0.00",
+    });
     expect(api.legePersonAn).not.toHaveBeenCalled();
   });
 
@@ -693,5 +711,105 @@ describe("Geldfluss", () => {
     render(<HaushaltsbuchSeite unterseite="fluss" />);
 
     expect(await screen.findByText(/Noch nichts zu zeigen/)).toBeInTheDocument();
+  });
+});
+
+describe("Anlage aus dem Überschuss", () => {
+  it("legt einen Posten an, der sich am Überschuss orientiert", async () => {
+    /* Kein Betrag, sondern ein Gewicht: Was angelegt wird, rechnet das
+       Haushaltsbuch Monat für Monat aus dem aus, was übrig bleibt. */
+    alles({ konten: [...konten(), EIGENES] });
+
+    render(<HaushaltsbuchSeite unterseite="posten" />);
+
+    await userEvent.type(await screen.findByLabelText("Name"), "ETF Welt");
+    await userEvent.selectOptions(screen.getByLabelText("Konto"), EIGENES.id);
+    await userEvent.click(screen.getByLabelText(/Aus dem Überschuss anlegen/));
+    await userEvent.type(screen.getByLabelText("Gewichtung"), "50");
+    await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
+
+    expect(api.legePostenAn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "ETF Welt",
+        anlage_gewicht: 50,
+        betrag: "0",
+        konto_id: EIGENES.id,
+      }),
+    );
+  });
+
+  it("fragt beim Anlageposten nicht mehr nach Betrag und Rhythmus", async () => {
+    alles({ konten: [...konten(), EIGENES] });
+
+    render(<HaushaltsbuchSeite unterseite="posten" />);
+
+    await screen.findByLabelText(/Betrag je Abbuchung/);
+    await userEvent.selectOptions(screen.getByLabelText("Konto"), EIGENES.id);
+    await userEvent.click(screen.getByLabelText(/Aus dem Überschuss anlegen/));
+
+    expect(screen.queryByLabelText(/Betrag je Abbuchung/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Rhythmus")).not.toBeInTheDocument();
+  });
+
+  it("nennt in der Liste den Anteil statt eines Rhythmus", async () => {
+    alles({
+      posten: [
+        posten({
+          id: "etf-1",
+          name: "ETF Welt",
+          betrag: "500.00",
+          anlage_gewicht: 50,
+          anteile: [],
+        }),
+      ],
+      uebersicht: uebersicht({
+        alle: [{ ...zeile(), id: "etf-1", name: "ETF Welt", monatsrate: "500.00" }],
+      }),
+    });
+
+    render(<HaushaltsbuchSeite unterseite="posten" />);
+
+    const reihe = (await screen.findByText("ETF Welt")).closest("tr");
+
+    expect(reihe).toHaveTextContent("50 vom Überschuss");
+  });
+
+  it("zeigt im Monatsplan, was angelegt wird und was liegen bleibt", async () => {
+    alles({
+      uebersicht: uebersicht({
+        personen: [
+          {
+            ...bilanz("Aaron", "600.00"),
+            anlage: "1000.00",
+            sockel: "300.00",
+            rest: "300.00",
+          },
+        ],
+      }),
+    });
+
+    render(<HaushaltsbuchSeite unterseite="uebersicht" />);
+
+    expect(await screen.findByText("Angelegt")).toBeInTheDocument();
+    expect(screen.getByText(/1\.000,00/)).toBeInTheDocument();
+    expect(screen.getByText(/Puffer/)).toBeInTheDocument();
+  });
+
+  it("trägt den Puffer bei der Person ein", async () => {
+    alles();
+
+    render(<HaushaltsbuchSeite unterseite="stammdaten" />);
+
+    const abschnitt = within(await screen.findByRole("region", { name: "Personen" }));
+    await userEvent.click(abschnitt.getByRole("button", { name: "Aaron ändern" }));
+    const feld = abschnitt.getByLabelText(/Puffer/);
+    await userEvent.clear(feld);
+    await userEvent.type(feld, "300");
+    await userEvent.click(abschnitt.getByRole("button", { name: /„Aaron" umbenennen/ }));
+
+    expect(api.aenderePerson).toHaveBeenCalledWith(
+      AARON,
+      expect.objectContaining({ sockel: "300" }),
+    );
   });
 });

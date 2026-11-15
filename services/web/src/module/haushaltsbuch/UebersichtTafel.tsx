@@ -1,17 +1,15 @@
-import { Etikett, Hinweis, Karte, Knopf, Leerzustand } from "../../ui";
+import { Abschnitt, Etikett, Hinweis, Karte, Leerzustand } from "../../ui";
 import type { PersonBilanz, PostenZeile, Uebersicht } from "./api";
 import { alsEuro, alsProzent, alsZahl, monatswort, rhythmus } from "./geld";
-import type { Daten, Zeitraum } from "./daten";
+import type { Daten } from "./daten";
 import stil from "./HaushaltsbuchSeite.module.css";
 
 interface Props {
   daten: Daten;
-  zeitraum: Zeitraum;
-  onZeitraum: (schritte: number) => void;
-  onHeute: () => void;
 }
 
-export function UebersichtTafel({ daten, zeitraum, onZeitraum, onHeute }: Props) {
+/* Den Monat wählt die Hülle in der Titelzeile - sie hält den Zeitraum. */
+export function UebersichtTafel({ daten }: Props) {
   const { uebersicht } = daten;
 
   if (daten.posten.length === 0) {
@@ -27,8 +25,6 @@ export function UebersichtTafel({ daten, zeitraum, onZeitraum, onHeute }: Props)
 
   return (
     <>
-      <Monatswaehler zeitraum={zeitraum} onZeitraum={onZeitraum} onHeute={onHeute} />
-
       {uebersicht.gemeinschaft.ohne_aufteilung.length > 0 && (
         <Hinweis ton="warnung">
           Diese gemeinsamen Posten hat niemand übernommen und sie fehlen deshalb in jeder
@@ -64,35 +60,6 @@ export function UebersichtTafel({ daten, zeitraum, onZeitraum, onHeute }: Props)
   );
 }
 
-function Monatswaehler({ zeitraum, onZeitraum, onHeute }: Omit<Props, "daten">) {
-  return (
-    <div className={stil.monatswaehler}>
-      <Knopf
-        groesse="sm"
-        auspraegung="leise"
-        onClick={() => onZeitraum(-1)}
-        aria-label="Einen Monat zurück"
-      >
-        ←
-      </Knopf>
-      <h2 className={stil.monat}>
-        {monatswort(zeitraum.monat)} {zeitraum.jahr}
-      </h2>
-      <Knopf
-        groesse="sm"
-        auspraegung="leise"
-        onClick={() => onZeitraum(1)}
-        aria-label="Einen Monat vor"
-      >
-        →
-      </Knopf>
-      <Knopf groesse="sm" auspraegung="leise" onClick={onHeute}>
-        Heute
-      </Knopf>
-    </div>
-  );
-}
-
 function Bilanzkarte({ person }: { person: PersonBilanz }) {
   const einkommen = alsZahl(person.einnahmen) + alsZahl(person.gutschrift_gemeinschaft);
   const knapp = alsZahl(person.rest) < 0;
@@ -117,12 +84,20 @@ function Bilanzkarte({ person }: { person: PersonBilanz }) {
           leise
         />
         <Zahl name="Sparen und Anlage" wert={alsEuro(person.sparen)} />
+        {alsZahl(person.anlage) > 0 && (
+          <Zahl name="Angelegt" wert={alsEuro(person.anlage)} leise />
+        )}
         <Zahl name="Frei verfügbar" wert={alsEuro(person.variabel)} />
         <Zahl
           name="Bleibt übrig"
           wert={alsEuro(person.rest)}
           ton={knapp ? "fehler" : "gut"}
         />
+        {/* Steht der Rest auf dem Puffer, ist das keine Zufallszahl,
+            sondern die Vorgabe - sonst sucht man den Grund. */}
+        {alsZahl(person.anlage) > 0 && (
+          <Zahl name="davon Puffer" wert={alsEuro(person.sockel)} leise />
+        )}
         <Zahl
           name="Sparen wäre möglich bis"
           wert={`${alsEuro(person.moeglich)} (${alsProzent(person.moegliche_sparquote)})`}
@@ -250,61 +225,57 @@ function Zeilenblock({
   fuss?: string;
 }) {
   return (
-    <section aria-labelledby={`block-${spalte}`} className={stil.block}>
-      <h2 id={`block-${spalte}`} className={stil.abschnittstitel}>
-        {titel}
-      </h2>
-
+    <Abschnitt titel={titel} id={`block-${spalte}`} regel>
       {zeilen.length === 0 ? (
         <Karte>
           <p className={stil.leer}>{leer}</p>
         </Karte>
       ) : (
-        <Karte blank>
-          <div className={stil.rollbereich}>
-            <table className={stil.tabelle}>
-              <caption className="nur-vorlesen">{titel}</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Posten</th>
-                  <th scope="col">Konto</th>
-                  <th scope="col">Rhythmus</th>
-                  <th scope="col" className={stil.rechts}>
-                    monatlich
-                  </th>
-                  <th scope="col" className={stil.rechts}>
-                    {spalte}
-                  </th>
+        <div className={stil.rollbereich}>
+          <table className={stil.tabelle}>
+            <caption className="nur-vorlesen">{titel}</caption>
+            <thead>
+              <tr>
+                <th scope="col">Posten</th>
+                <th scope="col">Konto</th>
+                <th scope="col">Rhythmus</th>
+                <th scope="col" className={stil.rechts}>
+                  monatlich
+                </th>
+                <th scope="col" className={stil.rechts}>
+                  {spalte}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {zeilen.map((zeile) => (
+                <tr key={zeile.id}>
+                  <td>
+                    {zeile.name}
+                    <span className={stil.unterzeile}>{zeile.kategorie}</span>
+                  </td>
+                  <td>{zeile.konto}</td>
+                  <td>{rhythmus(zeile.intervall_monate, zeile.faellige_monate)}</td>
+                  <td className={stil.rechts} data-spalte="im Monat">
+                    {alsEuro(zeile.monatsrate)}
+                  </td>
+                  <td className={`${stil.rechts} ${stil.betont}`} data-spalte={spalte}>
+                    {alsEuro(wert(zeile))}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {zeilen.map((zeile) => (
-                  <tr key={zeile.id}>
-                    <td>
-                      {zeile.name}
-                      <span className={stil.unterzeile}>{zeile.kategorie}</span>
-                    </td>
-                    <td>{zeile.konto}</td>
-                    <td>{rhythmus(zeile.intervall_monate, zeile.faellige_monate)}</td>
-                    <td className={stil.rechts}>{alsEuro(zeile.monatsrate)}</td>
-                    <td className={`${stil.rechts} ${stil.betont}`}>
-                      {alsEuro(wert(zeile))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              {fuss && (
-                <tfoot>
-                  <tr>
-                    <td colSpan={4}></td>
-                    <td className={`${stil.rechts} ${stil.betont}`}>{fuss}</td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        </Karte>
+              ))}
+            </tbody>
+            {fuss && (
+              <tfoot>
+                <tr>
+                  <td colSpan={4}></td>
+                  <td className={`${stil.rechts} ${stil.betont}`}>{fuss}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
       )}
-    </section>
+    </Abschnitt>
   );
 }

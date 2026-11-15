@@ -158,6 +158,7 @@ def posten(
     variabel: bool = False,
     aktiv: bool = True,
     anteile: dict[uuid.UUID, int] | None = None,
+    anlage_gewicht: int | None = None,
 ) -> PostenSicht:
     return PostenSicht(
         id=uuid.uuid4(),
@@ -172,6 +173,7 @@ def posten(
         variabel=variabel,
         aktiv=aktiv,
         anteile=tuple((person, gewicht) for person, gewicht in (anteile or {}).items()),
+        anlage_gewicht=anlage_gewicht,
     )
 
 
@@ -382,3 +384,181 @@ def test_ein_leerer_haushalt_ergibt_ein_leeres_bild() -> None:
     assert bild.knoten == []
     assert bild.fluesse == []
     assert bild.ebenen == 0
+
+
+# ------------------------------------------- Anlage aus dem Ueberschuss
+#
+# Ein Depot, das sich nicht auf einen Betrag festlegt, sondern auf einen
+# Anteil an dem, was uebrig bleibt. Die Zahlen sind mit Absicht rund: 2000
+# herein, 700 Miete, 300 bleiben als Puffer liegen - 1000 zum Anlegen, und
+# die Gewichtung 10/50/30/10 macht daraus 100/500/300/100.
+
+DEPOT = KategorieSicht(id=uuid.uuid4(), name="Depot", zaehlt_als_sparen=True)
+
+
+def anleger(sockel: str = "300.00") -> PersonSicht:
+    return PersonSicht(id=AARON.id, name="Aaron", sockel=Decimal(sockel))
+
+
+def etfs(*gewichte: int) -> list[PostenSicht]:
+    return [
+        posten(
+            f"ETF {nummer}",
+            "ausgabe",
+            "0.00",
+            AARONS_KONTO,
+            kategorie=DEPOT,
+            anlage_gewicht=gewicht,
+        )
+        for nummer, gewicht in enumerate(gewichte, start=1)
+    ]
+
+
+def anlageplan(
+    *,
+    einkommen: str = "2000.00",
+    miete: str = "700.00",
+    sockel: str = "300.00",
+    gewichte: tuple[int, ...] = (10, 50, 30, 10),
+    weitere: list[PostenSicht] | None = None,
+) -> tuple[list[PersonSicht], list[PostenSicht]]:
+    alle = [
+        posten("Gehalt", "einnahme", einkommen, AARONS_KONTO),
+        posten("Miete", "ausgabe", miete, AARONS_KONTO, kategorie=WOHNEN),
+        *etfs(*gewichte),
+        *(weitere or []),
+    ]
+    return [anleger(sockel)], alle
+
+
+def anlagezeilen(personen: list[PersonSicht], alle: list[PostenSicht]) -> dict[str, Decimal]:
+    plan = dienst.monatsplan(personen, KONTEN, [*KATEGORIEN, DEPOT], alle, jahr=2026, monat=6)
+    return {z.name: z.monatsrate for z in plan.alle if z.name.startswith("ETF")}
+
+
+def test_die_gewichtung_verteilt_was_ueber_dem_sockel_bleibt() -> None:
+    """Der Fall aus der Aufgabe: 10/50/30/10 auf vier ETFs."""
+    personen, alle = anlageplan()
+
+    assert anlagezeilen(personen, alle) == {
+        "ETF 1": euro("100.00"),
+        "ETF 2": euro("500.00"),
+        "ETF 3": euro("300.00"),
+        "ETF 4": euro("100.00"),
+    }
+
+
+def test_mehr_kosten_heissen_sofort_weniger_anlage() -> None:
+    """Das ist der Zweck: der Betrag haengt an den Kosten, nicht an einer Zahl,
+    die jemand nachpflegen muss."""
+    personen, alle = anlageplan(miete="900.00")
+
+    assert sum(anlagezeilen(personen, alle).values()) == euro("800.00")
+
+
+def test_der_sockel_bleibt_liegen() -> None:
+    personen, alle = anlageplan()
+    plan = dienst.monatsplan(personen, KONTEN, [*KATEGORIEN, DEPOT], alle, jahr=2026, monat=6)
+    aaron = next(p for p in plan.personen if p.name == "Aaron")
+
+    assert aaron.anlage == euro("1000.00")
+    assert aaron.rest == euro("300.00")
+
+
+def test_ohne_ueberschuss_wird_nichts_angelegt() -> None:
+    """Und erst recht nichts Negatives - ein ETF-Sparplan mit minus 200 Euro
+    waere eine Abbuchung in die falsche Richtung."""
+    personen, alle = anlageplan(miete="1900.00")
+
+    assert set(anlagezeilen(personen, alle).values()) == {euro("0.00")}
+
+
+def test_kein_cent_geht_beim_verteilen_verloren() -> None:
+    personen, alle = anlageplan(einkommen="2000.07", gewichte=(1, 1, 1))
+    zeilen = anlagezeilen(personen, alle)
+
+    assert sum(zeilen.values()) == euro("1000.07")
+
+
+def test_die_anlage_zaehlt_als_sparen() -> None:
+    personen, alle = anlageplan()
+    plan = dienst.monatsplan(personen, KONTEN, [*KATEGORIEN, DEPOT], alle, jahr=2026, monat=6)
+    aaron = next(p for p in plan.personen if p.name == "Aaron")
+
+    assert aaron.sparen == euro("1000.00")
+    assert aaron.sparquote == Decimal("50.0")
+
+
+def test_jede_person_legt_ihren_eigenen_ueberschuss_an() -> None:
+    """Getrennte Toepfe: Jessis Depot haengt an Jessis Konto."""
+    jessi = PersonSicht(id=JESSI.id, name="Jessi", sockel=Decimal("0.00"))
+    jessis_etf = posten(
+        "ETF Jessi", "ausgabe", "0.00", JESSIS_KONTO, kategorie=DEPOT, anlage_gewicht=1
+    )
+    personen, alle = anlageplan(weitere=[posten("Sold Jessi", "einnahme", "500.00", JESSIS_KONTO)])
+
+    plan = dienst.monatsplan(
+        [*personen, jessi], KONTEN, [*KATEGORIEN, DEPOT], [*alle, jessis_etf], jahr=2026, monat=6
+    )
+    zeilen = {z.name: z.monatsrate for z in plan.alle}
+
+    assert zeilen["ETF Jessi"] == euro("500.00")
+    assert zeilen["ETF 2"] == euro("500.00")
+
+
+def test_ein_pausierter_anlageposten_bekommt_nichts() -> None:
+    personen, alle = anlageplan(gewichte=(1,))
+    pausiert = posten(
+        "ETF ruht",
+        "ausgabe",
+        "0.00",
+        AARONS_KONTO,
+        kategorie=DEPOT,
+        anlage_gewicht=1,
+        aktiv=False,
+    )
+
+    zeilen = anlagezeilen(personen, [*alle, pausiert])
+
+    assert zeilen["ETF 1"] == euro("1000.00")
+    assert zeilen["ETF ruht"] == euro("0.00")
+
+
+def test_eine_feste_ruecklage_geht_der_anlage_vor() -> None:
+    """Was die Bank im Januar abbucht, steht nicht zur Anlage frei."""
+    personen, alle = anlageplan(
+        gewichte=(1,),
+        weitere=[
+            posten(
+                "Kfz",
+                "ausgabe",
+                "1200.00",
+                AARONS_KONTO,
+                kategorie=WOHNEN,
+                intervall=12,
+                faellig_ab=1,
+            )
+        ],
+    )
+
+    assert anlagezeilen(personen, alle)["ETF 1"] == euro("900.00")
+
+
+def test_ohne_anlageposten_rechnet_sich_nichts_anders() -> None:
+    """Die Zusage fuer jeden bestehenden Haushalt."""
+    vorher = dienst.monatsplan(PERSONEN, KONTEN, KATEGORIEN, HAUSHALT, jahr=2026, monat=6)
+
+    assert vorher.personen[0].anlage == euro("0.00")
+    assert vorher.personen[0].rest == euro("1775.00")
+
+
+def test_das_flussbild_zeigt_die_anlage_mit_ihrem_betrag() -> None:
+    """Sonst faellt ein Depot aus dem Bild, sobald es sich am Ueberschuss
+    orientiert - sein Betrag steht ja nirgends."""
+    personen, alle = anlageplan(gewichte=(1,))
+
+    bild = dienst.flussbild(personen, KONTEN, [*KATEGORIEN, DEPOT], alle)
+    knoten = {k.id: k for k in bild.knoten}
+    zum_etf = [f for f in bild.fluesse if knoten[f.nach].beschriftung == "ETF 1"]
+
+    assert [f.betrag for f in zum_etf] == [euro("1000.00")]

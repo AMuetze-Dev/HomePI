@@ -4,16 +4,6 @@
   gap: var(--raum-4);
 }
 
-.block {
-  margin-top: var(--raum-8);
-}
-
-.abschnittstitel {
-  margin-bottom: var(--raum-4);
-  font-size: var(--text-lg);
-  font-weight: var(--gewicht-halbfett);
-}
-
 .leer {
   padding: var(--raum-2) 0;
   color: var(--farbe-text-gedaempft);
@@ -33,19 +23,12 @@
   color: var(--farbe-text-leise);
 }
 
-/* --- Monatswähler --- */
+/* Der Monatswähler steht in der Titelzeile der Fläche. Kein Abstand nach
+   außen: den gibt dort der Kopf der Tafel. */
 .monatswaehler {
   display: flex;
   align-items: center;
   gap: var(--raum-2);
-  margin-bottom: var(--raum-6);
-}
-
-.monat {
-  flex: 1;
-  font-size: var(--text-xl);
-  font-weight: var(--gewicht-halbfett);
-  letter-spacing: var(--laufweite-eng);
 }
 
 /* --- Bilanzen --- */
@@ -448,6 +431,13 @@
     text-align: right;
   }
 
+  /* Ohne Kopfzeile sagt die Zelle selbst, welche Zahl sie zeigt. */
+  .tabelle td[data-spalte]::before {
+    content: attr(data-spalte) " ";
+    color: var(--farbe-text-leise);
+    font-weight: var(--gewicht-normal);
+  }
+
   .aktionszelle {
     grid-column: 1 / -1;
     margin-top: var(--raum-3);
@@ -459,9 +449,5 @@
 
   .aktionen > * {
     flex: 1;
-  }
-
-  .monat {
-    font-size: var(--text-lg);
   }
 }

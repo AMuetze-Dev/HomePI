@@ -29,6 +29,9 @@ class Person(Base, ZeitstempelMixin):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
     reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Was liegen bleibt, bevor angelegt wird. Ohne diesen Puffer raeumte ein
+    # Anlageposten das Konto jeden Monat bis auf den Cent leer.
+    sockel: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
 
 
 class Kategorie(Base, ZeitstempelMixin):
@@ -97,6 +100,10 @@ class Posten(Base, ZeitstempelMixin):
     )
     variabel: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Gesetzt heisst: Dieser Posten hat keinen festen Betrag, sondern diesen
+    # Anteil an dem, was seiner Person uebrig bleibt. `betrag` steht dann auf
+    # null - die Zahl entsteht Monat fuer Monat neu (dienst.anlagebetraege).
+    anlage_gewicht: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
 
     # selectin, weil die Auswertung immer alle Anteile braucht: ohne sie
     # faellt je Posten eine eigene Abfrage an.

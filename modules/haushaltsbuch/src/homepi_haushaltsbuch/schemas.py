@@ -34,6 +34,9 @@ NameFeld = Annotated[str, Field(min_length=1, max_length=80)]
 #: Betrag traegt sie nicht noch einmal.
 BetragFeld = Annotated[Decimal, Field(ge=0, le=Decimal("9999999.99"), decimal_places=2)]
 MonatFeld = Annotated[int, Field(ge=1, le=12)]
+#: Ein Gewicht - fuer die Aufteilung zwischen Personen wie fuer die
+#: Gewichtung der Anlage. Dieselbe Spanne, damit beides sich gleich anfuehlt.
+GewichtFeld = Annotated[int, Field(ge=1, le=1000)]
 TagFeld = Annotated[int, Field(ge=1, le=31)]
 
 
@@ -44,9 +47,14 @@ def _getrimmt(wert: object) -> object:
 # --------------------------------------------------------------- Person
 
 
+#: Der Puffer, der auf dem Konto liegen bleibt, bevor angelegt wird.
+SockelFeld = Annotated[Decimal, Field(ge=0, le=1_000_000, decimal_places=2)]
+
+
 class PersonAnlegen(BaseModel):
     name: NameFeld
     reihenfolge: int = 0
+    sockel: SockelFeld = Decimal("0.00")
 
     _trimmen = field_validator("name", mode="before")(_getrimmt)
 
@@ -54,6 +62,7 @@ class PersonAnlegen(BaseModel):
 class PersonAendern(BaseModel):
     name: NameFeld | None = None
     reihenfolge: int | None = None
+    sockel: SockelFeld | None = None
 
     _trimmen = field_validator("name", mode="before")(_getrimmt)
 
@@ -64,6 +73,7 @@ class PersonAusgabe(BaseModel):
     id: uuid.UUID
     name: str
     reihenfolge: int
+    sockel: Decimal
 
 
 # ---------------------------------------------------------------- Konto
@@ -149,7 +159,7 @@ class Anteil(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     person_id: uuid.UUID
-    gewicht: Annotated[int, Field(ge=1, le=1000)]
+    gewicht: GewichtFeld
 
 
 class PostenBasis(BaseModel):
@@ -169,6 +179,10 @@ class PostenBasis(BaseModel):
     variabel: bool = False
     aktiv: bool = True
     anteile: list[Anteil] = Field(default_factory=list)
+    #: Gesetzt heisst: kein fester Betrag, sondern dieser Anteil an dem, was
+    #: der Person uebrig bleibt. 10/50/30/10 sind vier Posten mit diesen vier
+    #: Gewichten; die Summe muss nicht 100 ergeben.
+    anlage_gewicht: GewichtFeld | None = None
 
     _trimmen = field_validator("name", mode="before")(_getrimmt)
 
@@ -219,6 +233,10 @@ class PostenAendern(BaseModel):
     variabel: bool | None = None
     aktiv: bool | None = None
     anteile: list[Anteil] | None = None
+    anlage_gewicht: GewichtFeld | None = None
+    #: Zurueck zum festen Betrag. Ohne diesen Schalter waere die Entscheidung
+    #: endgueltig - `anlage_gewicht: null` heisst "nicht angegeben".
+    anlage_loeschen: bool = False
 
     _trimmen = field_validator("name", mode="before")(_getrimmt)
 
@@ -238,6 +256,7 @@ class PostenAusgabe(BaseModel):
     variabel: bool
     aktiv: bool
     anteile: list[Anteil]
+    anlage_gewicht: int | None
 
 
 # ------------------------------------------------------------- Auswertung
@@ -295,6 +314,11 @@ class PersonBilanz(BaseModel):
     moeglich: Decimal
     #: Was nach allem uebrig bleibt. Negativ heisst: die Rechnung geht nicht auf.
     rest: Decimal
+    #: Davon aus dem Ueberschuss angelegt - die Summe der Anlageposten.
+    anlage: Decimal = Decimal("0.00")
+    #: Der Puffer, der dabei liegen bleibt. Steht hier, damit die Oberflaeche
+    #: den Rest erklaeren kann, statt ihn nur zu zeigen.
+    sockel: Decimal = Decimal("0.00")
     sparquote: Decimal
     moegliche_sparquote: Decimal
     nach_kategorie: list[Kategoriesumme]

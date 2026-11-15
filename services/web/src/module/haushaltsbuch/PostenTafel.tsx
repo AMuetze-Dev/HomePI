@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { Etikett, Feld, Karte, Knopf, Leerzustand } from "../../ui";
+import { Abschnitt, Etikett, Feld, Karte, Knopf, Leerzustand } from "../../ui";
 import {
   aenderePosten,
   entfernePosten,
@@ -105,105 +105,119 @@ function Liste({
   const kategorie = new Map(daten.kategorien.map((k) => [k.id, k.name]));
 
   return (
-    <Karte blank>
-      <div className={stil.rollbereich}>
-        <table className={stil.tabelle}>
-          <caption className="nur-vorlesen">Alle Posten</caption>
-          <thead>
-            <tr>
-              <th scope="col">Posten</th>
-              <th scope="col">Konto</th>
-              <th scope="col">Rhythmus</th>
-              <th scope="col" className={stil.rechts}>
-                Abbuchung
-              </th>
-              <th scope="col" className={stil.rechts}>
-                monatlich
-              </th>
-              <th scope="col">Aufteilung</th>
-              <th scope="col">
-                <span className="nur-vorlesen">Aktion</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {daten.posten.map((posten) => (
-              <tr
-                key={posten.id}
-                className={posten.aktiv ? "" : stil.pausiert}
-                aria-current={posten.id === bearbeitetId ? "true" : undefined}
-              >
-                <td>
-                  {posten.name}
-                  <span className={stil.unterzeile}>
-                    {posten.kategorie_id
-                      ? (kategorie.get(posten.kategorie_id) ?? "—")
-                      : "Ohne Kategorie"}
-                    {posten.variabel ? " · frei verfügbar" : ""}
-                  </span>
-                </td>
-                <td>{konto.get(posten.konto_id) ?? "—"}</td>
-                <td>
-                  {rhythmus(
-                    posten.intervall_monate,
-                    berechnet.get(posten.id)?.faellige_monate ?? [],
-                  )}
-                  <span className={stil.unterzeile}>
-                    {abbuchungstext(posten.abbuchungstag)}
-                  </span>
-                </td>
-                <td className={stil.rechts}>{alsEuro(posten.betrag)}</td>
-                <td className={`${stil.rechts} ${stil.betont}`}>
-                  {alsEuro(berechnet.get(posten.id)?.monatsrate ?? posten.betrag)}
-                </td>
-                <td>
-                  {posten.anteile.length === 0 ? (
-                    <span className={stil.leise}>—</span>
-                  ) : (
-                    <span className={stil.leise}>
-                      {posten.anteile
-                        .map((a) => `${name.get(a.person_id) ?? "?"} ${a.gewicht}`)
-                        .join(" : ")}
+    <div className={stil.rollbereich}>
+      <table className={stil.tabelle}>
+        <caption className="nur-vorlesen">Alle Posten</caption>
+        <thead>
+          <tr>
+            <th scope="col">Posten</th>
+            <th scope="col">Konto</th>
+            <th scope="col">Rhythmus</th>
+            <th scope="col" className={stil.rechts}>
+              Abbuchung
+            </th>
+            <th scope="col" className={stil.rechts}>
+              monatlich
+            </th>
+            <th scope="col">Aufteilung</th>
+            <th scope="col">
+              <span className="nur-vorlesen">Aktion</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {daten.posten.map((posten) => (
+            <tr
+              key={posten.id}
+              className={posten.aktiv ? "" : stil.pausiert}
+              aria-current={posten.id === bearbeitetId ? "true" : undefined}
+            >
+              <td>
+                {posten.name}
+                <span className={stil.unterzeile}>
+                  {posten.kategorie_id
+                    ? (kategorie.get(posten.kategorie_id) ?? "—")
+                    : "Ohne Kategorie"}
+                  {posten.variabel ? " · frei verfügbar" : ""}
+                </span>
+              </td>
+              <td>{konto.get(posten.konto_id) ?? "—"}</td>
+              <td>
+                {posten.anlage_gewicht ? (
+                  <>
+                    {posten.anlage_gewicht} vom Überschuss
+                    <span className={stil.unterzeile}>
+                      monatlich, so viel wie übrig bleibt
                     </span>
-                  )}
-                </td>
-                <td className={stil.aktionszelle}>
-                  <div className={stil.aktionen}>
-                    <Knopf
-                      groesse="sm"
-                      auspraegung="primaer"
-                      onClick={() => onBearbeiten(posten)}
-                      aria-label={`${posten.name} ändern`}
-                    >
-                      Ändern
-                    </Knopf>
-                    <Knopf
-                      groesse="sm"
-                      onClick={() =>
-                        void aktion(() =>
-                          aenderePosten(posten.id, { aktiv: !posten.aktiv }),
-                        )
-                      }
-                      aria-label={`${posten.name} ${posten.aktiv ? "pausieren" : "wieder aufnehmen"}`}
-                    >
-                      {posten.aktiv ? "Pausieren" : "Aufnehmen"}
-                    </Knopf>
-                    <Knopf
-                      groesse="sm"
-                      auspraegung="leise"
-                      onClick={() => void aktion(() => entfernePosten(posten.id))}
-                      aria-label={`${posten.name} entfernen`}
-                    >
-                      Entfernen
-                    </Knopf>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Karte>
+                  </>
+                ) : (
+                  <>
+                    {rhythmus(
+                      posten.intervall_monate,
+                      berechnet.get(posten.id)?.faellige_monate ?? [],
+                    )}
+                    <span className={stil.unterzeile}>
+                      {abbuchungstext(posten.abbuchungstag)}
+                    </span>
+                  </>
+                )}
+              </td>
+              <td className={stil.rechts} data-spalte="Abbuchung">
+                {posten.anlage_gewicht ? (
+                  <span className={stil.leise}>—</span>
+                ) : (
+                  alsEuro(posten.betrag)
+                )}
+              </td>
+              <td className={`${stil.rechts} ${stil.betont}`} data-spalte="im Monat">
+                {alsEuro(berechnet.get(posten.id)?.monatsrate ?? posten.betrag)}
+              </td>
+              <td>
+                {posten.anteile.length === 0 ? (
+                  <span className={stil.leise}>—</span>
+                ) : (
+                  <span className={stil.leise}>
+                    {posten.anteile
+                      .map((a) => `${name.get(a.person_id) ?? "?"} ${a.gewicht}`)
+                      .join(" : ")}
+                  </span>
+                )}
+              </td>
+              <td className={stil.aktionszelle}>
+                <div className={stil.aktionen}>
+                  <Knopf
+                    groesse="sm"
+                    onClick={() => onBearbeiten(posten)}
+                    aria-label={`${posten.name} ändern`}
+                  >
+                    Ändern
+                  </Knopf>
+                  <Knopf
+                    groesse="sm"
+                    onClick={() =>
+                      void aktion(() =>
+                        aenderePosten(posten.id, { aktiv: !posten.aktiv }),
+                      )
+                    }
+                    aria-label={`${posten.name} ${posten.aktiv ? "pausieren" : "wieder aufnehmen"}`}
+                  >
+                    {posten.aktiv ? "Pausieren" : "Aufnehmen"}
+                  </Knopf>
+                  <Knopf
+                    groesse="sm"
+                    auspraegung="leise"
+                    onClick={() => void aktion(() => entfernePosten(posten.id))}
+                    aria-label={`${posten.name} entfernen`}
+                  >
+                    Entfernen
+                  </Knopf>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -238,24 +252,40 @@ function PostenFormular({
       : String(bearbeitet.abbuchungstag),
   );
   const [variabel, setVariabel] = useState(bearbeitet?.variabel ?? false);
+  // Ein Anlageposten legt sich nicht auf einen Betrag fest, sondern auf
+  // einen Anteil an dem, was uebrig bleibt.
+  const [anlage, setAnlage] = useState(bearbeitet?.anlage_gewicht != null);
+  const [gewicht, setGewicht] = useState(
+    bearbeitet?.anlage_gewicht != null ? String(bearbeitet.anlage_gewicht) : "",
+  );
   const [gewichte, setGewichte] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       (bearbeitet?.anteile ?? []).map((a) => [a.person_id, String(a.gewicht)]),
     ),
   );
   const [laeuft, setLaeuft] = useState(false);
-  const ueberschrift = useRef<HTMLHeadingElement>(null);
+  const anfang = useRef<HTMLDivElement>(null);
 
   // Die Liste kann lang sein, das Formular steht darunter. Ohne diesen
   // Sprung klickt man "Ändern" und sieht nichts passieren.
   useEffect(() => {
-    if (bearbeitet) ueberschrift.current?.scrollIntoView?.({ block: "center" });
+    if (bearbeitet) anfang.current?.scrollIntoView?.({ block: "center" });
   }, [bearbeitet]);
 
   const konto: Konto | undefined = daten.konten.find((k) => k.id === kontoId);
   const gemeinschaftlich = konto?.inhaber_id === null;
   const vollstaendig =
-    name.trim() !== "" && alsZahlenfeld(betrag) !== "" && kontoId !== "";
+    name.trim() !== "" &&
+    kontoId !== "" &&
+    (anlage ? Number(gewicht) > 0 : alsZahlenfeld(betrag) !== "");
+  // Der Ueberschuss ist der einer Person - auf einem gemeinsamen Konto gibt
+  // es keinen, aus dem sich der Posten bedienen koennte.
+  const anlageMoeglich = konto !== undefined && konto.inhaber_id !== null;
+  // Ein Gewicht allein sagt nichts - es zaehlt im Verhaeltnis zu den
+  // anderen Anlageposten desselben Kontos. Deshalb stehen sie im Hinweis.
+  const geschwister = daten.posten
+    .filter((p) => p.id !== bearbeitet?.id && p.konto_id === kontoId && p.anlage_gewicht)
+    .map((p) => `${p.name} ${p.anlage_gewicht}`);
 
   function anteileBauen(): Anteil[] {
     if (!gemeinschaftlich) return [];
@@ -271,17 +301,21 @@ function PostenFormular({
     ereignis.preventDefault();
     if (!vollstaendig || laeuft) return;
 
+    const angelegt = anlage && anlageMoeglich;
     const felder = {
       name: name.trim(),
       art,
-      betrag: alsZahlenfeld(betrag),
-      intervall_monate: intervall,
-      faelligkeitsmonat: intervall === 1 ? 1 : monat,
+      // Ein Anlageposten hat keinen eigenen Betrag und keinen Rhythmus: Die
+      // Zahl entsteht jeden Monat neu aus dem, was uebrig bleibt.
+      betrag: angelegt ? "0" : alsZahlenfeld(betrag),
+      intervall_monate: angelegt ? 1 : intervall,
+      faelligkeitsmonat: angelegt || intervall === 1 ? 1 : monat,
       abbuchungstag: tag.trim() === "" ? null : Number(tag),
       konto_id: kontoId,
       kategorie_id: kategorieId === "" ? null : kategorieId,
       variabel,
       anteile: anteileBauen(),
+      anlage_gewicht: angelegt ? Number(gewicht) : null,
     };
 
     setLaeuft(true);
@@ -293,6 +327,7 @@ function PostenFormular({
             // Diese beiden sagen: wirklich weg.
             tag_loeschen: felder.abbuchungstag === null,
             kategorie_loeschen: felder.kategorie_id === null,
+            anlage_loeschen: !angelegt,
           })
         : legePostenAn(felder),
     );
@@ -307,161 +342,211 @@ function PostenFormular({
       setName("");
       setBetrag("");
       setTag("");
+      setGewicht("");
     }
   }
 
   return (
-    <section aria-labelledby="posten-formular" className={stil.block}>
-      <h2 id="posten-formular" className={stil.abschnittstitel} ref={ueberschrift}>
-        {bearbeitet ? `„${bearbeitet.name}" ändern` : "Posten anlegen"}
-      </h2>
+    /* Der Kasten traegt nur die Marke, zu der gesprungen wird: Der Abschnitt
+       nimmt keine Referenz, und die Ueberschrift selbst muss dafuer auch
+       nicht gefunden werden - gemeint ist der Anfang des Formulars. */
+    <div ref={anfang}>
+      <Abschnitt
+        titel={bearbeitet ? `„${bearbeitet.name}" ändern` : "Posten anlegen"}
+        id="posten-formular"
+        regel
+      >
+        <Karte>
+          <form onSubmit={(e) => void absenden(e)} className={stil.formular}>
+            <Feld
+              beschriftung="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Kfz-Versicherung"
+              autoComplete="off"
+              required
+            />
 
-      <Karte>
-        <form onSubmit={(e) => void absenden(e)} className={stil.formular}>
-          <Feld
-            beschriftung="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Kfz-Versicherung"
-            autoComplete="off"
-            required
-          />
-
-          <Auswahl
-            beschriftung="Art"
-            value={art}
-            onChange={(wert) => setArt(wert as Postenart)}
-            optionen={[
-              ["ausgabe", "Ausgabe"],
-              ["einnahme", "Einnahme"],
-            ]}
-          />
-
-          <Feld
-            beschriftung="Betrag je Abbuchung"
-            hinweis="Was die Bank abbucht — nicht die monatliche Rücklage."
-            value={betrag}
-            onChange={(e) => setBetrag(e.target.value)}
-            inputMode="decimal"
-            placeholder="549,09"
-            required
-          />
-
-          <Auswahl
-            beschriftung="Konto"
-            value={kontoId}
-            onChange={setKontoId}
-            optionen={daten.konten.map((k) => [
-              k.id,
-              k.inhaber_id === null ? `${k.name} (gemeinsam)` : k.name,
-            ])}
-          />
-
-          <Auswahl
-            beschriftung="Kategorie"
-            value={kategorieId}
-            onChange={setKategorieId}
-            optionen={[
-              ["", "Ohne Kategorie"],
-              ...daten.kategorien.map((k): [string, string] => [k.id, k.name]),
-            ]}
-          />
-
-          <Auswahl
-            beschriftung="Rhythmus"
-            value={String(intervall)}
-            onChange={(wert) => setIntervall(Number(wert))}
-            optionen={INTERVALLE.map(([wert, wort]): [string, string] => [
-              String(wert),
-              wort,
-            ])}
-          />
-
-          {intervall > 1 && (
             <Auswahl
-              beschriftung="Erstmals fällig im"
-              value={String(monat)}
-              onChange={(wert) => setMonat(Number(wert))}
-              optionen={MONATE.map((wort, i): [string, string] => [String(i + 1), wort])}
+              beschriftung="Art"
+              value={art}
+              onChange={(wert) => setArt(wert as Postenart)}
+              optionen={[
+                ["ausgabe", "Ausgabe"],
+                ["einnahme", "Einnahme"],
+              ]}
             />
-          )}
 
-          <Feld
-            beschriftung="Abbuchungstag"
-            hinweis="Leer lassen, wenn es nicht darauf ankommt."
-            value={tag}
-            onChange={(e) => setTag(e.target.value)}
-            inputMode="numeric"
-            placeholder="1"
-          />
-
-          <label className={stil.schalter}>
-            <input
-              type="checkbox"
-              checked={variabel}
-              onChange={(e) => setVariabel(e.target.checked)}
-            />
-            <span>
-              Frei verfügbar
-              <span className={stil.unterzeile}>
-                Zählt nicht zu den festen Kosten — der Puffer, der übrig bleiben darf.
-              </span>
-            </span>
-          </label>
-
-          {gemeinschaftlich && (
-            <fieldset className={stil.anteile}>
-              <legend className={stil.anteileTitel}>
-                Aufteilung
-                <span className={stil.unterzeile}>
-                  Gewichte, kein Prozent: 1 und 2 heißt ein Drittel zu zwei Dritteln. Null
-                  heißt nicht beteiligt.
+            {anlageMoeglich && (
+              <label className={stil.schalter}>
+                <input
+                  type="checkbox"
+                  checked={anlage}
+                  onChange={(e) => setAnlage(e.target.checked)}
+                />
+                <span>
+                  Aus dem Überschuss anlegen
+                  <span className={stil.unterzeile}>
+                    Kein fester Betrag: Was nach allen Kosten übrig bleibt, geht nach
+                    Gewichten in die Depots.
+                  </span>
                 </span>
-              </legend>
+              </label>
+            )}
 
-              {daten.personen.length === 0 ? (
-                <p className={stil.leer}>
-                  Es gibt noch keine Person. Ohne sie trägt diesen Posten niemand.
-                </p>
-              ) : (
-                <div className={stil.anteilsfelder}>
-                  {daten.personen.map((person: Person) => (
-                    <Feld
-                      key={person.id}
-                      beschriftung={person.name}
-                      value={gewichte[person.id] ?? ""}
-                      onChange={(e) =>
-                        setGewichte((alt) => ({ ...alt, [person.id]: e.target.value }))
-                      }
-                      inputMode="numeric"
-                      placeholder="0"
-                    />
-                  ))}
-                </div>
+            {anlage && anlageMoeglich ? (
+              <Feld
+                beschriftung="Gewichtung"
+                hinweis={
+                  geschwister.length > 0
+                    ? `Anteil am Überschuss. Neben ${geschwister.join(", ")} — die Summe muss nicht 100 ergeben.`
+                    : "Anteil am Überschuss. Bei mehreren Posten zählt das Verhältnis, nicht die Summe."
+                }
+                value={gewicht}
+                onChange={(e) => setGewicht(e.target.value)}
+                inputMode="numeric"
+                placeholder="50"
+                required
+              />
+            ) : (
+              <Feld
+                beschriftung="Betrag je Abbuchung"
+                hinweis="Was die Bank abbucht — nicht die monatliche Rücklage."
+                value={betrag}
+                onChange={(e) => setBetrag(e.target.value)}
+                inputMode="decimal"
+                placeholder="549,09"
+                required
+              />
+            )}
+
+            <Auswahl
+              beschriftung="Konto"
+              value={kontoId}
+              onChange={setKontoId}
+              optionen={daten.konten.map((k) => [
+                k.id,
+                k.inhaber_id === null ? `${k.name} (gemeinsam)` : k.name,
+              ])}
+            />
+
+            <Auswahl
+              beschriftung="Kategorie"
+              value={kategorieId}
+              onChange={setKategorieId}
+              optionen={[
+                ["", "Ohne Kategorie"],
+                ...daten.kategorien.map((k): [string, string] => [k.id, k.name]),
+              ]}
+            />
+
+            {!(anlage && anlageMoeglich) && (
+              <Auswahl
+                beschriftung="Rhythmus"
+                value={String(intervall)}
+                onChange={(wert) => setIntervall(Number(wert))}
+                optionen={INTERVALLE.map(([wert, wort]): [string, string] => [
+                  String(wert),
+                  wort,
+                ])}
+              />
+            )}
+
+            {intervall > 1 && !(anlage && anlageMoeglich) && (
+              <Auswahl
+                beschriftung="Erstmals fällig im"
+                value={String(monat)}
+                onChange={(wert) => setMonat(Number(wert))}
+                optionen={MONATE.map((wort, i): [string, string] => [
+                  String(i + 1),
+                  wort,
+                ])}
+              />
+            )}
+
+            <Feld
+              beschriftung="Abbuchungstag"
+              hinweis="Leer lassen, wenn es nicht darauf ankommt."
+              value={tag}
+              onChange={(e) => setTag(e.target.value)}
+              inputMode="numeric"
+              placeholder="1"
+            />
+
+            <label className={stil.schalter}>
+              <input
+                type="checkbox"
+                checked={variabel}
+                onChange={(e) => setVariabel(e.target.checked)}
+              />
+              <span>
+                Frei verfügbar
+                <span className={stil.unterzeile}>
+                  Zählt nicht zu den festen Kosten — der Puffer, der übrig bleiben darf.
+                </span>
+              </span>
+            </label>
+
+            {gemeinschaftlich && (
+              <fieldset className={stil.anteile}>
+                <legend className={stil.anteileTitel}>
+                  Aufteilung
+                  <span className={stil.unterzeile}>
+                    Gewichte, kein Prozent: 1 und 2 heißt ein Drittel zu zwei Dritteln.
+                    Null heißt nicht beteiligt.
+                  </span>
+                </legend>
+
+                {daten.personen.length === 0 ? (
+                  <p className={stil.leer}>
+                    Es gibt noch keine Person. Ohne sie trägt diesen Posten niemand.
+                  </p>
+                ) : (
+                  <div className={stil.anteilsfelder}>
+                    {daten.personen.map((person: Person) => (
+                      <Feld
+                        key={person.id}
+                        beschriftung={person.name}
+                        value={gewichte[person.id] ?? ""}
+                        onChange={(e) =>
+                          setGewichte((alt) => ({ ...alt, [person.id]: e.target.value }))
+                        }
+                        inputMode="numeric"
+                        placeholder="0"
+                      />
+                    ))}
+                  </div>
+                )}
+              </fieldset>
+            )}
+
+            <div className={stil.formularfuss}>
+              {gemeinschaftlich && anteileBauen().length === 0 && (
+                <Etikett ton="warnung">
+                  Ohne Aufteilung zahlt diesen Posten niemand
+                </Etikett>
               )}
-            </fieldset>
-          )}
-
-          <div className={stil.formularfuss}>
-            {gemeinschaftlich && anteileBauen().length === 0 && (
-              <Etikett ton="warnung">Ohne Aufteilung zahlt diesen Posten niemand</Etikett>
-            )}
-            {bearbeitet && (
-              <Knopf type="button" auspraegung="leise" onClick={onAbbrechen}>
-                Abbrechen
+              {bearbeitet && (
+                <Knopf type="button" auspraegung="leise" onClick={onAbbrechen}>
+                  Abbrechen
+                </Knopf>
+              )}
+              <Knopf
+                type="submit"
+                auspraegung="primaer"
+                disabled={!vollstaendig || laeuft}
+              >
+                {laeuft
+                  ? "Wird gespeichert …"
+                  : bearbeitet
+                    ? "Änderungen speichern"
+                    : "Anlegen"}
               </Knopf>
-            )}
-            <Knopf type="submit" auspraegung="primaer" disabled={!vollstaendig || laeuft}>
-              {laeuft
-                ? "Wird gespeichert …"
-                : bearbeitet
-                  ? "Änderungen speichern"
-                  : "Anlegen"}
-            </Knopf>
-          </div>
-        </form>
-      </Karte>
-    </section>
+            </div>
+          </form>
+        </Karte>
+      </Abschnitt>
+    </div>
   );
 }
 
