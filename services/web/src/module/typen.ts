@@ -6,9 +6,9 @@ import type { ModulEintrag } from "../api/client";
  * Wie viel Platz eine Ansicht beansprucht.
  *
  * Vorher entschied das die Hülle für alle gleich. Das ging so lange gut, wie
- * es ein Modul gab. Bei dreien ist es falsch: eine Geräteliste mit drei
- * Einträgen braucht keine 1088 px, eine Spielprüftabelle mit neun Bereichen
- * hätte gern mehr.
+ * es ein Modul gab. Bei dreien ist es falsch: ein Formular mit drei Feldern
+ * braucht keine 1088 px, eine Spielprüftabelle mit neun Bereichen hätte gern
+ * mehr.
  *
  * Deshalb meldet das Modul seinen Bedarf an, und die Hülle richtet sich
  * danach. Vier Stufen, mehr braucht es nicht — eine fünfte wäre schon eine

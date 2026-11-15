@@ -58,7 +58,7 @@ async function meldung(antwort: Response): Promise<string> {
 }
 
 /**
- * Schnittstelle zu einem Artefakt, etwa `schnittstelle("/geraete")`.
+ * Schnittstelle zu einem Artefakt, etwa `schnittstelle("/haushaltsbuch")`.
  *
  * `basis` ist der Pfad, unter dem das Gateway das Artefakt einhängt - also
  * `/` + seine id.

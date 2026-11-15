@@ -117,7 +117,7 @@ services:
       # Artefakt, ein Passwort abzulegen - und sagt das.
       STAFFELPILOT_SCHLUESSEL: ${STAFFELPILOT_SCHLUESSEL:-1WuoSsS9q2oVVI5snLycfEnX63URJyb38kZJNo6vQ04=}
       # Leer = alle Artefakte. Zum Arbeiten an einem einzelnen:
-      #   make dev N=geraete
+      #   make dev N=tischtennis
       HOMEPI_MODULE: ${HOMEPI_MODULE:-}
     volumes:
       # Quellcode live einhängen - der Reload beobachtet genau diese Pfade.

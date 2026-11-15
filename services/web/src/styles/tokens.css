@@ -202,8 +202,8 @@
 
   /* ------------------------------------------------------------- Breiten
    * Eine Skala, keine einzelne Zahl. Vorher gab es nur --breite-inhalt, und
-   * damit bekam jede Ansicht dieselbe Spalte: die Geraeteliste mit drei
-   * Eintraegen genauso wie eine Spielprueftabelle. Auf einem breiten Monitor
+   * damit bekam jede Ansicht dieselbe Spalte: das Formular mit drei Feldern
+   * genauso wie eine Spielprueftabelle. Auf einem breiten Monitor
    * war ueber die Haelfte Rand.
    *
    * Welche Breite gilt, entscheidet das Modul (src/module/typen.ts), nicht

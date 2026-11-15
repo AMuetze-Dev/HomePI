@@ -1,4 +1,3 @@
-import { GeraeteSeite } from "./geraete/GeraeteSeite";
 import type { Breite, ModulOberflaeche, Unterseite } from "./typen";
 import { StaffelpilotSeite } from "./staffelpilot/StaffelpilotSeite";
 import { VerwaltungSeite } from "./verwaltung/VerwaltungSeite";
@@ -30,15 +29,24 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
     // Rhythmus und Betrag. Bei "normal" stehen die Karten untereinander und
     // der Vergleich, um den es geht, findet nicht mehr statt.
     breite: "weit",
+    // Jeder Bereich baut seinen Kopf selbst: Neben dem Namen steht der Monat
+    // oder die Zahl, um die es hier geht. Siehe `eigenerTitel` in typen.ts.
+    // Die Wörter stehen ein zweites Mal in `haushaltsbuch/daten.ts`, weil die
+    // Fläche ihren Titel schon braucht, solange sie lädt.
     unterseiten: [
-      { id: "uebersicht", wort: "Monatsplan" },
+      { id: "uebersicht", wort: "Monatsplan", eigenerTitel: true },
       // Ein Bild, das ganz von der Breite lebt: jede Spalte ist eine Station,
       // und die Beschriftung steht daneben, nicht darunter.
-      { id: "fluss", wort: "Geldfluss", breite: "voll" },
-      { id: "posten", wort: "Posten" },
+      { id: "fluss", wort: "Geldfluss", breite: "voll", eigenerTitel: true },
+      { id: "posten", wort: "Posten", eigenerTitel: true },
       // Formulare. Ein Eingabefeld über die ganze Monitorbreite ist nicht
       // großzügig, sondern unlesbar.
-      { id: "stammdaten", wort: "Konten & Personen", breite: "normal" },
+      {
+        id: "stammdaten",
+        wort: "Konten & Personen",
+        breite: "normal",
+        eigenerTitel: true,
+      },
     ],
   },
   {
@@ -101,13 +109,6 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
       { id: "turnier", wort: "Turnier", eigenerTitel: true },
       { id: "einstellungen", wort: "Einstellungen", breite: "text", eigenerTitel: true },
     ],
-  },
-  {
-    id: "geraete",
-    Komponente: GeraeteSeite,
-    // Eine Liste, ein Formular. Mehr Breite macht sie nicht besser, nur
-    // die Wege zwischen Name und Aktion laenger.
-    breite: "normal",
   },
   {
     id: "verwaltung",

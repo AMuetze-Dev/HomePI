@@ -152,15 +152,15 @@ test-web:
 	cd $(WEB) && npm run typecheck
 	cd $(WEB) && npm run test:coverage
 
-## tdd-api: pytest im Watch-Modus (Verzeichnis ueber P=..., Standard: geraete)
+## tdd-api: pytest im Watch-Modus (Verzeichnis ueber P=..., Standard: haushaltsbuch)
 tdd-api:
-	cd $(or $(P),modules/geraete) && uv run ptw . --now
+	cd $(or $(P),modules/haushaltsbuch) && uv run ptw . --now
 
 ## tdd-web: vitest im Watch-Modus; mit N=<modul> nur dessen Oberflaeche
 tdd-web:
 	cd $(WEB) && npm run test:watch -- $(if $(N),src/module/$(N),)
 
-## modul: zeigt beide Haelften eines Artefakts, z.B. make modul N=geraete
+## modul: zeigt beide Haelften eines Artefakts, z.B. make modul N=haushaltsbuch
 modul:
 	@test -n "$(N)" || { echo "Aufruf: make modul N=<name>"; exit 1; }
 	@echo "Backend   modules/$(N)/"

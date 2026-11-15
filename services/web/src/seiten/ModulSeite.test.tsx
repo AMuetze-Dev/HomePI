@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as client from "../api/client";
-import * as geraeteApi from "../module/geraete/api";
+import * as verwaltungApi from "../module/verwaltung/api";
 import * as register from "../module/register";
 import { mitAnmeldung } from "../testhilfen";
 import { ModulSeite } from "./ModulSeite";
@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 // Bewusst ein Artefakt OHNE eingetragene Oberflaeche: genau dieser Fall soll
-// die generische Ansicht bekommen. "geraete" hat inzwischen eine eigene.
+// die generische Ansicht bekommen. "verwaltung" hat eine eigene.
 const ohneOberflaeche: client.ModulEintrag = {
   id: "messwerte",
   titel: "Messwerte",
@@ -69,34 +69,33 @@ describe("Modulseite", () => {
   });
 
   it("nimmt für ein eingetragenes Artefakt dessen eigene Oberfläche", async () => {
-    // geraete ist in register.ts eingetragen - hier wird die echte
+    // verwaltung ist in register.ts eingetragen - hier wird die echte
     // Verdrahtung geprüft, nicht ein Mock davon.
     vi.spyOn(client, "fetchModule").mockResolvedValue([
-      { ...ohneOberflaeche, id: "geraete", titel: "Geräte", pfad: "/geraete" },
+      { ...ohneOberflaeche, id: "verwaltung", titel: "Verwaltung", pfad: "/verwaltung" },
     ]);
-    vi.spyOn(geraeteApi, "ladeGeraete").mockResolvedValue([
+    vi.spyOn(verwaltungApi, "ladeKonten").mockResolvedValue([
       {
-        id: "1",
-        name: "Stehlampe",
-        raum: "Wohnzimmer",
-        zustand: "bereit",
-        eingeschaltet: false,
+        id: "22222222-2222-4222-8222-222222222222",
+        name: "gast",
+        anzeigename: "Gast",
+        aktiv: true,
+        rechte: {},
+        angelegt: null,
+        verwalter: false,
+        passwort_wechseln: false,
       },
     ]);
-    vi.spyOn(geraeteApi, "ladeZusammenfassung").mockResolvedValue({
-      anzahl: 1,
-      eingeschaltet: 0,
-      in_wartung: 0,
-      raeume: { Wohnzimmer: 1 },
-    });
+    vi.spyOn(verwaltungApi, "ladeArtefakte").mockResolvedValue([
+      { id: "verwaltung", titel: "Verwaltung", zugang: "geschuetzt" },
+    ]);
 
-    zeige("geraete");
+    zeige("verwaltung");
 
-    // Die Geräteseite zeigt Kennzahlen und eine Tabelle mit den Geräten -
-    // die generische Ansicht zeigt eine Tabelle mit Endpunkten. Der Inhalt
-    // unterscheidet sie, nicht die Struktur.
-    expect(await screen.findByText("Stehlampe")).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Überblick" })).toBeInTheDocument();
+    // Die Verwaltung zeigt die Konten - die generische Ansicht zeigt eine
+    // Tabelle mit Endpunkten. Der Inhalt unterscheidet sie, nicht die
+    // Struktur.
+    expect(await screen.findByText("Gast")).toBeInTheDocument();
   });
 
   it("bevorzugt eine eingetragene eigene Oberfläche", async () => {

@@ -56,9 +56,9 @@ describe("Bereichsleiste", () => {
   });
 
   it("zeigt nichts, wo es nichts zu wechseln gibt", () => {
-    // "geraete" hat eine eigene Oberflaeche, aber keine zweite Ebene. Eine
-    // leere Leiste waere ein Streifen, der aussieht, als fehle etwas.
-    zeige("/modul/geraete");
+    // "verwaltung" hat eine eigene Oberflaeche, aber keine zweite Ebene.
+    // Eine leere Leiste waere ein Streifen, der aussieht, als fehle etwas.
+    zeige("/modul/verwaltung");
 
     expect(
       screen.queryByRole("navigation", { name: "Bereiche" }),

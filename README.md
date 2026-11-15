@@ -17,7 +17,6 @@ stacks/        Docker-Compose-Stacks, einer pro Verantwortungsbereich
 packages/      wiederverwendbare Bausteine
   homepi-core/   Grundgeruest jedes Microservice + homepi-CLI
 modules/       Artefakte, die im Gateway laufen
-  geraete/       Geraete im Haus (FastAPI-Router + Fachlogik)
                neue entstehen mit: homepi new <name>
 services/      lauffaehige Dienste
   gateway/       Python / FastAPI - laedt die Artefakte
@@ -104,7 +103,7 @@ make dev           # Frontend 5173, API 18000, Postgres 15432
 make test          # alles, was die CI auch prüft
 make smoke         # Rauchtests gegen die laufende Umgebung
 make tdd-web       # vitest im Watch-Modus
-make tdd-api P=modules/geraete
+make tdd-api P=modules/haushaltsbuch
 ```
 
 Details in [docs/07-lokale-entwicklung.md](docs/07-lokale-entwicklung.md).

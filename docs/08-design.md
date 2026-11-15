@@ -323,9 +323,8 @@ Leiste — ein leerer Streifen sähe aus, als fehle etwas.
 ### Die Breite meldet das Artefakt an, nicht die Hülle
 
 Vorher gab es genau ein `--breite-inhalt` von 68 rem für alles. Das ging so
-lange gut, wie es ein Artefakt gab. Bei dreien ist es falsch: Eine Geräteliste
-mit drei Einträgen braucht keine 1088 px, eine Spielprüftabelle hätte gern
-mehr, und auf einem 2560-px-Monitor war über die Hälfte Rand.
+lange gut, wie es ein Artefakt gab. Bei dreien ist es falsch: Ein Formular mit
+drei Feldern braucht keine 1088 px, eine Spielprüftabelle hätte gern mehr, und auf einem 2560-px-Monitor war über die Hälfte Rand.
 
 Jetzt meldet jedes Artefakt seinen Bedarf in `src/module/register.ts` an:
 

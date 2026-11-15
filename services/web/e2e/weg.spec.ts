@@ -99,12 +99,12 @@ test.describe("Der Weg einer frischen Installation", () => {
     await anmelden(page, VERWALTERIN.name, VERWALTERIN.passwort);
 
     await expect(artefakt(page, /Verwaltung/)).toBeVisible();
-    // Auf "geraete" hat sie kein Recht - das Artefakt existiert für sie nicht.
-    await expect(artefakt(page, /Geräte/)).toHaveCount(0);
+    // Auf das Haushaltsbuch hat sie kein Recht - es existiert für sie nicht.
+    await expect(artefakt(page, /Haushaltsbuch/)).toHaveCount(0);
   });
 
   test("in der Navigationsfläche liegt nichts über etwas anderem", async ({ page }) => {
-    // Auf dem Pi stand in der Leiste "steckdose" über "Geräte" und
+    // Auf dem Pi stand in der Leiste "steckdose" über einem Artefaktnamen und
     // "schluessel" über "Verwaltung": Das Manifest liefert Symbolnamen, die
     // Leiste setzte sie als Text in ein 20-px-Feld, und das Wort lief heraus.
     // Kein Komponententest hat das gesehen - dort gibt es kein Layout, und
@@ -184,9 +184,9 @@ test.describe("Der Weg einer frischen Installation", () => {
     await page
       .getByRole("button", { name: new RegExp(`Rechte von ${NEULING.name}`) })
       .click();
-    await page.getByLabel("Geräte").selectOption("nutzer");
+    await page.getByLabel("Haushaltsbuch").selectOption("nutzer");
 
-    await expect(page.getByLabel("Geräte")).toHaveValue("nutzer");
+    await expect(page.getByLabel("Haushaltsbuch")).toHaveValue("nutzer");
   });
 
   test("der Neue kommt mit dem Startpasswort hinein, aber an kein Artefakt", async ({
@@ -206,7 +206,7 @@ test.describe("Der Weg einer frischen Installation", () => {
   test("auch nicht, wenn er die Adresse von Hand eintippt", async ({ page }) => {
     await anmelden(page, NEULING.name, startpasswort);
 
-    await page.goto("/modul/geraete");
+    await page.goto("/modul/haushaltsbuch");
 
     await expect(
       page.getByRole("heading", { name: "Eigenes Passwort wählen" }),
@@ -223,7 +223,7 @@ test.describe("Der Weg einer frischen Installation", () => {
 
     // Ohne erneutes Anmelden: die laufende Sitzung bleibt.
     await expect(startliste(page)).toBeVisible();
-    await expect(artefakt(page, /Geräte/)).toBeVisible();
+    await expect(artefakt(page, /Haushaltsbuch/)).toBeVisible();
     // Die Verwaltung darf er nicht - sie steht nicht da.
     await expect(artefakt(page, /Verwaltung/)).toHaveCount(0);
   });
@@ -240,9 +240,9 @@ test.describe("Der Weg einer frischen Installation", () => {
   test("mit dem eigenen Passwort kommt er an sein Artefakt", async ({ page }) => {
     await anmelden(page, NEULING.name, NEULING.eigenes);
 
-    await artefakt(page, /Geräte/).click();
+    await artefakt(page, /Haushaltsbuch/).click();
 
-    await expect(page.getByRole("heading", { name: "Geräte" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Monatsplan" })).toBeVisible();
   });
 
   test("abmelden laesst nur das oeffentliche Artefakt stehen", async ({ page }) => {
@@ -262,7 +262,7 @@ test.describe("Der Weg einer frischen Installation", () => {
     await expect(
       page.getByRole("banner").getByRole("link", { name: "Anmelden" }),
     ).toBeVisible();
-    await expect(artefakt(page, /Geräte/)).toHaveCount(0);
+    await expect(artefakt(page, /Haushaltsbuch/)).toHaveCount(0);
     await expect(artefakt(page, /Verwaltung/)).toHaveCount(0);
     await expect(artefakt(page, /Tischtennisturnier/)).toBeVisible();
   });

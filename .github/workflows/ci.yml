@@ -420,7 +420,7 @@ jobs:
           GATEWAY="docker compose -f compose.dev.yml exec -T -w /app/services/gateway gateway"
           printf '%s' "$HOMEPI_SMOKE_PASSWORT" \
             | $GATEWAY uv run homepi benutzer anlegen rauchtest --passwort-stdin \
-                --artefakt geraete --rolle verwalter
+                --artefakt haushaltsbuch --rolle verwalter
           $GATEWAY uv run homepi benutzer recht rauchtest verwaltung verwalter
 
       - name: Rauchtests gegen die laufende Instanz

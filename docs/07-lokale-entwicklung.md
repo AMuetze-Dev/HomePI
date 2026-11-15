@@ -46,8 +46,8 @@ uv run homepi benutzer anlegen aaron --artefakt verwaltung --rolle verwalter
 uv run homepi benutzer liste
 ```
 
-Weitere Rechte — etwa `geraete` — vergibst du danach in der Oberfläche unter
-_Verwaltung_ oder mit `homepi benutzer recht aaron geraete verwalter`.
+Weitere Rechte — etwa `haushaltsbuch` — vergibst du danach in der Oberfläche
+unter _Verwaltung_ oder mit `homepi benutzer recht aaron haushaltsbuch verwalter`.
 
 `make dev-reset` wirft die Datenbank weg — danach ist auch das Konto weg.
 
@@ -102,7 +102,7 @@ make dev-testkonto N=klick R=leser # anderer Name, andere Rolle
 
 ```
 ==> Testkonto 'tester' anlegen
-    verwalter auf: geraete, staffelpilot, verwaltung
+    verwalter auf: haushaltsbuch, staffelpilot, tischtennis, verwaltung
     + 'tester' kann sich anmelden.
 ==> Passwort
     nur-zum-durchklicken-im-eigenen-netz
@@ -137,7 +137,7 @@ make test-python    # die drei Python-Projekte
 make test-web       # Frontend
 make smoke          # gegen die laufende Dev-Umgebung
 make tdd-web        # vitest im Watch-Modus
-make tdd-api P=modules/geraete
+make tdd-api P=modules/haushaltsbuch
 ```
 
 ### Die Testdatenbank ist nicht die Arbeitsdatenbank

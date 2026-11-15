@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { BEREICHSTITEL } from "./haushaltsbuch/daten";
 import {
   BREITE_VOREINSTELLUNG,
   breiteFuer,
@@ -29,6 +30,16 @@ describe("Das Register der Oberflächen", () => {
     ]);
   });
 
+  it("nennt die Bereiche des Haushaltsbuchs so wie das Modul selbst", () => {
+    // Die Wörter stehen zweimal: hier und in haushaltsbuch/daten.ts, weil die
+    // Fläche ihren Titel schon braucht, solange sie lädt - und ein Import
+    // zurück ins Register wäre ein Zyklus. Läuft das auseinander, heißt die
+    // Fläche anders als der Eintrag, über den man sie aufgemacht hat.
+    expect(unterseitenFuer("haushaltsbuch").map((u) => [u.id, u.wort])).toEqual(
+      Object.entries(BEREICHSTITEL),
+    );
+  });
+
   it("hält die Einrichtung aus der Leiste heraus", () => {
     // Ein Weg und keine Fläche: einmal durchlaufen, danach nur noch bei
     // Bedarf. Als Dauereintrag stünde er ab dem zweiten Tag nur im Weg --
@@ -47,13 +58,13 @@ describe("Das Register der Oberflächen", () => {
   it("gibt Modulen ohne Bereiche auch keine", () => {
     // Ein Artefakt ohne zweite Ebene bekommt keine leere Leiste, sondern
     // gar keine - der Platz gehört dann dem Inhalt.
-    expect(unterseitenFuer("geraete")).toEqual([]);
-    expect(ersteUnterseite("geraete")).toBeUndefined();
+    expect(unterseitenFuer("verwaltung")).toEqual([]);
+    expect(ersteUnterseite("verwaltung")).toBeUndefined();
   });
 
   it("gibt Staffelpilot die volle Breite und den anderen die mittlere", () => {
     expect(breiteFuer("staffelpilot")).toBe("voll");
-    expect(breiteFuer("geraete")).toBe("normal");
+    expect(breiteFuer("verwaltung")).toBe("normal");
   });
 
   it("lässt einen Bereich von der Breite seines Moduls abweichen", () => {

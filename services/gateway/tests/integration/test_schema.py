@@ -65,9 +65,9 @@ async def test_schema_wird_beim_start_angelegt(
     async with app.router.lifespan_context(app):
         pass
 
-    # Die Tabelle des geraete-Moduls muss dabei sein: alle Module erben von
-    # derselben Base, deshalb genuegt dem Gateway ein Durchgang.
-    assert "geraete" in await _tabellen()
+    # Eine Tabelle des Haushaltsbuch-Moduls muss dabei sein: alle Module
+    # erben von derselben Base, deshalb genuegt dem Gateway ein Durchgang.
+    assert "haushaltsbuch_personen" in await _tabellen()
 
 
 async def test_ohne_schalter_wird_nichts_angelegt(
@@ -80,7 +80,7 @@ async def test_ohne_schalter_wird_nichts_angelegt(
     async with app.router.lifespan_context(app):
         pass
 
-    assert "geraete" not in await _tabellen()
+    assert "haushaltsbuch_personen" not in await _tabellen()
 
 
 async def test_zweiter_start_ist_unschaedlich(
@@ -94,7 +94,7 @@ async def test_zweiter_start_ist_unschaedlich(
     async with app.router.lifespan_context(app):
         pass
 
-    assert "geraete" in await _tabellen()
+    assert "haushaltsbuch_personen" in await _tabellen()
 
 
 async def test_gateway_arbeitet_nach_dem_start(
@@ -112,21 +112,22 @@ async def test_gateway_arbeitet_nach_dem_start(
         kontext = app.state.homepi
         async with kontext.db.session() as sitzung:
             benutzer = await auth_speicher.lege_benutzer_an(sitzung, "pruefer", PASSWORT, "Prüfer")
-            await auth_speicher.setze_recht(sitzung, benutzer.id, "geraete", Rolle.VERWALTER)
+            await auth_speicher.setze_recht(sitzung, benutzer.id, "haushaltsbuch", Rolle.VERWALTER)
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             gesundheit = await client.get("/health")
-            ohne_anmeldung = await client.get("/geraete/")
+            ohne_anmeldung = await client.get("/haushaltsbuch/personen")
             await client.post("/auth/anmelden", json={"name": "pruefer", "passwort": PASSWORT})
-            geraete = await client.get("/geraete/")
+            personen = await client.get("/haushaltsbuch/personen")
 
     assert gesundheit.status_code == 200
     assert gesundheit.json()["checks"]["database"] is True
     assert ohne_anmeldung.status_code == 401
-    assert geraete.status_code == 200
-    assert geraete.json() == []
+    assert personen.status_code == 200
+    assert personen.json() == []
 
     # Eine leere Datenbank ist etwas anderes als eine fehlende Tabelle.
     async with create_async_engine(URL).connect() as verbindung:
-        assert (await verbindung.execute(text("SELECT count(*) FROM geraete"))).scalar() == 0
+        zaehlung = await verbindung.execute(text("SELECT count(*) FROM haushaltsbuch_personen"))
+        assert zaehlung.scalar() == 0
