@@ -43,7 +43,14 @@ services:
       #
       # Nebenbei erledigt das die Fritz!Box-Falle aus docs/03: Fragt das LAN
       # Pi-hole, kommt die Antwort nie beim DNS-Rebind-Schutz des Routers an.
-      FTLCONF_misc_dnsmasq_lines: "address=/${DOMAIN}/${PI_IP}"
+      #
+      # "local=" gehoert dazu: "address=" beantwortet nur die IPv4-Frage, die
+      # nach IPv6 (AAAA) reichte Pi-hole sonst nach draussen weiter - und
+      # DuckDNS kennt dort die IPv6 der Fritz!Box. Wer im LAN IPv6 hat, landete
+      # damit beim Router statt am Pi. Mit "local=" bleibt die Antwort auf AAAA
+      # leer. TXT (das DNS-01 der Zertifikate) betrifft das nicht: Traefik
+      # fragt dafuer 1.1.1.1 und 9.9.9.9 direkt.
+      FTLCONF_misc_dnsmasq_lines: "address=/${DOMAIN}/${PI_IP};local=/${DOMAIN}/"
     volumes:
       - ${DATA_ROOT}/pihole/etc-pihole:/etc/pihole
     cap_add:

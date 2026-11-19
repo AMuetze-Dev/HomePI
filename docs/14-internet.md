@@ -82,6 +82,12 @@ Pi (`FTLCONF_misc_dnsmasq_lines` in `stacks/dns/docker-compose.yml`). Im LAN
 merkt man nicht, wohin DuckDNS zeigt — und der DNS-Rebind-Schutz der Fritz!Box
 aus docs/03 ist nebenbei erledigt, weil die Frage ihn nie erreicht.
 
+Dazu gehört, dass Pi-hole die Frage nach **IPv6** (AAAA) für die Domain leer
+beantwortet (`local=/<domain>/`). Sonst reicht es sie nach draußen weiter, und
+DuckDNS nennt dort die IPv6-Adresse der Fritz!Box — jedes Gerät mit IPv6 ginge
+dann zum Router statt zum Pi, auch im eigenen Netz. Der Pi selbst hat keine
+öffentliche IPv6-Adresse; von außen geht es über IPv4.
+
 Das Zertifikat bleibt unberührt: Traefik holt es per DNS-01 über einen
 TXT-Eintrag, die Fritz!Box ändert nur den A-Eintrag. Die beiden kommen sich
 nicht in die Quere.
@@ -106,6 +112,7 @@ Repository-Variable `VITE_API_URL` liest der Workflow nicht mehr und darf weg.
 
 ```bash
 dig +short app.<domain> @127.0.0.1         # die private Adresse des Pi
+dig +short AAAA app.<domain> @127.0.0.1    # leer
 curl -s https://app.<domain>/api/health     # {"status":"ok", ...}
 ```
 
