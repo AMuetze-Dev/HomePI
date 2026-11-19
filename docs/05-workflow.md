@@ -170,8 +170,8 @@ dabei nichts, alles kommt als fertiges `manylinux-aarch64`-Wheel.
 Zu hinterlegen ist nichts mehr: Die Website ruft ihre API unter `/api` auf, unter
 derselben Adresse wie sich selbst, und Traefik schneidet das Präfix ab. Früher stand
 hier die Repository-Variable `VITE_API_URL = https://api.deine-domain`; mit ihr lief
-die Seite unter jedem anderen Port ins Leere — aus dem Internet ist sie unter `:8443`
-erreichbar ([14-internet.md](14-internet.md)). Wer die alte Variable noch hat, kann
+die Seite unter jedem anderen Namen ins Leere — aus dem Internet ist sie unter dem
+ts.net-Namen des Funnels erreichbar ([14-internet.md](14-internet.md)). Wer die alte Variable noch hat, kann
 sie löschen; der Workflow liest sie nicht mehr.
 
 ### `deploy.yml` — von Hand ausgelöst

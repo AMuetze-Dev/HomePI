@@ -26,16 +26,15 @@ services:
     labels:
       traefik.enable: "true"
       # Die Website ruft ihre API unter DERSELBEN Adresse auf, unter
-      # /api - im LAN wie aus dem Internet, mit Port 443 wie mit 8443.
-      # Vorher stand im Bundle fest "https://api.<domain>", und unter
-      # https://app.<domain>:8443 gingen alle Aufrufe an einen Port, der
-      # von aussen zu ist. Dazu kein CORS mehr: Seite und API haben einen
+      # /api - im LAN unter app.<domain>, aus dem Internet unter dem
+      # ts.net-Namen des Funnels. Ein fester Name im Bundle liefe unter dem
+      # jeweils anderen ins Leere. Dazu kein CORS: Seite und API haben einen
       # Ursprung.
       #
       # Die laengere Regel gewinnt in Traefik von selbst - /api schlaegt
       # damit den Router der Website, die Anmeldung wiederum /api.
       traefik.http.routers.app-api.rule: "Host(`app.${DOMAIN}`) && PathPrefix(`/api`)"
-      traefik.http.routers.app-api.entrypoints: "websecure,internet"
+      traefik.http.routers.app-api.entrypoints: "websecure"
       traefik.http.routers.app-api.middlewares: "api-praefix@file,rate-limit@file"
       traefik.http.routers.app-api.service: "gateway"
       # Die Anmeldung bekommt eine eigene, enge Bremse je Adresse. Sie sitzt
@@ -43,9 +42,21 @@ services:
       # Fehlversuchen, erfaehrt aber nicht, wer von wo wie viele Namen
       # durchprobiert. Das sieht nur der Reverse Proxy.
       traefik.http.routers.app-anmelden.rule: "Host(`app.${DOMAIN}`) && Path(`/api/auth/anmelden`)"
-      traefik.http.routers.app-anmelden.entrypoints: "websecure,internet"
+      traefik.http.routers.app-anmelden.entrypoints: "websecure"
       traefik.http.routers.app-anmelden.middlewares: "api-praefix@file,anmelde-bremse@file"
       traefik.http.routers.app-anmelden.service: "gateway"
+
+      # Dasselbe aus dem Internet, ueber Tailscale Funnel. Eigene Bremsen,
+      # die die Adresse aus X-Forwarded-For lesen - siehe
+      # middlewares.yml.tmpl, "rate-limit-funnel".
+      traefik.http.routers.funnel-api.rule: "PathPrefix(`/api`)"
+      traefik.http.routers.funnel-api.entrypoints: "funnel"
+      traefik.http.routers.funnel-api.middlewares: "api-praefix@file,rate-limit-funnel@file"
+      traefik.http.routers.funnel-api.service: "gateway"
+      traefik.http.routers.funnel-anmelden.rule: "Path(`/api/auth/anmelden`)"
+      traefik.http.routers.funnel-anmelden.entrypoints: "funnel"
+      traefik.http.routers.funnel-anmelden.middlewares: "api-praefix@file,anmelde-bremse-funnel@file"
+      traefik.http.routers.funnel-anmelden.service: "gateway"
 
       # api.<domain> bleibt - fuer die Rauchtests (homepi.toml) und fuer
       # Werkzeuge im LAN. Aus dem Internet braucht es niemand mehr, also

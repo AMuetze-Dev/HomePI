@@ -35,11 +35,11 @@ services:
       FTLCONF_dns_listeningMode: all
       FTLCONF_dns_dnssec: "true"
       # Die eigene Domain samt ALLEN Unternamen zeigt im LAN auf den Pi -
-      # egal, was das oeffentliche DNS sagt. Das oeffentliche sagt die
-      # Adresse des Anschlusses: Die Fritz!Box haelt DuckDNS darauf aktuell
-      # (docs/14-internet.md). Ohne diese Zeile ginge jeder Aufruf aus dem
-      # Wohnzimmer erst hinaus zum Router, und Dashboard, Logs und Home
-      # Assistant waeren im eigenen Netz nicht mehr erreichbar.
+      # egal, was das oeffentliche DNS sagt (docs/14-internet.md). Ohne
+      # diese Zeile ginge jeder Aufruf aus dem Wohnzimmer an die Adresse,
+      # die bei DuckDNS steht - im besten Fall der Router, im schlechtesten
+      # eine veraltete -, und Dashboard, Logs und Home Assistant waeren im
+      # eigenen Netz nicht mehr erreichbar.
       #
       # Nebenbei erledigt das die Fritz!Box-Falle aus docs/03: Fragt das LAN
       # Pi-hole, kommt die Antwort nie beim DNS-Rebind-Schutz des Routers an.

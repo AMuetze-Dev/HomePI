@@ -1,53 +1,77 @@
 # 14 — Aus dem Internet erreichbar
 
 Bis hierher stand nichts im Internet: Das Zertifikat kam per DNS-01, der Name
-zeigte auf die private Adresse des Pi, von unterwegs ging es über Tailscale.
-Dieses Kapitel öffnet **die Website samt API** nach außen — damit Spieler das
-Tischtennisturnier auf dem eigenen Handy sehen und die Website von überall
-bedienbar ist. Kosten: keine. DuckDNS und Let's Encrypt sind frei.
+zeigte auf die private Adresse des Pi. Dieses Kapitel öffnet **die Website samt
+API** nach außen — damit Spieler das Tischtennisturnier auf dem eigenen Handy
+sehen und die Website von überall bedienbar ist.
 
-Von außen heißt die Adresse **`https://app.<domain>:8443`**. Port 443 bleibt
-außen frei — die Fritz!Box braucht ihn oft selbst für ihren eigenen
-Fernzugang.
+Der Weg dafür ist **Tailscale Funnel**. Kosten: keine. Die Adresse lautet
+
+```
+https://homelab.<tailnet>.ts.net
+```
+
+— `<tailnet>` vergibt Tailscale (etwa `tail1a2b3c`), sie steht nach dem
+Einrichten in `tailscale funnel status`. Hübsch ist sie nicht; für Spieler in
+der Halle und für den eigenen Zugriff von unterwegs genügt sie.
+
+## Warum Funnel und keine Portfreigabe
+
+Der erste Anlauf war DuckDNS mit einer Portfreigabe in der Fritz!Box. Er ist
+an drei Dingen gescheitert, und alle drei fallen mit Funnel weg:
+
+- **DynDNS.** Die Fritz!Box muss jede neue Adresse des Anschlusses melden. Als
+  das einmal ausblieb, zeigte der Name auf eine fremde Adresse, und nichts war
+  erreichbar. Manche Arbeitgeber sperren DynDNS-Namen außerdem ganz. Funnel
+  baut die Verbindung vom Pi aus auf; welche Adresse der Anschluss gerade hat,
+  ist egal.
+- **IPv6.** DuckDNS trug die IPv6-Adresse der Fritz!Box ein. Wer IPv6 hatte,
+  landete beim Router und sah eine Zertifikatswarnung.
+- **Die Freigabe selbst.** Port 443 außen gehört der Fritz!Box, und eine
+  Freigabe auf den falschen Port am Pi stellte den LAN-Eingang samt Home
+  Assistant ins Internet. Ohne Freigabe kann das nicht passieren.
 
 ## Was danach öffentlich ist — und was nicht
 
-|                                              | aus dem Internet | im LAN / über Tailscale |
-| -------------------------------------------- | :--------------: | :---------------------: |
-| `app.<domain>` — die Website, API unter `/api` |  ja (`:8443`)  |           ja            |
-| `api.<domain>` — das Gateway unter eigenem Namen |    nein      |           ja            |
-| Traefik-Dashboard, Logs, Status              |       nein       |           ja            |
-| Pi-hole, pgAdmin, Home Assistant             |       nein       |           ja            |
+|                                                  | aus dem Internet | im LAN |
+| ------------------------------------------------ | :--------------: | :----: |
+| Website, API unter `/api` — unter dem ts.net-Namen |      ja        |   ja   |
+| `app.<domain>`, `api.<domain>`                   |       nein       |   ja   |
+| Traefik-Dashboard, Logs, Status                  |       nein       |   ja   |
+| Pi-hole, pgAdmin, Home Assistant                 |       nein       |   ja   |
 
-Das „nein" hängt nicht an einer Regel, die jeder Dienst einhalten muss, sondern
-an einem **eigenen Eingang**: Die Fritz!Box leitet von außen auf Port **8443 des
-Pi**, und auf diesem Traefik-Eingang (`internet`) hängen nur die Router, die ihn
-ausdrücklich nennen — `web`, `app-api` und `app-anmelden`. Ein neuer Dienst ist
-damit erst einmal **nicht** öffentlich. Dashboard, Logs, Status, Pi-hole,
-pgAdmin und Zigbee2MQTT tragen zusätzlich `lan-only@file`. **Home Assistant
-nicht** — es soll auch über Tailscale erreichbar bleiben, und dort schützt es
-allein der getrennte Eingang. Deshalb ist die Freigabe auf Port 443 des Pi
-gefährlich (siehe unten): Dort hängt Home Assistant.
+Das „nein" hängt an einem **eigenen Eingang**: Tailscale reicht die Anfragen
+auf dem Pi an `127.0.0.1:8081` weiter, Traefiks Eingang `funnel`. Dort hängen
+nur die Router, die ihn ausdrücklich nennen — `funnel-web`, `funnel-api` und
+`funnel-anmelden`. Ein neuer Dienst ist damit erst einmal **nicht**
+öffentlich. Weil der Eingang nur an `127.0.0.1` horcht, erreicht ihn aus dem
+Netz niemand an Tailscale vorbei.
+
+Dashboard, Logs, Status, Pi-hole, pgAdmin, Zigbee2MQTT und Home Assistant
+tragen zusätzlich `lan-only@file` (LAN und Tailscale-Bereich). Das ist die
+zweite Linie, falls doch jemand eine Portfreigabe auf den Pi anlegt.
 
 ### Eine Adresse für Seite und API
 
 Die Website ruft ihre API unter **`/api`** auf, unter derselben Adresse wie sich
 selbst; Traefik schneidet das Präfix ab und reicht an das Gateway weiter
-(Router `app-api`, Middleware `api-praefix@file`). Früher stand im Bundle fest
-`https://api.<domain>` — unter `https://app.<domain>:8443` lud die Seite dann
-zwar, aber jeder Aufruf ging an Port 443, und der ist von außen zu. Mit `/api`
-funktioniert dieselbe Seite im LAN, über Tailscale und aus dem Internet, egal
-unter welchem Port. CORS ist dafür nicht mehr nötig: Seite und API haben einen
-Ursprung.
+(Middleware `api-praefix@file`). So funktioniert dasselbe Bundle unter
+`app.<domain>` im LAN und unter dem ts.net-Namen von außen. CORS ist nicht
+nötig: Seite und API haben einen Ursprung.
 
 ## Was die Anmeldung schützt
 
 Seit die Anmeldung öffentlich ist, kann jeder es versuchen, so oft er will.
 Drei Schichten, von außen nach innen:
 
-1. **Traefik bremst je Adresse.** `anmelde-bremse@file`: zehn Versuche je
-   Minute und Absender auf `/api/auth/anmelden`, danach 429. Mit der
-   Portfreigabe sieht Traefik die echte Adresse des Besuchers.
+1. **Traefik bremst je Adresse.** Zehn Versuche je Minute und Absender auf
+   `/api/auth/anmelden`, danach 429. Am Eingang `funnel` kommt jede Verbindung
+   vom Docker-Proxy, also von **einer** Adresse; die echte steht in
+   `X-Forwarded-For`, gesetzt von Tailscale. Deshalb gibt es eigene Bremsen
+   (`anmelde-bremse-funnel`, `rate-limit-funnel`), die diesen Kopf lesen —
+   sonst teilten sich alle Besucher ein Limit, und zwanzig Spieler vor der
+   Anzeigetafel brauchten es gemeinsam auf. Geglaubt wird der Kopf nur, wenn
+   die Verbindung von `127.0.0.1` oder aus `172.16.0.0/12` kommt.
 2. **Das Gateway sperrt je Name.** Fünf Fehlversuche in einer Viertelstunde,
    danach wird für diesen Benutzernamen auch das richtige Passwort abgewiesen,
    bis der älteste Fehlversuch aus dem Fenster fällt
@@ -63,101 +87,62 @@ Drei Schichten, von außen nach innen:
 Dazu kommt, was schon vorher galt: Sitzungs-Cookie `HttpOnly`, `Secure` und
 `SameSite=Lax`, HSTS über `secure-headers@file`, OpenAPI in Produktion aus.
 
-> **Ehrlich gesagt:** Wer die Website nur selbst von unterwegs bedienen will,
-> braucht dieses Kapitel nicht — Tailscale kann das schon, ohne dass etwas im
-> Internet steht. Gebraucht wird es für Menschen, die kein Tailscale haben:
-> die Spieler beim Turnier.
-
-## DuckDNS: hält die Fritz!Box aktuell
-
-Der DuckDNS-Eintrag zeigt auf die **öffentliche** Adresse des Anschlusses; die
-Fritz!Box pflegt ihn selbst (_Internet → Freigaben → DynDNS_, Anbieter
-„Benutzerdefiniert" mit der Update-Adresse von DuckDNS). Im Homelab läuft dafür
-nichts.
-
-Genau das brach vorher den Zugriff im eigenen Netz: Der Name zeigte nach außen,
-und jeder Aufruf aus dem Wohnzimmer ging erst zum Router. **Pi-hole beantwortet
-die Domain deshalb samt allen Unternamen selbst** mit der privaten Adresse des
-Pi (`FTLCONF_misc_dnsmasq_lines` in `stacks/dns/docker-compose.yml`). Im LAN
-merkt man nicht, wohin DuckDNS zeigt — und der DNS-Rebind-Schutz der Fritz!Box
-aus docs/03 ist nebenbei erledigt, weil die Frage ihn nie erreicht.
-
-Dazu gehört, dass Pi-hole die Frage nach **IPv6** (AAAA) für die Domain leer
-beantwortet (`local=/<domain>/`). Sonst reicht es sie nach draußen weiter, und
-DuckDNS nennt dort die IPv6-Adresse der Fritz!Box — jedes Gerät mit IPv6 ginge
-dann zum Router statt zum Pi, auch im eigenen Netz. Der Pi selbst hat keine
-öffentliche IPv6-Adresse; von außen geht es über IPv4.
-
-Das Zertifikat bleibt unberührt: Traefik holt es per DNS-01 über einen
-TXT-Eintrag, die Fritz!Box ändert nur den A-Eintrag. Die beiden kommen sich
-nicht in die Quere.
-
 ## Einschalten
 
 Auf dem Pi, im Repo:
 
 ```bash
 git pull
-make up-dns       # Pi-hole beantwortet die Domain im LAN selbst
-make up-core      # Traefik mit dem Eingang "internet" auf 8443
-make up-apps      # Website und API auf beiden Eingängen
+make up-core      # Traefik mit dem Eingang "funnel" auf 127.0.0.1:8081
+make up-apps      # Website und API auch an diesem Eingang
+make funnel       # Tailscale installieren, anmelden, Funnel einschalten
 ```
 
-Die Website braucht ein **neues Image** — die API-Adresse steht zur Build-Zeit
-im Bundle, und die alte zeigt auf `api.<domain>`. Nach dem Push auf `develop`
-baut die Pipeline es; danach `make pull` und noch einmal `make up-apps`. Die
-Repository-Variable `VITE_API_URL` liest der Workflow nicht mehr und darf weg.
+`make funnel` (`scripts/50-tailscale-funnel.sh`) fragt zweimal nach dem
+Browser:
 
-**Im LAN prüfen:**
+1. **Anmelden.** Ein Link `https://login.tailscale.com/a/…` — öffnen, mit dem
+   eigenen Konto anmelden, den Pi aufnehmen. Ein Tailscale-Konto ist kostenlos.
+2. **Funnel erlauben.** Ein Link `https://login.tailscale.com/f/funnel?…` —
+   dort HTTPS-Zertifikate und Funnel für das Tailnet einschalten.
 
-```bash
-dig +short app.<domain> @127.0.0.1         # die private Adresse des Pi
-dig +short AAAA app.<domain> @127.0.0.1    # leer
-curl -s https://app.<domain>/api/health     # {"status":"ok", ...}
-```
-
-**An der Fritz!Box** (_Internet → Freigaben → Portfreigaben_ → der Pi):
-
-| Protokoll | Port außen | Port am Pi | Wozu                   |
-| --------- | ---------- | ---------- | ---------------------- |
-| TCP       | 8443       | **8443**   | der Eingang „internet" |
-
-> **Nicht 8443 auf 443.** Port 443 des Pi ist der Eingang fürs LAN — dort
-> hängen Dashboard, Logs und Home Assistant, und Home Assistant hat kein
-> `lan-only`. Eine Freigabe dorthin stellt es ins Internet.
+Danach zeigt `tailscale funnel status` die Adresse. Die Einstellung übersteht
+Neustarts; `make funnel` muss nur einmal laufen.
 
 **Von außen prüfen** — WLAN am Handy aus, mobile Daten an:
 
-- `https://app.<domain>:8443` zeigt die Startseite mit grünem Schloss.
-- `https://app.<domain>:8443/modul/tischtennis` zeigt die Anzeigetafel
+- `https://homelab.<tailnet>.ts.net` zeigt die Startseite mit gültigem Schloss.
+- `https://homelab.<tailnet>.ts.net/modul/tischtennis` zeigt die Anzeigetafel
   **ohne** Anmeldung, und sie füllt sich — das ist die API unter `/api`.
-- `https://ha.<domain>:8443` und `https://traefik.<domain>:8443` antworten mit
-  **404**: Der Eingang „internet" kennt diese Namen nicht. Kommt dort eine
-  Anmeldemaske, zeigt die Freigabe auf den falschen Port.
 
-Derselbe Link mit `:8443` funktioniert auch im LAN: Pi-hole schickt den Namen
-zum Pi, und dort horcht Port 8443 direkt.
+Der erste Aufruf nach dem Einschalten kann ein, zwei Minuten dauern, bis der
+Name überall bekannt ist.
+
+## Die Fritz!Box
+
+Für den Funnel braucht es dort **nichts**. Eine Portfreigabe auf den Pi aus
+früheren Anläufen gehört gelöscht (_Internet → Freigaben → Portfreigaben_).
+
+## Im LAN
+
+Im eigenen Netz bleibt alles unter `<dienst>.<domain>`, mit dem Zertifikat aus
+DNS-01. Dafür muss jedes Gerät **Pi-hole** fragen: Pi-hole beantwortet die
+Domain samt allen Unternamen selbst mit der privaten Adresse des Pi
+(`FTLCONF_misc_dnsmasq_lines` in `stacks/dns/docker-compose.yml`), und die
+Frage nach IPv6 (AAAA) bleibt leer (`local=/<domain>/`). Was der öffentliche
+DNS-Eintrag sagt, spielt dann keine Rolle — er muss nicht einmal aktuell sein.
+
+Fragen die Geräte stattdessen die Fritz!Box, bekommen sie den öffentlichen
+Eintrag und finden den Pi nicht. Deshalb in der Fritz!Box Pi-hole als
+DNS-Server eintragen (_Internet → Zugangsdaten → DNS-Server_) und die Domain
+beim DNS-Rebind-Schutz als Ausnahme (_Heimnetz → Netzwerk →
+Netzwerkeinstellungen_).
 
 ## Ausschalten
 
-Die Portfreigabe in der Fritz!Box löschen. Die Eingänge in Traefik dürfen
-bleiben — ohne Weiterleitung kommt dort nichts an. DuckDNS darf weiter auf die
-öffentliche Adresse zeigen; im LAN antwortet ohnehin Pi-hole.
+```bash
+sudo tailscale funnel reset
+```
 
-## Ohne öffentliche IPv4
-
-Bei DS-Lite (Fritz!Box: _Internet → Online-Monitor_ zeigt „DS-Lite" oder eine
-Adresse aus `100.64.0.0/10`) gibt es keine eigene IPv4 und damit keine
-Portfreigabe dafür. Zwei kostenlose Wege, beide ohne Freigabe am Router:
-
-- **Tailscale Funnel** — nutzt das schon installierte Tailscale.
-  `sudo tailscale funnel --bg 8443` leitet `https://<pi>.<tailnet>.ts.net` auf
-  den Eingang „internet". Seit die API unter `/api` liegt, braucht die Website
-  dafür nichts weiter — nur in Traefik einen Router für diesen Namen.
-- **IPv6** — viele DS-Lite-Anschlüsse haben eine öffentliche IPv6-Adresse. Die
-  Fritz!Box kann dafür eine IPv6-Freigabe auf den Pi öffnen, und DuckDNS nimmt
-  zusätzlich `&ipv6=`. Besucher ohne IPv6 (manche Mobilfunknetze) kommen dann
-  aber nicht durch.
-
-ngrok ginge auch, zeigt im kostenlosen Tarif aber jedem Besucher erst eine
-Warnseite — für eine Anzeigetafel in der Halle der falsche erste Eindruck.
+Danach ist nichts mehr öffentlich. Der Eingang in Traefik darf bleiben — ohne
+Funnel kommt dort nichts an.
