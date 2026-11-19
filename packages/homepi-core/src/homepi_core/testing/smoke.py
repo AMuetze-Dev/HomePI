@@ -198,7 +198,7 @@ async def test_geschuetzte_artefakte_weisen_anonyme_ab(
         base_url=ziel.basis_url,
         timeout=ziel.timeout,
         verify=ziel.tls_pruefen,
-        # Ohne das kommt der 307 von "/geraete" nach "/geraete/" zurueck und
+        # Ohne das kommt der 307 von "/beispiel" nach "/beispiel/" zurueck und
         # nicht die Antwort, um die es hier geht.
         follow_redirects=True,
     ) as anonym:

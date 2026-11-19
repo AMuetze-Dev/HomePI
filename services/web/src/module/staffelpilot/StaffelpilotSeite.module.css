@@ -727,15 +727,6 @@
   color: var(--farbe-text-leise);
 }
 
-/* Ganz rechts und leise: die Zahl beantwortet "ist das alles?", sie ist
-   keine Ueberschrift. */
-.zaehler {
-  margin-left: auto;
-  font-size: var(--text-xs);
-  color: var(--farbe-text-leise);
-  font-variant-numeric: tabular-nums;
-}
-
 /* Zwei Zahlenfelder nebeneinander. Ein Feld ueber die ganze Breite fuer "30"
    ist siebenhundert Pixel fuer zwei Ziffern; untereinander machten die beiden
    die Seite doppelt so lang wie noetig. Unter 34rem wieder gestapelt -- auf
@@ -827,29 +818,6 @@
    hinter Text. */
 .anteil > span {
   opacity: 1;
-}
-
-/* Quelltext. Monospace und Tabulatoren: hier steht Python, und Einrueckung
-   ist dort keine Geschmacksfrage. */
-.quelltext {
-  width: 100%;
-  padding: var(--raum-3);
-  border: 1px solid var(--farbe-rand);
-  border-radius: var(--rundung-md);
-  background: var(--farbe-flaeche-gedaempft);
-  color: var(--farbe-text);
-  font-family: var(--schrift-mono);
-  font-size: var(--text-sm);
-  line-height: var(--zeile-normal);
-  tab-size: 4;
-  white-space: pre;
-  overflow-x: auto;
-  resize: vertical;
-}
-
-.quelltext:focus-visible {
-  outline: 2px solid var(--farbe-fokus);
-  outline-offset: 1px;
 }
 
 /* ── Editor fuer Regeldateien ────────────────────────────────────────── */
@@ -1068,19 +1036,6 @@
 }
 
 .stapel > * {
-  margin-top: 0;
-  margin-bottom: 0;
-}
-
-/* Enger, wo die Teile zusammengehoeren: Ueberschrift und ihr Satz, Zahl
-   und ihre Beschriftung. */
-.stapelEng {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-2);
-}
-
-.stapelEng > * {
   margin-top: 0;
   margin-bottom: 0;
 }

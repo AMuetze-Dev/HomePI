@@ -3,10 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Etikett, Hinweis, Karte, Knopf, Platzhalter } from "../../ui";
 import { type Mannschaft, ladeMannschaften, speichereMannschaften } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 /**
  * Welche Mannschaft eines Vereins über welcher steht.

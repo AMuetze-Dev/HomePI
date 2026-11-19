@@ -11,10 +11,7 @@ import {
   speichereEinstellungen,
 } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 /**
  * Was in jedem Schreiben steht und wie lange eine Frist läuft.

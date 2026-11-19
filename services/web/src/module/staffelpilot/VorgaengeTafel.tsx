@@ -30,10 +30,7 @@ import {
   verwerfeVorgang,
 } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 const ZUSTAND_WORT: Record<VorgangZustand, string> = {
   entwurf: "Entwurf",

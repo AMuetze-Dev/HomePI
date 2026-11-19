@@ -42,6 +42,19 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Was dem Benutzer von einem Fehler gezeigt wird.
+ *
+ * Steht hier, weil jede Fläche sie braucht und sie sechzehnmal wörtlich
+ * dieselbe war. Der `ApiError` trägt die Meldung des Backends - und die
+ * gehört WÖRTLICH auf den Schirm: „Anna steht schon auf der Liste" hilft,
+ * „Fehler beim Speichern" nicht. Nur was kein Error ist - ein abgebrochener
+ * Abruf, ein geworfener String - bekommt den Platzhalter.
+ */
+export function meldung(fehler: unknown): string {
+  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
+}
+
 function istObjekt(wert: unknown): wert is Record<string, unknown> {
   return typeof wert === "object" && wert !== null;
 }

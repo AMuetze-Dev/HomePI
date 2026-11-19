@@ -33,24 +33,24 @@ Container. Es meldet sich über einen Entry Point an:
 ```toml
 # pyproject.toml des Artefakts
 [project.entry-points."homepi.module"]
-geraete = "homepi_geraete:modul"
+beispiel = "homepi_beispiel:modul"
 ```
 
 ```python
-# homepi_geraete/__init__.py
+# homepi_beispiel/__init__.py
 from fastapi import APIRouter
 from homepi_core import Modul
 
 router = APIRouter()
 
-@router.get("/", summary="Alle Geräte")
+@router.get("/", summary="Alles")
 async def liste() -> list[str]:
     return ["lampe", "heizung"]
 
-modul = Modul(id="geraete", titel="Geräte", router=router, version="1.0.0")
+modul = Modul(id="beispiel", titel="Beispiel", router=router, version="1.0.0")
 ```
 
-Das Gateway findet es beim Start, hängt den Router unter `/geraete` ein und
+Das Gateway findet es beim Start, hängt den Router unter `/beispiel` ein und
 nennt es in `GET /module`. Zehn Artefakte: **ein Prozess, rund 250 MB.**
 
 ### Was das kostet
@@ -101,7 +101,7 @@ Prüfung stillschweigend ausfiel.
 Ausführlich, samt Rollenmodell und CLI: [11-anmeldung.md](11-anmeldung.md).
 
 Was diese Ebene **nicht** leistet: ein Angemeldeter ohne Recht bekommt auf
-`/geraete/` ein 403 und weiß damit, dass es dieses Artefakt gibt. Die
+`/haushaltsbuch/` ein 403 und weiß damit, dass es dieses Artefakt gibt. Die
 vollständige Trennung einer öffentlichen Website von den internen Artefakten
 leistet erst der Reverse Proxy.
 
@@ -148,11 +148,11 @@ ausrollen wollen. Dann ist Module Federation richtig — und zu dem Zeitpunkt is
 ## Der Weg eines neuen Artefakts
 
 ```bash
-homepi new geraete           # Modul, Tests, Compose-Fragment
-cd services/geraete
+homepi new beispiel          # Modul, Tests, Compose-Fragment
+cd modules/beispiel
 uv run ptw . --now           # rot, grün, aufräumen
 git commit && git push       # CI prüft
-homepi deploy -s geraete     # Pipeline baut, Pi zieht
+homepi deploy -s beispiel    # Pipeline baut, Pi zieht
 ```
 
 Danach steht die Kachel auf der Startseite. Ohne Frontend-Änderung.

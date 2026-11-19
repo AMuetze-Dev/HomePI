@@ -51,6 +51,7 @@ import { RegelnTafel } from "./RegelnTafel";
 import { VorgaengeTafel } from "./VorgaengeTafel";
 import type { ModulProps } from "../typen";
 import stil from "./StaffelpilotSeite.module.css";
+import { meldung } from "../../api/client";
 
 type Daten = { staffeln: Staffel[]; spiele: SpielZeile[]; uebersicht: Zusammenfassung };
 
@@ -75,10 +76,6 @@ const WELCHE = [
   { wert: "alle", wort: "Alle" },
   { wert: "faellig", wort: "Nur fällige" },
 ] as const;
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
 
 /**
  * Neun Bereiche - und keiner davon eine eigene Seite im alten Sinn.

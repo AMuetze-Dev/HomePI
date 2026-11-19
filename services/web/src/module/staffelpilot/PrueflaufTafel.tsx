@@ -29,10 +29,7 @@ import {
 } from "./api";
 import { ergebnisSatz } from "./ergebnis";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 const ZUSTAND_WORT: Record<AuftragZustand, string> = {
   angefordert: "Wartet",

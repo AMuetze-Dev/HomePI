@@ -6,7 +6,7 @@ den Container, den Traefik-Hostnamen und welchen Teil der Pipeline
 nicht bei jedem Aufruf erneut eingetippt.
 
     [tool.homepi]
-    service = "geraete"
+    service = "beispiel"
     stack   = "apps"
 """
 
@@ -93,7 +93,7 @@ def projekt_ermitteln(start: Path | None = None, *, service: str | None = None) 
     name = (
         service
         or homepi_tabelle.get("service")
-        # "homepi-geraete" -> "geraete": der Präfix steckt schon im Image-Namen
+        # "homepi-beispiel" -> "beispiel": der Präfix steckt schon im Image-Namen
         or str(projekt_tabelle.get("name", "")).removeprefix("homepi-")
         or verzeichnis.name
     )

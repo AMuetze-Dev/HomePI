@@ -13,7 +13,7 @@ Das ist die Regel, aus der alles Weitere folgt:
 
 ```
 benutzer  ──┬── recht(artefakt="staffelpilot", rolle="verwalter")
-            └── recht(artefakt="geraete",      rolle="leser")
+            └── recht(artefakt="haushaltsbuch", rolle="leser")
 ```
 
 **Es gibt keinen globalen Administrator.** Wer StaffelPilot verwaltet, hat
@@ -191,8 +191,8 @@ Kommandozeile.
 export DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/app'
 
 homepi benutzer anlegen aaron --artefakt staffelpilot --rolle verwalter
-homepi benutzer recht aaron geraete leser
-homepi benutzer entziehen aaron geraete
+homepi benutzer recht aaron haushaltsbuch leser
+homepi benutzer entziehen aaron haushaltsbuch
 homepi benutzer passwort aaron
 homepi benutzer liste
 
@@ -358,8 +358,8 @@ Entwicklung bleibt es offen, sonst fehlte die generische Ansicht.
 
 ### Was hier noch offen ist
 
-Ein Aufruf von `/geraete/` beantwortet sich für einen Angemeldeten ohne Recht
-mit **403**, nicht mit 404. Damit weiß er, dass es ein Artefakt `geraete` gibt.
+Ein Aufruf von `/haushaltsbuch/` beantwortet sich für einen Angemeldeten ohne
+Recht mit **403**, nicht mit 404. Damit weiß er, dass es dieses Artefakt gibt.
 Das ist die ehrliche HTTP-Semantik und macht Fehlersuche möglich; die
 vollständige Trennung einer öffentlichen Website von den internen Artefakten
 leistet erst der Reverse Proxy, der auf einem öffentlichen Host nur

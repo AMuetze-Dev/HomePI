@@ -24,18 +24,18 @@ class NameVergeben(ServiceError):
 
 # TODO: Hier stehen die Regeln des Artefakts.
 #
-# Beispiel aus modules/geraete - eine Entscheidung als eigener Typ, damit der
-# Grund an ihr haengt und der Aufrufer ihn weiterreichen kann:
+# Beispiel aus modules/tischtennis - eine Entscheidung als eigener Typ, damit
+# der Grund an ihr haengt und der Aufrufer ihn weiterreichen kann:
 #
 #     @dataclass(frozen=True, slots=True)
-#     class Schaltbar:
+#     class Entscheidung:
 #         erlaubt: bool
 #         grund: str = ""
 #
-#     def darf_geschaltet_werden(zustand: str) -> Schaltbar:
-#         if zustand == "wartung":
-#             return Schaltbar(False, "Geraet steht auf Wartung")
-#         return Schaltbar(True)
+#     def darf_auswuerfeln(zustand: str) -> Entscheidung:
+#         if zustand == "laufend":
+#             return Entscheidung(False, "Es wird schon gespielt")
+#         return Entscheidung(True)
 
 
 def normalisiere(name: str) -> str:

@@ -3,10 +3,7 @@ import { useEffect, useState } from "react";
 import { Feld, Hinweis, Karte, Knopf, Platzhalter, Tafel } from "../../ui";
 import { type ZugangStand, ladeZugang, loescheZugang, speichereZugang } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 /**
  * Die Anmeldedaten, mit denen der Prüfdienst nach DFBnet geht.

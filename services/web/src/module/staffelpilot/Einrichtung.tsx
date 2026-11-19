@@ -11,6 +11,7 @@ import {
   speichereZugang,
 } from "./api";
 import stil from "./Einrichtung.module.css";
+import { meldung } from "../../api/client";
 
 /** Die Schritte in ihrer Reihenfolge. `willkommen` erklärt nur. */
 const SCHRITTE = ["willkommen", "zugang", "staffeln", "fertig"] as const;
@@ -25,10 +26,6 @@ const WORT: Record<Schritt, string> = {
 
 /** Wie oft nachgesehen wird, solange ein Auftrag unterwegs ist. */
 const TAKT_MS = 2000;
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
 
 function beendet(auftrag: Auftrag | null): boolean {
   return (

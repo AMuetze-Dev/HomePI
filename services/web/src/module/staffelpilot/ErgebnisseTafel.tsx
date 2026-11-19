@@ -4,10 +4,7 @@ import { Hinweis, Karte, Leerzustand, Platzhalter, Tafel } from "../../ui";
 import { type Auswertung, type Posten, type Staffel, ladeErgebnisse } from "./api";
 import { BefundeListe } from "./BefundeTafel";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 const SCHWERE_WORT: Record<string, string> = {
   kritisch: "kritisch",

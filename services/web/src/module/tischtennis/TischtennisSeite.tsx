@@ -34,6 +34,7 @@ import { DashboardTafel } from "./DashboardTafel";
 import { EinstellungenTafel } from "./EinstellungenTafel";
 import { TurnierTafel } from "./TurnierTafel";
 import stil from "./TischtennisSeite.module.css";
+import { meldung } from "../../api/client";
 
 interface Daten {
   turniere: Turnier[];
@@ -55,10 +56,6 @@ const LEER: Daten = {
   spiele: [],
   tabellen: [],
 };
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
 
 const ZUSTANDSWORT: Record<Turnier["zustand"], string> = {
   planung: "in Planung",

@@ -4,10 +4,7 @@ import { Etikett, Hinweis, Karte, Knopf, Platzhalter } from "../../ui";
 import { type BefundZeile, type Schwere, ladeAlleBefunde } from "./api";
 import { alsDatum } from "./datum";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 const TON: Record<Schwere, "fehler" | "warnung" | "neutral"> = {
   kritisch: "fehler",

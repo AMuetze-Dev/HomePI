@@ -23,15 +23,12 @@ import stil from "./HaushaltsbuchSeite.module.css";
 import { PostenTafel } from "./PostenTafel";
 import { StammdatenTafel } from "./StammdatenTafel";
 import { UebersichtTafel } from "./UebersichtTafel";
+import { meldung } from "../../api/client";
 
 type Zustand =
   | { phase: "laedt" }
   | { phase: "fertig"; daten: Daten }
   | { phase: "fehler"; nachricht: string };
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
 
 export function HaushaltsbuchSeite({ unterseite }: ModulProps) {
   const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });

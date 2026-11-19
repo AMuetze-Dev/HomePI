@@ -3,7 +3,7 @@
 Eigene Services erben und ergänzen:
 
     class Settings(ServiceSettings):
-        service_name: str = "geraete"
+        service_name: str = "beispiel"
         mqtt_host: str = "mosquitto"
 
     settings = Settings()

@@ -12,10 +12,7 @@ import {
 } from "../../ui";
 import { type Regel, formuliereRegel, ladeRegeln, schalteRegel } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 const SCHWERE_WORT = {
   kritisch: "kritisch",

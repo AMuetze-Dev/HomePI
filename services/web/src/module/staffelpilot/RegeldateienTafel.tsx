@@ -19,10 +19,7 @@ import {
 } from "./api";
 import { Quelltexteditor } from "./Quelltexteditor";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 /** Was das Gateway als Dateinamen annimmt. Dieselbe Prüfung dort, nicht hier. */
 const NAME_MUSTER = /^[0-9A-Za-z_]+\.py$/;

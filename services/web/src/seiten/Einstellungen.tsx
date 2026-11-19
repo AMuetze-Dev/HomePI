@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 
 import { aenderePasswort, type Rolle } from "../api/anmeldung";
 import { useAnmeldung } from "../anmeldung/kontext";
-import { SystemStatus } from "../components/SystemStatus";
+import { SystemStatus } from "./SystemStatus";
 import { GRUENDE } from "../huelle/darstellung";
 import { useBewegung } from "../huelle/useBewegung";
 import { useGrund } from "../huelle/useGrund";
