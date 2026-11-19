@@ -11,10 +11,20 @@ import {
   Tafel,
 } from "../../ui";
 import { ladeDashboard, type Dashboard, type Spiel } from "./api";
-import { erlaubnisFragen, geweckte, melden, tonVorbereiten, umschalten } from "./glocke";
+import {
+  erlaubnisFragen,
+  gemerktesIch,
+  geweckte,
+  melden,
+  merkeIch,
+  tonVorbereiten,
+  umschalten,
+} from "./glocke";
+import { naechstesSpiel } from "./meinSpiel";
 import { PlanGrafik } from "./PlanGrafik";
 import stil from "./TischtennisSeite.module.css";
-import { seit, uhrzeit } from "./zeit";
+import { dauer, seit, uhrzeit } from "./zeit";
+import { meldung } from "../../api/client";
 
 /** Alle fünf Sekunden. Ein Ballwechsel dauert länger. */
 const TAKT = 5000;
@@ -23,10 +33,6 @@ type Zustand =
   | { phase: "laedt" }
   | { phase: "fertig"; daten: Dashboard }
   | { phase: "fehler"; nachricht: string };
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
 
 function istGeweckt(spiel: Spiel, glocken: string[]): boolean {
   return [spiel.heim_id, spiel.gast_id].some((id) => id !== null && glocken.includes(id));
@@ -45,6 +51,7 @@ function istGeweckt(spiel: Spiel, glocken: string[]): boolean {
 export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }) {
   const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
   const [glocken, setGlocken] = useState<string[]>(() => geweckte());
+  const [ich, setIch] = useState<string | null>(() => gemerktesIch());
   const [erlaubnis, setErlaubnis] = useState(false);
   // Je Spiel nur einmal läuten - sonst klingelt es im Fünf-Sekunden-Takt
   // weiter, solange das Spiel vor dem eigenen läuft.
@@ -152,6 +159,20 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
        frisch der Stand ist. Welcher Bereich das ist, steht ohnehin in der
        Kopfleiste darüber. */
     <Tafel titel={daten.turnier.name} beiwort={`Stand ${uhrzeit(daten.stand)}`}>
+      <DeinSpiel
+        teilnehmer={daten.teilnehmer}
+        spiele={daten.spiele}
+        ich={ich}
+        glocke={ich !== null && glocken.includes(ich)}
+        onIch={(wer) => {
+          setIch(wer);
+          merkeIch(wer);
+        }}
+        onGlocke={() => {
+          if (ich !== null) void glockeUmschalten(ich);
+        }}
+      />
+
       <Abschnitt titel="An den Tischen" id="tische">
         <div className={stil.tische}>
           {daten.tische.map((tisch) => (
@@ -168,14 +189,17 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
               {tisch.laeuft ? (
                 <div className={stil.laufend}>
                   <div className={stil.paarung}>
-                    <span className={stil.spielername}>{tisch.laeuft.heim}</span>
+                    <Spielername id={tisch.laeuft.heim_id} ich={ich}>
+                      {tisch.laeuft.heim}
+                    </Spielername>
                     <span className={stil.gegen}>gegen</span>
-                    <span className={stil.spielername}>{tisch.laeuft.gast}</span>
+                    <Spielername id={tisch.laeuft.gast_id} ich={ich}>
+                      {tisch.laeuft.gast}
+                    </Spielername>
                   </div>
                   <p className={stil.nebensache}>
                     {tisch.laeuft.bezeichnung}
-                    {seit(tisch.laeuft.begonnen_am) !== null &&
-                      ` · läuft seit ${seit(tisch.laeuft.begonnen_am)} min`}
+                    {laufzeit(tisch.laeuft.begonnen_am)}
                   </p>
                 </div>
               ) : (
@@ -189,7 +213,14 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
               {tisch.danach.length > 0 && (
                 <ol className={stil.danach}>
                   {tisch.danach.map((spiel) => (
-                    <li key={spiel.id}>
+                    <li
+                      key={spiel.id}
+                      className={
+                        ich !== null && (spiel.heim_id === ich || spiel.gast_id === ich)
+                          ? stil.meins
+                          : undefined
+                      }
+                    >
                       <span className={stil.paarungZeile}>
                         {spiel.heim ?? spiel.heim_herkunft} gegen{" "}
                         {spiel.gast ?? spiel.gast_herkunft}
@@ -286,5 +317,117 @@ export function DashboardTafel({ turnierId }: { turnierId?: string | undefined }
 
       <p className={stil.stand}>Aktualisiert sich alle {TAKT / 1000} Sekunden</p>
     </Tafel>
+  );
+}
+
+/**
+ * „seit 12 min", und ab einer Stunde „seit 1 h 50 min".
+ *
+ * Vorher stand dort „läuft seit 6599 min", wenn jemand vergessen hatte, ein
+ * Spiel zu werten - eine Zahl, die niemand mehr liest.
+ */
+function laufzeit(begonnen: string | null): string {
+  const minuten = seit(begonnen);
+  return minuten === null ? "" : ` · läuft seit ${dauer(minuten)}`;
+}
+
+/** Ein Name, der „ich" sein kann. Hervorgehoben UND angesagt. */
+function Spielername({
+  id,
+  ich,
+  children,
+}: {
+  id: string | null;
+  ich: string | null;
+  children: React.ReactNode;
+}) {
+  const meins = id !== null && id === ich;
+  return (
+    <span
+      className={meins ? `${stil.spielername} ${stil.ich}` : stil.spielername}
+      aria-current={meins ? "true" : undefined}
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
+ * „Dein Spiel" - die Frage, mit der ein Spieler die Tafel aufmacht.
+ *
+ * Oben und nicht in einer Klappe: Auf dem Telefon ist das der erste
+ * Bildschirm, und dort gehört die Antwort hin, wegen der jemand die Seite
+ * überhaupt geöffnet hat. Die Wahl merkt sich das Gerät; wer nichts wählt,
+ * sieht nur die eine Auswahl und sonst die Tafel wie bisher.
+ */
+function DeinSpiel({
+  teilnehmer,
+  spiele,
+  ich,
+  glocke,
+  onIch,
+  onGlocke,
+}: {
+  teilnehmer: Dashboard["teilnehmer"];
+  spiele: Dashboard["spiele"];
+  ich: string | null;
+  glocke: boolean;
+  onIch: (wer: string | null) => void;
+  onGlocke: () => void;
+}) {
+  const mein = ich === null ? null : naechstesSpiel(spiele, ich);
+
+  return (
+    <Abschnitt titel="Dein Spiel" id="dein-spiel">
+      <div className={stil.deinSpiel}>
+        <label className={stil.ichWahl}>
+          <span className={stil.nebensache}>Ich bin</span>
+          <select
+            value={ich ?? ""}
+            onChange={(e) => onIch(e.target.value === "" ? null : e.target.value)}
+          >
+            <option value="">Namen wählen</option>
+            {teilnehmer.map((wer) => (
+              <option key={wer.id} value={wer.id}>
+                {wer.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {mein !== null && (
+          <p className={stil.deinSpielText} aria-live="polite">
+            {mein.art === "laeuft" &&
+              `Du spielst gerade${mein.spiel.tisch !== null ? ` an Tisch ${mein.spiel.tisch}` : ""} gegen ${mein.gegner}.`}
+            {mein.art === "wartet" && (
+              <>
+                Als Nächstes
+                {mein.spiel.tisch !== null && ` an Tisch ${mein.spiel.tisch}`} gegen{" "}
+                {mein.gegner}
+                <span className={stil.nebensache}>
+                  {mein.spiel.gleich_dran
+                    ? " · gleich dran"
+                    : mein.spiel.erwartet_ab !== null
+                      ? ` · ab ${uhrzeit(mein.spiel.erwartet_ab)}`
+                      : ""}
+                </span>
+              </>
+            )}
+            {mein.art === "nichts" && "Gerade steht kein Spiel für dich an."}
+          </p>
+        )}
+
+        {ich !== null && (
+          <Knopf
+            groesse="sm"
+            auspraegung={glocke ? "primaer" : "sekundaer"}
+            aria-pressed={glocke}
+            onClick={onGlocke}
+          >
+            {glocke ? "🔔 Glocke an" : "Glocke"}
+          </Knopf>
+        )}
+      </div>
+    </Abschnitt>
   );
 }

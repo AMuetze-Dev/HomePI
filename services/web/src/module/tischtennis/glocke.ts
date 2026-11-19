@@ -18,6 +18,33 @@
  */
 
 const SCHLUESSEL = "homepi.tischtennis.glocke";
+const ICH = "homepi.tischtennis.ich";
+
+/**
+ * Wer auf diesem Gerät „ich" ist - für „Dein Spiel" oben auf der Tafel.
+ *
+ * Getrennt von der Glocke: Wer seinen Namen wählt, will wissen, wann er
+ * dran ist - nicht unbedingt, dass das Telefon dabei piept. Die Glocke ist
+ * ein zweiter, eigener Schritt.
+ */
+export function gemerktesIch(): string | null {
+  try {
+    const gespeichert = window.localStorage.getItem(ICH);
+    const gelesen: unknown = gespeichert ? JSON.parse(gespeichert) : null;
+    return typeof gelesen === "string" ? gelesen : null;
+  } catch {
+    return null;
+  }
+}
+
+export function merkeIch(wer: string | null): void {
+  try {
+    if (wer === null) window.localStorage.removeItem(ICH);
+    else window.localStorage.setItem(ICH, JSON.stringify(wer));
+  } catch {
+    /* Ohne Speicher gilt die Wahl eben nur, solange die Seite offen ist. */
+  }
+}
 
 export function geweckte(): string[] {
   try {

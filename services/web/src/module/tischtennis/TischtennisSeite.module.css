@@ -92,6 +92,17 @@
   margin-top: var(--raum-5);
 }
 
+/* Was in einer geoeffneten Ergebniszeile steht: woher es kommt, und die
+   eine Korrektur. */
+.korrektur {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+  padding: var(--raum-1) var(--raum-2) var(--raum-4);
+}
+
 .gegen {
   flex: none;
   color: var(--farbe-text-leise);
@@ -177,12 +188,6 @@
 
 /* --------------------------------------------------------------- Dashboard */
 
-.dashboard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-10);
-}
-
 /* Mobil eine Spalte: bei 375 px steht ein Tisch unter dem anderen, und die
    Paarung bleibt groß genug, um sie aus zwei Metern zu lesen. */
 .tische {
@@ -225,6 +230,61 @@
   font-weight: var(--gewicht-mittel);
   letter-spacing: var(--laufweite-enger);
   line-height: var(--zeile-eng);
+  overflow-wrap: anywhere;
+}
+
+/* Der eigene Name: in der Akzentschrift. Nicht fett allein - die Namen am
+   Tisch sind schon gross und mittelfett, ein weiterer Schnitt fiele dort
+   nicht auf. */
+.ich {
+  color: var(--farbe-akzent-schrift);
+}
+
+/* Ein eigenes Spiel in der Warteschlange: ein Strich an der Kante, wie der
+   Sieger im Raster. Die Zeile bleibt lesbar, auch fuer wen das nicht ist. */
+.meins {
+  margin-left: calc(var(--raum-3) * -1);
+  padding-left: calc(var(--raum-3) - 2px);
+  border-left: 2px solid var(--farbe-akzent);
+}
+
+/* "Dein Spiel": Auswahl, Antwort und Glocke auf einer Zeile, die auf dem
+   Telefon umbricht. Die Antwort ist der Grund fuer den ganzen Block -
+   deshalb gross und mit Platz. */
+.deinSpiel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--raum-3) var(--raum-5);
+}
+
+.ichWahl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+}
+
+.ichWahl select {
+  min-width: 12rem;
+  padding: var(--raum-2) var(--raum-3);
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  font: inherit;
+  font-size: var(--text-md);
+}
+
+.ichWahl select:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+.deinSpielText {
+  flex: 1 1 16rem;
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-mittel);
   overflow-wrap: anywhere;
 }
 

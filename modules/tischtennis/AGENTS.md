@@ -60,6 +60,17 @@ sein Mann noch nicht fest - in einer spaeteren Runde laeuft dort ein Sieger
 ein -, bleibt es `geplant` und entscheidet sich in
 `speicher._sieger_weiterreichen`, sobald er eintrifft.
 
+**Die Anzeigetafel ist die öffentliche Seite** — seit dem vierten Durchgang
+auch aus dem Internet ([docs/14-internet.md](../../docs/14-internet.md)), auf
+dem Handy eines Spielers, der kein Konto hat. Ganz oben steht deshalb
+**„Dein Spiel"**: Name wählen, dann steht dort „Als Nächstes an Tisch 2 gegen
+Anna · gleich dran". Die Wahl merkt sich das Gerät
+(`glocke.ts`, `homepi.tischtennis.ich`), nicht der Server; die Rechnung steht
+rein in `meinSpiel.ts`. Sie nimmt `spiele` aus dem Dashboard — dort trägt
+jedes Spiel Tisch und erwartete Uhrzeit aus dem Zeitplan. Wer am Dashboard
+etwas ändert, prüft, dass das so bleibt; sonst steht oben „kein Spiel", obwohl
+in der Warteschlange eines steht.
+
 **Sechs Zusagen sind nicht verhandelbar** und gehören in jede Änderung:
 
 1. **Jeder schreibende Endpunkt prüft selbst.** Dieses Artefakt ist

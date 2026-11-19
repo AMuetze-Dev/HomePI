@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -190,19 +190,6 @@ describe("Turnier: während gespielt wird", () => {
     expect(screen.queryByRole("button", { name: /gewinnt/ })).not.toBeInTheDocument();
   });
 
-  it("nimmt ein Ergebnis zurück", async () => {
-    const { onZuruecknehmen } = aufbauen({
-      turnier: LAEUFT,
-      spiele: [spiel({ zustand: "beendet", sieger_id: "p1" })],
-    });
-
-    await userEvent.click(
-      screen.getByRole("button", { name: "Ergebnis von Spiel 1 zurücknehmen" }),
-    );
-
-    expect(onZuruecknehmen).toHaveBeenCalledWith("s1");
-  });
-
   it("bietet das Raster an, sobald alles gewertet ist", async () => {
     const { onNaechsteRunde } = aufbauen({
       turnier: turnier({ zustand: "laufend", offene_spiele: 0 }),
@@ -230,5 +217,57 @@ describe("Turnier: während gespielt wird", () => {
     await userEvent.click(screen.getByRole("button", { name: "Spielplan verwerfen" }));
 
     expect(onZuruecksetzen).toHaveBeenCalled();
+  });
+});
+
+describe("Turnier: Listen, die lang werden", () => {
+  const LAEUFT = turnier({ zustand: "laufend", anzahl_spiele: 2, offene_spiele: 1 });
+
+  it("schreibt die Paarung über die Siegerknöpfe", () => {
+    /* Die Knöpfe sagen "Anna gewinnt" - wer gegen wen spielt, musste man
+       sich aus zwei Knöpfen zusammensetzen. */
+    aufbauen({ turnier: LAEUFT, spiele: [spiel()] });
+
+    expect(screen.getByText("Anna gegen Bernd")).toBeInTheDocument();
+  });
+
+  it("bietet Zurücknehmen erst in der geöffneten Zeile an", async () => {
+    /* Bei einem Turnier mit vierzig Spielen standen hier vierzig Knöpfe -
+       für eine Handlung, die man einmal am Abend braucht. */
+    const { onZuruecknehmen } = aufbauen({
+      turnier: LAEUFT,
+      spiele: [spiel({ zustand: "beendet", sieger_id: "p1" })],
+    });
+
+    expect(
+      screen.queryByRole("button", { name: /Ergebnis von Spiel 1 zurücknehmen/ }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Anna gegen Bernd/ }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /Ergebnis von Spiel 1 zurücknehmen/ }),
+    );
+
+    expect(onZuruecknehmen).toHaveBeenCalledWith("s1");
+  });
+
+  it("zeigt die neuesten Ergebnisse zuerst und kürzt lange Listen", async () => {
+    const ergebnisse = Array.from({ length: 14 }, (_, i) =>
+      spiel({
+        id: `e${i}`,
+        nummer: i + 1,
+        zustand: "beendet",
+        sieger_id: "p1",
+        beendet_am: `2026-11-09T18:${String(i).padStart(2, "0")}:00Z`,
+      }),
+    );
+    aufbauen({ turnier: LAEUFT, spiele: ergebnisse });
+
+    const liste = within(screen.getByRole("list", { name: "Gewertet" }));
+    expect(liste.getAllByRole("listitem")).toHaveLength(10);
+
+    await userEvent.click(screen.getByRole("button", { name: "Alle 14 zeigen" }));
+
+    expect(liste.getAllByRole("listitem")).toHaveLength(14);
   });
 });
