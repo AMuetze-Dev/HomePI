@@ -69,6 +69,9 @@ export interface Spiel {
   gast: string | null;
   heim_herkunft: string | null;
   gast_herkunft: string | null;
+  /** Die Nummer hinter der Herkunft - daran hängt die Hervorhebung im Raster. */
+  heim_aus_spiel: number | null;
+  gast_aus_spiel: number | null;
   zustand: SpielZustand;
   tisch: number | null;
   sieger_id: string | null;

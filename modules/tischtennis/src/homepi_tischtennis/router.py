@@ -113,6 +113,8 @@ def _spiel_ausgabe(
         gast_herkunft=_herkunft(
             spiel.gast_id, spiel.gast_aus_spiel, spiel.freilos, spiel.gast_aus_verlierer
         ),
+        heim_aus_spiel=spiel.heim_aus_spiel,
+        gast_aus_spiel=spiel.gast_aus_spiel,
         zustand=spiel.zustand,  # type: ignore[arg-type]
         tisch=spiel.tisch if spiel.tisch is not None else (zeile.tisch if zeile else None),
         sieger_id=spiel.sieger_id,

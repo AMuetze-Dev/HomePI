@@ -467,11 +467,87 @@
 .rasterspiel {
   position: relative;
   display: flex;
-  flex-direction: column;
   border: 1px solid var(--farbe-rand);
   border-radius: var(--rundung-md);
-  overflow: hidden;
   background: var(--farbe-flaeche);
+  /* Ein Verweis rollt das Spiel ins Bild - ohne diesen Abstand landete es
+     genau unter der Kopfleiste, die oben stehen bleibt. */
+  scroll-margin: calc(var(--hoehe-kopf) + var(--raum-4)) var(--raum-4) var(--raum-4);
+  transition:
+    border-color var(--dauer-schnell),
+    box-shadow var(--dauer-schnell),
+    background-color var(--dauer-schnell);
+}
+
+/* Das Spiel, auf das ein Verweis gerade zeigt: Rand und Fläche im Akzent,
+   dazu ein zweiter Ring. Ein einzelnes Pixel sähe man nicht, wenn man im
+   Verliererzweig zeigt und das Spiel eine Karte weiter oben steht. */
+.rasterspiel[aria-current="true"] {
+  border-color: var(--farbe-akzent);
+  background: var(--farbe-akzent-fuellung);
+  box-shadow: 0 0 0 1px var(--farbe-akzent);
+}
+
+/* Eine schmale Spalte für die Nummer, über beide Zeilen. Sie macht die
+   Paarung nicht höher und verschiebt deshalb den Strich zur nächsten
+   Runde nicht, der an der halben Höhe hängt. */
+.rasternummer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: calc(2ch + var(--raum-3));
+  border-right: 1px solid var(--farbe-rand);
+  color: var(--farbe-text-leise);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  transition: color var(--dauer-schnell);
+}
+
+.rasterspiel[aria-current="true"] .rasternummer {
+  border-right-color: var(--farbe-akzent);
+  color: var(--farbe-akzent-schrift);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.rasterpaar {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 0 var(--rundung-md) var(--rundung-md) 0;
+}
+
+/* Der Verweis sieht aus wie ein Querverweis im Buch: gepunktet
+   unterstrichen. Ein Knopf mit Rahmen machte aus jedem offenen Platz eine
+   Schaltfläche - vor dem ersten Ball bestünde das Raster aus nichts
+   anderem. */
+.rasterverweis {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--farbe-text-gedaempft);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: start;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: color var(--dauer-schnell);
+}
+
+.rasterverweis:hover,
+.rasterverweis[aria-pressed="true"] {
+  color: var(--farbe-akzent-schrift);
+  text-decoration-style: solid;
+}
+
+.rasterverweis:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+  border-radius: var(--rundung-sm);
 }
 
 /* Der Strich nach rechts, der zur nächsten Runde zeigt. */

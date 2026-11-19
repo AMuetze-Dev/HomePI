@@ -161,6 +161,12 @@ class SpielAusgabe(BaseModel):
     #: Steht statt des Namens, solange der Gegner nicht feststeht.
     heim_herkunft: str | None = None
     gast_herkunft: str | None = None
+    #: Die Nummer des Spiels, aus dem der Platz gefuellt wird - dasselbe wie
+    #: in der Herkunft, aber als Zahl. Daran haengt das Raster die
+    #: Hervorhebung; den Satz auseinanderzunehmen hiesse, ihn nie wieder
+    #: umformulieren zu duerfen. Bleibt stehen, wenn der Name feststeht.
+    heim_aus_spiel: int | None = None
+    gast_aus_spiel: int | None = None
 
     zustand: SpielZustand
     tisch: int | None = None

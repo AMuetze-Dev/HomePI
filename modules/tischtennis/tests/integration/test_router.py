@@ -841,6 +841,25 @@ class TestDoppelKo:
         assert erste_verliererrunde["heim_herkunft"].startswith("Verlierer aus Spiel")
         assert erste_verliererrunde["gast_herkunft"].startswith("Verlierer aus Spiel")
 
+    async def test_die_herkunft_nennt_das_spiel_auch_als_zahl(self, client: AsyncClient) -> None:
+        """Das Raster hebt das Spiel hervor, auf das "Verlierer aus Spiel 3"
+        zeigt. Dafuer braucht es die Nummer als Feld - aus dem Satz
+        herausgelesen, braeche es mit der ersten anderen Formulierung."""
+        lauf = await turnier_anlegen(client, modus="ko", doppel_ko=True)
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        alle = await spiele(client, lauf["id"])
+        nummern = {s["nummer"] for s in alle}
+        unten = next(s for s in alle if s["phase"] == "ko_verlierer")
+
+        assert unten["heim_aus_spiel"] in nummern
+        assert unten["heim_herkunft"] == f"Verlierer aus Spiel {unten['heim_aus_spiel']}"
+        assert unten["gast_aus_spiel"] in nummern
+        # Ein Spiel der ersten Runde kommt aus keinem anderen.
+        anfang = next(s for s in alle if s["phase"] == "ko" and s["runde"] == 1)
+        assert anfang["heim_aus_spiel"] is None
+
     async def test_eine_korrektur_zieht_den_verliererzweig_mit(self, client: AsyncClient) -> None:
         """Wird ein Ergebnis gedreht, wechselt nicht nur der Sieger oben,
         sondern auch der Verlierer unten - sonst spielt im Verliererzweig
