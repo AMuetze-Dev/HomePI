@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Auslosung } from "./api";
+import type { Auslosung, Liste } from "./api";
 import { spiel, turnier } from "./testdaten";
 import { TurnierTafel } from "./TurnierTafel";
 
@@ -21,10 +21,19 @@ const LEUTE = [
   { id: "p2", name: "Bernd", notiz: "", gruppe: null, freilose: 0 },
 ];
 
+const LISTEN: Liste[] = [
+  { id: "l1", name: "Stammtisch", namen: ["Anna", "Cem", "Dana"] },
+];
+
 function aufbauen(abweichend: Partial<Parameters<typeof TurnierTafel>[0]> = {}) {
   const griffe = {
     onTeilnehmerAnlegen: vi.fn().mockResolvedValue(true),
     onTeilnehmerEntfernen: vi.fn(),
+    onListeLaden: vi
+      .fn()
+      .mockResolvedValue({ eingetragen: [LEUTE[0], LEUTE[1]], schon_dabei: ["Anna"] }),
+    onListeSpeichern: vi.fn().mockResolvedValue(true),
+    onListeLoeschen: vi.fn(),
     onLosen: vi.fn().mockResolvedValue(AUSLOSUNG),
     onUebernehmen: vi.fn().mockResolvedValue(true),
     onZuruecksetzen: vi.fn(),
@@ -42,6 +51,7 @@ function aufbauen(abweichend: Partial<Parameters<typeof TurnierTafel>[0]> = {}) 
       turnier={turnier()}
       teilnehmer={LEUTE}
       spiele={[]}
+      listen={LISTEN}
       darfEinrichten
       {...zusammen}
     />,
@@ -82,12 +92,99 @@ describe("Turnier: vor dem Auswürfeln", () => {
     expect(screen.getByLabelText("Name")).toHaveValue("Anna");
   });
 
-  it("entfernt einen Namen", async () => {
+  it("entfernt einen Namen erst nach dem Aufklappen", async () => {
+    /* Kein Kreuz an jedem Namen: Bei zwanzig Leuten waren das zwanzig
+       Knöpfe, und gesucht hat man trotzdem einen Namen. */
     const { onTeilnehmerEntfernen } = aufbauen();
 
+    expect(
+      screen.queryByRole("button", { name: "Anna entfernen" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Anna" }));
     await userEvent.click(screen.getByRole("button", { name: "Anna entfernen" }));
 
     expect(onTeilnehmerEntfernen).toHaveBeenCalledWith("p1");
+  });
+
+  it("zählt die Namen durch", () => {
+    aufbauen();
+
+    const liste = screen.getByRole("list", { name: "Eingetragene Namen" });
+    expect(within(liste).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(liste).getByText("01")).toBeInTheDocument();
+  });
+
+  /* Gespeicherte Listen: einmal tippen, vor jedem Turnier laden. */
+  it("zeigt die Listen mit der Zahl ihrer Namen", () => {
+    aufbauen();
+
+    expect(
+      screen.getByRole("heading", { name: "Gespeicherte Listen" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Stammtisch/ })).toHaveTextContent(
+      "3 Namen",
+    );
+  });
+
+  it("erklärt im Erstzustand, wozu es Listen gibt", () => {
+    aufbauen({ listen: [] });
+
+    expect(screen.getByText(/Noch keine Liste/)).toBeInTheDocument();
+  });
+
+  it("lädt eine Liste und sagt, was passiert ist", async () => {
+    const { onListeLaden } = aufbauen();
+
+    await userEvent.click(screen.getByRole("button", { name: /Stammtisch/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Übernehmen" }));
+
+    expect(onListeLaden).toHaveBeenCalledWith("l1");
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "2 eingetragen, 1 war schon dabei",
+    );
+  });
+
+  it("löscht eine Liste aus der Ausklappung", async () => {
+    const { onListeLoeschen } = aufbauen();
+
+    await userEvent.click(screen.getByRole("button", { name: /Stammtisch/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Liste löschen" }));
+
+    expect(onListeLoeschen).toHaveBeenCalledWith("l1");
+  });
+
+  it("speichert die eingetragenen Namen als neue Liste", async () => {
+    const { onListeSpeichern } = aufbauen();
+
+    expect(screen.queryByLabelText("Name der Liste")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Als Liste speichern" }));
+    await userEvent.type(screen.getByLabelText("Name der Liste"), "Testlauf");
+    await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    expect(onListeSpeichern).toHaveBeenCalledWith("Testlauf", undefined);
+    expect(screen.queryByLabelText("Name der Liste")).not.toBeInTheDocument();
+  });
+
+  it("überschreibt eine Liste gleichen Namens - und sagt das vorher", async () => {
+    const { onListeSpeichern } = aufbauen();
+
+    await userEvent.click(screen.getByRole("button", { name: "Als Liste speichern" }));
+    await userEvent.type(screen.getByLabelText("Name der Liste"), "stammtisch");
+
+    expect(screen.getByText(/ersetzt die 3 Namen/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Überschreiben" }));
+
+    expect(onListeSpeichern).toHaveBeenCalledWith("Stammtisch", "l1");
+  });
+
+  it("behält das Formular offen, wenn das Speichern fehlschlägt", async () => {
+    aufbauen({ onListeSpeichern: vi.fn().mockResolvedValue(false) });
+
+    await userEvent.click(screen.getByRole("button", { name: "Als Liste speichern" }));
+    await userEvent.type(screen.getByLabelText("Name der Liste"), "Testlauf");
+    await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    expect(screen.getByLabelText("Name der Liste")).toHaveValue("Testlauf");
   });
 
   it("würfelt und übernimmt genau dieses Los", async () => {

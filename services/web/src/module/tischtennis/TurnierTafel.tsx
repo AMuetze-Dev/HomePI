@@ -8,11 +8,20 @@ import {
   Karte,
   Knopf,
   Leerzustand,
+  Regel,
   Reihe,
   Tabelle,
   Zelle,
 } from "../../ui";
-import type { Auslosung, Richtung, Spiel, Teilnehmer, Turnier } from "./api";
+import type {
+  Auslosung,
+  Liste,
+  Richtung,
+  Spiel,
+  Teilnehmer,
+  Turnier,
+  Uebernahme,
+} from "./api";
 import stil from "./TischtennisSeite.module.css";
 import { dauer, uhrzeit } from "./zeit";
 
@@ -20,9 +29,16 @@ interface Props {
   turnier: Turnier;
   teilnehmer: Teilnehmer[];
   spiele: Spiel[];
+  /** Gespeicherte Namenslisten - Vorlagen, die an keinem Turnier hängen. */
+  listen: Liste[];
   darfEinrichten: boolean;
   onTeilnehmerAnlegen: (name: string) => Promise<boolean>;
   onTeilnehmerEntfernen: (id: string) => void;
+  /** `null`, wenn es nicht geklappt hat - die Meldung zeigt die Seite. */
+  onListeLaden: (id: string) => Promise<Uebernahme | null>;
+  /** Mit `id` wird diese Liste überschrieben, ohne entsteht eine neue. */
+  onListeSpeichern: (name: string, id?: string) => Promise<boolean>;
+  onListeLoeschen: (id: string) => void;
   onLosen: () => Promise<Auslosung | null>;
   onUebernehmen: (saat: number) => Promise<boolean>;
   onZuruecksetzen: () => void;
@@ -48,9 +64,13 @@ export function TurnierTafel({
   turnier,
   teilnehmer,
   spiele,
+  listen,
   darfEinrichten,
   onTeilnehmerAnlegen,
   onTeilnehmerEntfernen,
+  onListeLaden,
+  onListeSpeichern,
+  onListeLoeschen,
   onLosen,
   onUebernehmen,
   onZuruecksetzen,
@@ -67,6 +87,13 @@ export function TurnierTafel({
           teilnehmer={teilnehmer}
           onAnlegen={onTeilnehmerAnlegen}
           onEntfernen={onTeilnehmerEntfernen}
+        />
+        <GespeicherteListen
+          teilnehmer={teilnehmer}
+          listen={listen}
+          onLaden={onListeLaden}
+          onSpeichern={onListeSpeichern}
+          onLoeschen={onListeLoeschen}
         />
         {darfEinrichten ? (
           <Wuerfel turnier={turnier} onLosen={onLosen} onUebernehmen={onUebernehmen} />
@@ -103,6 +130,9 @@ function Teilnehmerliste({
 }) {
   const [name, setName] = useState("");
   const [laeuft, setLaeuft] = useState(false);
+  // Höchstens ein Name ist aufgeklappt: Wer zwei entfernen will, tut das
+  // nacheinander, und dazwischen steht die Liste wieder ruhig da.
+  const [offen, setOffen] = useState<string | null>(null);
 
   async function absenden(ereignis: React.FormEvent) {
     ereignis.preventDefault();
@@ -115,7 +145,11 @@ function Teilnehmerliste({
   }
 
   return (
-    <Abschnitt titel="Wer spielt mit?" id="mitspieler">
+    <Abschnitt
+      titel="Wer spielt mit?"
+      id="mitspieler"
+      beiwort={teilnehmer.length > 0 ? `${teilnehmer.length} Namen` : undefined}
+    >
       <Karte>
         {/* Das Formular steht oben: hier werden zwanzig Namen hintereinander
             eingetippt, und nach jedem rutschte es sonst eine Zeile tiefer. */}
@@ -140,26 +174,232 @@ function Teilnehmerliste({
 
         {teilnehmer.length === 0 ? (
           <p className={stil.nebensache}>
-            Noch niemand dabei. Ab zwei Namen lässt sich auswürfeln.
+            Noch niemand dabei. Ab zwei Namen lässt sich auswürfeln - oder lade unten eine
+            gespeicherte Liste.
           </p>
         ) : (
-          <ul className={stil.namen}>
-            {teilnehmer.map((wer) => (
-              <li key={wer.id} className={stil.namenschild}>
-                {wer.name}
-                <Knopf
-                  groesse="sm"
-                  auspraegung="leise"
-                  onClick={() => onEntfernen(wer.id)}
-                  aria-label={`${wer.name} entfernen`}
-                >
-                  ×
-                </Knopf>
-              </li>
-            ))}
-          </ul>
+          /* Eine durchgezählte Liste in Spalten statt runder Schildchen mit
+             Kreuz: Die Namen sind das, was man hier liest, und die eine
+             Handlung - entfernen - steht erst da, wenn man einen Namen
+             antippt. */
+          <ol className={stil.namen} aria-label="Eingetragene Namen">
+            {teilnehmer.map((wer, stelle) => {
+              const istOffen = offen === wer.id;
+              return (
+                <li key={wer.id} className={stil.namenszeile}>
+                  <div className={stil.namensinhalt}>
+                    <button
+                      type="button"
+                      className={stil.namenskopf}
+                      aria-expanded={istOffen}
+                      onClick={() => setOffen(istOffen ? null : wer.id)}
+                    >
+                      <span className={stil.laufnummer} aria-hidden="true">
+                        {String(stelle + 1).padStart(2, "0")}
+                      </span>
+                      <span className={stil.namenstext}>{wer.name}</span>
+                    </button>
+                    {istOffen && (
+                      <Knopf
+                        groesse="sm"
+                        auspraegung="leise"
+                        onClick={() => {
+                          setOffen(null);
+                          onEntfernen(wer.id);
+                        }}
+                        aria-label={`${wer.name} entfernen`}
+                      >
+                        Entfernen
+                      </Knopf>
+                    )}
+                  </div>
+                  <Regel />
+                </li>
+              );
+            })}
+          </ol>
         )}
       </Karte>
+    </Abschnitt>
+  );
+}
+
+/** Was das Laden einer Liste bewirkt hat, in einem Satz. */
+function bericht(ergebnis: Uebernahme): string {
+  const neu = ergebnis.eingetragen.length;
+  const schon = ergebnis.schon_dabei.length;
+  if (neu === 0) return "Alle Namen dieser Liste waren schon dabei.";
+  const teil = `${neu} eingetragen`;
+  if (schon === 0) return `${teil}.`;
+  return `${teil}, ${schon} ${schon === 1 ? "war" : "waren"} schon dabei.`;
+}
+
+const gleich = (a: string, b: string) =>
+  a.trim().toLocaleLowerCase("de") === b.trim().toLocaleLowerCase("de");
+
+/**
+ * Namen einmal speichern, vor jedem Turnier laden.
+ *
+ * Laden trägt nur nach, wer noch fehlt - es ersetzt nie. Deshalb lassen
+ * sich zwei Listen nacheinander laden („Stammtisch" und „Gäste"), und ein
+ * Name, der schon steht, behält seine Notiz.
+ */
+function GespeicherteListen({
+  teilnehmer,
+  listen,
+  onLaden,
+  onSpeichern,
+  onLoeschen,
+}: {
+  teilnehmer: Teilnehmer[];
+  listen: Liste[];
+  onLaden: (id: string) => Promise<Uebernahme | null>;
+  onSpeichern: (name: string, id?: string) => Promise<boolean>;
+  onLoeschen: (id: string) => void;
+}) {
+  const [offen, setOffen] = useState<string | null>(null);
+  const [laedt, setLaedt] = useState(false);
+  const [meldungstext, setMeldungstext] = useState("");
+  const [formularOffen, setFormularOffen] = useState(false);
+  const [listenname, setListenname] = useState("");
+  const [sichert, setSichert] = useState(false);
+
+  // Gleicher Name heißt überschreiben - und das steht auf dem Knopf, bevor
+  // es passiert. Groß- und Kleinschreibung zählen dabei nicht.
+  const gleichnamig =
+    listenname.trim() === ""
+      ? undefined
+      : listen.find((liste) => gleich(liste.name, listenname));
+
+  async function laden(liste: Liste) {
+    setLaedt(true);
+    setMeldungstext("");
+    const ergebnis = await onLaden(liste.id);
+    setLaedt(false);
+    if (ergebnis) {
+      setMeldungstext(bericht(ergebnis));
+      setOffen(null);
+    }
+  }
+
+  async function sichern(ereignis: React.FormEvent) {
+    ereignis.preventDefault();
+    const name = gleichnamig ? gleichnamig.name : listenname.trim();
+    if (name === "" || sichert) return;
+    setSichert(true);
+    const geklappt = await onSpeichern(name, gleichnamig?.id);
+    setSichert(false);
+    if (!geklappt) return;
+    setMeldungstext(`„${name}“ ${gleichnamig ? "überschrieben" : "gespeichert"}.`);
+    setListenname("");
+    setFormularOffen(false);
+  }
+
+  return (
+    <Abschnitt
+      titel="Gespeicherte Listen"
+      id="listen"
+      beiwort={listen.length > 0 ? String(listen.length) : undefined}
+    >
+      {meldungstext && (
+        <p role="status" className={stil.nebensache}>
+          {meldungstext}
+        </p>
+      )}
+
+      {listen.length === 0 ? (
+        <p className={stil.nebensache}>
+          Noch keine Liste. Trag die Namen einmal ein und speichere sie - beim nächsten
+          Turnier sind sie mit einem Klick wieder da.
+        </p>
+      ) : (
+        <Tabelle beschriftung="Gespeicherte Listen" raster="1fr auto" rechtsBuendig>
+          {listen.map((liste) => {
+            const istOffen = offen === liste.id;
+            return (
+              <Reihe
+                key={liste.id}
+                onKlick={() => setOffen(istOffen ? null : liste.id)}
+                offen={istOffen}
+                ausklappung={
+                  <div className={stil.listenausklappung}>
+                    <p className={stil.nebensache}>{liste.namen.join(", ")}</p>
+                    <div className={stil.knopfzeile}>
+                      <Knopf
+                        groesse="sm"
+                        auspraegung="primaer"
+                        disabled={laedt}
+                        onClick={() => void laden(liste)}
+                      >
+                        Übernehmen
+                      </Knopf>
+                      <Knopf
+                        groesse="sm"
+                        auspraegung="leise"
+                        aria-label="Liste löschen"
+                        onClick={() => {
+                          setOffen(null);
+                          onLoeschen(liste.id);
+                        }}
+                      >
+                        Löschen
+                      </Knopf>
+                    </div>
+                  </div>
+                }
+              >
+                <Zelle>{liste.name}</Zelle>
+                <Zelle rechts leise>
+                  {liste.namen.length} Namen
+                </Zelle>
+              </Reihe>
+            );
+          })}
+        </Tabelle>
+      )}
+
+      {formularOffen ? (
+        <form onSubmit={(e) => void sichern(e)} className={stil.listenformular}>
+          <Feld
+            beschriftung="Name der Liste"
+            value={listenname}
+            onChange={(e) => setListenname(e.target.value)}
+            autoComplete="off"
+            autoFocus
+            required
+          />
+          {gleichnamig && (
+            <p className={stil.nebensache}>
+              Gibt es schon - ersetzt die {gleichnamig.namen.length} Namen von „
+              {gleichnamig.name}“ durch die {teilnehmer.length} eingetragenen.
+            </p>
+          )}
+          <div className={stil.knopfzeile}>
+            <Knopf
+              type="submit"
+              auspraegung="primaer"
+              disabled={listenname.trim() === "" || sichert}
+            >
+              {gleichnamig ? "Überschreiben" : "Speichern"}
+            </Knopf>
+            <Knopf
+              auspraegung="leise"
+              onClick={() => {
+                setFormularOffen(false);
+                setListenname("");
+              }}
+            >
+              Abbrechen
+            </Knopf>
+          </div>
+        </form>
+      ) : (
+        teilnehmer.length > 0 && (
+          <div className={stil.knopfzeile}>
+            <Knopf onClick={() => setFormularOffen(true)}>Als Liste speichern</Knopf>
+          </div>
+        )
+      )}
     </Abschnitt>
   );
 }

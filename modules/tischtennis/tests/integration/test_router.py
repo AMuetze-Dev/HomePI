@@ -20,6 +20,7 @@ pytestmark = pytest.mark.integration
 ACHT = ["Anna", "Bernd", "Cem", "Dana", "Elif", "Fiete", "Gesa", "Hanna"]
 #: So viele, dass die Zahl keine Zweierpotenz ist - das ist der Normalfall.
 NEUNZEHN = [f"Spieler {nummer:02d}" for nummer in range(1, 20)]
+EINUNDZWANZIG = [f"Spieler {nummer:02d}" for nummer in range(1, 22)]
 
 
 async def turnier_anlegen(client: AsyncClient, **abweichend: Any) -> dict[str, Any]:
@@ -599,20 +600,35 @@ class TestWeitereModi:
         assert nachher["zustand"] == "beendet"
         assert nachher["sieger_id"] == nachher["heim_id"] is not None
 
-    async def test_mit_zweiter_chance_bleibt_es_beim_gesetzten_raster(
+    async def test_auch_mit_zweiter_chance_spielt_jeder_in_runde_eins(
         self, client: AsyncClient
     ) -> None:
-        """Im Doppel-KO spielt ohnehin jeder mindestens zweimal. Dann ist ein
-        Freilos in der ersten Runde kein verlorener Abend, und das gesetzte
-        Raster ist das bessere: es haelt die Staerksten auseinander."""
+        """Frueher bekam das Doppel-KO das gesetzte Raster - bei 19 Leuten
+        hiess das drei Spiele und dreizehn Zuschauer in der ersten Runde.
+        Jetzt wird auch hier ausgelost: neun Spiele, ein Freilos."""
         lauf = await turnier_anlegen(client, modus="ko", doppel_ko=True)
         await leute_eintragen(client, lauf["id"], NEUNZEHN)
 
         await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
 
         alle = await spiele(client, lauf["id"])
-        assert not [s for s in alle if s["freilos"]]
-        assert len([s for s in alle if s["runde"] == 1 and s["phase"] == "ko"]) == 3
+        erste = [s for s in alle if s["runde"] == 1 and s["phase"] == "ko"]
+        assert len([s for s in erste if not s["freilos"]]) == 9
+        assert len([s for s in erste if s["freilos"]]) == 1
+
+    async def test_ein_freilos_reicht_seinen_mann_sofort_weiter(self, client: AsyncClient) -> None:
+        """Das Freilos in Runde 1 ist mit dem Ansetzen entschieden. Sein
+        Sieger muss im Folgespiel schon stehen - sonst wartet es auf ein
+        Ergebnis, das nie eingetragen wird, und das Turnier haengt."""
+        lauf = await turnier_anlegen(client, modus="ko")
+        await leute_eintragen(client, lauf["id"], NEUNZEHN)
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        for _ in range(2 * len(NEUNZEHN)):
+            await alles_durchspielen(client, lauf["id"])
+
+        alle = await spiele(client, lauf["id"])
+        assert [s["nummer"] for s in alle if s["zustand"] != "beendet"] == []
 
     async def test_schweizer_setzt_runde_fuer_runde(self, client: AsyncClient) -> None:
         lauf = await turnier_anlegen(client, modus="schweizer", runden=3)
@@ -861,6 +877,47 @@ class TestDoppelKo:
         assert [s for s in alle if s["zustand"] != "beendet"] == []
         assert endspiel["sieger_id"] is not None
 
+    async def test_die_vorschau_nennt_verlierer_und_zweige(self, client: AsyncClient) -> None:
+        """Die Vorschau ist dieselbe Rechnung wie das Festschreiben - dann muss
+        sie auch dasselbe sagen. Stand dort "Sieger aus Spiel 1", wo der
+        Verlierer einlaeuft, war das Los vor dem Speichern nicht zu lesen."""
+        lauf = await turnier_anlegen(client, modus="ko", doppel_ko=True)
+        await leute_eintragen(client, lauf["id"])
+
+        antwort = await client.post(
+            f"/tischtennis/turnier/{lauf['id']}/auslosung", json={"saat": 7}
+        )
+
+        paarungen = antwort.json()["paarungen"]
+        assert any(p["heim"].startswith("Verlierer aus Spiel") for p in paarungen)
+        assert any(p["bezeichnung"].startswith("Verlierer-Runde") for p in paarungen)
+        assert paarungen[-1]["bezeichnung"] == "Endspiel"
+
+    async def test_mit_21_spielt_jeder_in_der_ersten_runde(self, client: AsyncClient) -> None:
+        """Der Fall vom Weihnachtsturnier, durch Speicher und Router: zehn
+        Spiele und ein Freilos in Runde 1, und das Turnier laeuft bis zum
+        Endspiel durch, ohne dass irgendwo jemand fehlt."""
+        lauf = await turnier_anlegen(client, modus="ko", doppel_ko=True)
+        await leute_eintragen(client, lauf["id"], EINUNDZWANZIG)
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 3})
+
+        alle = await spiele(client, lauf["id"])
+        erste = [s for s in alle if s["phase"] == "ko" and s["runde"] == 1]
+        echte = [s for s in erste if not s["freilos"]]
+
+        assert len(echte) == 10
+        assert len(erste) == 11
+        assert all(s["heim_id"] and s["gast_id"] for s in echte)
+        assert len([s for s in alle if not s["freilos"]]) == 2 * 21 - 2
+
+        for _ in range(4 * 21):
+            await alles_durchspielen(client, lauf["id"])
+        danach = await spiele(client, lauf["id"])
+        endspiel = next(s for s in danach if s["phase"] == "ko_finale")
+
+        assert [s["nummer"] for s in danach if s["zustand"] != "beendet"] == []
+        assert endspiel["sieger_id"] is not None
+
     async def test_doppel_ko_laesst_sich_im_lauf_nicht_umstellen(self, client: AsyncClient) -> None:
         """Daran haengt der halbe Spielplan. Mitten im Turnier umgestellt,
         gehoerte die eine Haelfte zu anderen Regeln als die andere."""
@@ -942,3 +999,107 @@ class TestVerschieben:
         )
 
         assert antwort.status_code in (401, 403), antwort.text
+
+
+class TestTeilnehmerlisten:
+    """Namen einmal speichern, vor jedem Turnier laden.
+
+    Ausloeser war das Testen: vor jedem Probelauf 21 Namen von Hand. Eine
+    Liste haengt an keinem Turnier - sie ist eine Vorlage, und Laden heisst
+    "fehlende Namen eintragen", nie "vorhandene ersetzen".
+    """
+
+    async def speichern(
+        self, client: AsyncClient, name: str, namen: list[str], erwartet: int = 201
+    ) -> dict[str, Any]:
+        antwort = await client.post("/tischtennis/listen", json={"name": name, "namen": namen})
+        assert antwort.status_code == erwartet, antwort.text
+        return dict(antwort.json())
+
+    async def test_gespeichert_steht_sie_in_der_uebersicht(self, client: AsyncClient) -> None:
+        liste = await self.speichern(client, "Stammtisch", [" Anna", "Bernd", "anna", ""])
+
+        alle = (await client.get("/tischtennis/listen")).json()
+
+        assert liste["namen"] == ["Anna", "Bernd"]
+        assert [(eine["name"], eine["namen"]) for eine in alle] == [
+            ("Stammtisch", ["Anna", "Bernd"])
+        ]
+
+    async def test_derselbe_name_zweimal_wird_abgelehnt(self, client: AsyncClient) -> None:
+        await self.speichern(client, "Stammtisch", ACHT)
+
+        antwort = await client.post(
+            "/tischtennis/listen", json={"name": "Stammtisch", "namen": ["Anna"]}
+        )
+
+        assert antwort.status_code == 409
+        assert "Stammtisch" in antwort.json()["detail"]
+
+    async def test_ueberschreiben_ersetzt_die_namen(self, client: AsyncClient) -> None:
+        liste = await self.speichern(client, "Stammtisch", ACHT)
+
+        antwort = await client.put(
+            f"/tischtennis/listen/{liste['id']}",
+            json={"name": "Stammtisch", "namen": ["Cem", "Dana"]},
+        )
+
+        assert antwort.status_code == 200, antwort.text
+        alle = (await client.get("/tischtennis/listen")).json()
+        assert alle[0]["namen"] == ["Cem", "Dana"]
+
+    async def test_eine_leere_liste_gibt_es_nicht(self, client: AsyncClient) -> None:
+        antwort = await client.post("/tischtennis/listen", json={"name": "Leer", "namen": [" "]})
+
+        assert antwort.status_code == 422
+
+    async def test_laden_traegt_fehlende_ein_und_laesst_vorhandene_stehen(
+        self, client: AsyncClient
+    ) -> None:
+        liste = await self.speichern(client, "Stammtisch", ACHT)
+        lauf = await turnier_anlegen(client, modus="ko")
+        await leute_eintragen(client, lauf["id"], ["bernd", "Zoe"])
+
+        antwort = await client.post(
+            f"/tischtennis/turnier/{lauf['id']}/teilnehmer/aus-liste/{liste['id']}"
+        )
+
+        assert antwort.status_code == 200, antwort.text
+        ergebnis = antwort.json()
+        assert [wer["name"] for wer in ergebnis["eingetragen"]] == [n for n in ACHT if n != "Bernd"]
+        assert ergebnis["schon_dabei"] == ["Bernd"]
+        dabei = (await client.get(f"/tischtennis/turnier/{lauf['id']}/teilnehmer")).json()
+        assert len(dabei) == 2 + 7
+
+    async def test_zweimal_laden_traegt_niemanden_doppelt_ein(self, client: AsyncClient) -> None:
+        liste = await self.speichern(client, "Stammtisch", ACHT)
+        lauf = await turnier_anlegen(client, modus="ko")
+        pfad = f"/tischtennis/turnier/{lauf['id']}/teilnehmer/aus-liste/{liste['id']}"
+
+        await client.post(pfad)
+        zweites = (await client.post(pfad)).json()
+
+        assert zweites["eingetragen"] == []
+        assert len((await client.get(f"/tischtennis/turnier/{lauf['id']}/teilnehmer")).json()) == 8
+
+    async def test_ins_laufende_turnier_wird_nichts_geladen(self, client: AsyncClient) -> None:
+        liste = await self.speichern(client, "Stammtisch", ["Zoe"])
+        lauf = await turnier_anlegen(client, modus="ko")
+        await leute_eintragen(client, lauf["id"])
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 1})
+
+        antwort = await client.post(
+            f"/tischtennis/turnier/{lauf['id']}/teilnehmer/aus-liste/{liste['id']}"
+        )
+
+        assert antwort.status_code == 409
+
+    async def test_loeschen(self, client: AsyncClient) -> None:
+        liste = await self.speichern(client, "Stammtisch", ACHT)
+
+        geloescht = await client.delete(f"/tischtennis/listen/{liste['id']}")
+        noch_einmal = await client.delete(f"/tischtennis/listen/{liste['id']}")
+
+        assert geloescht.status_code == 204
+        assert noch_einmal.status_code == 404
+        assert (await client.get("/tischtennis/listen")).json() == []

@@ -17,7 +17,7 @@ import datetime as dt
 import uuid
 
 from homepi_core import Base, ZeitstempelMixin
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -199,3 +199,18 @@ class Spiel(Base, ZeitstempelMixin):
     freilos: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     turnier: Mapped[Turnier] = relationship(back_populates="spiele")
+
+
+class Teilnehmerliste(Base, ZeitstempelMixin):
+    """Gespeicherte Namen - eine Vorlage, kein Teil eines Turniers.
+
+    Die Namen stehen als Liste in einer Spalte und nicht als eigene Zeilen:
+    Eine Liste wird immer ganz gelesen und ganz ueberschrieben, nie ein
+    einzelner Name darin geaendert.
+    """
+
+    __tablename__ = "tischtennis_teilnehmerlisten"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
+    namen: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
