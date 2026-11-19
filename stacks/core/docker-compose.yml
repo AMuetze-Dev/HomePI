@@ -18,11 +18,11 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      # Der Eingang aus dem Internet. Der Router leitet 443 von aussen
-      # HIERHER und nicht auf 443 - siehe docs/14-internet.md. Auf 443
-      # haengen auch Dashboard, Logs, Status und Home Assistant; auf 8443
-      # nur, was ausdruecklich "internet" als Eingang nennt.
-      - "8443:8443"
+      # Der Eingang aus dem Internet - NUR an 127.0.0.1. Von aussen kommt
+      # niemand direkt hierher: Tailscale Funnel nimmt die Anfragen unter
+      # https://<pi>.<tailnet>.ts.net an und reicht sie auf dem Pi an diesen
+      # Port weiter (docs/14-internet.md). Keine Portfreigabe, kein DynDNS.
+      - "127.0.0.1:8081:8081"
     command:
       - --global.checknewversion=false
       - --global.sendanonymoususage=false
@@ -53,14 +53,21 @@ services:
       - --entrypoints.websecure.http.tls.domains[0].main=*.${DOMAIN}
       - --entrypoints.websecure.http.middlewares=secure-headers@file
 
-      # Zweiter TLS-Eingang, gleiches Zertifikat. Getrennt, damit die Frage
-      # "was steht im Internet" eine Liste von Routern ist, die man lesen
-      # kann - und keine Eigenschaft, die jeder Router stillschweigend erbt.
-      # Ein neuer Dienst ist damit erst einmal NICHT oeffentlich.
-      - --entrypoints.internet.address=:8443
-      - --entrypoints.internet.http.tls.certresolver=dns
-      - --entrypoints.internet.http.tls.domains[0].main=*.${DOMAIN}
-      - --entrypoints.internet.http.middlewares=secure-headers@file
+      # Eingang fuer Tailscale Funnel. Getrennt, damit die Frage "was steht
+      # im Internet" eine Liste von Routern ist, die man lesen kann - und
+      # keine Eigenschaft, die jeder Router stillschweigend erbt. Ein neuer
+      # Dienst ist damit erst einmal NICHT oeffentlich.
+      #
+      # Ohne TLS: Das Zertifikat fuer den ts.net-Namen haelt Tailscale, und
+      # bis hierher laeuft die Anfrage nur noch ueber 127.0.0.1.
+      #
+      # Die echte Adresse des Besuchers steht in X-Forwarded-For, die
+      # Verbindung selbst kommt vom Docker-Proxy (172.x). Nur von dort wird
+      # der Kopf geglaubt - sonst koennte jeder sich eine Adresse ausdenken
+      # und die Anmeldebremse umgehen.
+      - --entrypoints.funnel.address=:8081
+      - --entrypoints.funnel.forwardedHeaders.trustedIPs=127.0.0.1/32,172.16.0.0/12
+      - --entrypoints.funnel.http.middlewares=secure-headers@file
 
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false

@@ -138,9 +138,10 @@ Subnet-Router für 192.168.1.0/24) und auf deinen Geräten. Dann funktionieren d
 Hostnamen mit denselben Zertifikaten von unterwegs, ohne dass etwas im Internet steht.
 
 **Öffentlich, für Menschen ohne Tailscale** — die Spieler beim Turnier etwa:
-[14-internet.md](14-internet.md). Dort bekommen App und API einen eigenen
-Traefik-Eingang auf Port 8443, auf den der Router weiterleitet; alles andere
-bleibt im LAN.
+[14-internet.md](14-internet.md). Tailscale Funnel reicht Anfragen an
+`https://homelab.<tailnet>.ts.net` an einen eigenen Traefik-Eingang weiter, der
+nur an 127.0.0.1 horcht — ohne Portfreigabe und ohne DynDNS. Dort hängen nur App
+und API; alles andere bleibt im LAN.
 
 ## Eureka: brauchst du hier nicht
 

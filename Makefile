@@ -50,6 +50,10 @@ up-apps:
 down:
 	@for s in $(STACKS); do $(DC) -f stacks/$$s/docker-compose.yml down; done
 
+## funnel: Website und API ueber Tailscale Funnel ins Internet (einmalig)
+funnel:
+	@./scripts/50-tailscale-funnel.sh
+
 ## render: core/dynamic/*.tmpl mit Werten aus .env rendern
 render:
 	@./scripts/40-render-config.sh
@@ -358,4 +362,4 @@ pruefdienst-zusehen:
 smoke:
 	cd services/gateway && uv run pytest -m smoke -v
 
-.PHONY: artefakt backup cert check deploy-apps dev dev-logs dev-ps dev-reset dev-stop dev-testkonto down e2e e2e-bauen e2e-hoch e2e-runter e2e-token fmt help install lint-ci logs modul pg-tunnel ps psql pull render smoke stats tdd-api tdd-web test test-infra test-modul test-python test-web up up-apps up-core up-data up-dns up-home update verify
+.PHONY: artefakt backup cert check deploy-apps dev dev-logs dev-ps dev-reset dev-stop dev-testkonto down e2e e2e-bauen e2e-hoch e2e-runter e2e-token fmt funnel help install lint-ci logs modul pg-tunnel ps psql pull render smoke stats tdd-api tdd-web test test-infra test-modul test-python test-web up up-apps up-core up-data up-dns up-home update verify

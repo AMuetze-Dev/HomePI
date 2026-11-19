@@ -14,7 +14,12 @@ http:
       entryPoints:
         - websecure
       service: homeassistant
-      # kein lan-only: HA soll auch ueber Tailscale erreichbar bleiben
+      # lan-only laesst LAN und den Tailscale-Bereich (100.64.0.0/10) durch.
+      # Es schuetzt davor, dass eine Portfreigabe in der Fritz!Box HA ins
+      # Internet stellt - genau das ist am 19.11.2026 passiert, als 443 von
+      # aussen auf 443 am Pi zeigte (docs/14-internet.md).
+      middlewares:
+        - lan-only@file
 
   services:
     homeassistant:
