@@ -22,7 +22,7 @@ COPY services/pruefdienst/src ./src
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
 
 
-FROM python:3.12-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 # Chromium und seine Bibliotheken. `playwright install --with-deps` holt beides
 # in der Fassung, die zur installierten Playwright-Version passt - eine von
