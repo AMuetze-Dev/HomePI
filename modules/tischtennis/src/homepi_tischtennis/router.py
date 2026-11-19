@@ -36,6 +36,8 @@ from .schemas import (
     Dashboard,
     ErgebnisEintragen,
     GruppeVorschau,
+    ListeAusgabe,
+    ListeSpeichern,
     PaarungVorschau,
     SpielAusgabe,
     SpielBeginnen,
@@ -48,6 +50,7 @@ from .schemas import (
     TurnierAnlegen,
     TurnierAusgabe,
     TurnierEinstellungen,
+    UebernahmeAusgabe,
 )
 
 ARTEFAKT = "tischtennis"
@@ -126,7 +129,8 @@ def _vorschauname(platz: los.KoPlatz, name: dict[str, str]) -> str:
     if platz.teilnehmer is not None:
         return name[platz.teilnehmer]
     if platz.aus_spiel is not None:
-        return f"Sieger aus Spiel {platz.aus_spiel}"
+        wer = "Verlierer" if platz.verlierer else "Sieger"
+        return f"{wer} aus Spiel {platz.aus_spiel}"
     return "Freilos"
 
 
@@ -390,10 +394,16 @@ async def auslosen(
         )
         for begegnung in plan.begegnungen
     ]
-    runden_im_raster = max((spiel.runde for spiel in plan.ko), default=0)
+    # Je Zweig eigene Rundenzahl - wie beim Festschreiben, sonst hiesse die
+    # letzte Runde des Siegerzweigs in der Vorschau "Endspiel".
+    runden_je_zweig: dict[str, int] = {}
+    for spiel in plan.ko:
+        runden_je_zweig[spiel.zweig] = max(runden_je_zweig.get(spiel.zweig, 0), spiel.runde)
     paarungen += [
         PaarungVorschau(
-            bezeichnung=dienst.ko_bezeichnung(spiel.runde, runden_im_raster),
+            bezeichnung=dienst.ko_bezeichnung(
+                spiel.runde, runden_je_zweig[spiel.zweig], spiel.zweig
+            ),
             heim=_vorschauname(spiel.heim, name),
             gast=_vorschauname(spiel.gast, name),
         )
@@ -490,6 +500,60 @@ async def teilnehmer_aendern(
 )
 async def teilnehmer_loeschen(teilnehmer_id: uuid.UUID, sitzung: DbSitzung) -> None:
     await speicher.teilnehmer_loeschen(sitzung, teilnehmer_id)
+
+
+@router.post(
+    "/turnier/{turnier_id}/teilnehmer/aus-liste/{liste_id}",
+    summary="Teilnehmer aus einer gespeicherten Liste eintragen",
+    dependencies=[MITSCHREIBEN],
+)
+async def liste_uebernehmen(
+    turnier_id: uuid.UUID, liste_id: uuid.UUID, sitzung: DbSitzung
+) -> UebernahmeAusgabe:
+    neu, schon_dabei = await speicher.liste_uebernehmen(sitzung, turnier_id, liste_id)
+    return UebernahmeAusgabe(
+        eingetragen=[_teilnehmer_ausgabe(wer, {}) for wer in neu], schon_dabei=schon_dabei
+    )
+
+
+# --------------------------------------------------------- Teilnehmerlisten
+#
+# Vorlagen fuer die Teilnehmer: einmal speichern, vor jedem Turnier laden.
+# Sie haengen an keinem Turnier und ueberleben dessen Loeschen.
+
+
+@router.get("/listen", summary="Gespeicherte Teilnehmerlisten", dependencies=[MITSCHREIBEN])
+async def listen(sitzung: DbSitzung) -> list[ListeAusgabe]:
+    return [ListeAusgabe.model_validate(liste) for liste in await speicher.listen(sitzung)]
+
+
+@router.post(
+    "/listen",
+    status_code=status.HTTP_201_CREATED,
+    summary="Teilnehmerliste speichern",
+    dependencies=[MITSCHREIBEN],
+)
+async def liste_anlegen(daten: ListeSpeichern, sitzung: DbSitzung) -> ListeAusgabe:
+    return ListeAusgabe.model_validate(await speicher.liste_anlegen(sitzung, daten))
+
+
+@router.put(
+    "/listen/{liste_id}", summary="Teilnehmerliste ueberschreiben", dependencies=[MITSCHREIBEN]
+)
+async def liste_aendern(
+    liste_id: uuid.UUID, daten: ListeSpeichern, sitzung: DbSitzung
+) -> ListeAusgabe:
+    return ListeAusgabe.model_validate(await speicher.liste_aendern(sitzung, liste_id, daten))
+
+
+@router.delete(
+    "/listen/{liste_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Teilnehmerliste loeschen",
+    dependencies=[MITSCHREIBEN],
+)
+async def liste_loeschen(liste_id: uuid.UUID, sitzung: DbSitzung) -> None:
+    await speicher.liste_loeschen(sitzung, liste_id)
 
 
 # -------------------------------------------------------------------- Spiele

@@ -254,6 +254,15 @@ class TestAusgelostesKoRaster:
         with pytest.raises(LosUnmoeglich):
             los.ausgelostes_ko_raster(["anna"], saat=1)
 
+    @pytest.mark.parametrize("anzahl", [7, 11, 13, 21, 23])
+    def test_niemand_bekommt_zwei_freilose_hintereinander(self, anzahl: int) -> None:
+        """Wer in Runde 1 ausgesetzt hat, soll in Runde 2 spielen - sonst
+        steht jemand im Achtelfinale, der noch keinen Ball geschlagen hat."""
+        leute = [f"Spieler {nummer:02d}" for nummer in range(1, anzahl + 1)]
+        for saat in range(40):
+            raster = los.ausgelostes_ko_raster(leute, saat=saat)
+            assert _freilos_folgen(raster) == [], f"saat={saat}"
+
 
 class TestSetzliste:
     @pytest.mark.parametrize("anzahl_gruppen", [2, 3, 4, 5, 8])
@@ -371,6 +380,17 @@ class TestPlanAuswuerfeln:
     def test_ohne_teilnehmer_sagt_es_das(self) -> None:
         with pytest.raises(LosUnmoeglich):
             los.plan_auswuerfeln("ko", ["anna"], anzahl_gruppen=1, saat=1)
+
+    def test_doppel_ko_mit_21_spielt_jeder_in_der_ersten_runde(self) -> None:
+        """Der Fall vom Weihnachtsturnier: 21 Leute, zweite Chance. Zehn
+        Spiele und ein Freilos - nicht fuenf Spiele und elf, die ohne Ball
+        ins Achtelfinale kommen."""
+        leute = [f"Spieler {nummer:02d}" for nummer in range(1, 22)]
+        plan = los.plan_auswuerfeln("ko", leute, anzahl_gruppen=2, saat=1, doppel_ko=True)
+
+        erste = [s for s in plan.ko if s.zweig == "sieger" and s.runde == 1]
+        assert sum(1 for s in erste if not s.gast.freilos) == 10
+        assert sum(1 for s in erste if s.gast.freilos) == 1
 
     def test_unbekannter_modus_wird_abgelehnt(self) -> None:
         with pytest.raises(LosUnmoeglich):
@@ -537,3 +557,108 @@ class TestDoppelKoRaster:
 
         assert len(raster) == 2
         assert raster[-1].zweig == "finale"
+
+
+def _freilos_folgen(raster: list[los.KoBegegnung]) -> list[int]:
+    """Freilos-Zeilen, deren Empfaenger direkt danach wieder eines bekommt."""
+    freilos_nummern = {s.nummer for s in raster if s.gast.freilos}
+    return [
+        s.nummer
+        for s in raster
+        if s.gast.freilos and s.heim.aus_spiel in freilos_nummern and not s.heim.verlierer
+    ]
+
+
+EINUNDZWANZIG = [f"Spieler {nummer:02d}" for nummer in range(1, 22)]
+
+
+class TestAusgelostesDoppelKo:
+    """Die zweite Chance, wenn das Turnier mit dem KO beginnt.
+
+    Dieselben Zusagen wie beim gesetzten Doppel-KO - und dazu die des
+    ausgelosten Rasters: jeder spielt in der ersten Runde, ein Freilos gibt
+    es nur, wenn die Zahl ungerade ist, und dann fuer genau einen.
+    """
+
+    @staticmethod
+    def echte(raster: list[los.KoBegegnung]) -> list[los.KoBegegnung]:
+        return [s for s in raster if not s.gast.freilos]
+
+    def test_einundzwanzig_spielen_zehn_spiele_mit_einem_freilos(self) -> None:
+        raster = los.ausgelostes_doppel_ko_raster(EINUNDZWANZIG, saat=1)
+        erste = [s for s in raster if s.zweig == "sieger" and s.runde == 1]
+
+        assert len(self.echte(erste)) == 10
+        assert len(erste) == 11
+        angetreten = [p.teilnehmer for s in erste for p in (s.heim, s.gast) if p.teilnehmer]
+        assert sorted(angetreten) == sorted(EINUNDZWANZIG)
+
+    def test_die_zweite_runde_ist_halb_so_gross(self) -> None:
+        """Elf sind weiter: fuenf Spiele und wieder ein Freilos."""
+        raster = los.ausgelostes_doppel_ko_raster(EINUNDZWANZIG, saat=1)
+        zweite = [s for s in raster if s.zweig == "sieger" and s.runde == 2]
+
+        assert len(self.echte(zweite)) == 5
+        assert len(zweite) == 6
+
+    @pytest.mark.parametrize("anzahl", [2, 3, 5, 7, 8, 11, 16, 21, 33])
+    def test_zweimal_so_viele_spiele_minus_zwei(self, anzahl: int) -> None:
+        leute = [f"Spieler {nummer:02d}" for nummer in range(1, anzahl + 1)]
+        raster = los.ausgelostes_doppel_ko_raster(leute, saat=3)
+
+        assert len(self.echte(raster)) == 2 * anzahl - 2
+
+    @pytest.mark.parametrize("anzahl", [3, 7, 21])
+    def test_jeder_erste_verlierer_spielt_weiter(self, anzahl: int) -> None:
+        """Aufgefangen wird jedes echte Spiel des Siegerzweigs - und kein
+        Freilos, denn dort verliert niemand."""
+        leute = [f"Spieler {nummer:02d}" for nummer in range(1, anzahl + 1)]
+        raster = los.ausgelostes_doppel_ko_raster(leute, saat=5)
+        sieger_zweig = self.echte([s for s in raster if s.zweig == "sieger"])
+
+        aufgefangen = [
+            platz.aus_spiel
+            for spiel in raster
+            for platz in (spiel.heim, spiel.gast)
+            if platz.verlierer
+        ]
+
+        assert sorted(aufgefangen) == sorted(s.nummer for s in sieger_zweig)
+
+    @pytest.mark.parametrize("anzahl", [3, 7, 21])
+    def test_kein_spiel_verweist_nach_vorn_und_das_endspiel_ist_das_letzte(
+        self, anzahl: int
+    ) -> None:
+        leute = [f"Spieler {nummer:02d}" for nummer in range(1, anzahl + 1)]
+        raster = los.ausgelostes_doppel_ko_raster(leute, saat=2)
+
+        assert [s.nummer for s in raster] == list(range(1, len(raster) + 1))
+        for spiel in raster:
+            for platz in (spiel.heim, spiel.gast):
+                if platz.aus_spiel is not None:
+                    assert platz.aus_spiel < spiel.nummer
+        assert raster[-1].zweig == "finale"
+        assert [s for s in raster if s.zweig == "finale"] == [raster[-1]]
+
+    def test_jeder_platz_wird_genau_einmal_weitergereicht(self) -> None:
+        """Ein Sieger laeuft an genau einer Stelle ein, ein Verlierer auch -
+        sonst stuende jemand zweimal im Plan oder gar nicht."""
+        raster = los.ausgelostes_doppel_ko_raster(EINUNDZWANZIG, saat=4)
+        verweise = [
+            (platz.aus_spiel, platz.verlierer)
+            for spiel in raster
+            for platz in (spiel.heim, spiel.gast)
+            if platz.aus_spiel is not None
+        ]
+
+        assert len(verweise) == len(set(verweise))
+
+    def test_niemand_bekommt_zwei_freilose_hintereinander(self) -> None:
+        for saat in range(40):
+            raster = los.ausgelostes_doppel_ko_raster(EINUNDZWANZIG, saat=saat)
+            assert _freilos_folgen(raster) == [], f"saat={saat}"
+
+    def test_dieselbe_saat_ergibt_dasselbe_raster(self) -> None:
+        assert los.ausgelostes_doppel_ko_raster(
+            EINUNDZWANZIG, saat=9
+        ) == los.ausgelostes_doppel_ko_raster(EINUNDZWANZIG, saat=9)

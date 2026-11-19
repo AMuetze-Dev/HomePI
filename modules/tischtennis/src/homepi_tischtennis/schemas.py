@@ -253,3 +253,29 @@ class Dashboard(BaseModel):
     teilnehmer: list[TeilnehmerAusgabe] = Field(default_factory=list)
     #: Vorbei, wenn kein Spiel mehr offen ist.
     fertig: bool = False
+
+
+class ListeSpeichern(BaseModel):
+    name: str = Field(min_length=1, max_length=60, description="z. B. Stammtisch, Testlauf")
+    namen: list[Annotated[str, Field(max_length=100)]] = Field(max_length=200)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _trimmen(cls, wert: object) -> object:
+        return _getrimmt(wert)
+
+
+class ListeAusgabe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    namen: list[str]
+
+
+class UebernahmeAusgabe(BaseModel):
+    """Was Laden bewirkt hat - damit die Oberflaeche es sagen kann."""
+
+    eingetragen: list[TeilnehmerAusgabe]
+    #: Namen aus der Liste, die schon im Turnier standen.
+    schon_dabei: list[str]

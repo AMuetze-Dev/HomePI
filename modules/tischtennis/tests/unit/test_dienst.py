@@ -477,3 +477,28 @@ class TestVerschieben:
             dienst.tauschpartner(reihe, "b", "hoch")
         with pytest.raises(dienst.FalscherZustand):
             dienst.tauschpartner(reihe, "a", "runter")
+
+
+class TestTeilnehmerlisten:
+    """Gespeicherte Namen, damit niemand vor jedem Turnier zwanzig Namen
+    abtippt. Die Regeln sind die einer Namensliste - nicht mehr."""
+
+    def test_leerzeichen_und_leere_zeilen_fallen_weg(self) -> None:
+        assert dienst.namen_ordnen(["  Anna ", "", "   ", "Bernd"]) == ["Anna", "Bernd"]
+
+    def test_doppelte_namen_zaehlen_einmal_auch_in_anderer_schreibweise(self) -> None:
+        """Zweimal "anna" waere im Turnier ein Fehler, den erst die
+        Datenbank meldet - mitten im Uebernehmen."""
+        assert dienst.namen_ordnen(["Anna", "anna", "ANNA ", "Bernd"]) == ["Anna", "Bernd"]
+
+    def test_die_reihenfolge_bleibt(self) -> None:
+        assert dienst.namen_ordnen(["Cem", "Anna", "Bernd"]) == ["Cem", "Anna", "Bernd"]
+
+    def test_uebernommen_wird_nur_wer_noch_fehlt(self) -> None:
+        assert dienst.noch_nicht_dabei(["Anna", "Bernd", "Cem"], vorhanden=["bernd"]) == [
+            "Anna",
+            "Cem",
+        ]
+
+    def test_ohne_vorhandene_kommen_alle(self) -> None:
+        assert dienst.noch_nicht_dabei(["Anna", "Bernd"], vorhanden=[]) == ["Anna", "Bernd"]

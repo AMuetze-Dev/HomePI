@@ -22,14 +22,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from . import dienst, los
 from .dienst import (
     FalscherZustand,
+    ListeLeer,
+    ListeUnbekannt,
     NameVergeben,
     SpielUnbekannt,
     TeilnehmerUnbekannt,
     TurnierUnbekannt,
 )
-from .modelle import Gruppe, Spiel, Teilnehmer, Turnier
+from .modelle import Gruppe, Spiel, Teilnehmer, Teilnehmerliste, Turnier
 from .schemas import (
     ErgebnisEintragen,
+    ListeSpeichern,
     TeilnehmerAnlegen,
     TurnierAnlegen,
     TurnierEinstellungen,
@@ -212,6 +215,84 @@ async def teilnehmer_loeschen(sitzung: AsyncSession, teilnehmer_id: uuid.UUID) -
     gefunden = await ein_teilnehmer(sitzung, teilnehmer_id)
     _pruefe_teilnehmer_aenderbar(await turnier(sitzung, gefunden.turnier_id))
     await sitzung.delete(gefunden)
+
+
+# --------------------------------------------------------- Teilnehmerlisten
+
+
+async def listen(sitzung: AsyncSession) -> list[Teilnehmerliste]:
+    ergebnis = await sitzung.execute(select(Teilnehmerliste).order_by(Teilnehmerliste.name))
+    return list(ergebnis.scalars())
+
+
+async def eine_liste(sitzung: AsyncSession, liste_id: uuid.UUID) -> Teilnehmerliste:
+    gefunden = await sitzung.get(Teilnehmerliste, liste_id)
+    if gefunden is None:
+        raise ListeUnbekannt("Diese Teilnehmerliste gibt es nicht (mehr)")
+    return gefunden
+
+
+def _listennamen(daten: ListeSpeichern) -> list[str]:
+    namen = dienst.namen_ordnen(daten.namen)
+    if not namen:
+        raise ListeLeer("Eine Liste braucht mindestens einen Namen")
+    return namen
+
+
+async def _liste_festschreiben(sitzung: AsyncSession, liste: Teilnehmerliste) -> None:
+    try:
+        await sitzung.flush()
+    except IntegrityError as fehler:
+        await sitzung.rollback()
+        raise NameVergeben(
+            f"Eine Liste '{liste.name}' gibt es schon - ueberschreib sie oder nimm einen "
+            "anderen Namen"
+        ) from fehler
+    await sitzung.refresh(liste)
+
+
+async def liste_anlegen(sitzung: AsyncSession, daten: ListeSpeichern) -> Teilnehmerliste:
+    neue = Teilnehmerliste(name=daten.name, namen=_listennamen(daten))
+    sitzung.add(neue)
+    await _liste_festschreiben(sitzung, neue)
+    return neue
+
+
+async def liste_aendern(
+    sitzung: AsyncSession, liste_id: uuid.UUID, daten: ListeSpeichern
+) -> Teilnehmerliste:
+    gefunden = await eine_liste(sitzung, liste_id)
+    gefunden.name = daten.name
+    gefunden.namen = _listennamen(daten)
+    await _liste_festschreiben(sitzung, gefunden)
+    return gefunden
+
+
+async def liste_loeschen(sitzung: AsyncSession, liste_id: uuid.UUID) -> None:
+    await sitzung.delete(await eine_liste(sitzung, liste_id))
+
+
+async def liste_uebernehmen(
+    sitzung: AsyncSession, turnier_id: uuid.UUID, liste_id: uuid.UUID
+) -> tuple[list[Teilnehmer], list[str]]:
+    """Traegt ein, wer aus der Liste im Turnier noch fehlt.
+
+    Gibt die neu Eingetragenen zurueck und die Namen, die schon dabei waren.
+    Ersetzt wird nie: Wer schon steht, behaelt seine Notiz.
+    """
+    _pruefe_teilnehmer_aenderbar(await turnier(sitzung, turnier_id))
+    liste = await eine_liste(sitzung, liste_id)
+    vorhanden = [wer.name for wer in await teilnehmer(sitzung, turnier_id)]
+
+    fehlend = dienst.noch_nicht_dabei(liste.namen, vorhanden)
+    neu = [Teilnehmer(turnier_id=turnier_id, name=name, notiz="") for name in fehlend]
+    sitzung.add_all(neu)
+    await sitzung.flush()
+    for wer in neu:
+        await sitzung.refresh(wer)
+
+    schon_dabei = [name for name in liste.namen if name not in fehlend]
+    return neu, schon_dabei
 
 
 def _pruefe_teilnehmer_aenderbar(gefunden: Turnier) -> None:
@@ -684,16 +765,30 @@ def _ko_schreiben(
     for spiel in raster:
         runden[spiel.zweig] = max(runden.get(spiel.zweig, 0), spiel.runde)
 
+    #: Rasternummer -> Sieger, fuer Freilose, die schon beim Ansetzen durch
+    #: sind. Wer daraus einlaeuft, steht damit ebenfalls schon fest - sonst
+    #: wartete das Folgespiel auf ein Ergebnis, das nie eingetragen wird.
+    schon_durch: dict[int, uuid.UUID] = {}
+
+    def einlaufend(platz: los.KoPlatz) -> uuid.UUID | None:
+        if platz.teilnehmer:
+            return nach_kennung[platz.teilnehmer].id
+        if platz.aus_spiel is not None and not platz.verlierer:
+            return schon_durch.get(platz.aus_spiel)
+        return None
+
     for spiel in raster:
         bezeichnung = dienst.ko_bezeichnung(spiel.runde, runden[spiel.zweig], spiel.zweig)
         freilos = spiel.gast.freilos
-        heim_id = nach_kennung[spiel.heim.teilnehmer].id if spiel.heim.teilnehmer else None
+        heim_id = einlaufend(spiel.heim)
 
         # Ein Freilos, dessen Mann schon feststeht, ist mit dem Ansetzen
         # durch. Steht er noch nicht fest - in einer spaeteren Runde laeuft
         # dort ein Sieger ein -, entscheidet es sich, sobald er eintrifft
         # (_sieger_weiterreichen).
         durch = freilos and heim_id is not None
+        if durch and heim_id is not None:
+            schon_durch[spiel.nummer] = heim_id
 
         sitzung.add(
             Spiel(
@@ -704,7 +799,7 @@ def _ko_schreiben(
                 runde=spiel.runde,
                 bezeichnung=f"{bezeichnung}, Freilos" if freilos else bezeichnung,
                 heim_id=heim_id,
-                gast_id=(nach_kennung[spiel.gast.teilnehmer].id if spiel.gast.teilnehmer else None),
+                gast_id=einlaufend(spiel.gast),
                 heim_aus_spiel=(versatz + spiel.heim.aus_spiel if spiel.heim.aus_spiel else None),
                 gast_aus_spiel=(versatz + spiel.gast.aus_spiel if spiel.gast.aus_spiel else None),
                 heim_aus_verlierer=spiel.heim.verlierer,

@@ -67,6 +67,16 @@ class UngueltigesErgebnis(ServiceError):
     title = "Ergebnis gibt es nicht"
 
 
+class ListeUnbekannt(ServiceError):
+    status = 404
+    title = "Teilnehmerliste unbekannt"
+
+
+class ListeLeer(ServiceError):
+    status = 422
+    title = "Liste ohne Namen"
+
+
 @dataclass(frozen=True, slots=True)
 class Entscheidung:
     """Eine Erlaubnis mit dem Grund daran.
@@ -441,6 +451,31 @@ def darf_teilnehmer_aendern(zustand: str) -> Entscheidung:
         "Der Spielplan steht schon. Wer jetzt dazukaeme, haette keine Spiele - "
         "und wer wegfiele, hinterliesse Spiele ohne Gegner.",
     )
+
+
+def namen_ordnen(namen: Iterable[str]) -> list[str]:
+    """Eine Namensliste, wie sie gespeichert wird: getrimmt, ohne Leere,
+    jeder Name einmal - auch in anderer Schreibweise. Die Reihenfolge bleibt,
+    der erste gewinnt.
+
+    Doppelt in der Liste waere beim Uebernehmen ein Fehler, den erst die
+    Datenbank meldet, mitten in einem Stapel von Eintraegen.
+    """
+    gesehen: set[str] = set()
+    geordnet: list[str] = []
+    for name in namen:
+        sauber = name.strip()
+        if sauber and sauber.casefold() not in gesehen:
+            gesehen.add(sauber.casefold())
+            geordnet.append(sauber)
+    return geordnet
+
+
+def noch_nicht_dabei(liste: Sequence[str], vorhanden: Iterable[str]) -> list[str]:
+    """Wer aus der Liste noch fehlt. Laden traegt nur nach, es ersetzt nie:
+    Wer schon eingetragen ist, bleibt mit seiner Notiz stehen."""
+    dabei = {name.strip().casefold() for name in vorhanden}
+    return [name for name in liste if name.casefold() not in dabei]
 
 
 def runde_vollstaendig(zustaende: Sequence[str]) -> bool:

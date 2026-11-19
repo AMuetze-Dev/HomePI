@@ -141,6 +141,20 @@ export interface NeuesTurnier extends Partial<Einstellungen> {
   name: string;
 }
 
+/** Gespeicherte Namen - eine Vorlage, die an keinem Turnier hängt. */
+export interface Liste {
+  id: string;
+  name: string;
+  namen: string[];
+}
+
+/** Was das Laden einer Liste bewirkt hat. Ersetzt wird nie. */
+export interface Uebernahme {
+  eingetragen: Teilnehmer[];
+  /** Namen aus der Liste, die schon im Turnier standen. */
+  schon_dabei: string[];
+}
+
 export interface NeuerTeilnehmer {
   name: string;
   notiz?: string;
@@ -202,6 +216,32 @@ export function aendereTeilnehmer(
 
 export function entferneTeilnehmer(id: string): Promise<void> {
   return sende<void>("DELETE", `/teilnehmer/${kennung(id)}`);
+}
+
+export function ladeListen(signal?: AbortSignal): Promise<Liste[]> {
+  return anfrage<Liste[]>("/listen", {}, signal);
+}
+
+/** Mit `id` überschreibt es diese Liste, ohne legt es eine neue an. */
+export function speichereListe(
+  name: string,
+  namen: string[],
+  id?: string,
+): Promise<Liste> {
+  return id
+    ? sende<Liste>("PUT", `/listen/${kennung(id)}`, { name, namen })
+    : sende<Liste>("POST", "/listen", { name, namen });
+}
+
+export function loescheListe(id: string): Promise<void> {
+  return sende<void>("DELETE", `/listen/${kennung(id)}`);
+}
+
+export function uebernimmListe(turnierId: string, listeId: string): Promise<Uebernahme> {
+  return sende<Uebernahme>(
+    "POST",
+    `/turnier/${kennung(turnierId)}/teilnehmer/aus-liste/${kennung(listeId)}`,
+  );
 }
 
 /** Der Würfel: zeigt ein Los, ohne es zu speichern. */

@@ -124,11 +124,12 @@ def plan_auswuerfeln(
     random.Random(saat).shuffle(gemischt)
 
     if modus == "ko":
-        # Mit zweiter Chance spielt ohnehin jeder mindestens zweimal - dann
-        # ist ein Freilos in der ersten Runde kein verlorener Abend, und das
-        # gesetzte Raster bleibt das bessere.
+        # Auch mit zweiter Chance wird ausgelost und nicht gesetzt: Das
+        # gesetzte Raster liess bei 21 Leuten elf von ihnen ohne Spiel ins
+        # Achtelfinale - und wer in der ersten Runde zuschaut, hat an einem
+        # Turnierabend nichts von seiner zweiten Chance.
         if doppel_ko:
-            return Spielplan(ko=doppel_ko_raster(gemischt))
+            return Spielplan(ko=ausgelostes_doppel_ko_raster(gemischt, saat))
         return Spielplan(ko=ausgelostes_ko_raster(gemischt, saat))
 
     if modus == "schweizer":
@@ -337,6 +338,10 @@ def ausgelostes_ko_raster(teilnehmer: Sequence[Kennung], saat: int) -> list[KoBe
     keiner Liste. In den spaeteren Runden gilt dasselbe, sobald die Zahl der
     Weitergekommenen ungerade ist.
 
+    Wer schon ein Freilos hatte, bekommt in der Runde danach keines: Bei 21
+    Leuten stuende sonst gelegentlich jemand im Viertelfinale, der noch
+    keinen Ball geschlagen hat.
+
     In der ersten Runde trifft der Erste der Liste auf den Letzten, der
     Zweite auf den Vorletzten: Steht doch eine Reihenfolge drin, soll sie
     etwas bedeuten. Danach treffen sich die Sieger benachbarter Spiele -
@@ -348,14 +353,22 @@ def ausgelostes_ko_raster(teilnehmer: Sequence[Kennung], saat: int) -> list[KoBe
     wuerfel = random.Random(saat)
     plaetze = [KoPlatz(teilnehmer=wer) for wer in teilnehmer]
     spiele: list[KoBegegnung] = []
+    #: Nummern der Freilos-Zeilen: Wer aus einer von ihnen kommt, hat eben
+    #: ausgesetzt und ist beim naechsten Los nicht wieder dran.
+    freilos_zeilen: set[int] = set()
     nummer = 0
     runde = 1
 
     while len(plaetze) > 1:
         antretende = list(plaetze)
-        glueckspilz = (
-            antretende.pop(wuerfel.randrange(len(antretende))) if len(antretende) % 2 else None
-        )
+        glueckspilz: KoPlatz | None = None
+        if len(antretende) % 2:
+            kandidaten = [
+                stelle
+                for stelle, platz in enumerate(antretende)
+                if platz.aus_spiel not in freilos_zeilen
+            ] or list(range(len(antretende)))
+            glueckspilz = antretende.pop(kandidaten[wuerfel.randrange(len(kandidaten))])
 
         if runde == 1:
             paare = [
@@ -383,6 +396,7 @@ def ausgelostes_ko_raster(teilnehmer: Sequence[Kennung], saat: int) -> list[KoBe
                     nummer=nummer, runde=runde, heim=glueckspilz, gast=KoPlatz(freilos=True)
                 )
             )
+            freilos_zeilen.add(nummer)
             naechste.append(KoPlatz(aus_spiel=nummer))
 
         plaetze = naechste
@@ -392,7 +406,26 @@ def ausgelostes_ko_raster(teilnehmer: Sequence[Kennung], saat: int) -> list[KoBe
 
 
 def doppel_ko_raster(gesetzte: Sequence[Kennung]) -> list[KoBegegnung]:
-    """Dasselbe Raster, aber mit zweiter Chance: wer einmal verliert, spielt
+    """Das gesetzte Raster mit zweiter Chance - fuer die KO-Phase nach den
+    Gruppen, wo die Setzliste etwas bedeutet. Wie es entsteht, steht bei
+    ``_mit_zweiter_chance``."""
+    return _mit_zweiter_chance(ko_raster(gesetzte))
+
+
+def ausgelostes_doppel_ko_raster(teilnehmer: Sequence[Kennung], saat: int) -> list[KoBegegnung]:
+    """Das ausgeloste Raster mit zweiter Chance - fuer ein Turnier, das mit
+    dem KO beginnt.
+
+    Der Siegerzweig ist ``ausgelostes_ko_raster``: Jeder spielt in der ersten
+    Runde, bei 21 Leuten zehn Spiele und ein Freilos, danach elf, sechs,
+    drei, zwei. Ein Freilos verliert niemand, deshalb faengt der
+    Verliererzweig nur die Verlierer echter Spiele auf.
+    """
+    return _mit_zweiter_chance(ausgelostes_ko_raster(teilnehmer, saat))
+
+
+def _mit_zweiter_chance(sieger_zweig: list[KoBegegnung]) -> list[KoBegegnung]:
+    """Ein Siegerzweig wird zum Doppel-KO: wer einmal verliert, spielt
     in der Verliererrunde weiter und ist erst nach der zweiten Niederlage aus.
 
     Das Ergebnis ist eine Liste in Spielreihenfolge, und die Reihenfolge ist
@@ -412,8 +445,6 @@ def doppel_ko_raster(gesetzte: Sequence[Kennung]) -> list[KoBegegnung]:
     Turnier, dessen Ende "vielleicht noch ein Spiel" ist, laesst sich nebenbei
     nicht fuehren.
     """
-    sieger_zweig = ko_raster(gesetzte)
-
     nach_runde: dict[int, list[KoBegegnung]] = {}
     for spiel in sieger_zweig:
         nach_runde.setdefault(spiel.runde, []).append(spiel)
@@ -466,9 +497,11 @@ def doppel_ko_raster(gesetzte: Sequence[Kennung]) -> list[KoBegegnung]:
                 )
             )
 
+        # Nur aus echten Spielen: Wer ein Freilos hatte, hat nicht verloren.
         absteiger = [
             KoPlatz(aus_spiel=umbenannt[spiel.nummer], verlierer=True)
             for spiel in nach_runde[runde]
+            if not spiel.gast.freilos
         ]
 
         # Kreuzweise: wer schon eine Niederlage hat, trifft einen gerade
@@ -485,7 +518,11 @@ def doppel_ko_raster(gesetzte: Sequence[Kennung]) -> list[KoBegegnung]:
         # So lange zusammenfuehren, bis gerade so viele uebrig sind, wie in
         # der naechsten Runde von oben nachkommen. Ohne diesen Schritt
         # staende der Verliererzweig am Ende mit zwei Leuten da.
-        nachkommend = len(nach_runde[runden[stelle + 1]]) if stelle + 1 < len(runden) else 0
+        nachkommend = (
+            sum(1 for spiel in nach_runde[runden[stelle + 1]] if not spiel.gast.freilos)
+            if stelle + 1 < len(runden)
+            else 0
+        )
         while len(lebend) > max(1, nachkommend):
             lebend = _verliererrunde(lebend)
 

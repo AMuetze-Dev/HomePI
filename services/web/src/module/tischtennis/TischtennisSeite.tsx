@@ -8,6 +8,7 @@ import {
   aendereTurnier,
   beginneSpiel,
   entferneTeilnehmer,
+  ladeListen,
   ladeSpiele,
   ladeTabellen,
   ladeTeilnehmer,
@@ -15,16 +16,20 @@ import {
   ladeTurniere,
   legeTeilnehmerAn,
   legeTurnierAn,
+  loescheListe,
   loescheTurnier,
   loseAus,
   naechsteRunde,
   nimmErgebnisZurueck,
   setzeZurueck,
+  speichereListe,
   trageErgebnisEin,
+  uebernimmListe,
   verschiebeSpiel,
   wuerfleAus,
   beendeTurnier,
   type Einstellungen,
+  type Liste,
   type Spiel,
   type Tabelle,
   type Teilnehmer,
@@ -81,6 +86,10 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
   // Getrennt vom Ladezustand: ein Fehler beim Eintragen darf die Liste nicht
   // gegen eine Fehlerseite austauschen.
   const [aktionsfehler, setAktionsfehler] = useState("");
+  // Neben dem Turnier und nicht darin: Eine Liste haengt an keinem Turnier,
+  // und wer sie nicht lesen darf, bekommt eben keine - die Seite laeuft
+  // trotzdem.
+  const [listen, setListen] = useState<Liste[]>([]);
 
   const laden = useCallback(async (id: string, signal?: AbortSignal) => {
     try {
@@ -91,12 +100,14 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
         return;
       }
 
-      const [turnier, teilnehmer, spiele, tabellen] = await Promise.all([
+      const [turnier, teilnehmer, spiele, tabellen, gespeichert] = await Promise.all([
         ladeTurnier(kennung, signal),
         ladeTeilnehmer(kennung, signal),
         ladeSpiele(kennung, signal),
         ladeTabellen(kennung, signal),
+        ladeListen(signal).catch(() => [] as Liste[]),
       ]);
+      setListen(gespeichert);
       setZustand({
         phase: "fertig",
         daten: { turniere, turnier, teilnehmer, spiele, tabellen },
@@ -293,6 +304,7 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
         turnier={turnier}
         teilnehmer={teilnehmer}
         spiele={spiele}
+        listen={listen}
         darfEinrichten={darfEinrichten}
         onTeilnehmerAnlegen={(name) =>
           mitFehlerbehandlung(() => legeTeilnehmerAn(turnier.id, { name }))
@@ -300,6 +312,27 @@ export function TischtennisSeite({ unterseite = "dashboard" }: ModulProps) {
         onTeilnehmerEntfernen={(id) =>
           void mitFehlerbehandlung(() => entferneTeilnehmer(id))
         }
+        onListeLaden={async (id) => {
+          setAktionsfehler("");
+          try {
+            const ergebnis = await uebernimmListe(turnier.id, id);
+            await laden(gewaehlt);
+            return ergebnis;
+          } catch (fehler) {
+            setAktionsfehler(meldung(fehler));
+            return null;
+          }
+        }}
+        onListeSpeichern={(name, id) =>
+          mitFehlerbehandlung(() =>
+            speichereListe(
+              name,
+              teilnehmer.map((wer) => wer.name),
+              id,
+            ),
+          )
+        }
+        onListeLoeschen={(id) => void mitFehlerbehandlung(() => loescheListe(id))}
         onLosen={async () => {
           setAktionsfehler("");
           try {

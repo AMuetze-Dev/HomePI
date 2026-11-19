@@ -523,28 +523,102 @@
 
 /* ------------------------------------------------------------------ Turnier */
 
+/* Die eingetragenen Namen: eine durchgezaehlte Liste in Spalten, getrennt
+   von ausblendenden Linien wie jede Tabelle hier. Frueher waren das runde
+   Schildchen mit einem Kreuz - bei zwanzig Namen eine Wand aus Kapseln, in
+   der man den Namen suchte, den man eben getippt hatte. */
 .namen {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--raum-2);
+  display: grid;
+  /* 8 rem: Am Telefon passen so zwei Spalten in die Karte - 21 Namen
+     untereinander waren drei Bildschirme. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr));
+  column-gap: var(--raum-4);
   margin: var(--raum-5) 0 0;
   padding: 0;
   list-style: none;
 }
 
-.namenschild {
+.namenszeile {
   display: flex;
-  align-items: center;
-  gap: var(--raum-1);
-  padding: var(--raum-1) var(--raum-2) var(--raum-1) var(--raum-3);
-  border: 1px solid var(--farbe-rand);
-  border-radius: var(--rundung-voll);
-  font-size: var(--text-sm);
-  transition: border-color var(--dauer-schnell) var(--verlauf);
+  flex-direction: column;
+  min-width: 0;
 }
 
-.namenschild:hover {
-  border-color: var(--farbe-rand-stark);
+.namensinhalt {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+}
+
+/* 44 px Trefferflaeche wie die Reihen der Tabelle: Die Liste ist dicht,
+   das Ziel darf es nicht sein. */
+.namenskopf {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: var(--raum-3);
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: var(--raum-2) var(--raum-2);
+  border: 0;
+  border-radius: var(--rundung-sm);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+  transition: background var(--dauer-schnell) var(--verlauf);
+}
+
+.namenskopf:hover {
+  background: linear-gradient(to right, var(--farbe-akzent-spur), transparent 70%);
+}
+
+.namenskopf[aria-expanded="true"] {
+  background: linear-gradient(to right, var(--farbe-akzent-fuellung), transparent 70%);
+}
+
+.namenskopf:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: -2px;
+}
+
+.laufnummer {
+  flex: none;
+  min-width: 2ch;
+  color: var(--farbe-text-leise);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.namenstext {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Gespeicherte Listen: was in einer geoeffneten Reihe steht, und das
+   Formular, das erst auf Knopfdruck aufgeht. */
+.listenausklappung {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  padding: var(--raum-1) var(--raum-2) var(--raum-4);
+}
+
+.listenformular {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  margin-top: var(--raum-4);
+}
+
+.knopfzeile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-3);
+  margin-top: var(--raum-3);
 }
 
 .spielzeile {
@@ -714,7 +788,7 @@
   .turnierwahl select,
   .auswahl select,
   .klappengriff,
-  .namenschild,
+  .namenskopf,
   .schalter {
     transition: none;
   }
