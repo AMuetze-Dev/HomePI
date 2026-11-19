@@ -1,6 +1,5 @@
-import { NavLink, Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 
-import type { ModulEintrag } from "../api/client";
 import { Anmeldeformular } from "../anmeldung/Anmeldeformular";
 import { useAnmeldung } from "../anmeldung/kontext";
 import { GenerischeAnsicht } from "../module/GenerischeAnsicht";
@@ -88,15 +87,26 @@ export function ModulSeite() {
     return <Navigate to={`/modul/${modul.id}/${erste}`} replace />;
   }
 
+  // Die Überschrift ist der BEREICH, nicht das Artefakt: Das Artefakt steht
+  // schon in der Kopfleiste darüber („StaffelPilot / Spielprüfung"), und
+  // zweimal dasselbe Wort untereinander sagt beim zweiten Mal nichts mehr.
+  // Dasselbe gilt für die Beschreibung des Artefakts - sie gehört an den
+  // Anfang, nicht über jeden seiner neun Bereiche.
+  const offenerBereich = bereiche.find((b) => b.id === unterseite);
+
   return (
     <Inhaltsbreite breite={breiteFuer(modul.id, unterseite)}>
-      <Seitenkopf
-        titel={modul.titel}
-        beschreibung={modul.beschreibung || undefined}
-        neben={<Etikett mono>v{modul.version}</Etikett>}
-      />
-
-      <Bereichsleiste modul={modul} bereiche={bereiche} />
+      {/* Ein Bereich mit `eigenerTitel` baut seinen Kopf selbst - samt dem,
+          was nur er kennt: eine Zahl, ein Filter, die eine Handlung dieser
+          Fläche. Hier noch eine Überschrift daraufzusetzen hieße, dasselbe
+          Wort zweimal untereinander zu schreiben. */}
+      {!(offenerBereich?.eigenerTitel ?? eigene?.eigenerTitel) && (
+        <Seitenkopf
+          titel={offenerBereich?.wort ?? modul.titel}
+          beschreibung={offenerBereich ? undefined : modul.beschreibung || undefined}
+          neben={offenerBereich ? undefined : <Etikett mono>v{modul.version}</Etikett>}
+        />
+      )}
 
       {/* Bewusst OHNE key auf den Bereich: Ein wechselnder key montierte die
           Modulkomponente bei jedem Bereichswechsel neu - und damit wären die
@@ -110,42 +120,5 @@ export function ModulSeite() {
         )}
       </div>
     </Inhaltsbreite>
-  );
-}
-
-/**
- * Die Bereiche als Leiste - aber nur, solange die Navigationsleiste eine
- * Schublade ist.
- *
- * Auf dem Monitor stehen dieselben Bereiche links in der Leiste, dauerhaft
- * sichtbar und untereinander lesbar. Sie ein zweites Mal über dem Inhalt zu
- * wiederholen, wäre dieselbe Navigation zweimal - und die Frage, welche von
- * beiden gerade gilt.
- *
- * Auf einem Telefon liegt die Leiste hinter einem Knopf. Dort wäre der
- * Wechsel zwischen zwei Bereichen sonst zwei Antipper statt einem, und das
- * bei der häufigsten Bewegung im Modul.
- */
-function Bereichsleiste({
-  modul,
-  bereiche,
-}: {
-  modul: ModulEintrag;
-  bereiche: readonly { id: string; wort: string }[];
-}) {
-  if (bereiche.length === 0) return null;
-
-  return (
-    <div className={stil.bereichsleiste} role="navigation" aria-label="Bereiche">
-      {bereiche.map((bereich) => (
-        <NavLink
-          key={bereich.id}
-          to={`/modul/${modul.id}/${bereich.id}`}
-          className={({ isActive }) => (isActive ? stil.bereichAktiv : stil.bereich)}
-        >
-          {bereich.wort}
-        </NavLink>
-      ))}
-    </div>
   );
 }

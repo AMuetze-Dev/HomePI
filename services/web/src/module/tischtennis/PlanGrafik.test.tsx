@@ -79,7 +79,12 @@ describe("Der Plan als Bild", () => {
     expect(raster.getByText("Sieger aus Spiel 1")).toBeInTheDocument();
   });
 
-  it("hebt im Raster hervor, wer weiter ist", () => {
+  it("sagt vorgelesen, wer weiter ist - sichtbar traegt das die Zeile", () => {
+    // Sichtbar ist der Sieger halbfett und hat einen Strich an der Kante,
+    // der Verlierer tritt zurueck. Ein Etikett "weiter" dahinter sagte
+    // dasselbe ein zweites Mal, und zwar in der Haelfte aller Zeilen des
+    // Rasters. Schriftschnitt und Strich kommen bei einem Screenreader
+    // aber nicht an - deshalb bleibt das Wort fuer ihn stehen.
     render(
       <PlanGrafik
         tabellen={[]}
@@ -88,7 +93,9 @@ describe("Der Plan als Bild", () => {
     );
 
     const raster = within(screen.getByRole("group", { name: "KO-Raster" }));
-    expect(raster.getByText("weiter")).toBeInTheDocument();
+    const wort = raster.getByText("weiter");
+
+    expect(wort).toHaveClass("nur-vorlesen");
   });
 
   it("nennt ein Freilos beim Namen statt eine Leerstelle zu zeigen", () => {

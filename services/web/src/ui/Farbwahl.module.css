@@ -1,0 +1,99 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
+.gruppe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-4);
+}
+
+.farbe {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--raum-2);
+  cursor: pointer;
+}
+
+/* Unsichtbar, aber vorhanden: Ein `display: none` naehme dem Feld die
+   Tastaturfolge und die Ansage, und uebrig blieben ein Tupfen und ein Wort,
+   die aussehen wie eine Wahl und keine sind. */
+.feld {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * Der Tupfen zeigt den Grund dieser Voreinstellung.
+ *
+ * `var(--farbe-grund)` und nicht ein fester Wert: Der Tupfen traegt
+ * `data-grund` selbst, und damit gelten fuer ihn dieselben Werte wie fuer
+ * die Oberflaeche - auch im Hellmodus, wo der Grund ein anderer ist.
+ *
+ * Der Ring darum ist noetig, weil ein heller Tupfen auf hellem Grund sonst
+ * verschwindet. Er traegt den Rand und nicht den Akzent: Gewaehlt ist eine
+ * andere Auskunft als vorhanden.
+ */
+.tupfen {
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--rundung-voll);
+  /* Zwei Werte statt einem: Grund und erhobene Flaeche. Ein einzelner
+     dunkler Kreis auf dunklem Grund zeigt den Stich nicht - zwei Stufen
+     nebeneinander schon, und sie sind genau das, was man spaeter sieht. */
+  background: linear-gradient(
+    140deg,
+    var(--farbe-grund) 0%,
+    var(--farbe-grund) 48%,
+    var(--farbe-flaeche-erhoben) 52%,
+    var(--farbe-flaeche-erhoben) 100%
+  );
+  box-shadow: inset 0 0 0 1px var(--farbe-rand-stark);
+  transition: box-shadow var(--dauer-schnell) var(--verlauf);
+}
+
+.wort {
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+  transition: color var(--dauer-schnell) var(--verlauf);
+}
+
+.farbe:hover .tupfen {
+  box-shadow: inset 0 0 0 1px var(--farbe-text-leise);
+}
+
+.farbe:hover .wort {
+  color: var(--farbe-text);
+}
+
+/* Gewaehlt heisst: ein Ring aus dem Akzent UND das Wort in voller
+   Schriftfarbe. Nur der Ring waere eine Auskunft allein ueber Farbe - und
+   das ausgerechnet bei einer Farbwahl. */
+.feld:checked + .tupfen {
+  box-shadow:
+    0 0 0 2px var(--farbe-akzent),
+    inset 0 0 0 1px var(--farbe-rand-stark);
+}
+
+.feld:checked ~ .wort {
+  color: var(--farbe-text);
+}
+
+.feld:focus-visible + .tupfen {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 4px;
+}
+
+@media (pointer: coarse) {
+  .tupfen {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+}

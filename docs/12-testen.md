@@ -144,12 +144,36 @@ Wechsel. Genau dort war der Fehler, den kein Komponententest sehen konnte.
 Sie brauchen eine eigene Umgebung mit eigener Datenbank:
 
 ```bash
-make e2e     # Umgebung hoch, Tests, Umgebung samt Datenbank weg
+make e2e                        # alle Reisen: weg, einrichtung, staffelpilot
+make e2e E2E_SPECS=staffelpilot # nur eine
 ```
 
 Bevor der erste Test etwas anfasst, fragt eine Wache nach, ob diese
 Installation schon einen Verwalter hat. Wenn ja, bricht der Lauf ab, statt in
-fremden Konten zu wüten.
+fremden Konten zu wüten. Sie fragt das Gateway direkt (`E2E_API_URL`) und
+nicht über die Oberfläche: eine Wache, die am Weg scheitert statt an der
+Antwort, schützt nichts.
+
+**Sie laufen gegen das gebaute Bundle, nicht gegen den Entwicklungsserver.**
+`make e2e` ruft vorher `npm run build` und lässt Playwright `vite preview`
+darauf starten; aus dem Compose-Projekt kommt nur das Backend. Der Grund ist
+Zeit, die sonst niemandem gehört: der Entwicklungsserver übersetzt die
+Anwendung erst beim ersten Aufruf, und das wächst mit jedem Artefakt —
+inzwischen zwanzigtausend Zeilen Modul-Oberfläche. In der CI hat das die Tests
+gekippt, bevor einer von ihnen etwas geprüft hatte, und zwar mit
+`locator.waitFor: Timeout 120000ms exceeded` als einziger Auskunft. Ein
+fertiges Bundle steht sofort.
+
+Zwei Folgen davon, die man wissen muss:
+
+- Eine Änderung am Frontend ist erst im Test sichtbar, wenn neu gebaut wurde —
+  also nach einem erneuten `make e2e`, nicht nach einem Speichern.
+- Der Vorschauserver darf nicht schon laufen. Ein belegter Port bricht den
+  Lauf ab, statt das Bundle von vorhin zu prüfen und grün zu werden.
+
+In der CI ist jede Reise ein eigener Job (`e2e`, Matrix über `E2E_SPECS`):
+eigener Runner, eigene Umgebung, eigenes Ergebnis. Ein roter Weg eines
+Artefakts erscheint damit als dieses Artefakt und nimmt die anderen nicht mit.
 
 Ein neues Artefakt gehört **nicht** automatisch in `weg.spec.ts`. Dort steht
 der Weg durch die Anwendung, nicht jede Ansicht. Nimm es auf, wenn es den Weg

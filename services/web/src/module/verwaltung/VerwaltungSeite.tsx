@@ -1,7 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useAnmeldung } from "../../anmeldung/kontext";
-import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import {
+  Abschnitt,
+  Etikett,
+  Feld,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Platzhalter,
+  Reihe,
+  Tabelle,
+  Tafel,
+  Zelle,
+} from "../../ui";
 import {
   entzieheRecht,
   ladeArtefakte,
@@ -17,6 +30,7 @@ import {
 } from "./api";
 import { Startpasswort } from "./Startpasswort";
 import stil from "./VerwaltungSeite.module.css";
+import { meldung } from "../../api/client";
 
 type Daten = { konten: Konto[]; artefakte: Artefakt[] };
 
@@ -31,15 +45,16 @@ const ROLLEN: Rolle[] = ["leser", "nutzer", "verwalter"];
 //: sonst sähe es aus, als wäre nur noch nichts gewählt worden.
 const OHNE = "-";
 
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
-
 export function VerwaltungSeite() {
   const [zustand, setZustand] = useState<Zustand>({ phase: "laedt" });
   // Getrennt vom Ladezustand: ein misslungener Klick darf die Liste nicht
   // gegen eine Fehlerseite austauschen.
   const [aktionsfehler, setAktionsfehler] = useState("");
+  // Welche Zeile aufgeklappt ist - und ob das Anlegeformular dasteht. Beides
+  // war vorher dauernd sichtbar: drei Knoepfe je Konto und ein Formular
+  // darunter, auch wenn man nur nachsehen wollte, wer was darf.
+  const [offenesKonto, setOffenesKonto] = useState<string | null>(null);
+  const [anlegen, setAnlegen] = useState(false);
   // Ein Startpasswort ist genau einmal abrufbar. Es steht deshalb hier oben
   // und nicht in der Zeile, die beim naechsten Laden verschwindet.
   const [start, setStart] = useState<{ name: string; wert: string } | null>(null);
@@ -80,27 +95,45 @@ export function VerwaltungSeite() {
 
   if (zustand.phase === "laedt") {
     return (
-      <div className={stil.laden} role="status" aria-label="Konten werden geladen">
-        <Platzhalter breite="100%" hoehe="4rem" />
-        <Platzhalter breite="100%" hoehe="14rem" />
-      </div>
+      <Tafel titel="Verwaltung">
+        <div className={stil.laden} role="status" aria-label="Konten werden geladen">
+          <Platzhalter breite="100%" hoehe="4rem" />
+          <Platzhalter breite="100%" hoehe="14rem" />
+        </div>
+      </Tafel>
     );
   }
 
   if (zustand.phase === "fehler") {
     return (
-      <Hinweis ton="fehler" dringend>
-        {zustand.nachricht}
-      </Hinweis>
+      <Tafel titel="Verwaltung">
+        <Hinweis ton="fehler" dringend>
+          {zustand.nachricht}
+        </Hinweis>
+      </Tafel>
     );
   }
 
   const { konten, artefakte } = zustand.daten;
+  const verwalter = konten.filter((k) => k.verwalter).length;
+  const gesperrt = konten.filter((k) => !k.aktiv).length;
 
   return (
-    <>
-      <Uebersicht konten={konten} />
-
+    <Tafel
+      titel="Verwaltung"
+      beiwort={[
+        `${konten.length} ${konten.length === 1 ? "Konto" : "Konten"}`,
+        `${verwalter} ${verwalter === 1 ? "Verwalter" : "Verwalter"}`,
+        ...(gesperrt > 0 ? [`${gesperrt} gesperrt`] : []),
+      ].join(" · ")}
+      aktionen={
+        konten.length > 0 && (
+          <Knopf groesse="sm" auspraegung="primaer" onClick={() => setAnlegen(true)}>
+            Konto anlegen
+          </Knopf>
+        )
+      }
+    >
       {aktionsfehler && (
         <Hinweis ton="fehler" dringend>
           {aktionsfehler}
@@ -111,169 +144,100 @@ export function VerwaltungSeite() {
         <Startpasswort name={start.name} wert={start.wert} onWeg={() => setStart(null)} />
       )}
 
-      <section aria-labelledby="konten">
-        <h2 id="konten" className={stil.abschnittstitel}>
-          Konten
-        </h2>
-
-        {konten.length === 0 ? (
-          <Leerzustand titel="Noch kein Konto">Lege unten das erste an.</Leerzustand>
-        ) : (
-          <ul className={stil.liste} aria-label="Konten">
-            {konten.map((konto) => (
-              <li key={konto.id}>
-                <Kontokarte
-                  konto={konto}
-                  artefakte={artefakte}
-                  ichSelbst={konto.id === benutzer?.id}
-                  aufAktion={mitFehlerbehandlung}
-                  aufStartpasswort={setStart}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <Anlegen
-        onAnlegen={async (daten) =>
-          mitFehlerbehandlung(async () => {
-            const neu = await legeKontoAn(daten);
-            setStart({ name: neu.name, wert: neu.startpasswort });
-          })
-        }
-      />
-    </>
-  );
-}
-
-function Uebersicht({ konten }: { konten: Konto[] }) {
-  const verwalter = konten.filter((k) => k.verwalter).length;
-  const gesperrt = konten.filter((k) => !k.aktiv).length;
-
-  return (
-    <ul className={stil.kennzahlen} aria-label="Überblick">
-      <Kennzahl wert={konten.length} name="Konten" />
-      <Kennzahl wert={verwalter} name="Verwalter" />
-      <Kennzahl wert={gesperrt} name="gesperrt" ton="warnung" />
-    </ul>
-  );
-}
-
-function Kennzahl({
-  wert,
-  name,
-  ton = "neutral",
-}: {
-  wert: number;
-  name: string;
-  ton?: "neutral" | "warnung";
-}) {
-  // Eine Null wird nicht eingefärbt: sie ist keine Meldung, sondern die
-  // Abwesenheit einer.
-  const eingefaerbt = ton !== "neutral" && wert > 0;
-
-  return (
-    <li className={stil.kennzahleintrag} aria-label={`${wert} ${name}`}>
-      <Karte className={stil.kennzahl}>
-        <span
-          className={`${stil.wert} ${eingefaerbt ? stil[ton] : ""}`}
-          aria-hidden="true"
+      {konten.length === 0 ? (
+        <Leerzustand titel="Noch kein Konto">
+          Lege das erste an — ohne Konto kommt niemand an ein Artefakt.
+          <p className={stil.leerknopf}>
+            <Knopf auspraegung="primaer" onClick={() => setAnlegen(true)}>
+              Konto anlegen
+            </Knopf>
+          </p>
+        </Leerzustand>
+      ) : (
+        <Tabelle
+          beschriftung="Konten"
+          raster="1.6fr 1.1fr 1fr"
+          spalten={["Konto", "Zustand", "Rechte"]}
         >
-          {wert}
-        </span>
-        <span className={stil.kennzahlname} aria-hidden="true">
-          {name}
-        </span>
-      </Karte>
-    </li>
+          {konten.map((konto) => (
+            <Kontoreihe
+              key={konto.id}
+              konto={konto}
+              artefakte={artefakte}
+              ichSelbst={konto.id === benutzer?.id}
+              offen={offenesKonto === konto.id}
+              onKlick={() => setOffenesKonto(offenesKonto === konto.id ? null : konto.id)}
+              aufAktion={mitFehlerbehandlung}
+              aufStartpasswort={setStart}
+            />
+          ))}
+        </Tabelle>
+      )}
+
+      {anlegen && (
+        <Anlegen
+          onAbbrechen={() => setAnlegen(false)}
+          onAnlegen={async (daten) =>
+            mitFehlerbehandlung(async () => {
+              const neu = await legeKontoAn(daten);
+              setStart({ name: neu.name, wert: neu.startpasswort });
+              setAnlegen(false);
+            })
+          }
+        />
+      )}
+    </Tafel>
   );
 }
 
-function Kontokarte({
+function Kontoreihe({
   konto,
   artefakte,
   ichSelbst,
+  offen,
+  onKlick,
   aufAktion,
   aufStartpasswort,
 }: {
   konto: Konto;
   artefakte: Artefakt[];
   ichSelbst: boolean;
+  offen: boolean;
+  onKlick: () => void;
   aufAktion: (aktion: () => Promise<unknown>) => Promise<boolean>;
   aufStartpasswort: (start: { name: string; wert: string }) => void;
 }) {
-  const [offen, setOffen] = useState(false);
+  const anzahl = Object.keys(konto.rechte).length;
 
   return (
-    <Karte className={stil.konto}>
-      <div className={stil.kopfzeile}>
-        <div className={stil.namen}>
-          <span className={stil.anzeigename}>{konto.anzeigename}</span>
-          <span className={stil.benutzername}>{konto.name}</span>
-        </div>
+    <Reihe
+      leise={!konto.aktiv}
+      onKlick={onKlick}
+      offen={offen}
+      ausklappung={
+        <div className={stil.ausklappung}>
+          {ichSelbst && (
+            <p className={stil.selbsthinweis}>
+              Am eigenen Konto sind Sperren und Löschen abgeschaltet — ein Fehlgriff ließe
+              sich nicht zurücknehmen.
+            </p>
+          )}
 
-        <div className={stil.etiketten}>
-          {ichSelbst && <Etikett>Du</Etikett>}
-          {konto.verwalter && <Etikett ton="gut">Verwalter</Etikett>}
-          {konto.passwort_wechseln && <Etikett ton="warnung">Startpasswort</Etikett>}
-          {!konto.aktiv && <Etikett ton="warnung">Gesperrt</Etikett>}
-        </div>
-      </div>
+          {konto.passwort_wechseln && !ichSelbst && (
+            <p className={stil.selbsthinweis}>
+              Benutzt noch das vergebene Startpasswort. Bis es ersetzt ist, kommt dieses
+              Konto an kein Artefakt.
+            </p>
+          )}
 
-      <div className={stil.aktionen}>
-        <Knopf
-          groesse="sm"
-          onClick={() => void aufAktion(() => setzeAktiv(konto.id, !konto.aktiv))}
-          disabled={ichSelbst}
-          aria-label={`${konto.name} ${konto.aktiv ? "sperren" : "entsperren"}`}
-        >
-          {konto.aktiv ? "Sperren" : "Entsperren"}
-        </Knopf>
-
-        <Knopf
-          groesse="sm"
-          auspraegung="leise"
-          onClick={() => setOffen((o) => !o)}
-          aria-expanded={offen}
-          aria-label={`Rechte von ${konto.name} ${offen ? "schließen" : "bearbeiten"}`}
-        >
-          Rechte
-        </Knopf>
-
-        <Knopf
-          groesse="sm"
-          auspraegung="leise"
-          onClick={() => void aufAktion(() => loescheKonto(konto.id))}
-          disabled={ichSelbst}
-          aria-label={`${konto.name} löschen`}
-        >
-          Löschen
-        </Knopf>
-      </div>
-
-      {ichSelbst && (
-        <p className={stil.selbsthinweis}>
-          Am eigenen Konto sind Sperren und Löschen abgeschaltet — ein Fehlgriff ließe
-          sich nicht zurücknehmen.
-        </p>
-      )}
-
-      {konto.passwort_wechseln && !ichSelbst && (
-        <p className={stil.selbsthinweis}>
-          Benutzt noch das vergebene Startpasswort. Bis es ersetzt ist, kommt dieses Konto
-          an kein Artefakt.
-        </p>
-      )}
-
-      {offen && (
-        <>
-          <Rechte
-            konto={konto}
-            artefakte={artefakte}
-            ichSelbst={ichSelbst}
-            aufAktion={aufAktion}
-          />
+          <Abschnitt titel="Rechte" id={`rechte-${konto.id}`}>
+            <Rechte
+              konto={konto}
+              artefakte={artefakte}
+              ichSelbst={ichSelbst}
+              aufAktion={aufAktion}
+            />
+          </Abschnitt>
 
           <div className={stil.passwortzeile}>
             <div className={stil.passworttext}>
@@ -298,9 +262,47 @@ function Kontokarte({
               Startpasswort erzeugen
             </Knopf>
           </div>
-        </>
-      )}
-    </Karte>
+
+          <div className={stil.aktionen}>
+            <Knopf
+              groesse="sm"
+              onClick={() => void aufAktion(() => setzeAktiv(konto.id, !konto.aktiv))}
+              disabled={ichSelbst}
+              aria-label={`${konto.name} ${konto.aktiv ? "sperren" : "entsperren"}`}
+            >
+              {konto.aktiv ? "Sperren" : "Entsperren"}
+            </Knopf>
+            <Knopf
+              groesse="sm"
+              auspraegung="leise"
+              onClick={() => void aufAktion(() => loescheKonto(konto.id))}
+              disabled={ichSelbst}
+              aria-label={`${konto.name} löschen`}
+            >
+              Löschen
+            </Knopf>
+          </div>
+        </div>
+      }
+    >
+      <Zelle>
+        {konto.anzeigename}
+        <span className={stil.benutzername}>{konto.name}</span>
+      </Zelle>
+      <Zelle>
+        <span className={stil.etiketten}>
+          {ichSelbst && <Etikett>Du</Etikett>}
+          {konto.verwalter && <Etikett ton="gut">Verwalter</Etikett>}
+          {konto.passwort_wechseln && <Etikett ton="warnung">Startpasswort</Etikett>}
+          {!konto.aktiv && <Etikett ton="warnung">Gesperrt</Etikett>}
+        </span>
+      </Zelle>
+      <Zelle leise>
+        {anzahl === 0
+          ? "kein Recht"
+          : `${anzahl} ${anzahl === 1 ? "Artefakt" : "Artefakte"}`}
+      </Zelle>
+    </Reihe>
   );
 }
 
@@ -369,8 +371,10 @@ function Rechte({
 
 function Anlegen({
   onAnlegen,
+  onAbbrechen,
 }: {
   onAnlegen: (daten: { name: string; anzeigename?: string }) => Promise<boolean>;
+  onAbbrechen: () => void;
 }) {
   const [name, setName] = useState("");
   const [anzeigename, setAnzeigename] = useState("");
@@ -400,11 +404,7 @@ function Anlegen({
   }
 
   return (
-    <section aria-labelledby="anlegen">
-      <h2 id="anlegen" className={stil.abschnittstitel}>
-        Konto anlegen
-      </h2>
-
+    <Abschnitt titel="Konto anlegen" id="anlegen" regel>
       <Karte>
         <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
           <div className={stil.felder}>
@@ -430,11 +430,16 @@ function Anlegen({
             zunächst keine — was es darf, vergibst du danach einzeln.
           </p>
 
-          <Knopf type="submit" auspraegung="primaer" disabled={!vollstaendig || laeuft}>
-            {laeuft ? "Einen Moment …" : "Anlegen"}
-          </Knopf>
+          <div className={stil.formularfuss}>
+            <Knopf type="button" auspraegung="leise" onClick={onAbbrechen}>
+              Abbrechen
+            </Knopf>
+            <Knopf type="submit" auspraegung="primaer" disabled={!vollstaendig || laeuft}>
+              {laeuft ? "Einen Moment …" : "Anlegen"}
+            </Knopf>
+          </div>
         </form>
       </Karte>
-    </section>
+    </Abschnitt>
   );
 }

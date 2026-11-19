@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { Karte, Leerzustand } from "../../ui";
+import { Leerzustand } from "../../ui";
 import type { Flussbild, Knotenart } from "./api";
 import { alsEuro } from "./geld";
 import stil from "./HaushaltsbuchSeite.module.css";
@@ -39,59 +39,57 @@ export function FlussTafel({ bild }: { bild: Flussbild }) {
 
   return (
     <>
-      <Karte blank>
-        <div className={stil.rollbereich}>
-          <svg
-            className={stil.flussbild}
-            viewBox={`0 0 ${aufbau.breite} ${hoehe}`}
-            role="img"
-            aria-label="Geldfluss eines Monats: von den Einnahmen über die Konten und Kategorien zu den einzelnen Posten"
-          >
-            <g transform={`translate(0 ${RAND})`}>
-              {aufbau.baender.map((band) => (
-                <path key={band.id} className={bandstil(band)} d={band.pfad}>
-                  <title>
-                    {band.von.beschriftung} → {band.nach.beschriftung}:{" "}
-                    {alsEuro(String(band.wert))}
-                  </title>
-                </path>
-              ))}
+      <div className={stil.rollbereich}>
+        <svg
+          className={stil.flussbild}
+          viewBox={`0 0 ${aufbau.breite} ${hoehe}`}
+          role="img"
+          aria-label="Geldfluss eines Monats: von den Einnahmen über die Konten und Kategorien zu den einzelnen Posten"
+        >
+          <g transform={`translate(0 ${RAND})`}>
+            {aufbau.baender.map((band) => (
+              <path key={band.id} className={bandstil(band)} d={band.pfad}>
+                <title>
+                  {band.von.beschriftung} → {band.nach.beschriftung}:{" "}
+                  {alsEuro(String(band.wert))}
+                </title>
+              </path>
+            ))}
 
-              {aufbau.plaetze.map((platz) => {
-                const letzte = platz.knoten.ebene === bild.ebenen - 1;
-                return (
-                  <g key={platz.id}>
-                    <rect
-                      className={`${stil.knoten} ${stil[`knoten_${platz.knoten.art}`]}`}
-                      x={platz.x}
-                      y={platz.y}
-                      width={KNOTEN_BREITE}
-                      height={platz.hoehe}
-                      rx={2}
-                    >
-                      <title>
-                        {platz.knoten.beschriftung}: {alsEuro(String(platz.wert))}
-                      </title>
-                    </rect>
-                    <text
-                      className={stil.knotenname}
-                      x={letzte ? platz.x + KNOTEN_BREITE + 6 : platz.x - 6}
-                      y={platz.y + platz.hoehe / 2}
-                      textAnchor={letzte ? "start" : "end"}
-                      dominantBaseline="middle"
-                    >
-                      {platz.knoten.beschriftung}
-                      <tspan className={stil.knotenwert} dx="6">
-                        {alsEuro(String(platz.wert))}
-                      </tspan>
-                    </text>
-                  </g>
-                );
-              })}
-            </g>
-          </svg>
-        </div>
-      </Karte>
+            {aufbau.plaetze.map((platz) => {
+              const letzte = platz.knoten.ebene === bild.ebenen - 1;
+              return (
+                <g key={platz.id}>
+                  <rect
+                    className={`${stil.knoten} ${stil[`knoten_${platz.knoten.art}`]}`}
+                    x={platz.x}
+                    y={platz.y}
+                    width={KNOTEN_BREITE}
+                    height={platz.hoehe}
+                    rx={2}
+                  >
+                    <title>
+                      {platz.knoten.beschriftung}: {alsEuro(String(platz.wert))}
+                    </title>
+                  </rect>
+                  <text
+                    className={stil.knotenname}
+                    x={letzte ? platz.x + KNOTEN_BREITE + 6 : platz.x - 6}
+                    y={platz.y + platz.hoehe / 2}
+                    textAnchor={letzte ? "start" : "end"}
+                    dominantBaseline="middle"
+                  >
+                    {platz.knoten.beschriftung}
+                    <tspan className={stil.knotenwert} dx="6">
+                      {alsEuro(String(platz.wert))}
+                    </tspan>
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+      </div>
 
       <p className={stil.legende}>
         Jede Spalte ist eine Station: Einnahmen, Konten, Kategorien, einzelne Posten. Alle

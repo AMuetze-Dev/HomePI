@@ -401,6 +401,15 @@ async def _sieger_weiterreichen(sitzung: AsyncSession, lauf: Turnier, ausgangspu
                 # Die Nummer eines Folgespiels ist immer groesser, deshalb
                 # endet dieser Durchlauf.
                 offen.append(folge)
+            if folge.freilos and folge.heim_id is not None:
+                # Es gibt nichts zu spielen: wer hier einlaeuft, ist durch.
+                # Und weil er durch ist, laeuft er sofort weiter - deshalb
+                # steht dieses Spiel gleich wieder auf der Liste.
+                folge.sieger_id = folge.heim_id
+                folge.zustand = "beendet"
+                folge.beendet_am = jetzt()
+                if folge not in offen:
+                    offen.append(folge)
 
 
 def _verlierer(gefunden: Spiel) -> uuid.UUID | None:
@@ -676,6 +685,16 @@ def _ko_schreiben(
         runden[spiel.zweig] = max(runden.get(spiel.zweig, 0), spiel.runde)
 
     for spiel in raster:
+        bezeichnung = dienst.ko_bezeichnung(spiel.runde, runden[spiel.zweig], spiel.zweig)
+        freilos = spiel.gast.freilos
+        heim_id = nach_kennung[spiel.heim.teilnehmer].id if spiel.heim.teilnehmer else None
+
+        # Ein Freilos, dessen Mann schon feststeht, ist mit dem Ansetzen
+        # durch. Steht er noch nicht fest - in einer spaeteren Runde laeuft
+        # dort ein Sieger ein -, entscheidet es sich, sobald er eintrifft
+        # (_sieger_weiterreichen).
+        durch = freilos and heim_id is not None
+
         sitzung.add(
             Spiel(
                 turnier_id=lauf.id,
@@ -683,13 +702,17 @@ def _ko_schreiben(
                 reihenfolge=versatz + spiel.nummer,
                 phase=PHASE_JE_ZWEIG[spiel.zweig],
                 runde=spiel.runde,
-                bezeichnung=dienst.ko_bezeichnung(spiel.runde, runden[spiel.zweig], spiel.zweig),
-                heim_id=(nach_kennung[spiel.heim.teilnehmer].id if spiel.heim.teilnehmer else None),
+                bezeichnung=f"{bezeichnung}, Freilos" if freilos else bezeichnung,
+                heim_id=heim_id,
                 gast_id=(nach_kennung[spiel.gast.teilnehmer].id if spiel.gast.teilnehmer else None),
                 heim_aus_spiel=(versatz + spiel.heim.aus_spiel if spiel.heim.aus_spiel else None),
                 gast_aus_spiel=(versatz + spiel.gast.aus_spiel if spiel.gast.aus_spiel else None),
                 heim_aus_verlierer=spiel.heim.verlierer,
                 gast_aus_verlierer=spiel.gast.verlierer,
+                freilos=freilos,
+                zustand="beendet" if durch else "geplant",
+                sieger_id=heim_id if durch else None,
+                beendet_am=jetzt() if durch else None,
             )
         )
     return versatz + len(raster)

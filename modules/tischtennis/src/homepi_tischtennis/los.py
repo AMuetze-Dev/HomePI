@@ -44,16 +44,19 @@ class Begegnung:
 
 @dataclass(frozen=True, slots=True)
 class KoPlatz:
-    """Ein Platz im Raster: entweder jemand steht darin, oder der Sieger
-    eines vorherigen Spiels laeuft dort ein.
+    """Ein Platz im Raster: jemand steht darin, der Sieger eines vorherigen
+    Spiels laeuft dort ein - oder es ist ein Freilos.
 
-    Genau eines von beiden ist gesetzt. Deshalb steht das Raster vollstaendig
+    Genau eines von dreien ist gesetzt. Deshalb steht das Raster vollstaendig
     an der Wand, bevor der erste Ball gespielt ist - mit "Sieger aus Spiel 3"
     statt einer Leerstelle.
     """
 
     teilnehmer: Kennung | None = None
     aus_spiel: int | None = None
+    #: Kein Gegner. Der andere Platz rueckt auf, ohne gespielt zu haben; das
+    #: Spiel ist beendet, sobald feststeht, wer darin steht.
+    freilos: bool = False
     #: Deutet ``aus_spiel`` auf den VERLIERER jenes Spiels? Nur im Doppel-KO,
     #: wo die zweite Chance genau daraus besteht. Ohne dieses Feld muesste
     #: "Verlierer aus Spiel 3" als Text irgendwo mitlaufen - und waere damit
@@ -121,7 +124,12 @@ def plan_auswuerfeln(
     random.Random(saat).shuffle(gemischt)
 
     if modus == "ko":
-        return Spielplan(ko=doppel_ko_raster(gemischt) if doppel_ko else ko_raster(gemischt))
+        # Mit zweiter Chance spielt ohnehin jeder mindestens zweimal - dann
+        # ist ein Freilos in der ersten Runde kein verlorener Abend, und das
+        # gesetzte Raster bleibt das bessere.
+        if doppel_ko:
+            return Spielplan(ko=doppel_ko_raster(gemischt))
+        return Spielplan(ko=ausgelostes_ko_raster(gemischt, saat))
 
     if modus == "schweizer":
         paarungen, freilos = schweizer_paarung(gemischt, bisherige=set(), freilose=set())
@@ -309,6 +317,77 @@ def ko_raster(gesetzte: Sequence[Kennung]) -> list[KoBegegnung]:
             naechste.append(KoPlatz(aus_spiel=nummer))
         plaetze = naechste
         runde += 1
+    return spiele
+
+
+def ausgelostes_ko_raster(teilnehmer: Sequence[Kennung], saat: int) -> list[KoBegegnung]:
+    """Das Raster fuer ein Turnier, das mit dem KO beginnt - jeder spielt.
+
+    Der Unterschied zu ``ko_raster`` ist die Frage, die davor steht: dort
+    kommen die Leute aus einer Gruppenphase und haben schon gespielt, hier
+    ist der erste Ballwechsel des Abends auch ihr erster. Ein gesetztes
+    Raster waere hier das falsche Werkzeug - bei 19 Angemeldeten saessen
+    dreizehn in der ersten Runde da und sahen zu, weil 19 keine Zweierpotenz
+    ist. Also wird gepaart, so weit es aufgeht: neun Spiele, und der eine
+    Uebrige bekommt ein Freilos.
+
+    Das Freilos wird **ausgelost**. Es nach Setzliste zu vergeben setzt eine
+    Rangfolge voraus, die es vor dem ersten Spiel nicht gibt; und wer an
+    einem Feierabend eine Runde aussetzt, soll das dem Los verdanken und
+    keiner Liste. In den spaeteren Runden gilt dasselbe, sobald die Zahl der
+    Weitergekommenen ungerade ist.
+
+    In der ersten Runde trifft der Erste der Liste auf den Letzten, der
+    Zweite auf den Vorletzten: Steht doch eine Reihenfolge drin, soll sie
+    etwas bedeuten. Danach treffen sich die Sieger benachbarter Spiele -
+    sonst laesst sich das Raster nicht als Baum an die Wand haengen.
+    """
+    if len(teilnehmer) < 2:
+        raise LosUnmoeglich("Ein KO-Raster braucht mindestens zwei Teilnehmer")
+
+    wuerfel = random.Random(saat)
+    plaetze = [KoPlatz(teilnehmer=wer) for wer in teilnehmer]
+    spiele: list[KoBegegnung] = []
+    nummer = 0
+    runde = 1
+
+    while len(plaetze) > 1:
+        antretende = list(plaetze)
+        glueckspilz = (
+            antretende.pop(wuerfel.randrange(len(antretende))) if len(antretende) % 2 else None
+        )
+
+        if runde == 1:
+            paare = [
+                (antretende[stelle], antretende[-1 - stelle])
+                for stelle in range(len(antretende) // 2)
+            ]
+        else:
+            paare = [
+                (antretende[stelle], antretende[stelle + 1])
+                for stelle in range(0, len(antretende), 2)
+            ]
+
+        naechste: list[KoPlatz] = []
+        for heim, gast in paare:
+            nummer += 1
+            spiele.append(KoBegegnung(nummer=nummer, runde=runde, heim=heim, gast=gast))
+            naechste.append(KoPlatz(aus_spiel=nummer))
+
+        if glueckspilz is not None:
+            # Steht am Ende der Runde: im Spielplan ist es keine Begegnung,
+            # sondern die Zeile, die erklaert, warum einer durch ist.
+            nummer += 1
+            spiele.append(
+                KoBegegnung(
+                    nummer=nummer, runde=runde, heim=glueckspilz, gast=KoPlatz(freilos=True)
+                )
+            )
+            naechste.append(KoPlatz(aus_spiel=nummer))
+
+        plaetze = naechste
+        runde += 1
+
     return spiele
 
 

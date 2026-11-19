@@ -21,6 +21,33 @@ export interface Daten {
   posten: Posten[];
 }
 
+/**
+ * Die Titel der vier Bereiche - dieselben Wörter wie im Register.
+ *
+ * Hier und nicht aus dem Register gelesen: Das Register importiert diese
+ * Oberfläche, der Weg zurück wäre ein Zyklus. Dass es damit an zwei Stellen
+ * steht, hält ein Test im Register fest.
+ */
+export const BEREICHSTITEL = {
+  uebersicht: "Monatsplan",
+  fluss: "Geldfluss",
+  posten: "Posten",
+  stammdaten: "Konten & Personen",
+} as const;
+
+/**
+ * Der Titel zu einer Bereichskennung, mit dem Monatsplan als Rückfall.
+ *
+ * Ohne Bereich steht man auf der Startfläche - und ein erfundener Bereich
+ * landet dort ebenfalls, weil die Modulseite ihn dorthin umleitet.
+ */
+export function bereichstitel(unterseite: string | undefined): string {
+  if (unterseite !== undefined && unterseite in BEREICHSTITEL) {
+    return BEREICHSTITEL[unterseite as keyof typeof BEREICHSTITEL];
+  }
+  return BEREICHSTITEL.uebersicht;
+}
+
 export interface Zeitraum {
   jahr: number;
   monat: number;

@@ -46,8 +46,8 @@ uv run homepi benutzer anlegen aaron --artefakt verwaltung --rolle verwalter
 uv run homepi benutzer liste
 ```
 
-Weitere Rechte — etwa `geraete` — vergibst du danach in der Oberfläche unter
-_Verwaltung_ oder mit `homepi benutzer recht aaron geraete verwalter`.
+Weitere Rechte — etwa `haushaltsbuch` — vergibst du danach in der Oberfläche
+unter _Verwaltung_ oder mit `homepi benutzer recht aaron haushaltsbuch verwalter`.
 
 `make dev-reset` wirft die Datenbank weg — danach ist auch das Konto weg.
 
@@ -102,7 +102,7 @@ make dev-testkonto N=klick R=leser # anderer Name, andere Rolle
 
 ```
 ==> Testkonto 'tester' anlegen
-    verwalter auf: geraete, staffelpilot, verwaltung
+    verwalter auf: haushaltsbuch, staffelpilot, tischtennis, verwaltung
     + 'tester' kann sich anmelden.
 ==> Passwort
     nur-zum-durchklicken-im-eigenen-netz
@@ -137,7 +137,7 @@ make test-python    # die drei Python-Projekte
 make test-web       # Frontend
 make smoke          # gegen die laufende Dev-Umgebung
 make tdd-web        # vitest im Watch-Modus
-make tdd-api P=modules/geraete
+make tdd-api P=modules/haushaltsbuch
 ```
 
 ### Die Testdatenbank ist nicht die Arbeitsdatenbank
@@ -205,6 +205,12 @@ Konten an, ändern Rechte und werfen am Ende alles weg.
 ```bash
 make e2e          # Umgebung hoch, Tests, Umgebung samt Datenbank weg
 ```
+
+Aus dem Compose-Projekt kommt dabei nur das Backend. Die Oberfläche baut
+`make e2e` vorher und lässt Playwright sie als `vite preview` ausliefern —
+gegen das fertige Bundle also, nicht gegen den Entwicklungsserver. Warum,
+steht in [12-testen.md](12-testen.md); hier zählt die Folge:
+eine Frontend-Änderung wirkt erst nach einem erneuten `make e2e`.
 
 Bevor der erste Test etwas anfasst, fragt er nach: hat diese Installation
 schon einen Verwalter? Wenn ja, bricht der Lauf ab, statt in fremden Konten

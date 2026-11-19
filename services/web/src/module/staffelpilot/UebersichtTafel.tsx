@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import {
+  Abschnitt,
+  Etikett,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Platzhalter,
+  Reihe,
+  Statuspunkt,
+  Tabelle,
+  Tafel,
+  Zelle,
+} from "../../ui";
 import {
   type Auftrag,
   type SpielZeile,
@@ -13,10 +26,7 @@ import {
 } from "./api";
 import { alsDatum } from "./datum";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 /** So viele Spiele stehen auf der Startfläche. Wer mehr will, geht in die
  *  Spielprüfung — das hier ist der Blick, nicht die Arbeit. */
@@ -62,35 +72,50 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
 
   if (fehler && werte === null) {
     return (
-      <Hinweis ton="fehler" dringend>
-        {fehler}
-      </Hinweis>
+      <Tafel titel="Übersicht">
+        <Hinweis ton="fehler" dringend>
+          {fehler}
+        </Hinweis>
+      </Tafel>
     );
   }
 
   if (werte === null || uebertragung === null) {
     return (
-      <div role="status" aria-label="Übersicht wird geladen">
-        <Platzhalter breite="100%" hoehe="6rem" />
-        <Platzhalter breite="100%" hoehe="12rem" />
-      </div>
+      <Tafel titel="Übersicht">
+        <div role="status" aria-label="Übersicht wird geladen">
+          <Platzhalter breite="100%" hoehe="6rem" />
+          <Platzhalter breite="100%" hoehe="12rem" />
+        </div>
+      </Tafel>
     );
   }
 
   return (
-    <>
+    <Tafel
+      titel="Übersicht"
+      beiwort={
+        werte.offen === 0
+          ? "nichts zu prüfen"
+          : `${werte.offen} von ${werte.spiele} ${werte.spiele === 1 ? "Bericht" : "Berichten"} offen`
+      }
+    >
       <ul className={stil.kennzahlen} aria-label="Überblick">
         <Zahl wert={werte.offen} name="zu prüfen" onKlick={() => onWechsel("spiele")} />
+        {/* "befunde" gibt es als Bereich nicht - das Register kennt ihn
+            nicht, und die Modulseite leitete beide Zahlen deshalb stumm auf
+            die Uebersicht zurueck, also auf die Flaeche, von der man kam.
+            Die Befundliste steht unter "Ergebnisse". */}
         <Zahl
           wert={werte.befunde_kritisch}
           name="kritische Befunde"
           warnend
-          onKlick={() => onWechsel("befunde")}
+          onKlick={() => onWechsel("ergebnisse")}
         />
         <Zahl
           wert={werte.befunde_offen}
           name="offene Befunde"
-          onKlick={() => onWechsel("befunde")}
+          onKlick={() => onWechsel("ergebnisse")}
         />
         <Zahl
           wert={werte.vorgaenge_entwurf}
@@ -100,7 +125,7 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
       </ul>
 
       {auftrag !== null && (
-        <Karte>
+        <Karte className={stil.stapel}>
           <div className={stil.zeile}>
             <span className={stil.paarung}>
               {auftrag.art === "pruflauf" ? "Prüflauf" : "Initialisierung"}
@@ -142,42 +167,41 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
         </Leerzustand>
       )}
 
-      <h2 className={stil.formularTitel}>Als Nächstes</h2>
-      {naechste.length === 0 ? (
-        <Leerzustand titel="Nichts fällig">
-          Kein Spielbericht im Prüfzeitraum wartet auf eine Entscheidung.
-        </Leerzustand>
-      ) : (
-        <ul className={stil.liste} aria-label="Als Nächstes">
-          {naechste.map((z) => (
-            <li key={z.id}>
-              <Karte>
-                <button
-                  type="button"
-                  className={stil.kopf}
-                  onClick={() => onWechsel("spiele")}
-                >
-                  <span className={stil.paarung}>
-                    {z.heim} – {z.gast}
-                  </span>
-                  <span className={stil.zeile}>
-                    {/* Feste Spalte, damit das Datum unter dem Datum steht --
-                        siehe `spalteDatum`. */}
-                    <span className={stil.spalteDatum}>{alsDatum(z.datum)}</span>
-                    {z.kritische_befunde > 0 && (
-                      <Etikett ton="fehler">{z.kritische_befunde} kritisch</Etikett>
-                    )}
-                    {z.offene_befunde > 0 && (
-                      <Etikett ton="warnung">{z.offene_befunde} offen</Etikett>
-                    )}
-                  </span>
-                </button>
-              </Karte>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
+      <Abschnitt titel="Als Nächstes">
+        {naechste.length === 0 ? (
+          <Leerzustand titel="Nichts fällig">
+            Kein Spielbericht im Prüfzeitraum wartet auf eine Entscheidung.
+          </Leerzustand>
+        ) : (
+          <Tabelle
+            beschriftung="Als Nächstes"
+            raster="1.8fr 1fr 0.8fr"
+            spalten={["Paarung", "Befunde", "Angesetzt"]}
+          >
+            {naechste.map((z) => (
+              <Reihe key={z.id} onKlick={() => onWechsel("spiele")}>
+                <Zelle>
+                  {z.heim} – {z.gast}
+                </Zelle>
+                <Zelle>
+                  {z.kritische_befunde > 0 ? (
+                    <Etikett ton="fehler">{z.kritische_befunde} kritisch</Etikett>
+                  ) : z.offene_befunde > 0 ? (
+                    <>
+                      <Statuspunkt ton="akzent" />
+                      {`${z.offene_befunde} offen`}
+                    </>
+                  ) : (
+                    <span className={stil.ohneBefund}>ohne Befund</span>
+                  )}
+                </Zelle>
+                <Zelle leise>{alsDatum(z.datum)}</Zelle>
+              </Reihe>
+            ))}
+          </Tabelle>
+        )}
+      </Abschnitt>
+    </Tafel>
   );
 }
 

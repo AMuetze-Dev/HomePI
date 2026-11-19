@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 
-import { Hinweis, Karte, Knopf, Feld } from "../../ui";
+import { Feld, Hinweis, Karte, Knopf } from "../../ui";
 import type { Einstellungen, Modus, Turnier } from "./api";
 import stil from "./TischtennisSeite.module.css";
 import { dauer } from "./zeit";
@@ -97,11 +97,9 @@ export function EinstellungenTafel({
   return (
     <>
       <Karte>
-        <div className={stil.abschnittskopf}>
-          <h2 className={stil.abschnittstitel}>
-            {turnier === null ? "Turnier anlegen" : "Einstellungen"}
-          </h2>
-        </div>
+        <h2 className={stil.kartentitel}>
+          {turnier === null ? "Turnier anlegen" : "Einstellungen"}
+        </h2>
 
         {!planung && (
           <Hinweis>
@@ -246,9 +244,7 @@ export function EinstellungenTafel({
 
       {turnier !== null && (
         <Karte>
-          <div className={stil.abschnittskopf}>
-            <h2 className={stil.abschnittstitel}>Turnier abschließen</h2>
-          </div>
+          <h2 className={stil.kartentitel}>Turnier abschließen</h2>
           <p className={stil.nebensache}>
             Beenden lässt den Spielplan stehen und nimmt das Turnier aus der
             Dashboard-Ansicht. Löschen entfernt Teilnehmer, Spiele und Ergebnisse.

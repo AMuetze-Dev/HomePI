@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import {
+  Etikett,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Platzhalter,
+  Tafel,
+} from "../../ui";
 import {
   type Regeldatei,
   aendereRegeldatei,
@@ -11,10 +19,7 @@ import {
 } from "./api";
 import { Quelltexteditor } from "./Quelltexteditor";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 /** Was das Gateway als Dateinamen annimmt. Dieselbe Prüfung dort, nicht hier. */
 const NAME_MUSTER = /^[0-9A-Za-z_]+\.py$/;
@@ -65,24 +70,27 @@ export function RegeldateienTafel() {
 
   if (fehler && dateien === null) {
     return (
-      <Hinweis ton="fehler" dringend>
-        {fehler}
-      </Hinweis>
+      <Tafel titel="Regeldateien">
+        <Hinweis ton="fehler" dringend>
+          {fehler}
+        </Hinweis>
+      </Tafel>
     );
   }
 
   if (dateien === null) {
     return (
-      <div role="status" aria-label="Regeldateien werden geladen">
-        <Platzhalter breite="100%" hoehe="10rem" />
-      </div>
+      <Tafel titel="Regeldateien">
+        <div role="status" aria-label="Regeldateien werden geladen">
+          <Platzhalter breite="100%" hoehe="10rem" />
+        </div>
+      </Tafel>
     );
   }
 
   return (
-    <>
-      <Karte>
-        <h2 className={stil.formularTitel}>Regeldateien</h2>
+    <Tafel titel="Regeldateien">
+      <Karte className={stil.stapel}>
         <p className={stil.vorgangHinweis}>
           Der Quelltext der Prüfungen. Er wird im Prüfdienst ausgeführt — vor jedem Lauf
           schreibt er sich die Dateien von hier in seinen Ordner. Was hier steht, ist die
@@ -130,7 +138,7 @@ export function RegeldateienTafel() {
           ))}
         </ul>
       )}
-    </>
+    </Tafel>
   );
 }
 
@@ -223,7 +231,7 @@ function DateiKarte({
   }, [offen, datei.id]);
 
   return (
-    <Karte>
+    <Karte className={stil.stapel}>
       <button
         type="button"
         className={stil.kopf}

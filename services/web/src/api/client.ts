@@ -2,8 +2,11 @@
  * Zugriff auf das Gateway.
  *
  * VITE_API_URL wird zur BUILD-Zeit in das Bundle geschrieben, nicht zur
- * Laufzeit gelesen. Ein Image, das gegen api.home.example.com gebaut wurde,
- * spricht auch nur mit dieser Adresse.
+ * Laufzeit gelesen - und ist überall "/api": in der Entwicklung, in den
+ * Oberflächentests und in Produktion. Die API liegt damit immer unter
+ * derselben Adresse wie die Seite. Eine feste Adresse wie
+ * https://api.<domain> lief unter jedem anderen Port ins Leere - aus dem
+ * Internet ist die Seite unter :8443 erreichbar (docs/14-internet.md).
  */
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
@@ -40,6 +43,19 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
+}
+
+/**
+ * Was dem Benutzer von einem Fehler gezeigt wird.
+ *
+ * Steht hier, weil jede Fläche sie braucht und sie sechzehnmal wörtlich
+ * dieselbe war. Der `ApiError` trägt die Meldung des Backends - und die
+ * gehört WÖRTLICH auf den Schirm: „Anna steht schon auf der Liste" hilft,
+ * „Fehler beim Speichern" nicht. Nur was kein Error ist - ein abgebrochener
+ * Abruf, ein geworfener String - bekommt den Platzhalter.
+ */
+export function meldung(fehler: unknown): string {
+  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
 }
 
 function istObjekt(wert: unknown): wert is Record<string, unknown> {

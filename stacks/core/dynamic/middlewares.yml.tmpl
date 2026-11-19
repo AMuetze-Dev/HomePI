@@ -29,6 +29,24 @@ http:
         average: 100
         burst: 50
 
+    # app.<domain>/api/... -> Gateway /...: Das Gateway weiss nichts von
+    # dem Praefix, es ist eine Sache der Adresse, unter der die Website es
+    # erreicht. Genau so macht es der Vite-Server in der Entwicklung.
+    api-praefix:
+      stripPrefix:
+        prefixes:
+          - "/api"
+
+    # Nur fuer die Anmeldung: zehn Versuche je Minute und Adresse. Ein
+    # Mensch braucht keine drei; ein Skript, das Namen durchprobiert, kommt
+    # damit auf 14 400 am Tag statt auf 8 Millionen. Gezaehlt wird je
+    # Quelladresse - mit der Portfreigabe ist das die echte des Besuchers.
+    anmelde-bremse:
+      rateLimit:
+        average: 10
+        period: 1m
+        burst: 5
+
     # CORS fuer das Frontend gegen die API
     api-cors:
       headers:

@@ -22,8 +22,8 @@ const KLASSE: Record<Breite, string | undefined> = {
  *
  * Steht bewusst um den Inhalt herum und nicht in der Hülle: Die Hülle weiß
  * nicht, was sie anzeigt, und eine einzige Breite für alles war genau der
- * Fehler, den diese Komponente behebt. Eine Geräteliste mit drei Einträgen
- * und eine Spielprüftabelle haben verschiedene Bedürfnisse.
+ * Fehler, den diese Komponente behebt. Ein Formular mit drei Feldern und
+ * eine Spielprüftabelle haben verschiedene Bedürfnisse.
  *
  * Welche Stufe ein Artefakt bekommt, steht in `src/module/register.ts`.
  */

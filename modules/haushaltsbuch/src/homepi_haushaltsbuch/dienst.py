@@ -79,6 +79,11 @@ class AnteilOhneGewicht(ServiceError):
     title = "Aufteilung ohne Gewicht"
 
 
+class AnlageOhnePerson(ServiceError):
+    status = 422
+    title = "Anlage ohne Person"
+
+
 def geld(wert: Decimal) -> Decimal:
     """Auf den Cent, kaufmaennisch. Jede Zahl, die das Haus verlaesst."""
     return wert.quantize(CENT, rounding=ROUND_HALF_UP)
@@ -188,6 +193,9 @@ def prozent(teil: Decimal, ganzes: Decimal) -> Decimal:
 class PersonSicht:
     id: uuid.UUID
     name: str
+    #: Was auf dem Konto liegen bleibt, bevor angelegt wird. Die Anlage
+    #: nimmt nur, was darueber hinaus uebrig ist.
+    sockel: Decimal = NULL
 
 
 @dataclass(frozen=True, slots=True)
@@ -221,6 +229,9 @@ class PostenSicht:
     aktiv: bool
     #: (Person, Gewicht). Leer heisst: nicht geteilt.
     anteile: tuple[tuple[uuid.UUID, int], ...] = ()
+    #: Gesetzt heisst: Dieser Posten hat keinen festen Betrag, sondern
+    #: nimmt diesen Anteil an dem, was der Person uebrig bleibt.
+    anlage_gewicht: int | None = None
 
 
 @dataclass(slots=True)
@@ -234,15 +245,28 @@ class _Konto:
     fest: Decimal = NULL
     sparen: Decimal = NULL
     variabel: Decimal = NULL
+    #: Davon aus dem Ueberschuss angelegt. Steckt auch in `sparen` oder
+    #: `fest` - es ist eine zweite Sicht auf dieselben Betraege, nicht eine
+    #: weitere Ausgabe.
+    anlage: Decimal = NULL
     kategorien: dict[str, Decimal] = field(default_factory=dict)
 
-    def verbuchen(self, betrag: Decimal, kategorie: str, sparen: bool, variabel: bool) -> None:
+    def verbuchen(
+        self,
+        betrag: Decimal,
+        kategorie: str,
+        sparen: bool,
+        variabel: bool,
+        anlage: bool = False,
+    ) -> None:
         if sparen:
             self.sparen += betrag
         elif variabel:
             self.variabel += betrag
         else:
             self.fest += betrag
+        if anlage:
+            self.anlage += betrag
         self.kategorien[kategorie] = self.kategorien.get(kategorie, NULL) + betrag
 
 
@@ -255,9 +279,17 @@ def _zeile(
     konten: dict[uuid.UUID, KontoSicht],
     kategorien: dict[uuid.UUID, KategorieSicht],
     monat: int,
+    rate: Decimal | None = None,
 ) -> PostenZeile:
+    """Eine Zeile des Monatsplans.
+
+    ``rate`` setzt den Monatsbetrag von aussen - das brauchen die
+    Anlageposten, deren Betrag erst aus dem Ueberschuss entsteht. Ohne
+    Angabe rechnet die Zeile ihn wie immer aus dem Betrag und dem Rhythmus.
+    """
     kategorie = kategorien.get(posten.kategorie_id) if posten.kategorie_id else None
-    rate = monatsrate(posten.betrag, posten.intervall_monate)
+    if rate is None:
+        rate = monatsrate(posten.betrag, posten.intervall_monate)
     gewichte = [gewicht for _, gewicht in posten.anteile]
     teile = aufteilen(rate, gewichte) if gewichte else []
 
@@ -267,20 +299,168 @@ def _zeile(
         name=posten.name,
         konto=konten[posten.konto_id].name if posten.konto_id in konten else "",
         kategorie=_kategoriename(kategorie),
-        betrag=posten.betrag,
+        betrag=rate if posten.anlage_gewicht is not None else posten.betrag,
         monatsrate=rate,
         intervall_monate=posten.intervall_monate,
         faelligkeitsmonat=posten.faelligkeitsmonat,
         abbuchungstag=posten.abbuchungstag,
         faellige_monate=list(faelligkeiten(posten.intervall_monate, posten.faelligkeitsmonat)),
         faellig_im_monat=ist_faellig(posten.intervall_monate, posten.faelligkeitsmonat, monat),
-        ruecklagenstand=ruecklagenstand(
-            posten.betrag, posten.intervall_monate, posten.faelligkeitsmonat, monat
+        ruecklagenstand=(
+            NULL
+            if posten.anlage_gewicht is not None
+            else ruecklagenstand(
+                posten.betrag, posten.intervall_monate, posten.faelligkeitsmonat, monat
+            )
         ),
         anteile={
             str(person): teil for (person, _), teil in zip(posten.anteile, teile, strict=True)
         },
     )
+
+
+@dataclass(slots=True)
+class _Durchgang:
+    """Was ein Lauf ueber alle Posten ergibt."""
+
+    je_person: dict[uuid.UUID, _Konto] = field(default_factory=lambda: defaultdict(_Konto))
+    gemeinschaft_ein: Decimal = NULL
+    gemeinschaft_aus: Decimal = NULL
+    ohne_aufteilung: list[str] = field(default_factory=list)
+
+
+def _durchrechnen(
+    konto_nach_id: dict[uuid.UUID, KontoSicht],
+    kategorie_nach_id: dict[uuid.UUID, KategorieSicht],
+    posten: Sequence[PostenSicht],
+    raten: dict[uuid.UUID, Decimal],
+) -> _Durchgang:
+    """Verteilt die Monatsbetraege auf die Personen und die Gemeinschaft.
+
+    ``raten`` sagt, mit welchem Betrag ein Posten zaehlt - und welche
+    ueberhaupt zaehlen: Was dort fehlt, bleibt aussen vor. Genau das ist der
+    Grund fuer diese eigene Funktion. Der Topf, aus dem die Anlageposten
+    schoepfen, ist das Ergebnis eines Laufs OHNE sie; mit ihnen waere die
+    Rechnung im Kreis gelaufen.
+    """
+    durchgang = _Durchgang()
+
+    for eintrag in posten:
+        rate = raten.get(eintrag.id)
+        if rate is None:
+            continue
+
+        konto = konto_nach_id.get(eintrag.konto_id)
+        if konto is None:
+            continue
+        kategorie = kategorie_nach_id.get(eintrag.kategorie_id) if eintrag.kategorie_id else None
+        name = _kategoriename(kategorie)
+        spart = bool(kategorie and kategorie.zaehlt_als_sparen)
+        angelegt = eintrag.anlage_gewicht is not None
+
+        if konto.inhaber_id is not None:
+            haushalt = durchgang.je_person[konto.inhaber_id]
+            if eintrag.art == "einnahme":
+                haushalt.einnahmen += rate
+            else:
+                haushalt.eigene_ausgaben += rate
+                haushalt.verbuchen(rate, name, spart, eintrag.variabel, angelegt)
+            continue
+
+        # Ab hier: gemeinschaftliches Konto.
+        if eintrag.art == "einnahme":
+            durchgang.gemeinschaft_ein += rate
+        else:
+            durchgang.gemeinschaft_aus += rate
+
+        if not eintrag.anteile:
+            # Namentlich statt nur als Zahl: ein gemeinsamer Posten, den
+            # niemand traegt, ist ein Fehler in der Eingabe - und der ist nur
+            # zu beheben, wenn man weiss, welcher es ist.
+            durchgang.ohne_aufteilung.append(eintrag.name)
+            continue
+
+        for (person_id, _), teil in zip(
+            eintrag.anteile,
+            aufteilen(rate, [g for _, g in eintrag.anteile]),
+            strict=True,
+        ):
+            haushalt = durchgang.je_person[person_id]
+            if eintrag.art == "einnahme":
+                haushalt.gutschrift += teil
+            else:
+                haushalt.einzahlung += teil
+                haushalt.verbuchen(teil, name, spart, eintrag.variabel, angelegt)
+
+    return durchgang
+
+
+def anlagebetraege(
+    personen: Iterable[PersonSicht],
+    konten: Iterable[KontoSicht],
+    kategorien: Iterable[KategorieSicht],
+    posten: Iterable[PostenSicht],
+) -> dict[uuid.UUID, Decimal]:
+    """Was jeder Anlageposten in diesem Monat bekommt.
+
+    Ein Anlageposten legt sich nicht auf einen Betrag fest, sondern auf
+    einen Anteil an dem, was seiner Person uebrig bleibt. Gerechnet wird in
+    zwei Schritten, und die Reihenfolge ist die ganze Idee:
+
+    1. Der Haushalt ohne die Anlageposten. Was dabei uebrig bleibt, ist der
+       Ueberschuss der Person - abzueglich ihres Sockels, der liegen bleibt.
+    2. Dieser Topf wird nach den Gewichten verteilt, mit derselben
+       Cent-genauen Teilung wie eine Aufteilung zwischen Personen.
+
+    Ein Topf ist nie negativ: Wer mehr ausgibt als einnimmt, legt nichts an.
+    Das waere sonst eine Abbuchung in die falsche Richtung.
+
+    Die Zuordnung laeuft ueber den Inhaber des Kontos - ein Anlageposten
+    gehoert zu einer Person. Liegt er doch auf einem gemeinsamen Konto,
+    findet er keinen Topf und bleibt bei null; den Fall weist der Speicher
+    beim Anlegen ab.
+    """
+    posten = list(posten)
+    konto_nach_id = {k.id: k for k in konten}
+    gewichtet = [p for p in posten if p.aktiv and p.anlage_gewicht]
+    if not gewichtet:
+        return {}
+
+    vorlauf = _durchrechnen(
+        konto_nach_id,
+        {k.id: k for k in kategorien},
+        posten,
+        {
+            p.id: monatsrate(p.betrag, p.intervall_monate)
+            for p in posten
+            if p.aktiv and p.anlage_gewicht is None
+        },
+    )
+
+    betraege: dict[uuid.UUID, Decimal] = {}
+    for person in personen:
+        meine = [
+            p
+            for p in gewichtet
+            if (konto := konto_nach_id.get(p.konto_id)) and konto.inhaber_id == person.id
+        ]
+        if not meine:
+            continue
+
+        konto_stand = vorlauf.je_person[person.id]
+        uebrig = (
+            konto_stand.einnahmen
+            + konto_stand.gutschrift
+            - konto_stand.eigene_ausgaben
+            - konto_stand.einzahlung
+        )
+        topf = max(NULL, uebrig - person.sockel)
+
+        gewichte = [p.anlage_gewicht or 0 for p in meine]
+        for eintrag, teil in zip(meine, aufteilen(topf, gewichte), strict=True):
+            betraege[eintrag.id] = teil
+
+    return betraege
 
 
 def monatsplan(
@@ -294,62 +474,31 @@ def monatsplan(
 ) -> Uebersicht:
     """Der ganze Plan fuer einen Monat: wer zahlt was, und was liegt bereit."""
     personen = list(personen)
+    posten = list(posten)
     konto_nach_id = {k.id: k for k in konten}
     kategorie_nach_id = {k.id: k for k in kategorien}
     # Die Reihenfolge der Kategorien ist eine Entscheidung des Benutzers -
     # die Auswertung erfindet keine eigene.
     rang = {k.name: i for i, k in enumerate(kategorie_nach_id.values())}
 
-    zeilen = {p.id: _zeile(p, konto_nach_id, kategorie_nach_id, monat) for p in posten}
-    konten_je_person: dict[uuid.UUID, _Konto] = defaultdict(_Konto)
-    gemeinschaft_ein = NULL
-    gemeinschaft_aus = NULL
-    ohne_aufteilung: list[str] = []
+    angelegt = anlagebetraege(personen, konten, kategorie_nach_id.values(), posten)
 
-    for eintrag in posten:
-        if not eintrag.aktiv:
-            continue
+    def rate(eintrag: PostenSicht) -> Decimal:
+        if eintrag.anlage_gewicht is not None:
+            return angelegt.get(eintrag.id, NULL)
+        return monatsrate(eintrag.betrag, eintrag.intervall_monate)
 
-        zeile = zeilen[eintrag.id]
-        konto = konto_nach_id.get(eintrag.konto_id)
-        if konto is None:
-            continue
-        kategorie = kategorie_nach_id.get(eintrag.kategorie_id) if eintrag.kategorie_id else None
-        spart = bool(kategorie and kategorie.zaehlt_als_sparen)
-
-        if konto.inhaber_id is not None:
-            haushalt = konten_je_person[konto.inhaber_id]
-            if eintrag.art == "einnahme":
-                haushalt.einnahmen += zeile.monatsrate
-            else:
-                haushalt.eigene_ausgaben += zeile.monatsrate
-                haushalt.verbuchen(zeile.monatsrate, zeile.kategorie, spart, eintrag.variabel)
-            continue
-
-        # Ab hier: gemeinschaftliches Konto.
-        if eintrag.art == "einnahme":
-            gemeinschaft_ein += zeile.monatsrate
-        else:
-            gemeinschaft_aus += zeile.monatsrate
-
-        if not eintrag.anteile:
-            # Namentlich statt nur als Zahl: ein gemeinsamer Posten, den
-            # niemand traegt, ist ein Fehler in der Eingabe - und der ist nur
-            # zu beheben, wenn man weiss, welcher es ist.
-            ohne_aufteilung.append(eintrag.name)
-            continue
-
-        for (person_id, _), teil in zip(
-            eintrag.anteile,
-            aufteilen(zeile.monatsrate, [g for _, g in eintrag.anteile]),
-            strict=True,
-        ):
-            haushalt = konten_je_person[person_id]
-            if eintrag.art == "einnahme":
-                haushalt.gutschrift += teil
-            else:
-                haushalt.einzahlung += teil
-                haushalt.verbuchen(teil, zeile.kategorie, spart, eintrag.variabel)
+    zeilen = {p.id: _zeile(p, konto_nach_id, kategorie_nach_id, monat, rate(p)) for p in posten}
+    durchgang = _durchrechnen(
+        konto_nach_id,
+        kategorie_nach_id,
+        posten,
+        {p.id: rate(p) for p in posten if p.aktiv},
+    )
+    konten_je_person = durchgang.je_person
+    gemeinschaft_ein = durchgang.gemeinschaft_ein
+    gemeinschaft_aus = durchgang.gemeinschaft_aus
+    ohne_aufteilung = durchgang.ohne_aufteilung
 
     bilanzen = [
         _bilanz(person, konten_je_person[person.id], rang, kategorie_nach_id) for person in personen
@@ -401,6 +550,8 @@ def _bilanz(
         variabel=geld(konto.variabel),
         moeglich=geld(moeglich),
         rest=geld(basis - ausgaben),
+        anlage=geld(konto.anlage),
+        sockel=geld(person.sockel),
         sparquote=prozent(konto.sparen, basis),
         moegliche_sparquote=prozent(moeglich, basis),
         nach_kategorie=[
@@ -469,9 +620,22 @@ def flussbild(
     ueber Pixel. Die Oberflaeche macht daraus nur noch Baender.
     """
     konten = list(konten)
+    personen = list(personen)
+    posten = list(posten)
     konto_nach_id = {k.id: k for k in konten}
     kategorie_nach_id = {k.id: k for k in kategorien}
-    aktive = [p for p in posten if p.aktiv and p.betrag > 0]
+
+    # Ein Anlageposten traegt keinen eigenen Betrag - er bekommt ihn aus dem
+    # Ueberschuss. Ohne diese Zeile fiele jedes Depot aus dem Bild, sobald es
+    # sich daran orientiert.
+    angelegt = anlagebetraege(personen, konten, kategorie_nach_id.values(), posten)
+
+    def monatlich(eintrag: PostenSicht) -> Decimal:
+        if eintrag.anlage_gewicht is not None:
+            return angelegt.get(eintrag.id, NULL)
+        return monatsrate(eintrag.betrag, eintrag.intervall_monate)
+
+    aktive = [p for p in posten if p.aktiv and monatlich(p) > 0]
 
     beschriftung: dict[str, tuple[str, str]] = {}
     kanten: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
@@ -486,7 +650,7 @@ def flussbild(
         if konto is None:
             continue
 
-        rate = monatsrate(eintrag.betrag, eintrag.intervall_monate)
+        rate = monatlich(eintrag)
         konto_knoten = knoten_id("konto", str(konto.id), konto.name)
 
         if eintrag.art == "einnahme":

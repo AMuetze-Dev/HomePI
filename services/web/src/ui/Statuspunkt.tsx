@@ -1,6 +1,11 @@
 import stil from "./Statuspunkt.module.css";
 
-export type Ton = "gut" | "warnung" | "fehler" | "neutral";
+/**
+ * „akzent" ist kein Signal, sondern eine Auszeichnung: etwas läuft gerade,
+ * etwas ist das Gewählte. Die drei Signale daneben sagen, wie es steht -
+ * dieser hier sagt nur, dass es gemeint ist.
+ */
+export type Ton = "gut" | "warnung" | "fehler" | "neutral" | "akzent";
 
 interface Props {
   ton: Ton;

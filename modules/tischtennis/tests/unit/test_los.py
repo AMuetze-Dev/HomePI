@@ -180,6 +180,81 @@ class TestKoRaster:
             los.ko_raster(["anna"])
 
 
+NEUNZEHN = [f"spieler{nummer:02d}" for nummer in range(1, 20)]
+
+
+class TestAusgelostesKoRaster:
+    """Das Raster fuer ein Turnier ohne Gruppenphase.
+
+    Hier hat noch niemand gespielt, und ein gesetztes Raster wuerde bei 19
+    Leuten dreizehn von ihnen in der ersten Runde zuschauen lassen. Deshalb
+    spielt hier JEDER in der ersten Runde, und bei ungerader Zahl bekommt
+    genau einer ein Freilos - ausgelost, nicht nach Setzliste.
+    """
+
+    def test_neunzehn_ergeben_neun_spiele_und_ein_freilos(self) -> None:
+        raster = los.ausgelostes_ko_raster(NEUNZEHN, saat=1)
+
+        erste = [s for s in raster if s.runde == 1]
+        assert len(erste) == 10
+        assert sum(1 for s in erste if s.gast.freilos) == 1
+
+    def test_in_der_ersten_runde_tritt_jeder_an(self) -> None:
+        erste = [s for s in los.ausgelostes_ko_raster(NEUNZEHN, saat=3) if s.runde == 1]
+
+        angetreten = [p.teilnehmer for s in erste for p in (s.heim, s.gast) if p.teilnehmer]
+        assert sorted(angetreten) == sorted(NEUNZEHN)
+
+    def test_am_ende_bleibt_einer_uebrig(self) -> None:
+        """Ein KO braucht n-1 Entscheidungen, Freilose zaehlen nicht dazu."""
+        raster = los.ausgelostes_ko_raster(NEUNZEHN, saat=7)
+
+        echte = [s for s in raster if not s.gast.freilos]
+        assert len(echte) == len(NEUNZEHN) - 1
+        assert raster[-1].runde == 5
+
+    def test_gerade_zahl_kommt_ohne_freilos_aus(self) -> None:
+        raster = los.ausgelostes_ko_raster(ACHT, saat=1)
+
+        assert not any(s.gast.freilos for s in raster)
+        assert len(raster) == 7
+
+    def test_ein_freilosplatz_ist_weder_name_noch_verweis(self) -> None:
+        """Sonst liefe er im Speicher als Teilnehmer oder als Verweis mit."""
+        raster = los.ausgelostes_ko_raster(NEUNZEHN, saat=1)
+
+        for platz in (s.gast for s in raster if s.gast.freilos):
+            assert platz.teilnehmer is None
+            assert platz.aus_spiel is None
+
+    def test_das_freilos_wird_ausgelost_und_nicht_vergeben(self) -> None:
+        """Nicht immer der Erste der Liste: wer zuschaut, entscheidet das Los."""
+
+        def begnadeter(saat: int) -> str | None:
+            raster = los.ausgelostes_ko_raster(NEUNZEHN, saat=saat)
+            return next(s.heim.teilnehmer for s in raster if s.runde == 1 and s.gast.freilos)
+
+        assert len({begnadeter(saat) for saat in range(12)}) > 1
+
+    def test_dieselbe_saat_ergibt_dasselbe_raster(self) -> None:
+        assert los.ausgelostes_ko_raster(NEUNZEHN, saat=4) == los.ausgelostes_ko_raster(
+            NEUNZEHN, saat=4
+        )
+
+    def test_nummern_sind_fortlaufend_und_verweisen_nur_zurueck(self) -> None:
+        raster = los.ausgelostes_ko_raster(NEUNZEHN, saat=2)
+
+        assert [s.nummer for s in raster] == list(range(1, len(raster) + 1))
+        for spiel in raster:
+            for platz in (spiel.heim, spiel.gast):
+                if platz.aus_spiel is not None:
+                    assert platz.aus_spiel < spiel.nummer
+
+    def test_unter_zwei_teilnehmern_gibt_es_kein_raster(self) -> None:
+        with pytest.raises(LosUnmoeglich):
+            los.ausgelostes_ko_raster(["anna"], saat=1)
+
+
 class TestSetzliste:
     @pytest.mark.parametrize("anzahl_gruppen", [2, 3, 4, 5, 8])
     def test_kein_gruppenduell_in_der_ersten_runde(self, anzahl_gruppen: int) -> None:

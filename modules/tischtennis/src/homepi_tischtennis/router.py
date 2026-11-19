@@ -28,7 +28,7 @@ from fastapi import APIRouter, status
 from homepi_core.auth import Rolle, erfordert
 from homepi_core.deps import DbSitzung
 
-from . import dienst, speicher
+from . import dienst, los, speicher
 from .modelle import Gruppe, Spiel, Teilnehmer, Turnier
 from .schemas import (
     Auslosung,
@@ -121,6 +121,15 @@ def _spiel_ausgabe(
     )
 
 
+def _vorschauname(platz: los.KoPlatz, name: dict[str, str]) -> str:
+    """Wie ein Rasterplatz in der Vorschau heisst, bevor etwas gespeichert ist."""
+    if platz.teilnehmer is not None:
+        return name[platz.teilnehmer]
+    if platz.aus_spiel is not None:
+        return f"Sieger aus Spiel {platz.aus_spiel}"
+    return "Freilos"
+
+
 def _herkunft(
     teilnehmer_id: uuid.UUID | None,
     aus_spiel: int | None,
@@ -135,11 +144,15 @@ def _herkunft(
     """
     if teilnehmer_id is not None:
         return None
-    if freilos:
-        return "Freilos"
     if aus_spiel is not None:
+        # Vor dem Freilos: in einer spaeteren KO-Runde steht auf der einen
+        # Seite "Sieger aus Spiel 14" und auf der anderen "Freilos". Beide
+        # Plaetze gehoeren zu einem Spiel mit ``freilos`` - die Frage ist,
+        # welcher Platz gerade gemeint ist.
         wer = "Verlierer" if aus_verlierer else "Sieger"
         return f"{wer} aus Spiel {aus_spiel}"
+    if freilos:
+        return "Freilos"
     return "offen"
 
 
@@ -352,7 +365,10 @@ async def auslosen(
     lauf, nach_kennung, plan, saat = await speicher.plan_vorschlag(sitzung, turnier_id, daten.saat)
     name = {kennung: wer.name for kennung, wer in nach_kennung.items()}
 
-    anzahl = len(plan.begegnungen) + len(plan.ko)
+    # Ein Freilos ist keine Paarung, die jemand spielt - es zaehlt weder in
+    # die Zahl der Spiele noch in die geschaetzte Dauer.
+    ko_spiele = [spiel for spiel in plan.ko if not spiel.gast.freilos]
+    anzahl = len(plan.begegnungen) + len(ko_spiele)
     dauer = dienst.geschaetzte_dauer(anzahl, lauf.tische, lauf.minuten_pro_spiel)
 
     gruppen = [
@@ -378,8 +394,8 @@ async def auslosen(
     paarungen += [
         PaarungVorschau(
             bezeichnung=dienst.ko_bezeichnung(spiel.runde, runden_im_raster),
-            heim=name.get(spiel.heim.teilnehmer or "", f"Sieger aus Spiel {spiel.heim.aus_spiel}"),
-            gast=name.get(spiel.gast.teilnehmer or "", f"Sieger aus Spiel {spiel.gast.aus_spiel}"),
+            heim=_vorschauname(spiel.heim, name),
+            gast=_vorschauname(spiel.gast, name),
         )
         for spiel in plan.ko
     ]

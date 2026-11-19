@@ -28,24 +28,6 @@
 
 /* ------------------------------------------------------------------ Gerüst */
 
-.kopf {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--raum-3);
-  margin-bottom: var(--raum-8);
-  padding-bottom: var(--raum-5);
-  border-bottom: 1px solid var(--farbe-rand);
-}
-
-.turniername {
-  margin: 0;
-  font-size: var(--text-2xl);
-  font-weight: var(--gewicht-halbfett);
-  /* Negative Laufweite erst ab dieser Größe - im Fließtext schadet sie. */
-  letter-spacing: var(--laufweite-enger);
-}
-
 .turnierwahl,
 .auswahl {
   display: flex;
@@ -82,22 +64,19 @@
    Die Haarlinie darunter ist das, was die Gliederung trägt - vorher stand
    nur ein fetter Titel da, und bei fünf Abschnitten hintereinander sah die
    Seite aus wie eine Aufzählung. */
-.abschnittskopf {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--raum-2) var(--raum-4);
-  margin-bottom: var(--raum-4);
-  padding-bottom: var(--raum-2);
-  border-bottom: 1px solid var(--farbe-rand);
-}
-
-.abschnittstitel {
+/* Die Ueberschrift einer Karte. Nicht zu verwechseln mit dem Abschnitt:
+   Der ordnet eine Flaeche, das hier benennt einen Kasten darin. */
+.kartentitel {
   margin: 0;
   font-size: var(--text-lg);
-  font-weight: var(--gewicht-halbfett);
   letter-spacing: var(--laufweite-eng);
+  color: var(--farbe-text);
+}
+
+/* Die Mittelpunkte zwischen den Angaben neben dem Titel. */
+.beiwortTrenner {
+  padding-inline: var(--raum-2);
+  color: var(--farbe-text-leise);
 }
 
 .nebensache {
@@ -111,6 +90,17 @@
   flex-wrap: wrap;
   gap: var(--raum-3);
   margin-top: var(--raum-5);
+}
+
+/* Was in einer geoeffneten Ergebniszeile steht: woher es kommt, und die
+   eine Korrektur. */
+.korrektur {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+  padding: var(--raum-1) var(--raum-2) var(--raum-4);
 }
 
 .gegen {
@@ -198,12 +188,6 @@
 
 /* --------------------------------------------------------------- Dashboard */
 
-.dashboard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-10);
-}
-
 /* Mobil eine Spalte: bei 375 px steht ein Tisch unter dem anderen, und die
    Paarung bleibt groß genug, um sie aus zwei Metern zu lesen. */
 .tische {
@@ -246,6 +230,61 @@
   font-weight: var(--gewicht-mittel);
   letter-spacing: var(--laufweite-enger);
   line-height: var(--zeile-eng);
+  overflow-wrap: anywhere;
+}
+
+/* Der eigene Name: in der Akzentschrift. Nicht fett allein - die Namen am
+   Tisch sind schon gross und mittelfett, ein weiterer Schnitt fiele dort
+   nicht auf. */
+.ich {
+  color: var(--farbe-akzent-schrift);
+}
+
+/* Ein eigenes Spiel in der Warteschlange: ein Strich an der Kante, wie der
+   Sieger im Raster. Die Zeile bleibt lesbar, auch fuer wen das nicht ist. */
+.meins {
+  margin-left: calc(var(--raum-3) * -1);
+  padding-left: calc(var(--raum-3) - 2px);
+  border-left: 2px solid var(--farbe-akzent);
+}
+
+/* "Dein Spiel": Auswahl, Antwort und Glocke auf einer Zeile, die auf dem
+   Telefon umbricht. Die Antwort ist der Grund fuer den ganzen Block -
+   deshalb gross und mit Platz. */
+.deinSpiel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--raum-3) var(--raum-5);
+}
+
+.ichWahl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+}
+
+.ichWahl select {
+  min-width: 12rem;
+  padding: var(--raum-2) var(--raum-3);
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  font: inherit;
+  font-size: var(--text-md);
+}
+
+.ichWahl select:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+.deinSpielText {
+  flex: 1 1 16rem;
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-mittel);
   overflow-wrap: anywhere;
 }
 
@@ -387,9 +426,17 @@
   }
 }
 
+/* Eine Spalte waechst bis 18 rem und nicht weiter.
+   Mit `flex: 1 0 11rem` teilten sich zwei Runden die ganze Breite -- auf
+   einem 1440er standen dann zwei Bloecke von je 600 px nebeneinander, und
+   zwischen "Anna Berger" und dem Rand der Zeile lag ein halber Meter. Ein
+   Raster liest sich als Weg nach rechts, und dafuer muessen die Spalten
+   die Breite eines Namens haben, nicht die des Monitors. */
 .rasterspalte {
   display: flex;
-  flex: 1 0 11rem;
+  flex: 0 1 15rem;
+  min-width: 11rem;
+  max-width: 18rem;
   flex-direction: column;
   gap: var(--raum-4);
 }
@@ -451,9 +498,14 @@
 
 /* Der Sieger wird markiert, nicht angestrahlt: ein Strich an der Kante und
    halbfette Schrift. Eine grüne Fläche über die ganze Zeile stach im
-   Raster mehr heraus als das Endspiel. */
+   Raster mehr heraus als das Endspiel.
+
+   Seit das Etikett „weiter" weg ist, traegt die Zeile die Auskunft allein -
+   deshalb ein Strich von 3 px statt 2. Dass er nicht die einzige Auskunft
+   ist, dafuer sorgt der Schriftschnitt darunter: Wer kein Gruen sieht,
+   sieht trotzdem, welcher Name halbfett steht. */
 .rastersieger {
-  box-shadow: inset 2px 0 0 0 var(--signal-gut);
+  box-shadow: inset 3px 0 0 0 var(--signal-gut);
 }
 
 .rasterverloren {

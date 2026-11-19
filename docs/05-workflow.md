@@ -32,20 +32,20 @@ vorher. Wer umstellt, ändert zwei Zeilen in der `.env` und startet
 
 ```bash
 git checkout develop && git pull
-git checkout -b feature/geraeteliste
+git checkout -b feature/monatsplan
 
 # ... rot, grün, aufräumen (siehe unten) ...
 
 make test                       # was die CI auch prüft
 git add -p && git commit
-git push -u origin feature/geraeteliste
+git push -u origin feature/monatsplan
 gh pr create --base develop --fill
 ```
 
 Nach dem Merge:
 
 ```bash
-git checkout develop && git pull && git branch -d feature/geraeteliste
+git checkout develop && git pull && git branch -d feature/monatsplan
 ```
 
 ### Auf den Pi bringen
@@ -92,9 +92,9 @@ Commit am Ende jedes vollständigen Zyklus, nicht nach jedem Schritt.
 
 ### Warum die Logik von I/O getrennt ist
 
-Schau dir [`health.py`](../services/api/src/homepi_api/health.py) an: `evaluate` ist eine
-reine Funktion — keine Datenbank, kein Eventloop, keine Fixtures. Deshalb sind die
-sechs Tests in `tests/unit/test_health.py` in Millisekunden durch.
+Schau dir [`health.py`](../packages/homepi-core/src/homepi_core/health.py) an:
+`evaluate` ist eine reine Funktion — keine Datenbank, kein Eventloop, keine
+Fixtures. Deshalb sind ihre Tests in Millisekunden durch.
 
 Das ist kein Zufall, sondern die Bedingung dafür, dass TDD funktioniert. Sobald die
 Entscheidungslogik in einem Handler steckt, der nebenbei die Datenbank befragt, brauchst
@@ -105,11 +105,13 @@ keine einzige Fallunterscheidung, `evaluate()` kein einziges `await`.
 
 ### Testarten
 
-| Ort                               | Was                                                       | Wann                               |
-| --------------------------------- | --------------------------------------------------------- | ---------------------------------- |
-| `services/api/tests/unit/`        | Logik, Endpunkte mit ersetzten Abhängigkeiten             | bei jeder Änderung                 |
-| `services/api/tests/integration/` | echtes Postgres — markiert mit `@pytest.mark.integration` | `make test-api-full` und in der CI |
-| `services/web/src/**/*.test.tsx`  | Komponenten aus Nutzersicht (Rollen, Texte)               | bei jeder Änderung                 |
+| Ort                                  | Was                                                       | Wann                   |
+| ------------------------------------ | --------------------------------------------------------- | ---------------------- |
+| `modules/<name>/tests/unit/`         | Logik, Endpunkte mit ersetzten Abhängigkeiten             | bei jeder Änderung     |
+| `modules/<name>/tests/integration/`  | echtes Postgres — markiert mit `@pytest.mark.integration` | `make test` und in der CI |
+| `packages/homepi-core/tests/`        | das Grundgerüst, das alle Artefakte erben                 | bei jeder Änderung     |
+| `services/web/src/**/*.test.tsx`     | Komponenten aus Nutzersicht (Rollen, Texte)               | bei jeder Änderung     |
+| `services/web/e2e/*.spec.ts`         | ganze Wege im Browser                                     | `make e2e`             |
 
 Integrationstests laufen **nicht** automatisch mit:
 
@@ -117,8 +119,10 @@ Integrationstests laufen **nicht** automatisch mit:
 addopts = "-m 'not integration'"
 ```
 
-`make test-api-full` startet einen Wegwerf-Postgres auf Port 55432, führt alles aus und
-räumt danach wieder auf — auch bei Strg-C, dank `trap`.
+`make test-python` setzt `HOMEPI_TEST_DATABASE_URL` auf die Testdatenbank der
+Entwicklungsumgebung. Jeder Lauf legt sich daraus eine **eigene** Datenbank an
+(`<projekt>_test`) und wirft sie danach weg; nach einem roten Lauf bleibt sie
+zum Hineinsehen stehen. Ausführlich: [12-testen.md](12-testen.md).
 
 ### Testen aus Nutzersicht, nicht aus Implementierungssicht
 
@@ -155,7 +159,7 @@ Tippfehler gemeldet werden, nicht als fehlgeschlagener Test.
 
 ### `images.yml` — bei Push auf `develop` oder `main`
 
-Baut `ghcr.io/amuetze-dev/homepi-api` und `homepi-web` für `linux/arm64`.
+Baut `ghcr.io/amuetze-dev/homepi-gateway` und `homepi-web` für `linux/arm64`.
 
 Das Frontend baut **nativ auf amd64** (`FROM --platform=$BUILDPLATFORM`) und legt nur die
 fertigen statischen Dateien in eine arm64-nginx-Schicht. Damit entfällt der komplette
@@ -163,8 +167,12 @@ QEMU-Aufwand für `npm ci` — das ist der Unterschied zwischen zwei und fünfze
 Nur die API braucht QEMU, weil ihre Wheels architekturspezifisch sind; kompiliert wird
 dabei nichts, alles kommt als fertiges `manylinux-aarch64`-Wheel.
 
-Einmalig zu hinterlegen: **Settings → Secrets and variables → Actions → Variables**,
-`VITE_API_URL = https://api.deine-domain`. Die Adresse landet zur Build-Zeit im Bundle.
+Zu hinterlegen ist nichts mehr: Die Website ruft ihre API unter `/api` auf, unter
+derselben Adresse wie sich selbst, und Traefik schneidet das Präfix ab. Früher stand
+hier die Repository-Variable `VITE_API_URL = https://api.deine-domain`; mit ihr lief
+die Seite unter jedem anderen Port ins Leere — aus dem Internet ist sie unter `:8443`
+erreichbar ([14-internet.md](14-internet.md)). Wer die alte Variable noch hat, kann
+sie löschen; der Workflow liest sie nicht mehr.
 
 ### `deploy.yml` — von Hand ausgelöst
 
@@ -213,13 +221,14 @@ schützt dann gar nichts mehr.
 ## Befehlsübersicht
 
 ```bash
-make install         # Abhängigkeiten beider Dienste einrichten
-make tdd-api         # pytest im Watch-Modus
-make tdd-web         # vitest im Watch-Modus
+make install         # Abhängigkeiten aller Projekte einrichten
+make tdd-api         # pytest im Watch-Modus (P=modules/<name>)
+make tdd-web         # vitest im Watch-Modus (N=<name>)
 make test            # alles, was die CI auch prüft
-make test-api        # nur Backend, nur Unit-Tests
-make test-api-full   # Backend inklusive Integration, mit Wegwerf-Postgres
+make test-python     # nur Backend, mit Integrationstests
 make test-web        # nur Frontend
+make test-modul N=…  # beide Hälften eines Artefakts
+make e2e             # Oberflächen-Reisen gegen eine frische Umgebung
 make fmt             # formatieren und automatisch behebbare Funde beheben
 ```
 

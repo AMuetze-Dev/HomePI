@@ -1,137 +1,126 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
-import { Benutzerleiste } from "./Benutzerleiste";
+import { useAnmeldung } from "../anmeldung/kontext";
 import stil from "./Huelle.module.css";
+import { Kopfleiste } from "./Kopfleiste";
 import { Navigation } from "./Navigation";
-import { Themenwechsel } from "./Themenwechsel";
 
 interface Props {
   children: ReactNode;
-  /** Ohne Navigation und Benutzerleiste. Fuer die Ersteinrichtung: dort gibt
-   *  es noch kein Konto und kein Artefakt, und beides daneben waere eine
+  /** Ohne Kopfleiste und Navigation. Fuer die Ersteinrichtung: dort gibt es
+   *  noch kein Konto und kein Artefakt, und beides daneben waere eine
    *  Einladung ins Leere. */
   schlicht?: boolean;
 }
 
 /**
- * Rahmen für alle Ansichten: Navigationsleiste, Kopfzeile, Inhalt.
+ * Rahmen für alle Ansichten: eine Zeile Kopfleiste, darunter der Inhalt.
  *
- * Die Hülle kennt keine Fachlichkeit - und seit dieser Fassung auch nicht
- * mehr die Breite des Inhalts. Die meldet das Modul selbst an
- * (src/module/typen.ts); die Hülle stellt nur den Platz bereit.
+ * Die Hülle kennt keine Fachlichkeit - und auch nicht die Breite des
+ * Inhalts. Die meldet das Modul selbst an (src/module/typen.ts); die Hülle
+ * stellt nur den Platz bereit.
  *
- * Die Leiste läuft über die volle Höhe und trägt die Marke oben. Die
- * Alternative wäre eine durchgehende Kopfzeile über der Leiste gewesen; sie
- * kostet 3,5 rem Höhe über die ganze Breite, ohne mehr zu zeigen.
+ * ── Warum keine Leiste mehr am Rand ───────────────────────────────────
+ * Bis hierher stand links eine Navigationsleiste über die volle Höhe. Sie
+ * kostete 15 rem Breite auf JEDER Seite, dauerhaft, und zeigte dabei
+ * meistens dasselbe: vier Artefakte, von denen man eines offen hat. Bei
+ * einer Spielprüftabelle mit fünf Spalten ist das der Unterschied zwischen
+ * lesbar und gequetscht.
  *
- * Auf schmalen Geräten wird aus der Leiste eine Schublade. Nicht als
- * Notlösung: Auf einem Telefon ist eine dauerhaft sichtbare Navigation
- * schlicht der halbe Bildschirm.
+ * Stattdessen eine Zeile oben, die sagt, wo man ist - und die vollständige
+ * Navigation als Fläche, die man ruft und wieder wegschickt. Sie ist
+ * seltener sichtbar, dafür ist sie dann ganz da: beide Ebenen nebeneinander
+ * statt eingerückt untereinander.
+ *
+ * Der Preis ist, dass der Weg zum nächsten Artefakt einen Griff mehr
+ * kostet. Deshalb liegt dieser Griff auf Escape und nicht in einem Menü:
+ * eine Taste, die jede Tastatur hat und auf der ohnehin „weg hier" liegt.
  */
 export function Huelle({ children, schlicht = false }: Props) {
-  const [schubladeOffen, setSchubladeOffen] = useState(false);
+  const [navOffen, setNavOffen] = useState(false);
   const { pathname } = useLocation();
+  const { zustand: anmeldung } = useAnmeldung();
 
-  // Nach jedem Wechsel zu. Ohne das bleibt die Schublade auf einem Telefon
-  // über dem Ziel stehen, das man gerade angetippt hat.
-  useEffect(() => setSchubladeOffen(false), [pathname]);
+  // Abgemeldet gibt es nichts zu navigieren: Das Manifest ist leer, und ein
+  // Zeichen, das eine leere Fläche aufzieht, ist ein Versprechen, das die
+  // Anwendung nicht halten kann.
+  const navigierbar = !schlicht && anmeldung === "angemeldet";
 
-  // Escape schließt. Wer eine Schublade öffnen kann, muss sie auch ohne
-  // Zielsuche wieder loswerden.
+  const schliessen = useCallback(() => setNavOffen(false), []);
+
+  // Nach jedem Wechsel zu. Ohne das bleibt die Fläche über dem Ziel stehen,
+  // das man gerade angetippt hat.
+  useEffect(() => setNavOffen(false), [pathname]);
+
+  // Und zu, sobald es nichts mehr zu navigieren gibt. Der Fall ist nicht
+  // theoretisch: „Abmelden" steht IN der Fläche. Wer es auf der Startseite
+  // anklickt, wechselt die Adresse nicht - die Fläche bliebe also über
+  // einer Anwendung stehen, in der sie nichts mehr anzuzeigen hat.
   useEffect(() => {
-    if (!schubladeOffen) return undefined;
+    if (!navigierbar) setNavOffen(false);
+  }, [navigierbar]);
+
+  useEffect(() => {
+    if (!navigierbar) return undefined;
+
     const beiTaste = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSchubladeOffen(false);
+      if (e.key !== "Escape") return;
+      // Wer gerade in einem Feld tippt, meint mit Escape dieses Feld -
+      // nicht die Navigation. Dasselbe gilt für ein offenes <dialog>, das
+      // Escape selbst behandelt.
+      if (navOffen) {
+        setNavOffen(false);
+        return;
+      }
+      if (tipptGerade()) return;
+      if (document.querySelector("dialog[open]")) return;
+      setNavOffen(true);
     };
+
     document.addEventListener("keydown", beiTaste);
     return () => document.removeEventListener("keydown", beiTaste);
-  }, [schubladeOffen]);
+  }, [navigierbar, navOffen]);
+
+  // Solange die Fläche offen ist, scrollt die Seite darunter nicht mit.
+  // Ohne das wandert der Inhalt weg, während man die Navigation liest, und
+  // beim Schließen ist man woanders.
+  useEffect(() => {
+    if (!navOffen) return undefined;
+    const vorher = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = vorher;
+    };
+  }, [navOffen]);
 
   return (
-    <div className={schlicht ? stil.huelleSchlicht : stil.huelle}>
+    <div className={stil.huelle}>
       <a className={stil.sprung} href="#inhalt">
         Zum Inhalt springen
       </a>
 
       {!schlicht && (
-        <>
-          <aside
-            id="navigation"
-            className={schubladeOffen ? stil.leisteOffen : stil.leiste}
-          >
-            <div className={stil.leistenkopf}>
-              <Marke />
-            </div>
-            <Navigation beiAuswahl={() => setSchubladeOffen(false)} />
-
-            {/* Steht am Fuß der Leiste statt unter jedem Inhalt. Unter dem
-                Inhalt hätte die Zeile bei einer langen Tabelle niemand je
-                gesehen - und bei einer kurzen hing sie in der Luft. */}
-            <p className={stil.leistenfuss}>
-              Selbst gehostet auf einem Raspberry&nbsp;Pi. Alle Daten bleiben im eigenen
-              Netz.
-            </p>
-          </aside>
-
-          {schubladeOffen && (
-            <button
-              type="button"
-              className={stil.schleier}
-              aria-label="Navigation schließen"
-              onClick={() => setSchubladeOffen(false)}
-            />
-          )}
-        </>
+        <Kopfleiste
+          navigierbar={navigierbar}
+          navOffen={navOffen}
+          beiNavigation={() => setNavOffen((offen) => !offen)}
+        />
       )}
 
-      <div className={stil.spalte}>
-        <header className={stil.kopf}>
-          {schlicht ? (
-            <Marke />
-          ) : (
-            <button
-              type="button"
-              className={stil.schubladenknopf}
-              aria-label="Navigation öffnen"
-              aria-expanded={schubladeOffen}
-              aria-controls="navigation"
-              onClick={() => setSchubladeOffen(true)}
-            >
-              <svg
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
-              </svg>
-            </button>
-          )}
+      <main id="inhalt" className={schlicht ? stil.inhaltSchlicht : stil.inhalt}>
+        {children}
+      </main>
 
-          <div className={stil.werkzeuge}>
-            {!schlicht && <Benutzerleiste />}
-            <Themenwechsel />
-          </div>
-        </header>
-
-        <main id="inhalt" className={stil.inhalt}>
-          {children}
-        </main>
-      </div>
+      {navOffen && <Navigation beiSchliessen={schliessen} />}
     </div>
   );
 }
 
-function Marke() {
-  return (
-    <Link to="/" className={stil.marke}>
-      <span className={stil.markenzeichen} aria-hidden="true">
-        H
-      </span>
-      HomePI
-    </Link>
-  );
+/** Steht der Schreibpunkt gerade in einem Feld? */
+function tipptGerade(): boolean {
+  const aktiv = document.activeElement;
+  if (!(aktiv instanceof HTMLElement)) return false;
+  if (aktiv.isContentEditable) return true;
+  return ["INPUT", "TEXTAREA", "SELECT"].includes(aktiv.tagName);
 }

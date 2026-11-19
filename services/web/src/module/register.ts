@@ -1,4 +1,3 @@
-import { GeraeteSeite } from "./geraete/GeraeteSeite";
 import type { Breite, ModulOberflaeche, Unterseite } from "./typen";
 import { StaffelpilotSeite } from "./staffelpilot/StaffelpilotSeite";
 import { VerwaltungSeite } from "./verwaltung/VerwaltungSeite";
@@ -30,15 +29,24 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
     // Rhythmus und Betrag. Bei "normal" stehen die Karten untereinander und
     // der Vergleich, um den es geht, findet nicht mehr statt.
     breite: "weit",
+    // Jeder Bereich baut seinen Kopf selbst: Neben dem Namen steht der Monat
+    // oder die Zahl, um die es hier geht. Siehe `eigenerTitel` in typen.ts.
+    // Die Wörter stehen ein zweites Mal in `haushaltsbuch/daten.ts`, weil die
+    // Fläche ihren Titel schon braucht, solange sie lädt.
     unterseiten: [
-      { id: "uebersicht", wort: "Monatsplan" },
+      { id: "uebersicht", wort: "Monatsplan", eigenerTitel: true },
       // Ein Bild, das ganz von der Breite lebt: jede Spalte ist eine Station,
       // und die Beschriftung steht daneben, nicht darunter.
-      { id: "fluss", wort: "Geldfluss", breite: "voll" },
-      { id: "posten", wort: "Posten" },
+      { id: "fluss", wort: "Geldfluss", breite: "voll", eigenerTitel: true },
+      { id: "posten", wort: "Posten", eigenerTitel: true },
       // Formulare. Ein Eingabefeld über die ganze Monitorbreite ist nicht
       // großzügig, sondern unlesbar.
-      { id: "stammdaten", wort: "Konten & Personen", breite: "normal" },
+      {
+        id: "stammdaten",
+        wort: "Konten & Personen",
+        breite: "normal",
+        eigenerTitel: true,
+      },
     ],
   },
   {
@@ -47,29 +55,38 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
     // Grundmaß für die Flächen, die Listen zeigen. Die Bereiche, bei denen
     // das falsch wäre, sagen es unten selbst.
     breite: "voll",
+    // Jeder Bereich baut seinen Kopf selbst: Neben dem Namen steht hier
+    // ueberall etwas, das nur der Bereich kennt - eine Zahl, ein Filter, die
+    // eine Handlung dieser Flaeche. Siehe `eigenerTitel` in typen.ts.
     unterseiten: [
       // Kennzahlen und die Liste des Tages - lebt von der Breite.
-      { id: "uebersicht", wort: "Übersicht" },
+      { id: "uebersicht", wort: "Übersicht", eigenerTitel: true },
       // Paarung, Datum, Befunde, Aktionen in einer Zeile. Der Grund, warum
       // dieses Modul überhaupt "voll" bekommt.
-      { id: "spiele", wort: "Spielprüfung" },
-      { id: "prueflauf", wort: "Prüflauf", breite: "normal" },
-      { id: "ergebnisse", wort: "Ergebnisse", breite: "weit" },
+      { id: "spiele", wort: "Spielprüfung", eigenerTitel: true },
+      { id: "prueflauf", wort: "Prüflauf", breite: "normal", eigenerTitel: true },
+      { id: "ergebnisse", wort: "Ergebnisse", breite: "weit", eigenerTitel: true },
       // Formulare. Ein Eingabefeld über die ganze Monitorbreite ist nicht
       // großzügig, sondern unlesbar: Der Blick findet den Anfang der
       // nächsten Zeile nicht mehr.
-      { id: "staffeln", wort: "Staffeln", breite: "normal" },
-      { id: "vorgaenge", wort: "Vorgänge", breite: "weit" },
-      { id: "regeln", wort: "Regeln", breite: "normal" },
+      { id: "staffeln", wort: "Staffeln", breite: "normal", eigenerTitel: true },
+      { id: "vorgaenge", wort: "Vorgänge", breite: "weit", eigenerTitel: true },
+      { id: "regeln", wort: "Regeln", breite: "normal", eigenerTitel: true },
       // Quelltext. Breiter als ein Formular, denn hier steht Python mit
       // Einrückung -- in einer Textspalte bricht jede zweite Zeile um.
-      { id: "regeldateien", wort: "Regeldateien", breite: "normal" },
-      { id: "einstellungen", wort: "Einstellungen", breite: "text" },
-      { id: "zugang", wort: "DFBnet-Zugang", breite: "text" },
+      { id: "regeldateien", wort: "Regeldateien", breite: "normal", eigenerTitel: true },
+      { id: "einstellungen", wort: "Einstellungen", breite: "text", eigenerTitel: true },
+      { id: "zugang", wort: "DFBnet-Zugang", breite: "text", eigenerTitel: true },
       // Ein Weg, keine Flaeche: einmal durchlaufen, danach nur noch bei
       // Bedarf aus den Einstellungen heraus. Deshalb versteckt -- in der
       // Leiste waere es ein Eintrag, der ab dem zweiten Tag nur stoert.
-      { id: "einrichten", wort: "Einrichtung", breite: "text", versteckt: true },
+      {
+        id: "einrichten",
+        wort: "Einrichtung",
+        breite: "text",
+        versteckt: true,
+        eigenerTitel: true,
+      },
     ],
   },
   {
@@ -78,29 +95,28 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
     // Die Dashboard-Ansicht lebt von der Breite: zwei Tische nebeneinander,
     // darunter Gruppen und Raster.
     breite: "weit",
+    // Jeder Bereich baut seinen Kopf selbst: Neben dem Namen steht hier
+    // ueberall etwas, das nur der Bereich kennt - das Turnier, sein Zustand,
+    // seine Zahlen. Siehe `eigenerTitel` in typen.ts.
     unterseiten: [
       // Zuerst, und das mit Absicht: diese Flaeche ist der Grund, warum das
       // Artefakt oeffentlich ist. Wer die Kachel ohne Konto antippt, landet
       // auf der ersten Unterseite - also hier.
-      { id: "dashboard", wort: "Dashboard", breite: "voll" },
+      { id: "dashboard", wort: "Dashboard", breite: "voll", eigenerTitel: true },
       // Teilnehmer, Auswuerfeln und Spielplan in einem. Drei Reiter waren
       // richtig, solange ein Ergebnis aus sechs Zahlen bestand; seit es ein
       // Name ist, sind es zwei Handgriffe und einer zu viel.
-      { id: "turnier", wort: "Turnier" },
-      { id: "einstellungen", wort: "Einstellungen", breite: "text" },
+      { id: "turnier", wort: "Turnier", eigenerTitel: true },
+      { id: "einstellungen", wort: "Einstellungen", breite: "text", eigenerTitel: true },
     ],
-  },
-  {
-    id: "geraete",
-    Komponente: GeraeteSeite,
-    // Eine Liste, ein Formular. Mehr Breite macht sie nicht besser, nur
-    // die Wege zwischen Name und Aktion laenger.
-    breite: "normal",
   },
   {
     id: "verwaltung",
     Komponente: VerwaltungSeite,
-    breite: "normal",
+    // Eine Liste von Konten mit Rechten daneben - sie lebt nicht von der
+    // Breite, und ein Formular ueber den ganzen Monitor ist unlesbar.
+    breite: "weit",
+    eigenerTitel: true,
   },
 ];
 
@@ -124,6 +140,26 @@ export function breiteFuer(id: string, unterseite?: string): Breite {
     ? oberflaeche?.unterseiten?.find((u) => u.id === unterseite)
     : undefined;
   return bereich?.breite ?? oberflaeche?.breite ?? BREITE_VOREINSTELLUNG;
+}
+
+/**
+ * Baut die Fläche ihre Überschrift selbst?
+ *
+ * Dieselbe Staffelung wie bei der Breite: erst der Bereich, dann das
+ * Artefakt. Ein Artefakt ohne zweite Ebene kann die Angabe nur an sich
+ * selbst tragen - die Verwaltung ist der Fall.
+ *
+ * Die Modulseite selbst fragt nicht hier, sondern liest die Oberfläche, die
+ * sie ohnehin schon geholt hat - ein zweiter Zugriff auf dasselbe Register
+ * wäre eine Abfrage zu viel. Diese Funktion ist für alle anderen da, die
+ * die Regel brauchen, ohne das Register zu kennen.
+ */
+export function traegtTitelSelbst(id: string, unterseite?: string): boolean {
+  const oberflaeche = oberflaecheFuer(id);
+  const bereich = unterseite
+    ? oberflaeche?.unterseiten?.find((u) => u.id === unterseite)
+    : undefined;
+  return bereich?.eigenerTitel ?? oberflaeche?.eigenerTitel ?? false;
 }
 
 export function unterseitenFuer(id: string): readonly Unterseite[] {

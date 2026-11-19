@@ -235,7 +235,7 @@ describe("Einschränken", () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue(dreiRegeln());
     render(<RegelnTafel />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Aus" }));
+    await userEvent.click(await screen.findByRole("radio", { name: "Aus" }));
 
     expect(await screen.findByText("1 von 3")).toBeInTheDocument();
     expect(screen.getByText("Dokumente am Spielbericht")).toBeInTheDocument();
@@ -245,7 +245,7 @@ describe("Einschränken", () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue(dreiRegeln());
     render(<RegelnTafel />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Mit Schreiben" }));
+    await userEvent.click(await screen.findByRole("radio", { name: "Mit Schreiben" }));
 
     expect(await screen.findByText("2 von 3")).toBeInTheDocument();
   });

@@ -31,9 +31,17 @@
 }
 
 .neutral {
-  background: var(--farbe-flaeche-gedaempft);
+  background: transparent;
   color: var(--farbe-text-gedaempft);
-  border-color: var(--farbe-rand);
+  border-color: var(--farbe-linie);
+}
+
+/* Gefasst statt gefuellt - wie jede andere Akzentflaeche in diesem
+   Entwurf. Zehn gefuellte Etiketten nebeneinander waeren ein Flickenteppich. */
+.akzent {
+  background: var(--farbe-akzent-fuellung);
+  color: var(--farbe-akzent-schrift);
+  border-color: color-mix(in srgb, var(--farbe-akzent) 45%, transparent);
 }
 
 /* Fuer Versionen und Kennungen: Monospace, damit Ziffern nicht wandern. */

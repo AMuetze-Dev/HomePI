@@ -18,6 +18,8 @@ from httpx import AsyncClient
 pytestmark = pytest.mark.integration
 
 ACHT = ["Anna", "Bernd", "Cem", "Dana", "Elif", "Fiete", "Gesa", "Hanna"]
+#: So viele, dass die Zahl keine Zweierpotenz ist - das ist der Normalfall.
+NEUNZEHN = [f"Spieler {nummer:02d}" for nummer in range(1, 20)]
 
 
 async def turnier_anlegen(client: AsyncClient, **abweichend: Any) -> dict[str, Any]:
@@ -150,6 +152,26 @@ class TestAuslosung:
         assert len(vorschau.json()["gruppen"]) == 2
         assert vorschau.json()["anzahl_spiele"] == 12
         assert await spiele(client, lauf["id"]) == []
+
+    async def test_die_vorschau_zaehlt_ein_freilos_nicht_als_spiel(
+        self, client: AsyncClient
+    ) -> None:
+        """Die Zahl in der Vorschau ist die Grundlage fuer "wie lange dauert
+        das". Ein Freilos dauert nichts - und es steht als Paarung mit dem
+        Gegner "Freilos" da, nicht mit einer Leerstelle."""
+        lauf = await turnier_anlegen(client, modus="ko")
+        await leute_eintragen(client, lauf["id"], NEUNZEHN)
+
+        vorschau = (
+            await client.post(f"/tischtennis/turnier/{lauf['id']}/auslosung", json={"saat": 7})
+        ).json()
+
+        assert vorschau["anzahl_spiele"] == 18
+        freilose = [p for p in vorschau["paarungen"] if p["gast"] == "Freilos"]
+        assert len(freilose) == 3
+        assert all(
+            "None" not in p["heim"] and "None" not in p["gast"] for p in vorschau["paarungen"]
+        )
 
     async def test_dieselbe_saat_ergibt_dieselbe_vorschau(self, client: AsyncClient) -> None:
         lauf = await turnier_anlegen(client)
@@ -513,14 +535,84 @@ class TestWeitereModi:
         assert {s["bezeichnung"] for s in alle} == {"Viertelfinale", "Halbfinale", "Endspiel"}
 
     async def test_ko_mit_freilosen(self, client: AsyncClient) -> None:
+        """Sechs im reinen KO: drei Spiele, danach bleibt einer uebrig."""
         lauf = await turnier_anlegen(client, modus="ko")
         await leute_eintragen(client, lauf["id"], ACHT[:6])
 
         await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
 
         alle = await spiele(client, lauf["id"])
-        assert len([s for s in alle if s["runde"] == 1]) == 2
-        assert len(alle) == 5
+        assert len([s for s in alle if s["runde"] == 1]) == 3
+        assert len([s for s in alle if not s["freilos"]]) == 5
+
+    async def test_im_reinen_ko_spielt_in_der_ersten_runde_jeder(self, client: AsyncClient) -> None:
+        """Neunzehn Angemeldete: neun Spiele und ein Freilos.
+
+        Ein gesetztes Raster haette drei Spiele - und sechzehn Leute, die
+        zusehen. Wer zu einem Feierabendturnier kommt, soll spielen.
+        """
+        lauf = await turnier_anlegen(client, modus="ko")
+        await leute_eintragen(client, lauf["id"], NEUNZEHN)
+
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        erste = [s for s in await spiele(client, lauf["id"]) if s["runde"] == 1]
+        assert len([s for s in erste if not s["freilos"]]) == 9
+        angetreten = {wer for s in erste for wer in (s["heim_id"], s["gast_id"]) if wer is not None}
+        assert len(angetreten) == 19
+
+    async def test_das_freilos_ist_entschieden_und_steht_im_raster(
+        self, client: AsyncClient
+    ) -> None:
+        """Es ist kein Spiel, sondern die Zeile, die erklaert, warum einer
+        durch ist: beendet, mit Sieger, und der Gegner heisst "Freilos"."""
+        lauf = await turnier_anlegen(client, modus="ko")
+        await leute_eintragen(client, lauf["id"], NEUNZEHN)
+
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        alle = await spiele(client, lauf["id"])
+        erstes = next(s for s in alle if s["runde"] == 1 and s["freilos"])
+        assert erstes["zustand"] == "beendet"
+        assert erstes["sieger_id"] == erstes["heim_id"]
+        assert erstes["gast_herkunft"] == "Freilos"
+        assert erstes["heim_herkunft"] is None
+
+    async def test_ein_spaeteres_freilos_wartet_auf_seinen_mann(self, client: AsyncClient) -> None:
+        """Fuenf Leute: in der zweiten Runde ist wieder einer uebrig - nur
+        steht da noch nicht fest, wer. Solange sagt die Zeile "Sieger aus
+        Spiel 2" und nicht "Freilos"; sobald es feststeht, ist sie durch."""
+        lauf = await turnier_anlegen(client, modus="ko")
+        await leute_eintragen(client, lauf["id"], ACHT[:5])
+
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        spaet = next(
+            s for s in await spiele(client, lauf["id"]) if s["freilos"] and s["heim_id"] is None
+        )
+        assert spaet["zustand"] == "geplant"
+        assert spaet["heim_herkunft"].startswith("Sieger aus Spiel")
+
+        await alles_durchspielen(client, lauf["id"])
+
+        nachher = next(s for s in await spiele(client, lauf["id"]) if s["id"] == spaet["id"])
+        assert nachher["zustand"] == "beendet"
+        assert nachher["sieger_id"] == nachher["heim_id"] is not None
+
+    async def test_mit_zweiter_chance_bleibt_es_beim_gesetzten_raster(
+        self, client: AsyncClient
+    ) -> None:
+        """Im Doppel-KO spielt ohnehin jeder mindestens zweimal. Dann ist ein
+        Freilos in der ersten Runde kein verlorener Abend, und das gesetzte
+        Raster ist das bessere: es haelt die Staerksten auseinander."""
+        lauf = await turnier_anlegen(client, modus="ko", doppel_ko=True)
+        await leute_eintragen(client, lauf["id"], NEUNZEHN)
+
+        await client.post(f"/tischtennis/turnier/{lauf['id']}/auswuerfeln", json={"saat": 7})
+
+        alle = await spiele(client, lauf["id"])
+        assert not [s for s in alle if s["freilos"]]
+        assert len([s for s in alle if s["runde"] == 1 and s["phase"] == "ko"]) == 3
 
     async def test_schweizer_setzt_runde_fuer_runde(self, client: AsyncClient) -> None:
         lauf = await turnier_anlegen(client, modus="schweizer", runden=3)

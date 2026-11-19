@@ -30,11 +30,25 @@ sein?*
 | **Kategorie** | Fasst Posten zusammen. `zaehlt_als_sparen` trennt Ruecklage und Anlage vom Verbrauch — davon haengt die Sparquote ab |
 | **Posten** | Eine wiederkehrende Buchung. `betrag` ist immer das, was die **Bank abbucht**; die Monatsrate wird gerechnet, nie gespeichert |
 | **Anteil** | Wie viel eines gemeinsamen Postens auf eine Person entfaellt — als Gewicht (1:2), nicht als Prozent |
+| **Anlage** | Ein Posten ohne festen Betrag: Er nimmt `anlage_gewicht` Anteile an dem, was seiner Person uebrig bleibt. Vier ETFs mit 10/50/30/10 teilen sich den Ueberschuss in diesem Verhaeltnis |
 
-## Drei Entscheidungen, die nicht offensichtlich sind
+## Vier Entscheidungen, die nicht offensichtlich sind
 
 **Gewichte statt Prozent.** „1:2" bleibt richtig, wenn sich der Betrag aendert;
 „33,3 % / 66,7 %" nicht, und die Summe muss nirgends 100 ergeben.
+
+**Die Anlage haengt an den Kosten, nicht an einer Zahl.** Ein ETF-Sparplan mit
+festem Betrag ist jeden Monat entweder zu vorsichtig oder zu mutig — und wird
+deshalb nie nachgepflegt. Ein Anlageposten bekommt stattdessen, was nach allen
+Kosten uebrig bleibt, abzueglich des **Sockels** der Person: der Puffer, der
+auf dem Konto liegen bleibt. Zieht eine Versicherung an, sinkt die Sparrate im
+selben Monat von selbst. Gerechnet wird in zwei Durchgaengen (zuerst der
+Haushalt ohne die Anlageposten, dann ihre Verteilung) — sonst liefe die
+Rechnung im Kreis. Siehe `dienst.anlagebetraege`.
+
+Zwei Grenzen gehoeren dazu: Ein Anlageposten liegt auf einem **persoenlichen**
+Konto, denn der Ueberschuss ist der einer Person; und er ist nie negativ — wer
+mehr ausgibt als einnimmt, legt nichts an.
 
 **Die Monatsrate wird aufgerundet.** 169 Euro im Jahr sind 14,0833 im Monat.
 Kaufmaennisch gerundet legt man zwoelfmal 14,08 zurueck und hat 168,96 — vier

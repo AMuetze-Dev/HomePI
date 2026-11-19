@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Etikett, Hinweis, Karte, Knopf, Leerzustand, Platzhalter } from "../../ui";
+import {
+  Abschnitt,
+  Etikett,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Platzhalter,
+  Tafel,
+} from "../../ui";
 import {
   type Auftrag,
   type AuftragArt,
@@ -20,10 +29,7 @@ import {
 } from "./api";
 import { ergebnisSatz } from "./ergebnis";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 const ZUSTAND_WORT: Record<AuftragZustand, string> = {
   angefordert: "Wartet",
@@ -139,22 +145,23 @@ export function PrueflaufTafel({
 
   if (verlauf === null || uebertragung === null) {
     return (
-      <div role="status" aria-label="Prüfläufe werden geladen">
-        <Platzhalter breite="100%" hoehe="12rem" />
-      </div>
+      <Tafel titel="Prüflauf">
+        <div role="status" aria-label="Prüfläufe werden geladen">
+          <Platzhalter breite="100%" hoehe="12rem" />
+        </div>
+      </Tafel>
     );
   }
 
   return (
-    <>
+    <Tafel titel="Prüflauf">
       {fehler && (
         <Hinweis ton="fehler" dringend>
           {fehler}
         </Hinweis>
       )}
 
-      <Karte>
-        <h2 className={stil.formularTitel}>Prüflauf</h2>
+      <Karte className={stil.stapel}>
         {offen === null ? (
           <>
             <p className={stil.vorgangHinweis}>
@@ -227,35 +234,36 @@ export function PrueflaufTafel({
         onWiederholen={() => void handeln(() => wiederholeUebertragung())}
       />
 
-      <h2 className={stil.formularTitel}>Bisherige Läufe</h2>
-      {verlauf.length === 0 ? (
-        <Leerzustand titel="Noch kein Lauf">
-          Was hier steht, sind die vergangenen Prüfläufe mit ihrem Ergebnis.
-        </Leerzustand>
-      ) : (
-        <ul className={stil.liste} aria-label="Bisherige Läufe">
-          {verlauf.map((z) => (
-            <li key={z.id}>
-              <Karte>
-                <div className={stil.zeile}>
-                  <span className={stil.paarung}>{ART_WORT[z.art]}</span>
-                  <Etikett ton={ZUSTAND_TON[z.zustand]}>
-                    {ZUSTAND_WORT[z.zustand]}
-                  </Etikett>
-                  <span className={stil.datum}>{alsZeit(z.angelegt)}</span>
-                </div>
-                <p className={stil.vorgangHinweis}>{ergebnisSatz(z)}</p>
-                {/* Auch hier das Abbild. Vorher gab es die Vorschau nur,
+      <Abschnitt titel="Bisherige Läufe">
+        {verlauf.length === 0 ? (
+          <Leerzustand titel="Noch kein Lauf">
+            Was hier steht, sind die vergangenen Prüfläufe mit ihrem Ergebnis.
+          </Leerzustand>
+        ) : (
+          <ul className={stil.liste} aria-label="Bisherige Läufe">
+            {verlauf.map((z) => (
+              <li key={z.id}>
+                <Karte className={stil.stapel}>
+                  <div className={stil.zeile}>
+                    <span className={stil.paarung}>{ART_WORT[z.art]}</span>
+                    <Etikett ton={ZUSTAND_TON[z.zustand]}>
+                      {ZUSTAND_WORT[z.zustand]}
+                    </Etikett>
+                    <span className={stil.datum}>{alsZeit(z.angelegt)}</span>
+                  </div>
+                  <p className={stil.vorgangHinweis}>{ergebnisSatz(z)}</p>
+                  {/* Auch hier das Abbild. Vorher gab es die Vorschau nur,
                     solange ein Lauf arbeitete -- und genau das Bild, das man
                     sehen will, entsteht beim Scheitern: danach war es weg,
                     und uebrig blieb das Protokoll. */}
-                <Vorschau auftrag={z} />
-              </Karte>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
+                  <Vorschau auftrag={z} />
+                </Karte>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Abschnitt>
+    </Tafel>
   );
 }
 
@@ -420,7 +428,7 @@ function Uebertragungsstreifen({
   onWiederholen: () => void;
 }) {
   return (
-    <Karte>
+    <Karte className={stil.stapel}>
       <h2 className={stil.formularTitel}>Übertragung nach DFBnet</h2>
 
       {stand.pausiert ? (

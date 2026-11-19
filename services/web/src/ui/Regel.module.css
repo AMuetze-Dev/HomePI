@@ -1,0 +1,47 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md).
+
+   Die 3 rem Ausblendung sind die einzige Ausnahme: sie sind die Form der
+   Linie, nicht ihr Abstand zu etwas. */
+
+.regel,
+.kurz {
+  height: 1px;
+  border: 0;
+  flex: 0 0 auto;
+}
+
+.regel {
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--farbe-linie) 3rem,
+    var(--farbe-linie) calc(100% - 3rem),
+    transparent
+  );
+}
+
+/* Auf einer Spalte von 20 rem fräße die lange Ausblendung ein Drittel der
+   Linie - übrig bliebe ein Strich in der Mitte, der aussieht wie ein
+   Fehler. */
+.kurz {
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--farbe-linie) 1.25rem,
+    var(--farbe-linie) calc(100% - 1.25rem),
+    transparent
+  );
+}
+
+@media (width < 48rem) {
+  .regel {
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--farbe-linie) 1.25rem,
+      var(--farbe-linie) calc(100% - 1.25rem),
+      transparent
+    );
+  }
+}

@@ -348,6 +348,175 @@ async def test_ein_posten_auf_einem_unbekannten_konto_nennt_das_konto(
 # -------------------------------------------------------------- Flussbild
 
 
+# ------------------------------------------------- Anlage aus dem Ueberschuss
+
+
+async def _anlagehaushalt(client: AsyncClient, sockel: str = "300.00") -> tuple[str, str]:
+    """Aaron mit 2000 herein, 700 Miete - und einem Puffer, der liegen bleibt."""
+    aaron = await _person(client, "Aaron")
+    await client.patch(f"{PFAD}/personen/{aaron}", json={"sockel": sockel})
+    konto = await _konto(client, "CON1", aaron)
+    wohnen = await _kategorie(client, "Wohnen")
+    depot = await _kategorie(client, "Depot", spart=True)
+
+    await _posten(client, name="Gehalt", art="einnahme", betrag="2000.00", konto_id=konto)
+    await _posten(
+        client,
+        name="Miete",
+        art="ausgabe",
+        betrag="700.00",
+        konto_id=konto,
+        kategorie_id=wohnen,
+    )
+    return konto, depot
+
+
+async def test_die_anlage_folgt_dem_ueberschuss_nach_gewicht(client: AsyncClient) -> None:
+    """Der Fall aus der Aufgabe: 10/50/30/10 auf vier ETFs."""
+    konto, depot = await _anlagehaushalt(client)
+    for nummer, gewicht in enumerate((10, 50, 30, 10), start=1):
+        await _posten(
+            client,
+            name=f"ETF {nummer}",
+            art="ausgabe",
+            betrag="0.00",
+            konto_id=konto,
+            kategorie_id=depot,
+            anlage_gewicht=gewicht,
+        )
+
+    plan = (await client.get(f"{PFAD}/")).json()
+    betraege = {z["name"]: z["monatsrate"] for z in plan["alle"] if z["name"].startswith("ETF")}
+
+    assert betraege == {
+        "ETF 1": "100.00",
+        "ETF 2": "500.00",
+        "ETF 3": "300.00",
+        "ETF 4": "100.00",
+    }
+    assert plan["personen"][0]["anlage"] == "1000.00"
+    assert plan["personen"][0]["rest"] == "300.00"
+    assert plan["personen"][0]["sockel"] == "300.00"
+
+
+async def test_ein_neuer_posten_verschiebt_die_anlage_sofort(client: AsyncClient) -> None:
+    """Der eigentliche Zweck: niemand pflegt die Sparrate von Hand nach."""
+    konto, depot = await _anlagehaushalt(client)
+    etf = await _posten(
+        client,
+        name="ETF",
+        art="ausgabe",
+        betrag="0.00",
+        konto_id=konto,
+        kategorie_id=depot,
+        anlage_gewicht=1,
+    )
+
+    vorher = (await client.get(f"{PFAD}/")).json()
+    await _posten(client, name="Strom", art="ausgabe", betrag="100.00", konto_id=konto)
+    nachher = (await client.get(f"{PFAD}/")).json()
+
+    def rate(plan: dict[str, Any]) -> str:
+        return next(z["monatsrate"] for z in plan["alle"] if z["id"] == etf["id"])
+
+    assert rate(vorher) == "1000.00"
+    assert rate(nachher) == "900.00"
+
+
+async def test_ein_anlageposten_gehoert_auf_ein_persoenliches_konto(
+    client: AsyncClient,
+) -> None:
+    """Der Ueberschuss ist der einer Person. Auf einem gemeinsamen Konto
+    gaebe es keinen, aus dem sich der Posten bedienen koennte."""
+    await _person(client, "Aaron")
+    gemeinsam = await _konto(client, "DKB1")
+
+    antwort = await client.post(
+        f"{PFAD}/posten",
+        json={
+            "name": "ETF",
+            "art": "ausgabe",
+            "betrag": "0.00",
+            "konto_id": gemeinsam,
+            "anlage_gewicht": 1,
+        },
+    )
+
+    assert antwort.status_code == 422, antwort.text
+    assert "persönliches Konto" in antwort.json()["detail"]
+
+
+async def test_ein_anlageposten_laeuft_monatlich(client: AsyncClient) -> None:
+    """Ein Sparplan mit Jahresrhythmus waere ein Widerspruch: Der Betrag
+    entsteht Monat fuer Monat aus dem, was uebrig bleibt."""
+    konto, depot = await _anlagehaushalt(client)
+
+    etf = await _posten(
+        client,
+        name="ETF",
+        art="ausgabe",
+        betrag="123.45",
+        intervall_monate=12,
+        konto_id=konto,
+        kategorie_id=depot,
+        anlage_gewicht=1,
+    )
+
+    assert etf["intervall_monate"] == 1
+    assert etf["betrag"] == "0.00"
+
+
+async def test_aus_einem_festen_posten_wird_ein_anlageposten(client: AsyncClient) -> None:
+    konto, depot = await _anlagehaushalt(client)
+    etf = await _posten(
+        client,
+        name="ETF",
+        art="ausgabe",
+        betrag="250.00",
+        konto_id=konto,
+        kategorie_id=depot,
+    )
+
+    antwort = await client.patch(f"{PFAD}/posten/{etf['id']}", json={"anlage_gewicht": 1})
+
+    assert antwort.status_code == 200, antwort.text
+    assert antwort.json()["anlage_gewicht"] == 1
+    plan = (await client.get(f"{PFAD}/")).json()
+    assert next(z["monatsrate"] for z in plan["alle"] if z["id"] == etf["id"]) == "1000.00"
+
+
+async def test_die_gewichtung_laesst_sich_wieder_abnehmen(client: AsyncClient) -> None:
+    """Zurueck zum festen Betrag - sonst waere die Entscheidung endgueltig."""
+    konto, depot = await _anlagehaushalt(client)
+    etf = await _posten(
+        client,
+        name="ETF",
+        art="ausgabe",
+        betrag="0.00",
+        konto_id=konto,
+        kategorie_id=depot,
+        anlage_gewicht=1,
+    )
+
+    antwort = await client.patch(
+        f"{PFAD}/posten/{etf['id']}", json={"anlage_loeschen": True, "betrag": "250.00"}
+    )
+
+    assert antwort.status_code == 200, antwort.text
+    assert antwort.json()["anlage_gewicht"] is None
+    assert antwort.json()["betrag"] == "250.00"
+
+
+async def test_der_sockel_steht_bei_der_person(client: AsyncClient) -> None:
+    aaron = await _person(client, "Aaron")
+
+    geaendert = await client.patch(f"{PFAD}/personen/{aaron}", json={"sockel": "250.00"})
+
+    assert geaendert.status_code == 200, geaendert.text
+    assert geaendert.json()["sockel"] == "250.00"
+    assert (await client.get(f"{PFAD}/personen")).json()[0]["sockel"] == "250.00"
+
+
 async def test_das_flussbild_verbindet_einkommen_konto_und_posten(
     client: AsyncClient,
 ) -> None:

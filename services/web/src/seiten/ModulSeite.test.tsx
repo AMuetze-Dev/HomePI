@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as client from "../api/client";
-import * as geraeteApi from "../module/geraete/api";
+import * as verwaltungApi from "../module/verwaltung/api";
 import * as register from "../module/register";
 import { mitAnmeldung } from "../testhilfen";
 import { ModulSeite } from "./ModulSeite";
@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 // Bewusst ein Artefakt OHNE eingetragene Oberflaeche: genau dieser Fall soll
-// die generische Ansicht bekommen. "geraete" hat inzwischen eine eigene.
+// die generische Ansicht bekommen. "verwaltung" hat eine eigene.
 const ohneOberflaeche: client.ModulEintrag = {
   id: "messwerte",
   titel: "Messwerte",
@@ -38,6 +38,20 @@ function zeige(id: string, angemeldet = true) {
   );
 }
 
+/** Dasselbe, aber auf einem Bereich - dort entscheidet sich, wer die
+ *  Überschrift setzt. */
+function zeigeBereich(id: string, unterseite: string) {
+  render(
+    <MemoryRouter initialEntries={[`/modul/${id}/${unterseite}`]}>
+      {mitAnmeldung(
+        <Routes>
+          <Route path="/modul/:id/:unterseite" element={<ModulSeite />} />
+        </Routes>,
+      )}
+    </MemoryRouter>,
+  );
+}
+
 describe("Modulseite", () => {
   it("zeigt die generische Ansicht, wenn es keine eigene Oberfläche gibt", async () => {
     vi.spyOn(client, "fetchModule").mockResolvedValue([ohneOberflaeche]);
@@ -54,35 +68,50 @@ describe("Modulseite", () => {
     expect(screen.getByText("/messwerte/")).toBeInTheDocument();
   });
 
+  it("setzt keine Überschrift über ein Artefakt, das seine eigene trägt", async () => {
+    /* Die Verwaltung baut ihren Kopf selbst - mit den Zahlen daneben, die
+       nur sie kennt. Eine zweite Überschrift darüber waere dasselbe Wort
+       zweimal untereinander. */
+    vi.spyOn(client, "fetchModule").mockResolvedValue([
+      { ...ohneOberflaeche, id: "verwaltung", titel: "Verwaltung", pfad: "/verwaltung" },
+    ]);
+    vi.spyOn(verwaltungApi, "ladeKonten").mockResolvedValue([]);
+    vi.spyOn(verwaltungApi, "ladeArtefakte").mockResolvedValue([]);
+
+    zeige("verwaltung");
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
   it("nimmt für ein eingetragenes Artefakt dessen eigene Oberfläche", async () => {
-    // geraete ist in register.ts eingetragen - hier wird die echte
+    // verwaltung ist in register.ts eingetragen - hier wird die echte
     // Verdrahtung geprüft, nicht ein Mock davon.
     vi.spyOn(client, "fetchModule").mockResolvedValue([
-      { ...ohneOberflaeche, id: "geraete", titel: "Geräte", pfad: "/geraete" },
+      { ...ohneOberflaeche, id: "verwaltung", titel: "Verwaltung", pfad: "/verwaltung" },
     ]);
-    vi.spyOn(geraeteApi, "ladeGeraete").mockResolvedValue([
+    vi.spyOn(verwaltungApi, "ladeKonten").mockResolvedValue([
       {
-        id: "1",
-        name: "Stehlampe",
-        raum: "Wohnzimmer",
-        zustand: "bereit",
-        eingeschaltet: false,
+        id: "22222222-2222-4222-8222-222222222222",
+        name: "gast",
+        anzeigename: "Gast",
+        aktiv: true,
+        rechte: {},
+        angelegt: null,
+        verwalter: false,
+        passwort_wechseln: false,
       },
     ]);
-    vi.spyOn(geraeteApi, "ladeZusammenfassung").mockResolvedValue({
-      anzahl: 1,
-      eingeschaltet: 0,
-      in_wartung: 0,
-      raeume: { Wohnzimmer: 1 },
-    });
+    vi.spyOn(verwaltungApi, "ladeArtefakte").mockResolvedValue([
+      { id: "verwaltung", titel: "Verwaltung", zugang: "geschuetzt" },
+    ]);
 
-    zeige("geraete");
+    zeige("verwaltung");
 
-    // Die Geräteseite zeigt Kennzahlen und eine Tabelle mit den Geräten -
-    // die generische Ansicht zeigt eine Tabelle mit Endpunkten. Der Inhalt
-    // unterscheidet sie, nicht die Struktur.
-    expect(await screen.findByText("Stehlampe")).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Überblick" })).toBeInTheDocument();
+    // Die Verwaltung zeigt die Konten - die generische Ansicht zeigt eine
+    // Tabelle mit Endpunkten. Der Inhalt unterscheidet sie, nicht die
+    // Struktur.
+    expect(await screen.findByText("Gast")).toBeInTheDocument();
   });
 
   it("bevorzugt eine eingetragene eigene Oberfläche", async () => {
@@ -131,5 +160,34 @@ describe("Modulseite", () => {
     zeige("messwerte");
 
     expect(await screen.findByText(/Noch keine Oberfläche/)).toBeInTheDocument();
+  });
+
+  it("setzt den Bereichsnamen als Überschrift über den Inhalt", async () => {
+    vi.spyOn(client, "fetchModule").mockResolvedValue([ohneOberflaeche]);
+    vi.spyOn(register, "oberflaecheFuer").mockReturnValue({
+      id: "messwerte",
+      Komponente: () => <p>Meine eigene Ansicht</p>,
+      unterseiten: [{ id: "tag", wort: "Heute" }],
+    });
+
+    zeigeBereich("messwerte", "tag");
+
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Heute");
+  });
+
+  it("hält sich heraus, wo der Bereich seinen Titel selbst mitbringt", async () => {
+    // Sonst stünde dasselbe Wort zweimal untereinander: einmal von hier,
+    // einmal aus der Tafel, die daneben noch eine Zahl und einen Filter
+    // trägt - beides kennt diese Seite nicht.
+    vi.spyOn(client, "fetchModule").mockResolvedValue([ohneOberflaeche]);
+    vi.spyOn(register, "oberflaecheFuer").mockReturnValue({
+      id: "messwerte",
+      Komponente: () => <h1>Heute</h1>,
+      unterseiten: [{ id: "tag", wort: "Heute", eigenerTitel: true }],
+    });
+
+    zeigeBereich("messwerte", "tag");
+
+    expect(await screen.findAllByRole("heading", { name: "Heute" })).toHaveLength(1);
   });
 });

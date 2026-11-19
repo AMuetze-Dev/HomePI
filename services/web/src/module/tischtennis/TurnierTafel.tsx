@@ -1,6 +1,17 @@
 import { useState } from "react";
 
-import { Etikett, Feld, Hinweis, Karte, Knopf, Leerzustand } from "../../ui";
+import {
+  Abschnitt,
+  Etikett,
+  Feld,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Reihe,
+  Tabelle,
+  Zelle,
+} from "../../ui";
 import type { Auslosung, Richtung, Spiel, Teilnehmer, Turnier } from "./api";
 import stil from "./TischtennisSeite.module.css";
 import { dauer, uhrzeit } from "./zeit";
@@ -104,13 +115,7 @@ function Teilnehmerliste({
   }
 
   return (
-    <section aria-labelledby="mitspieler">
-      <div className={stil.abschnittskopf}>
-        <h2 id="mitspieler" className={stil.abschnittstitel}>
-          Wer spielt mit?
-        </h2>
-      </div>
-
+    <Abschnitt titel="Wer spielt mit?" id="mitspieler">
       <Karte>
         {/* Das Formular steht oben: hier werden zwanzig Namen hintereinander
             eingetippt, und nach jedem rutschte es sonst eine Zeile tiefer. */}
@@ -155,7 +160,7 @@ function Teilnehmerliste({
           </ul>
         )}
       </Karte>
-    </section>
+    </Abschnitt>
   );
 }
 
@@ -180,13 +185,7 @@ function Wuerfel({
   if (turnier.anzahl_teilnehmer < 2) return null;
 
   return (
-    <section aria-labelledby="auswuerfeln">
-      <div className={stil.abschnittskopf}>
-        <h2 id="auswuerfeln" className={stil.abschnittstitel}>
-          Auswürfeln
-        </h2>
-      </div>
-
+    <Abschnitt titel="Auswürfeln" id="auswuerfeln">
       <Karte>
         <Knopf auspraegung="primaer" disabled={laeuft} onClick={() => void wuerfeln()}>
           {laeuft ? "Würfelt …" : vorschau ? "Nochmal würfeln" : "Würfeln"}
@@ -242,7 +241,7 @@ function Wuerfel({
           </>
         )}
       </Karte>
-    </section>
+    </Abschnitt>
   );
 }
 
@@ -267,7 +266,10 @@ function Spielplan({
   onNaechsteRunde: () => void;
   onZuruecksetzen: () => void;
 }) {
-  const offen = spiele.filter((spiel) => spiel.zustand !== "beendet");
+  // Ein Freilos ist kein Spiel: niemand steht dafuer am Tisch. Es steht im
+  // Raster, wo es erklaert, warum einer durch ist - aber nicht in der
+  // Liste dessen, was noch zu spielen ist.
+  const offen = spiele.filter((spiel) => spiel.zustand !== "beendet" && !spiel.freilos);
   const gewertet = spiele.filter(
     (spiel) => spiel.zustand === "beendet" && !spiel.freilos,
   );
@@ -288,13 +290,12 @@ function Spielplan({
 
       {turnier.zustand === "beendet" && <Hinweis>Das Turnier ist durch.</Hinweis>}
 
-      <section aria-labelledby="offen">
-        <div className={stil.abschnittskopf}>
-          <h2 id="offen" className={stil.abschnittstitel}>
-            {offen.length === 0 ? "Nichts mehr offen" : `Noch ${offen.length} zu spielen`}
-          </h2>
-        </div>
-
+      <Abschnitt
+        titel={
+          offen.length === 0 ? "Nichts mehr offen" : `Noch ${offen.length} zu spielen`
+        }
+        id="offen"
+      >
         {offen.length === 0 ? (
           <Leerzustand titel="Alles gewertet">
             Setze die nächste Runde an, oder sieh im Dashboard nach, wie es steht.
@@ -339,6 +340,15 @@ function Spielplan({
                     )}
                   </div>
 
+                  {spiel.heim_id && spiel.gast_id && (
+                    /* Die Knoepfe sagen "Anna gewinnt" - wer gegen wen
+                       spielt, musste man sich vorher aus zwei Knoepfen
+                       zusammensetzen. */
+                    <span className={stil.paarungZeile}>
+                      {spiel.heim} gegen {spiel.gast}
+                    </span>
+                  )}
+
                   {spiel.heim_id && spiel.gast_id ? (
                     <div className={stil.siegerwahl}>
                       {/* Ein Tippen auf den Namen - das ist das ganze
@@ -378,49 +388,10 @@ function Spielplan({
             </ul>
           </Karte>
         )}
-      </section>
+      </Abschnitt>
 
       {gewertet.length > 0 && (
-        <section aria-labelledby="gewertet">
-          <div className={stil.abschnittskopf}>
-            <h2 id="gewertet" className={stil.abschnittstitel}>
-              Gewertet
-            </h2>
-          </div>
-          <Karte blank>
-            <ul className={stil.liste}>
-              {gewertet.map((spiel) => (
-                <li key={spiel.id} className={stil.zeile}>
-                  <span>
-                    <span
-                      className={
-                        spiel.sieger_id === spiel.heim_id ? stil.sieger : undefined
-                      }
-                    >
-                      {spiel.heim}
-                    </span>
-                    <span className={stil.gegen}> gegen </span>
-                    <span
-                      className={
-                        spiel.sieger_id === spiel.gast_id ? stil.sieger : undefined
-                      }
-                    >
-                      {spiel.gast}
-                    </span>
-                  </span>
-                  <Knopf
-                    groesse="sm"
-                    auspraegung="leise"
-                    onClick={() => onZuruecknehmen(spiel.id)}
-                    aria-label={`Ergebnis von Spiel ${spiel.nummer} zurücknehmen`}
-                  >
-                    Zurücknehmen
-                  </Knopf>
-                </li>
-              ))}
-            </ul>
-          </Karte>
-        </section>
+        <Gewertet spiele={gewertet} onZuruecknehmen={onZuruecknehmen} />
       )}
 
       {darfEinrichten && (
@@ -435,5 +406,86 @@ function Spielplan({
         </Karte>
       )}
     </>
+  );
+}
+
+/** So viele Ergebnisse stehen da, bevor die Liste gekuerzt wird. */
+const ZULETZT = 10;
+
+/**
+ * Was schon gewertet ist - das Neueste zuerst, und nicht alles auf einmal.
+ *
+ * Bei einem Abend mit vierzig Spielen stand hier vorher jedes Ergebnis mit
+ * einem eigenen "Zuruecknehmen"-Knopf: vierzig Knoepfe fuer eine Handlung,
+ * die man einmal am Abend braucht, und das Ergebnis, das man gerade
+ * eingetragen hat, ganz unten. Jetzt steht es oben; korrigiert wird in der
+ * geoeffneten Zeile.
+ */
+function Gewertet({
+  spiele,
+  onZuruecknehmen,
+}: {
+  spiele: Spiel[];
+  onZuruecknehmen: (id: string) => void;
+}) {
+  const [offen, setOffen] = useState<string | null>(null);
+  const [alle, setAlle] = useState(false);
+
+  const neuestesZuerst = [...spiele].sort(
+    (a, b) =>
+      (b.beendet_am ?? "").localeCompare(a.beendet_am ?? "") || b.nummer - a.nummer,
+  );
+  const gezeigt = alle ? neuestesZuerst : neuestesZuerst.slice(0, ZULETZT);
+
+  return (
+    <Abschnitt titel="Gewertet" id="gewertet" beiwort={`${spiele.length}`}>
+      <Tabelle beschriftung="Gewertet" raster="1fr auto">
+        {gezeigt.map((spiel) => (
+          <Reihe
+            key={spiel.id}
+            onKlick={() => setOffen(offen === spiel.id ? null : spiel.id)}
+            offen={offen === spiel.id}
+            ausklappung={
+              <div className={stil.korrektur}>
+                <span className={stil.nebensache}>
+                  {spiel.bezeichnung} · Spiel {spiel.nummer}
+                </span>
+                <Knopf
+                  groesse="sm"
+                  auspraegung="leise"
+                  onClick={() => onZuruecknehmen(spiel.id)}
+                  aria-label={`Ergebnis von Spiel ${spiel.nummer} zurücknehmen`}
+                >
+                  Zurücknehmen
+                </Knopf>
+              </div>
+            }
+          >
+            <Zelle>
+              <span
+                className={spiel.sieger_id === spiel.heim_id ? stil.sieger : undefined}
+              >
+                {spiel.heim}
+              </span>
+              <span className={stil.gegen}>gegen</span>
+              <span
+                className={spiel.sieger_id === spiel.gast_id ? stil.sieger : undefined}
+              >
+                {spiel.gast}
+              </span>
+            </Zelle>
+            <Zelle leise rechts>
+              {uhrzeit(spiel.beendet_am)}
+            </Zelle>
+          </Reihe>
+        ))}
+      </Tabelle>
+
+      {!alle && spiele.length > ZULETZT && (
+        <Knopf groesse="sm" auspraegung="leise" onClick={() => setAlle(true)}>
+          Alle {spiele.length} zeigen
+        </Knopf>
+      )}
+    </Abschnitt>
   );
 }

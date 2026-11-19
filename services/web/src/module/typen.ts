@@ -6,9 +6,9 @@ import type { ModulEintrag } from "../api/client";
  * Wie viel Platz eine Ansicht beansprucht.
  *
  * Vorher entschied das die Hülle für alle gleich. Das ging so lange gut, wie
- * es ein Modul gab. Bei dreien ist es falsch: eine Geräteliste mit drei
- * Einträgen braucht keine 1088 px, eine Spielprüftabelle mit neun Bereichen
- * hätte gern mehr.
+ * es ein Modul gab. Bei dreien ist es falsch: ein Formular mit drei Feldern
+ * braucht keine 1088 px, eine Spielprüftabelle mit neun Bereichen hätte gern
+ * mehr.
  *
  * Deshalb meldet das Modul seinen Bedarf an, und die Hülle richtet sich
  * danach. Vier Stufen, mehr braucht es nicht — eine fünfte wäre schon eine
@@ -58,6 +58,20 @@ export interface Unterseite {
    */
   breite?: Breite | undefined;
   /**
+   * Der Bereich bringt seine Überschrift selbst mit.
+   *
+   * Ohne Angabe setzt die Modulseite den Bereichsnamen als `h1` darüber —
+   * das genügt, solange über dem Inhalt nur ein Wort stehen muss.
+   *
+   * Sobald daneben etwas gehört, das nur der Bereich kennt — „9 Berichte
+   * warten · 3 fällig", ein Filter, die eine Handlung dieser Fläche —, geht
+   * das nicht mehr: Die Modulseite kennt diese Zahlen nicht, und der Bereich
+   * kann sie nicht nach oben reichen. Dann baut der Bereich den ganzen Kopf
+   * selbst (`<Tafel>`), und die Modulseite hält sich heraus. Zwei
+   * Überschriften mit demselben Wort untereinander wären sonst die Folge.
+   */
+  eigenerTitel?: boolean | undefined;
+  /**
    * Nicht in der Navigation, aber eine echte Adresse.
    *
    * Für Wege statt Flächen: die Einrichtung wird einmal durchlaufen und
@@ -88,6 +102,13 @@ export interface ModulProps {
  * gemeint: derselbe Stil, unterschiedlicher Umfang.
  */
 export interface ModulOberflaeche {
+  /**
+   * Die Fläche bringt ihre Überschrift selbst mit - wie `eigenerTitel` an
+   * einem Bereich, nur für ein Artefakt ohne zweite Ebene. Die Verwaltung
+   * ist der Fall: eine einzige Fläche, deren Kopf Zahlen trägt, die nur sie
+   * kennt.
+   */
+  eigenerTitel?: boolean | undefined;
   /** Muss der Kennung aus dem Backend-Manifest entsprechen. */
   id: string;
   Komponente: ComponentType<ModulProps>;

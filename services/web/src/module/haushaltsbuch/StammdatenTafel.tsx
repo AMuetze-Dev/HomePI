@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { Etikett, Feld, Karte, Knopf, Leerzustand } from "../../ui";
+import { Abschnitt, Etikett, Feld, Karte, Knopf, Leerzustand } from "../../ui";
 import {
   aendereKategorie,
   aendereKonto,
@@ -67,12 +67,7 @@ function Zeilenknoepfe({
 }) {
   return (
     <>
-      <Knopf
-        groesse="sm"
-        auspraegung="primaer"
-        onClick={onBearbeiten}
-        aria-label={`${was} ändern`}
-      >
+      <Knopf groesse="sm" onClick={onBearbeiten} aria-label={`${was} ändern`}>
         Ändern
       </Knopf>
       <Knopf
@@ -91,25 +86,34 @@ function Personen({ daten, aktion }: Props) {
   const [bearbeitet, setBearbeitet] = useState<Person | null>(null);
   const [name, setName] = useState("");
   const [laeuft, setLaeuft] = useState(false);
+  // Der Puffer, der vor dem Anlegen liegen bleibt. Deutsch angezeigt - sonst
+  // steht beim Aendern ein Punkt da, wo jemand ein Komma getippt hat.
+  const [sockel, setSockel] = useState("");
 
   function beginne(person: Person) {
     setBearbeitet(person);
     setName(person.name);
+    setSockel(person.sockel.replace(".", ","));
   }
 
   function abbrechen() {
     setBearbeitet(null);
     setName("");
+    setSockel("");
   }
 
   async function absenden(ereignis: React.FormEvent) {
     ereignis.preventDefault();
     if (name.trim() === "" || laeuft) return;
 
+    const puffer = sockel.trim().replace(/\s/g, "").replace(",", ".");
     setLaeuft(true);
     const geklappt = await aktion(() =>
       bearbeitet
-        ? aenderePerson(bearbeitet.id, { name: name.trim() })
+        ? aenderePerson(bearbeitet.id, {
+            name: name.trim(),
+            sockel: puffer === "" ? "0" : puffer,
+          })
         : legePersonAn({ name: name.trim() }),
     );
     setLaeuft(false);
@@ -117,33 +121,27 @@ function Personen({ daten, aktion }: Props) {
   }
 
   return (
-    <section aria-labelledby="personen" className={stil.block}>
-      <h2 id="personen" className={stil.abschnittstitel}>
-        Personen
-      </h2>
-
+    <Abschnitt titel="Personen" id="personen" regel>
       {daten.personen.length === 0 ? (
         <Leerzustand titel="Noch niemand eingetragen">
           Wer teilt sich diesen Haushalt? Die Namen hier sind keine Anmeldungen am HomePI
           — sie sagen nur, zwischen wem eine gemeinsame Rechnung aufgeteilt wird.
         </Leerzustand>
       ) : (
-        <Karte blank>
-          <ul className={stil.zeilenliste} aria-label="Personen">
-            {daten.personen.map((person) => (
-              <li key={person.id} className={stil.zeile}>
-                <span>{person.name}</span>
-                <div className={stil.aktionen}>
-                  <Zeilenknoepfe
-                    was={person.name}
-                    onBearbeiten={() => beginne(person)}
-                    onEntfernen={() => void aktion(() => entfernePerson(person.id))}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Karte>
+        <ul className={stil.zeilenliste} aria-label="Personen">
+          {daten.personen.map((person) => (
+            <li key={person.id} className={stil.zeile}>
+              <span>{person.name}</span>
+              <div className={stil.aktionen}>
+                <Zeilenknoepfe
+                  was={person.name}
+                  onBearbeiten={() => beginne(person)}
+                  onEntfernen={() => void aktion(() => entfernePerson(person.id))}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
 
       <Karte>
@@ -155,6 +153,16 @@ function Personen({ daten, aktion }: Props) {
             placeholder="Aaron"
             autoComplete="off"
           />
+          {bearbeitet && (
+            <Feld
+              beschriftung="Puffer, der liegen bleibt"
+              hinweis="Nur für Posten, die sich am Überschuss orientieren: So viel bleibt vorher auf dem Konto."
+              value={sockel}
+              onChange={(e) => setSockel(e.target.value)}
+              inputMode="decimal"
+              placeholder="0,00"
+            />
+          )}
           <div className={stil.formularfuss}>
             {bearbeitet && (
               <Knopf type="button" auspraegung="leise" onClick={abbrechen}>
@@ -175,7 +183,7 @@ function Personen({ daten, aktion }: Props) {
           </div>
         </form>
       </Karte>
-    </section>
+    </Abschnitt>
   );
 }
 
@@ -229,44 +237,36 @@ function Konten({ daten, aktion }: Props) {
   }
 
   return (
-    <section aria-labelledby="konten" className={stil.block}>
-      <h2 id="konten" className={stil.abschnittstitel}>
-        Konten
-      </h2>
-
+    <Abschnitt titel="Konten" id="konten" regel>
       {daten.konten.length === 0 ? (
         <Leerzustand titel="Noch kein Konto">
           Ein Konto ohne Inhaber ist ein gemeinsames — darauf liegen die Posten, die
           aufgeteilt werden.
         </Leerzustand>
       ) : (
-        <Karte blank>
-          <ul className={stil.zeilenliste} aria-label="Konten">
-            {daten.konten.map((konto) => (
-              <li key={konto.id} className={stil.zeile}>
-                <span>
-                  {konto.name}
-                  <span className={stil.unterzeile}>
-                    {KONTOART_WORT[konto.art]} ·{" "}
-                    {konto.inhaber_id === null
-                      ? "gemeinsam"
-                      : (inhaberName.get(konto.inhaber_id) ?? "unbekannt")}
-                  </span>
+        <ul className={stil.zeilenliste} aria-label="Konten">
+          {daten.konten.map((konto) => (
+            <li key={konto.id} className={stil.zeile}>
+              <span>
+                {konto.name}
+                <span className={stil.unterzeile}>
+                  {KONTOART_WORT[konto.art]} ·{" "}
+                  {konto.inhaber_id === null
+                    ? "gemeinsam"
+                    : (inhaberName.get(konto.inhaber_id) ?? "unbekannt")}
                 </span>
-                <div className={stil.aktionen}>
-                  {konto.inhaber_id === null && (
-                    <Etikett ton="neutral">gemeinsam</Etikett>
-                  )}
-                  <Zeilenknoepfe
-                    was={konto.name}
-                    onBearbeiten={() => beginne(konto)}
-                    onEntfernen={() => void aktion(() => entferneKonto(konto.id))}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Karte>
+              </span>
+              <div className={stil.aktionen}>
+                {konto.inhaber_id === null && <Etikett ton="neutral">gemeinsam</Etikett>}
+                <Zeilenknoepfe
+                  was={konto.name}
+                  onBearbeiten={() => beginne(konto)}
+                  onEntfernen={() => void aktion(() => entferneKonto(konto.id))}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
 
       <Karte>
@@ -313,7 +313,7 @@ function Konten({ daten, aktion }: Props) {
           </div>
         </form>
       </Karte>
-    </section>
+    </Abschnitt>
   );
 }
 
@@ -350,11 +350,7 @@ function Kategorien({ daten, aktion }: Props) {
   }
 
   return (
-    <section aria-labelledby="kategorien" className={stil.block}>
-      <h2 id="kategorien" className={stil.abschnittstitel}>
-        Kategorien
-      </h2>
-
+    <Abschnitt titel="Kategorien" id="kategorien" regel>
       {daten.kategorien.length === 0 ? (
         <Leerzustand
           titel="Noch keine Kategorie"
@@ -371,25 +367,23 @@ function Kategorien({ daten, aktion }: Props) {
           Davon hängt die Sparquote ab.
         </Leerzustand>
       ) : (
-        <Karte blank>
-          <ul className={stil.zeilenliste} aria-label="Kategorien">
-            {daten.kategorien.map((kategorie) => (
-              <li key={kategorie.id} className={stil.zeile}>
-                <span>{kategorie.name}</span>
-                <div className={stil.aktionen}>
-                  {kategorie.zaehlt_als_sparen && (
-                    <Etikett ton="gut">zählt als Sparen</Etikett>
-                  )}
-                  <Zeilenknoepfe
-                    was={kategorie.name}
-                    onBearbeiten={() => beginne(kategorie)}
-                    onEntfernen={() => void aktion(() => entferneKategorie(kategorie.id))}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Karte>
+        <ul className={stil.zeilenliste} aria-label="Kategorien">
+          {daten.kategorien.map((kategorie) => (
+            <li key={kategorie.id} className={stil.zeile}>
+              <span>{kategorie.name}</span>
+              <div className={stil.aktionen}>
+                {kategorie.zaehlt_als_sparen && (
+                  <Etikett ton="gut">zählt als Sparen</Etikett>
+                )}
+                <Zeilenknoepfe
+                  was={kategorie.name}
+                  onBearbeiten={() => beginne(kategorie)}
+                  onEntfernen={() => void aktion(() => entferneKategorie(kategorie.id))}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
 
       <Karte>
@@ -435,6 +429,6 @@ function Kategorien({ daten, aktion }: Props) {
           </div>
         </form>
       </Karte>
-    </section>
+    </Abschnitt>
   );
 }

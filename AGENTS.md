@@ -26,8 +26,9 @@ docs/                   Begründungen. Lies sie, bevor du etwas umbaust.
    einen Entry Point `homepi.module` anmeldet.
 2. Das **Gateway** findet es beim Start, hängt es unter `/<name>` ein und nennt
    es in `GET /module`.
-3. Die **Startseite** baut ihre Kacheln aus genau dieser Liste — ein neues
-   Artefakt erscheint dort ohne Frontend-Änderung.
+3. Die **Startseite** baut ihre Zeilen aus genau dieser Liste — ein neues
+   Artefakt erscheint dort ohne Frontend-Änderung. Dieselbe Liste trägt die
+   Navigationsfläche, die `Esc` aufzieht.
 4. Ohne eigene Oberfläche bekommt es die **generische Ansicht**, die seine
    Endpunkte aus dem OpenAPI-Schema liest.
 5. In dieser Liste steht nur, was der Aufrufer sehen darf. Ein Artefakt ist per
@@ -171,3 +172,4 @@ ist alles ohne horizontales Scrollen erreichbar.
 | Artefakt bauen, Schritt für Schritt | [docs/09-artefakt-bauen.md](docs/09-artefakt-bauen.md) |
 | Auftrag zum Übergeben an einen Agenten | [docs/10-auftrag-artefakt.md](docs/10-auftrag-artefakt.md) |
 | Konten, Rechte, Sichtbarkeit von Artefakten | [docs/11-anmeldung.md](docs/11-anmeldung.md) |
+| Aus dem Internet erreichbar — was öffentlich ist und was nicht | [docs/14-internet.md](docs/14-internet.md) |

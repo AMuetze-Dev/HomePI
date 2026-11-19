@@ -9,7 +9,7 @@ eine eigene Fehlerbehandlung - und vergisst sie beim vierten.
       "title":    "Nicht gefunden",
       "status":   404,
       "detail":   "Gerät 42 existiert nicht",
-      "instance": "/geraete/42",
+      "instance": "/beispiel/42",
       "request_id": "0b1f..."
     }
 """

@@ -11,14 +11,21 @@
   min-width: 0;
 }
 
-/* Zentriert, nicht linksbündig: Bei einer schmalen Spalte auf einem breiten
-   Monitor säße der Text sonst an der Leiste geklebt, während rechts ein
-   halber Meter leer bliebe. */
-.text,
-.normal,
-.weit {
-  margin-inline: auto;
-}
+/*
+ * Linksbündig, nicht zentriert.
+ *
+ * Zentriert war es, solange links eine Navigationsleiste stand: Eine
+ * schmale Spalte hätte sonst an ihr geklebt. Die Leiste gibt es nicht mehr,
+ * und damit ist aus dem Ausgleich ein Fehler geworden — eine Spalte von
+ * 40 rem schwamm auf einem breiten Monitor in der Mitte, während Brotkrume,
+ * Bereichsleiste und Titel links an der Kante standen. Beim Wechsel
+ * zwischen zwei verschieden breiten Bereichen sprang sie zusätzlich
+ * seitwärts.
+ *
+ * Jede Stufe hängt jetzt an derselben linken Kante wie alles darüber; was
+ * sie nicht braucht, bleibt rechts frei. Das ist auch die Richtung des
+ * Entwurfs: links bündig, Luft nach rechts (docs/08-design.md).
+ */
 
 .text {
   max-width: var(--breite-text);

@@ -21,6 +21,8 @@ export interface Person {
   id: string;
   name: string;
   reihenfolge: number;
+  /** Was auf dem Konto liegen bleibt, bevor angelegt wird. */
+  sockel: Betrag;
 }
 
 export interface Konto {
@@ -58,6 +60,11 @@ export interface Posten {
   variabel: boolean;
   aktiv: boolean;
   anteile: Anteil[];
+  /**
+   * Gesetzt heißt: kein fester Betrag, sondern dieser Anteil an dem, was der
+   * Person übrig bleibt. 10/50/30/10 sind vier Posten mit diesen Gewichten.
+   */
+  anlage_gewicht: number | null;
 }
 
 export interface PostenZeile {
@@ -98,6 +105,10 @@ export interface PersonBilanz {
   rest: Betrag;
   sparquote: Betrag;
   moegliche_sparquote: Betrag;
+  /** Davon aus dem Überschuss angelegt. */
+  anlage: Betrag;
+  /** Der Puffer, der dabei liegen bleibt. */
+  sockel: Betrag;
   nach_kategorie: Kategoriesumme[];
 }
 
@@ -141,6 +152,7 @@ export interface Flussbild {
 
 export interface NeuePerson {
   name: string;
+  sockel?: string;
 }
 
 export interface NeuesKonto {
@@ -166,6 +178,7 @@ export interface NeuerPosten {
   kategorie_id: string | null;
   variabel: boolean;
   anteile: Anteil[];
+  anlage_gewicht?: number | null;
 }
 
 /** Was sich an einem Posten ändern lässt, ohne ihn neu anzulegen. */
@@ -173,6 +186,8 @@ export type PostenAenderung = Partial<NeuerPosten> & {
   aktiv?: boolean;
   kategorie_loeschen?: boolean;
   tag_loeschen?: boolean;
+  /** Zurück zum festen Betrag. `anlage_gewicht: null` hieße "nicht angegeben". */
+  anlage_loeschen?: boolean;
 };
 
 export function ladeUebersicht(

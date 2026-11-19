@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Feld, Hinweis, Karte, Knopf, Platzhalter } from "../../ui";
+import { Feld, Hinweis, Karte, Knopf, Platzhalter, Tafel } from "../../ui";
 import {
   type Beispieldatenstand,
   type Einstellungen,
@@ -11,10 +11,7 @@ import {
   speichereEinstellungen,
 } from "./api";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 /**
  * Was in jedem Schreiben steht und wie lange eine Frist läuft.
@@ -41,17 +38,21 @@ export function EinstellungenTafel() {
 
   if (fehler && werte === null) {
     return (
-      <Hinweis ton="fehler" dringend>
-        {fehler}
-      </Hinweis>
+      <Tafel titel="Einstellungen">
+        <Hinweis ton="fehler" dringend>
+          {fehler}
+        </Hinweis>
+      </Tafel>
     );
   }
 
   if (werte === null) {
     return (
-      <div role="status" aria-label="Einstellungen werden geladen">
-        <Platzhalter breite="100%" hoehe="14rem" />
-      </div>
+      <Tafel titel="Einstellungen">
+        <div role="status" aria-label="Einstellungen werden geladen">
+          <Platzhalter breite="100%" hoehe="14rem" />
+        </div>
+      </Tafel>
     );
   }
 
@@ -78,11 +79,9 @@ export function EinstellungenTafel() {
   }
 
   return (
-    <>
+    <Tafel titel="Einstellungen">
       <Karte>
         <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
-          <h2 className={stil.formularTitel}>Einstellungen</h2>
-
           <Feld
             beschriftung="Staffelleiter"
             hinweis="Steht unter jedem Schreiben."
@@ -177,7 +176,7 @@ export function EinstellungenTafel() {
       </Karte>
 
       <Einrichtungsweg />
-    </>
+    </Tafel>
   );
 }
 

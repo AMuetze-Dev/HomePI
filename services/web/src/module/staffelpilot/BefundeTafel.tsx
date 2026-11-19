@@ -4,10 +4,7 @@ import { Etikett, Hinweis, Karte, Knopf, Platzhalter } from "../../ui";
 import { type BefundZeile, type Schwere, ladeAlleBefunde } from "./api";
 import { alsDatum } from "./datum";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 const TON: Record<Schwere, "fehler" | "warnung" | "neutral"> = {
   kritisch: "fehler",
@@ -62,7 +59,7 @@ export function BefundeListe({ staffelId }: { staffelId?: string | undefined }) 
   }, [laden, staffelId, nurOffen, offen]);
 
   return (
-    <Karte>
+    <Karte className={stil.stapel}>
       <button
         type="button"
         className={stil.kopf}

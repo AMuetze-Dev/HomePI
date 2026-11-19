@@ -36,7 +36,7 @@ from homepi_core import ServiceSettings, create_service
 
 
 class Settings(ServiceSettings):
-    service_name: str = "geraete"
+    service_name: str = "beispiel"
     service_version: str = "0.1.0"
 
 
@@ -44,7 +44,7 @@ settings = Settings()
 app = create_service(settings)
 
 
-@app.get("/geraete")
+@app.get("/beispiel")
 async def liste() -> list[str]:
     return ["lampe", "heizung"]
 ```
@@ -68,7 +68,7 @@ Was `create_service` mitbringt, ohne dass du etwas dafür tust:
 ```bash
 homepi doctor            # Voraussetzungen prüfen
 homepi info              # welches Projekt erkannt wurde
-homepi new geraete       # neuen Service anlegen
+homepi new beispiel      # neuen Service anlegen
 homepi deploy            # über die Pipeline auf den Pi
 homepi deploy --dry-run  # nur zeigen, was passieren würde
 ```

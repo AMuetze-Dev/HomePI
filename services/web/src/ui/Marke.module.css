@@ -1,0 +1,53 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md).
+
+   Ausnahme sind die Maße des Zeichens selbst: ein Markenzeichen ist eine
+   Zeichnung mit festen Proportionen, kein Abstand im Raster. */
+
+.marke,
+.gross {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+}
+
+.marke {
+  width: 1.25rem;
+  height: 1.25rem;
+  gap: 3px;
+}
+
+/* Gefasst und mit Luft: So trägt das Zeichen eine Seite, auf der sonst
+   nichts über der Überschrift steht. */
+.gross {
+  width: 1.75rem;
+  height: 1.75rem;
+  gap: 3px;
+  padding: 7px;
+  border-radius: var(--rundung-md);
+  box-shadow: inset 0 0 0 1px var(--farbe-linie);
+}
+
+.feld,
+.akzentfeld {
+  display: block;
+  border-radius: 1px;
+  transition: background-color var(--dauer-schnell) var(--verlauf);
+}
+
+.feld {
+  background: var(--farbe-text-leise);
+}
+
+.akzentfeld {
+  background: var(--farbe-akzent);
+}
+
+/* Offene Navigation: alle vier Felder tragen den Akzent. Der Wechsel ist
+   die einzige Rückmeldung, die das Zeichen gibt - und er genügt, weil er
+   genau dort sitzt, wo man geklickt hat. */
+.aktiv .feld {
+  background: var(--farbe-akzent);
+}

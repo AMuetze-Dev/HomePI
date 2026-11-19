@@ -4,24 +4,9 @@
   gap: var(--raum-4);
 }
 
-.block {
-  margin-top: var(--raum-8);
-}
-
-.abschnittstitel {
-  margin-bottom: var(--raum-4);
-  font-size: var(--text-lg);
-  font-weight: var(--gewicht-halbfett);
-}
-
 .leer {
   padding: var(--raum-2) 0;
   color: var(--farbe-text-gedaempft);
-  font-size: var(--text-sm);
-}
-
-.leise {
-  color: var(--farbe-text-leise);
   font-size: var(--text-sm);
 }
 
@@ -33,19 +18,12 @@
   color: var(--farbe-text-leise);
 }
 
-/* --- Monatswähler --- */
+/* Der Monatswähler steht in der Titelzeile der Fläche. Kein Abstand nach
+   außen: den gibt dort der Kopf der Tafel. */
 .monatswaehler {
   display: flex;
   align-items: center;
   gap: var(--raum-2);
-  margin-bottom: var(--raum-6);
-}
-
-.monat {
-  flex: 1;
-  font-size: var(--text-xl);
-  font-weight: var(--gewicht-halbfett);
-  letter-spacing: var(--laufweite-eng);
 }
 
 /* --- Bilanzen --- */
@@ -89,7 +67,7 @@
 }
 
 .teilFest {
-  background: var(--neutral-400);
+  background: var(--ton-400);
 }
 
 .teilSparen {
@@ -222,17 +200,86 @@
   font-weight: var(--gewicht-halbfett);
 }
 
-/* Pausiert heißt: steht noch da, zählt aber nicht mit. Ausgegraut statt
-   versteckt - sonst sucht man, wohin der Posten verschwunden ist. */
-.pausiert td {
-  color: var(--farbe-text-leise);
-}
-
 .aktionen {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--raum-2);
+}
+
+/* --- Die Postenliste --- */
+
+/* Filter links, Summe in der Mitte, die eine Handlung rechts. Umbricht auf
+   schmalen Geräten, statt die Summe zu quetschen. */
+.listenkopf {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--raum-3) var(--raum-5);
+  margin-bottom: var(--raum-4);
+}
+
+.summe {
+  display: flex;
+  align-items: baseline;
+  gap: var(--raum-2);
+  margin: 0;
+  margin-inline-end: auto;
+  font-weight: var(--gewicht-halbfett);
+  font-variant-numeric: tabular-nums;
+}
+
+.summenwort {
+  font-size: var(--text-xs);
+  font-weight: var(--gewicht-normal);
+  letter-spacing: var(--laufweite-weit);
+  text-transform: uppercase;
+  color: var(--farbe-text-leise);
+}
+
+/* Was unter einer Zeile aufgeht: Merkmale links, Handlungen rechts. */
+.ausklappung {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--raum-4);
+  padding: var(--raum-1) var(--raum-4) var(--raum-5);
+}
+
+.merkmale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2) var(--raum-8);
+  margin: 0;
+}
+
+.merkmale dt {
+  font-size: var(--text-xs);
+  letter-spacing: var(--laufweite-weit);
+  text-transform: uppercase;
+  color: var(--farbe-text-leise);
+}
+
+.merkmale dd {
+  margin: var(--raum-1) 0 0;
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+}
+
+/* Die zweite Angabe in einer Reihe steht daneben, nicht darunter: Eine
+   Zelle ist dort eine Zeile, und zwei Zeilen machen die Liste doppelt hoch. */
+.nebenwort {
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leerknopf {
+  margin: var(--raum-5) 0 0;
 }
 
 /* --- Listen für Stammdaten --- */
@@ -368,11 +415,11 @@
 }
 
 .band_kategorie {
-  fill: var(--neutral-400);
+  fill: var(--ton-400);
 }
 
 .band_posten {
-  fill: var(--neutral-400);
+  fill: var(--ton-400);
 }
 
 .knoten_einnahme {
@@ -384,11 +431,11 @@
 }
 
 .knoten_kategorie {
-  fill: var(--neutral-500);
+  fill: var(--ton-500);
 }
 
 .knoten_posten {
-  fill: var(--neutral-400);
+  fill: var(--ton-400);
 }
 
 .knotenname {
@@ -448,6 +495,13 @@
     text-align: right;
   }
 
+  /* Ohne Kopfzeile sagt die Zelle selbst, welche Zahl sie zeigt. */
+  .tabelle td[data-spalte]::before {
+    content: attr(data-spalte) " ";
+    color: var(--farbe-text-leise);
+    font-weight: var(--gewicht-normal);
+  }
+
   .aktionszelle {
     grid-column: 1 / -1;
     margin-top: var(--raum-3);
@@ -459,9 +513,5 @@
 
   .aktionen > * {
     flex: 1;
-  }
-
-  .monat {
-    font-size: var(--text-lg);
   }
 }

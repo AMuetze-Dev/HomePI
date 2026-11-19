@@ -232,3 +232,92 @@ describe("Dashboard", () => {
     expect(letzte.getByText("Bernd")).toBeInTheDocument();
   });
 });
+
+describe("Dashboard: dein Spiel", () => {
+  const LAEUFT_AN_TISCH_2 = spiel({
+    id: "s7",
+    zustand: "laeuft",
+    tisch: 2,
+    begonnen_am: "2026-11-09T18:00:00Z",
+  });
+
+  it("fragt, wer man ist, und nennt dann das eigene nächste Spiel", async () => {
+    /* Die Frage, mit der ein Spieler die Tafel aufmacht - und die Antwort
+       stand vorher verteilt auf alle Tische. */
+    vi.spyOn(api, "ladeDashboard").mockResolvedValue(
+      dashboard({
+        spiele: [spiel({ tisch: 2, gleich_dran: true })],
+      }),
+    );
+    render(<DashboardTafel />);
+
+    await userEvent.selectOptions(await screen.findByLabelText("Ich bin"), "p2");
+
+    const deins = within(screen.getByRole("region", { name: "Dein Spiel" }));
+    expect(deins.getByText(/Tisch 2/)).toBeInTheDocument();
+    expect(deins.getByText(/gegen Anna/)).toBeInTheDocument();
+    expect(deins.getByText(/gleich dran/)).toBeInTheDocument();
+  });
+
+  it("merkt sich die Wahl auf diesem Gerät", async () => {
+    window.localStorage.setItem("homepi.tischtennis.ich", JSON.stringify("p1"));
+    vi.spyOn(api, "ladeDashboard").mockResolvedValue(
+      dashboard({ spiele: [LAEUFT_AN_TISCH_2] }),
+    );
+
+    render(<DashboardTafel />);
+
+    const deins = within(await screen.findByRole("region", { name: "Dein Spiel" }));
+    expect(deins.getByText(/spielst gerade an Tisch 2/)).toBeInTheDocument();
+  });
+
+  it("sagt ehrlich, wenn gerade nichts ansteht", async () => {
+    window.localStorage.setItem("homepi.tischtennis.ich", JSON.stringify("p1"));
+    vi.spyOn(api, "ladeDashboard").mockResolvedValue(dashboard({ spiele: [] }));
+
+    render(<DashboardTafel />);
+
+    expect(
+      await screen.findByText(/Gerade steht kein Spiel für dich an/),
+    ).toBeInTheDocument();
+  });
+
+  it("hebt den eigenen Namen an den Tischen hervor", async () => {
+    window.localStorage.setItem("homepi.tischtennis.ich", JSON.stringify("p1"));
+    vi.spyOn(api, "ladeDashboard").mockResolvedValue(
+      dashboard({
+        spiele: [LAEUFT_AN_TISCH_2],
+        tische: [{ tisch: 2, laeuft: LAEUFT_AN_TISCH_2, danach: [] }],
+      }),
+    );
+
+    render(<DashboardTafel />);
+
+    const tische = within(await screen.findByRole("region", { name: "An den Tischen" }));
+    expect(tische.getByText("Anna")).toHaveAttribute("aria-current", "true");
+    expect(tische.getByText("Bernd")).not.toHaveAttribute("aria-current");
+  });
+
+  it("nennt eine lange Spieldauer in Stunden statt in Minuten", async () => {
+    /* "läuft seit 6599 min" stand da, wenn jemand vergessen hatte, ein
+       Spiel zu werten. */
+    vi.spyOn(api, "ladeDashboard").mockResolvedValue(
+      dashboard({
+        tische: [
+          {
+            tisch: 1,
+            laeuft: spiel({
+              zustand: "laeuft",
+              begonnen_am: new Date(Date.now() - 110 * 60000).toISOString(),
+            }),
+            danach: [],
+          },
+        ],
+      }),
+    );
+
+    render(<DashboardTafel />);
+
+    expect(await screen.findByText(/läuft seit 1 h 50 min/)).toBeInTheDocument();
+  });
+});

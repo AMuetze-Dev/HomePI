@@ -643,7 +643,7 @@ describe("Nur fällige", () => {
     zeige("spiele");
     await screen.findByText("SG Gittersee – SV Fortschritt");
 
-    await userEvent.click(screen.getByRole("button", { name: "Nur fällige" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Nur fällige" }));
 
     await waitFor(() =>
       expect(api.ladeWarteschlange).toHaveBeenLastCalledWith(
@@ -807,9 +807,130 @@ describe("Die Weiche zur Einrichtung", () => {
 
     zeige("staffeln");
 
-    expect(await screen.findByRole("heading", { name: /Staffel/ })).toBeInTheDocument();
+    // Der Bereich traegt seinen Titel selbst (level 1) - darunter steht mit
+    // "Staffel anlegen" eine zweite Ueberschrift, die ebenfalls auf /Staffel/
+    // passt. Gemeint ist hier die Flaeche, also die erste Ebene.
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Staffeln" }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("list", { name: /Schritte der Einrichtung/ }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("Der Kopf der Spielprüfung", () => {
+  it("sagt neben dem Titel, wie viel ansteht", async () => {
+    // Die Frage, mit der man die Fläche aufmacht. Sie stand vorher nur auf
+    // der Übersicht, also eine Fläche weiter weg.
+    mitDaten(
+      [staffel()],
+      [
+        zeile({ id: "m1", faellig: true }),
+        zeile({ id: "m2", faellig: false }),
+        zeile({ id: "m3", abgehakt: true }),
+      ],
+    );
+    zeige("spiele");
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Spielprüfung" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2 Berichte warten · 1 fällig")).toBeInTheDocument();
+  });
+
+  it("zählt im Singular, wenn es einer ist", async () => {
+    mitDaten([staffel()], [zeile()]);
+    zeige("spiele");
+
+    expect(await screen.findByText("1 Bericht wartet · 1 fällig")).toBeInTheDocument();
+  });
+
+  it("zählt gar nicht, solange nichts da ist", async () => {
+    mitDaten([staffel()], []);
+    zeige("spiele");
+
+    await screen.findByRole("heading", { level: 1, name: "Spielprüfung" });
+
+    expect(screen.queryByText(/Berichte warten/)).not.toBeInTheDocument();
+  });
+
+  it("stellt den Staffelfilter neben die anderen Filter", async () => {
+    // Er stand vorher als eigene Karte zwischen Titel und Liste - eine
+    // Fläche für ein Auswahlfeld.
+    mitDaten([staffel(), staffel({ id: "s2", name: "1. Kreisklasse" })]);
+    zeige("spiele");
+
+    const wahl = await screen.findByRole("combobox", { name: "Staffel" });
+
+    expect(wahl).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Welche Spiele" })).toBeInTheDocument();
+  });
+});
+
+describe("Eine Zeile der Spielprüfung", () => {
+  it("nennt den Stand in Worten, nicht nur in der Farbe", async () => {
+    mitDaten([staffel()], [zeile({ faellig: true, kritische_befunde: 0 })]);
+    zeige("spiele");
+
+    const liste = await screen.findByRole("list", { name: "Spielberichte" });
+
+    expect(within(liste).getByText("fällig")).toBeInTheDocument();
+    expect(within(liste).getByText("1 offen")).toBeInTheDocument();
+  });
+
+  it("sagt es, wenn ein Bericht sauber ist", async () => {
+    // Eine leere Zelle liest sich wie ein fehlender Wert.
+    mitDaten([staffel()], [zeile({ offene_befunde: 0, kritische_befunde: 0 })]);
+    zeige("spiele");
+
+    const liste = await screen.findByRole("list", { name: "Spielberichte" });
+
+    expect(within(liste).getByText("ohne Befund")).toBeInTheDocument();
+  });
+
+  it("klappt den Bericht unter der Zeile auf, statt wegzuführen", async () => {
+    // Ein Staffelleiter arbeitet die Liste von oben nach unten ab. Jeder
+    // Sprung auf eine eigene Seite kostet den Platz in der Liste.
+    mitDaten();
+    vi.spyOn(api, "ladeSpiel").mockResolvedValue(spiel());
+    zeige("spiele");
+
+    const reihe = await screen.findByRole("button", { name: /SG Gittersee/ });
+    expect(reihe).toHaveAttribute("aria-expanded", "false");
+
+    await userEvent.click(reihe);
+
+    expect(await screen.findByRole("list", { name: "Befunde" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /SG Gittersee/ })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+});
+
+describe("Schwere und Stand in derselben Zelle", () => {
+  it("nennt bei einem kritischen Befund auch, wie viele offen sind", async () => {
+    // Zwischendurch stand hier nur das eine von beiden. Bei einem kritischen
+    // Befund verschwand damit die Auskunft, ob er schon entschieden ist -
+    // also genau die Frage, mit der man die Zeile ansieht.
+    mitDaten([staffel()], [zeile({ kritische_befunde: 1, offene_befunde: 2 })]);
+    zeige("spiele");
+
+    const liste = await screen.findByRole("list", { name: "Spielberichte" });
+
+    expect(within(liste).getByText("1 kritisch")).toBeInTheDocument();
+    expect(within(liste).getByText("2 offen")).toBeInTheDocument();
+  });
+
+  it("lässt den Stand weg, wenn alles entschieden ist", async () => {
+    mitDaten([staffel()], [zeile({ kritische_befunde: 1, offene_befunde: 0 })]);
+    zeige("spiele");
+
+    const liste = await screen.findByRole("list", { name: "Spielberichte" });
+
+    expect(within(liste).getByText("1 kritisch")).toBeInTheDocument();
+    expect(within(liste).queryByText(/offen/)).not.toBeInTheDocument();
+    expect(within(liste).queryByText("ohne Befund")).not.toBeInTheDocument();
   });
 });

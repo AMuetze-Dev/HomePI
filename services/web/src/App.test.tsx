@@ -37,19 +37,27 @@ describe("App", () => {
   it("zeigt unter / die Startseite", async () => {
     zeige("/");
 
+    // Die Ueberschrift der Startseite ist die Begruessung, nicht das Wort
+    // "Uebersicht": Wer seinen eigenen Pi aufruft, braucht keine Ueberschrift,
+    // die ihm sagt, dass er auf der Uebersicht ist.
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(
-      "Übersicht",
+      /Gut(en|e) \w+, Prüfer\./,
     );
   });
 
-  it("zeigt die Hülle mit Marke und Themenwechsel um jede Ansicht", async () => {
+  it("rahmt jede Ansicht mit der Kopfleiste", async () => {
     zeige("/");
 
-    expect(await screen.findByRole("link", { name: /HomePI/ })).toHaveAttribute(
-      "href",
-      "/",
+    expect(await screen.findByText("HomePI")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Navigation öffnen" })).toBeInTheDocument();
+  });
+
+  it("zeigt unter /einstellungen die Einstellungen", async () => {
+    zeige("/einstellungen");
+
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(
+      "Einstellungen",
     );
-    expect(screen.getByRole("button", { name: /Erscheinungsbild/ })).toBeInTheDocument();
   });
 
   it("zeigt unter /modul/:id die Modulseite", async () => {
@@ -62,7 +70,7 @@ describe("App", () => {
     zeige("/voellig/woanders");
 
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(
-      "Übersicht",
+      /Gut(en|e) \w+, Prüfer\./,
     );
   });
 });

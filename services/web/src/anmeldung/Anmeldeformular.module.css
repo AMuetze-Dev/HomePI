@@ -1,84 +1,124 @@
-/* Mobile first: die schmale Fassung ist die Voreinstellung, breiter wird
-   darüber ergänzt. Andersherum braucht jede Regel ein Gegenstück, und das
-   Gegenstück ist die, die man vergisst. */
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md).
 
-.karte {
+   Diese Datei bedient zwei Masken: die Anmeldung und den erzwungenen
+   Passwortwechsel. Beide sind dieselbe Situation - eine Spalte, eine
+   Handlung, kein Weg daran vorbei - und sollen deshalb nicht zweimal
+   gezeichnet werden. */
+
+.buehne {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Was die Huelle oben und unten schon verbraucht hat, muss hier abgezogen
+     werden - sonst sitzt die Spalte um genau diesen Betrag zu tief. */
+  min-height: calc(100dvh - var(--hoehe-kopf) - var(--raum-10) - var(--raum-16));
+}
+
+/* Ein Schein aus dem Akzent, oben links aus dem Bild kommend. Die einzige
+   Stelle in dieser Oberflaeche, an der Farbe Flaeche wird - und sie ist so
+   schwach, dass man sie eher als Tiefe liest denn als Farbe.
+
+   `fixed` und nicht `absolute`: Der Schein gehoert zum Bild, nicht zur
+   Textspalte. Innerhalb der Spalte endete er am Seitenrand des Inhalts -
+   und eine weiche Flaeche mit einer geraden Kante sieht nicht nach Tiefe
+   aus, sondern nach einem Kasten, den jemand vergessen hat. */
+.schein {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 22rem;
+  pointer-events: none;
+  background: radial-gradient(
+    60% 100% at 30% 0%,
+    color-mix(in srgb, var(--farbe-akzent) 13%, transparent),
+    transparent 70%
+  );
+}
+
+.saeule {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  max-width: 24rem;
-  /* Mittig in der Inhaltsspalte, nicht am linken Rand klebend. */
-  margin: var(--raum-8) auto;
+  max-width: 23.75rem;
   animation: eintreten var(--dauer-normal) var(--verlauf-eintritt);
+}
+
+.zeichen {
+  margin-bottom: var(--raum-8);
+}
+
+.titel {
+  font-size: var(--text-3xl);
+  letter-spacing: var(--laufweite-enger);
+  margin-bottom: var(--raum-2);
+}
+
+.beschreibung {
+  margin-bottom: var(--raum-8);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-gedaempft);
 }
 
 .formular {
   display: flex;
   flex-direction: column;
-  gap: var(--raum-4);
-}
-
-.kopf {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-2);
-  margin-bottom: var(--raum-2);
-}
-
-.titel {
-  font-size: var(--text-xl);
-  letter-spacing: var(--laufweite-enger);
-}
-
-.beschreibung {
-  color: var(--farbe-text-gedaempft);
-  font-size: var(--text-md);
-  line-height: var(--zeile-weit);
+  gap: var(--raum-5);
 }
 
 .knopf {
-  /* Die eine Handlung auf dieser Fläche - sie bekommt die volle Breite. */
+  /* Die eine Handlung auf dieser Flaeche - sie bekommt die volle Breite. */
   width: 100%;
+  min-height: 2.5rem;
   margin-top: var(--raum-2);
 }
 
+.trenner {
+  margin-block: var(--raum-8) var(--raum-4);
+}
+
 .fuss {
-  color: var(--farbe-text-leise);
   font-size: var(--text-xs);
   line-height: var(--zeile-weit);
-  border-top: 1px solid var(--farbe-rand);
-  padding-top: var(--raum-4);
+  color: var(--farbe-text-leise);
 }
 
-@keyframes eintreten {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .karte {
-    animation: none;
-  }
-}
-
-/* Ein Knopf, der wie ein Verweis aussieht: "abmelden" steht mitten im Satz
+/* Ein Knopf, der wie ein Verweis aussieht: „abmelden" steht mitten im Satz
    und ist trotzdem eine Handlung, kein Ziel. */
 .abmelden {
   background: none;
   border: none;
   padding: 0;
   font: inherit;
-  color: var(--farbe-text-gedaempft);
+  color: var(--farbe-akzent-schrift);
   text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
 }
 
 .abmelden:hover {
-  color: var(--farbe-text);
+  color: var(--farbe-akzent-hell);
 }
 
 .abmelden:focus-visible {
   outline: 2px solid var(--farbe-fokus);
   outline-offset: 2px;
   border-radius: var(--rundung-sm);
+}
+
+/* Der Passwortwechsel hat drei Felder und zwei Hinweise - er braucht mehr
+   Spalte als die Anmeldung mit zweien. */
+.breit {
+  max-width: 27rem;
+}
+
+@keyframes eintreten {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }

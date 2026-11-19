@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { Hinweis, Karte, Leerzustand, Platzhalter } from "../../ui";
+import { Hinweis, Karte, Leerzustand, Platzhalter, Tafel } from "../../ui";
 import { type Auswertung, type Posten, type Staffel, ladeErgebnisse } from "./api";
 import { BefundeListe } from "./BefundeTafel";
 import stil from "./StaffelpilotSeite.module.css";
-
-function meldung(fehler: unknown): string {
-  return fehler instanceof Error ? fehler.message : "Unbekannter Fehler";
-}
+import { meldung } from "../../api/client";
 
 const SCHWERE_WORT: Record<string, string> = {
   kritisch: "kritisch",
@@ -66,24 +63,28 @@ export function ErgebnisseTafel({ staffeln }: { staffeln: Staffel[] }) {
 
   if (fehler && werte === null) {
     return (
-      <Hinweis ton="fehler" dringend>
-        {fehler}
-      </Hinweis>
+      <Tafel titel="Ergebnisse">
+        <Hinweis ton="fehler" dringend>
+          {fehler}
+        </Hinweis>
+      </Tafel>
     );
   }
 
   if (werte === null) {
     return (
-      <div role="status" aria-label="Ergebnisse werden geladen">
-        <Platzhalter breite="100%" hoehe="14rem" />
-      </div>
+      <Tafel titel="Ergebnisse">
+        <div role="status" aria-label="Ergebnisse werden geladen">
+          <Platzhalter breite="100%" hoehe="14rem" />
+        </div>
+      </Tafel>
     );
   }
 
   return (
-    <>
+    <Tafel titel="Ergebnisse">
       {staffeln.length > 1 && (
-        <Karte>
+        <Karte className={stil.stapel}>
           <label className={stil.wahl}>
             <span className={stil.wahlName}>Staffel</span>
             <select
@@ -146,7 +147,7 @@ export function ErgebnisseTafel({ staffeln }: { staffeln: Staffel[] }) {
           <BefundeListe staffelId={staffelId || undefined} />
         </>
       )}
-    </>
+    </Tafel>
   );
 }
 
@@ -197,7 +198,7 @@ function Gruppe({
   const gesamt = posten.reduce((summe, p) => summe + p.anzahl, 0);
 
   return (
-    <Karte>
+    <Karte className={stil.stapel}>
       <h2 className={stil.formularTitel}>{titel}</h2>
 
       {/* Ein Anteilsbalken ueber der Liste: er beantwortet "wie verteilt sich

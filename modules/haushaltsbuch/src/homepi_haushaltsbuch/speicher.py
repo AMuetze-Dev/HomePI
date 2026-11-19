@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .dienst import (
+    AnlageOhnePerson,
     KategorieSicht,
     KategorieUnbekannt,
     KontoSicht,
@@ -89,7 +91,7 @@ async def person_aendern(
     sitzung: AsyncSession, person_id: uuid.UUID, daten: PersonAendern
 ) -> Person:
     zeile = await person(sitzung, person_id)
-    _uebernehmen(zeile, daten, "name", "reihenfolge")
+    _uebernehmen(zeile, daten, "name", "reihenfolge", "sockel")
     await sitzung.flush()
     return zeile
 
@@ -215,6 +217,35 @@ async def _anteile_bauen(sitzung: AsyncSession, anteile: Sequence[object]) -> li
     return gebaut
 
 
+async def _anlage_ordnen(sitzung: AsyncSession, zeile: Posten) -> None:
+    """Was fuer einen Anlageposten gelten muss - fuer beide Wege hierher.
+
+    Ein Anlageposten nimmt einen Anteil an dem, was einer PERSON uebrig
+    bleibt. Auf einem gemeinschaftlichen Konto gibt es diesen Ueberschuss
+    nicht; der Posten bekaeme Monat fuer Monat null und niemand wuesste
+    warum. Deshalb hier eine Absage mit Begruendung statt einer stillen Null.
+
+    Betrag und Rhythmus setzt diese Funktion zurueck, statt sie abzulehnen:
+    Beides ist bei einem Anlageposten gegenstandslos - die Zahl entsteht
+    jeden Monat neu -, und ein Formular, das deswegen eine Fehlermeldung
+    zeigt, waere Schikane.
+    """
+    if zeile.anlage_gewicht is None:
+        return
+
+    eigner = await konto(sitzung, zeile.konto_id)
+    if eigner.inhaber_id is None:
+        raise AnlageOhnePerson(
+            f"'{eigner.name}' ist ein gemeinschaftliches Konto. Ein Posten, der sich "
+            "am Überschuss orientiert, gehört auf ein persönliches Konto - der "
+            "Überschuss ist der einer Person."
+        )
+
+    zeile.betrag = Decimal("0.00")
+    zeile.intervall_monate = 1
+    zeile.faelligkeitsmonat = 1
+
+
 async def posten_anlegen(sitzung: AsyncSession, daten: PostenAnlegen) -> Posten:
     await konto(sitzung, daten.konto_id)
     if daten.kategorie_id is not None:
@@ -224,6 +255,7 @@ async def posten_anlegen(sitzung: AsyncSession, daten: PostenAnlegen) -> Posten:
         **daten.model_dump(exclude={"anteile"}),
         anteile=await _anteile_bauen(sitzung, daten.anteile),
     )
+    await _anlage_ordnen(sitzung, zeile)
     sitzung.add(zeile)
     await sitzung.flush()
     await sitzung.refresh(zeile)
@@ -245,8 +277,11 @@ async def posten_aendern(
         "abbuchungstag",
         "variabel",
         "aktiv",
+        "anlage_gewicht",
     )
 
+    if daten.anlage_loeschen:
+        zeile.anlage_gewicht = None
     if daten.tag_loeschen:
         zeile.abbuchungstag = None
     if daten.konto_id is not None:
@@ -261,6 +296,8 @@ async def posten_aendern(
     # Der Rhythmus kann sich geaendert haben - dann muss der Monat wieder in
     # die Form, in der schemas.PostenBasis ihn ablegt.
     zeile.faelligkeitsmonat = ((zeile.faelligkeitsmonat - 1) % zeile.intervall_monate) + 1
+
+    await _anlage_ordnen(sitzung, zeile)
 
     if daten.anteile is not None:
         # Ersetzen statt abgleichen: eine Aufteilung ist eine Aussage als
@@ -292,7 +329,7 @@ async def sichten(
     dieser tut das.
     """
     return (
-        [PersonSicht(id=p.id, name=p.name) for p in await personen(sitzung)],
+        [PersonSicht(id=p.id, name=p.name, sockel=p.sockel) for p in await personen(sitzung)],
         [
             KontoSicht(id=k.id, name=k.name, art=k.art, inhaber_id=k.inhaber_id)
             for k in await konten(sitzung)
@@ -315,6 +352,7 @@ async def sichten(
                 variabel=p.variabel,
                 aktiv=p.aktiv,
                 anteile=tuple((a.person_id, a.gewicht) for a in p.anteile),
+                anlage_gewicht=p.anlage_gewicht,
             )
             for p in await posten_alle(sitzung)
         ],

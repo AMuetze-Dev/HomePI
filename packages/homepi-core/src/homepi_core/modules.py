@@ -6,9 +6,9 @@ einen Entry Point anmeldet:
 
     # pyproject.toml des Artefakts
     [project.entry-points."homepi.module"]
-    geraete = "homepi_geraete:modul"
+    beispiel = "homepi_beispiel:modul"
 
-    # homepi_geraete/__init__.py
+    # homepi_beispiel/__init__.py
     from fastapi import APIRouter
     from homepi_core import Modul
 
@@ -17,9 +17,9 @@ einen Entry Point anmeldet:
     @router.get("/")
     async def liste() -> list[str]: ...
 
-    modul = Modul(id="geraete", titel="Geräte", router=router)
+    modul = Modul(id="beispiel", titel="Beispiel", router=router)
 
-Das Gateway findet es beim Start, hängt den Router unter ``/geraete`` ein und
+Das Gateway findet es beim Start, hängt den Router unter ``/beispiel`` ein und
 nennt es in ``GET /module``. Die Startseite liest genau diese Liste - ein neues
 Artefakt erscheint dort, ohne dass am Frontend etwas geändert wird.
 
@@ -51,7 +51,7 @@ log = logging.getLogger(__name__)
 
 GRUPPE = "homepi.module"
 
-#: Beschraenkt die Auswahl beim Entwickeln, z.B. HOMEPI_MODULE=geraete,messwerte
+#: Beschraenkt die Auswahl beim Entwickeln, z.B. HOMEPI_MODULE=tischtennis
 AUSWAHL_VARIABLE = "HOMEPI_MODULE"
 
 #: Die Kennung landet in URLs, im Traefik-Pfad und im Frontend-Router.

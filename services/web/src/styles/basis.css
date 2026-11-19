@@ -48,11 +48,14 @@ body {
   overflow-wrap: break-word;
 }
 
+/* Gewicht 500 und nicht 600: In diesem Entwurf entsteht die Hierarchie aus
+ * Größe und Abstand. Eine fette Überschrift über dünnem Fließtext wirkt bei
+ * dieser Dichte gedrängt statt geordnet. */
 h1,
 h2,
 h3,
 h4 {
-  font-weight: var(--gewicht-halbfett);
+  font-weight: var(--gewicht-mittel);
   line-height: var(--zeile-eng);
   letter-spacing: var(--laufweite-eng);
   text-wrap: balance;
@@ -142,7 +145,12 @@ samp {
 }
 
 /* Wer Bewegung abbestellt hat, bekommt keine. Das ist keine Kür: für
- * Menschen mit vestibulären Beschwerden sind Übergänge ein echtes Problem. */
+ * Menschen mit vestibulären Beschwerden sind Übergänge ein echtes Problem.
+ *
+ * Zwei Wege führen hierher: die Einstellung des Geräts und der Schalter in
+ * den Einstellungen dieser Installation. Der Schalter ist nicht Zierde -
+ * auf einem Pi im Wohnzimmer bedient oft jemand das Gerät, dessen
+ * Systemeinstellung jemand anderem gehört. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -152,6 +160,15 @@ samp {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+:root[data-bewegung="reduziert"] *,
+:root[data-bewegung="reduziert"] *::before,
+:root[data-bewegung="reduziert"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* Nur für Screenreader - etwa der Sprung zum Inhalt, der erst beim Fokus

@@ -10,8 +10,9 @@ steht.
 1. **Wertigkeit entsteht aus Abstufung, nicht aus Kontrast.** Die neutrale
    Skala ist eng gestuft. Wo ein Sprung nötig wäre, fehlt meist Struktur.
 2. **Farbe trägt Bedeutung, nicht Dekoration.** Es gibt genau drei
-   Signalfarben, alle entsättigt. Die Primäraktion ist schlicht die
-   kontrastreichste Fläche — ein bunter Knopf wäre das Erste, was billig wirkt.
+   Signalfarben, alle entsättigt, und **einen** Akzent. Der Akzent tritt als
+   Linie, Rand und Punkt auf, nie als gefüllte Fläche: Bei dieser Dichte ist
+   ein geschlossener Farbblock das Erste, was auf einer Seite laut wird.
 3. **Typografie macht die Hierarchie, nicht Linien und Kästen.** Größe, Gewicht
    und Abstand reichen. Rahmen trennen Ebenen, sie betonen nichts.
 4. **Bewegung bestätigt, sie inszeniert nicht.** Nichts über 250 ms, nichts mit
@@ -24,10 +25,10 @@ steht.
 ```
 src/styles/tokens.css   alle Werte - Farben, Typo, Maße, Bewegung
 src/styles/basis.css    Reset und Elementgrundlagen
-src/ui/                 Bausteine (Knopf, Karte, Feld, Etikett, …)
-src/huelle/             Rahmen: Navigationsleiste, Kopfzeile, Themenwechsel
+src/ui/                 Bausteine (Knopf, Karte, Feld, Regel, Marke, …)
+src/huelle/             Rahmen: Kopfleiste, Navigationsfläche, Darstellung
 src/module/register.ts  was jedes Artefakt an Platz und Bereichen anmeldet
-src/seiten/             Ansichten
+src/seiten/             Ansichten, einschließlich der Einstellungen
 ```
 
 Jede Komponente bringt ihr eigenes `*.module.css` mit. CSS Modules statt einer
@@ -47,36 +48,74 @@ Die Namen beschreiben die **Rolle**, nicht den Wert: `--farbe-text-leise` statt
 `--grau-500`. Dadurch ist der Dunkelmodus eine Frage der Werte, nicht der
 Komponenten.
 
-| Token                                    | Verwendung                                               |
-| ---------------------------------------- | -------------------------------------------------------- |
-| `--farbe-grund`                          | Seitenhintergrund                                        |
-| `--farbe-flaeche`                        | Karten, Eingabefelder                                    |
-| `--farbe-flaeche-gedaempft`              | Zeilen beim Zeigen, deaktivierte Felder                  |
-| `--farbe-rand` / `--farbe-rand-stark`    | Trennlinien, Ränder beim Zeigen                          |
-| `--farbe-text` / `-gedaempft` / `-leise` | drei Stufen, mehr braucht es nicht                       |
-| `--farbe-aktion`                         | Primärknopf, Markenzeichen                               |
-| `--farbe-fokus`                          | Fokusring — die einzige gesättigte Farbe im Grundzustand |
-| `--signal-gut` / `-warnung` / `-fehler`  | Zustände, je mit `-flaeche`                              |
+| Token                                    | Verwendung                                              |
+| ---------------------------------------- | ------------------------------------------------------- |
+| `--farbe-grund`                          | Seitenhintergrund                                       |
+| `--farbe-flaeche`                        | Karten, Eingabefelder                                   |
+| `--farbe-flaeche-gedaempft`              | Zeilen beim Zeigen, Felder zum Nachsehen                |
+| `--farbe-rand` / `--farbe-rand-stark`    | Ränder von Kästen und Feldern                           |
+| `--farbe-linie`                          | die ausblendende Trennlinie (`<Regel>`)                 |
+| `--farbe-text` / `-gedaempft` / `-leise` | drei Stufen, mehr braucht es nicht                      |
+| `--farbe-akzent`                         | Linie, Rand, Punkt — der Akzent als **Kante**           |
+| `--farbe-akzent-schrift`                 | derselbe Akzent als **Schrift**, eine Stufe tiefer      |
+| `--farbe-akzent-fuellung` / `-spur`      | 10 % bzw. 7 % Akzent — die einzigen Akzentflächen       |
+| `--farbe-aktion`                         | Marken, aktive Kanten; zeigt auf den Akzent             |
+| `--farbe-fokus`                          | Fokusring — ebenfalls der Akzent, kein zweites Blau     |
+| `--signal-gut` / `-warnung` / `-fehler`  | Zustände, je mit `-flaeche`                             |
+
+**Kante und Schrift sind zwei Tokens, und das ist kein Luxus.** Das Paar
+Akzent/Grund ist auf 3:1 gestimmt — genug für Symbole, große Schrift und
+Bedienränder, nicht für einen Absatz. Wo der Akzent als Text in Lesegröße
+steht, gilt `--farbe-akzent-schrift`; wo er eine Linie ist, `--farbe-akzent`.
+Auf hellem Grund liegen zwei Rampenstufen dazwischen.
 
 Hell und Dunkel stehen über `light-dark()` in **einer** Deklaration:
 
 ```css
---farbe-grund: light-dark(var(--neutral-25), var(--neutral-950));
+--farbe-grund: light-dark(var(--ton-100), var(--ton-950));
 ```
 
 Das ist kein Schönheitsgewinn, sondern der Grund, warum die beiden Schemata
 nicht auseinanderlaufen können: es gibt keinen zweiten Satz Farben, den man
 vergessen könnte mitzupflegen. Der Umschalter setzt nur `color-scheme`.
 
+### Der Stich des Grundes ist wählbar
+
+„Nocturne" ist der Entwurf, wie er gezeichnet wurde: ein Blauviolett-Stich,
+der auf einem Monitor warm wirkt und auf einem anderen kalt. Wer ihn nicht
+will, nimmt **Schiefer** (ohne Stich), **Glut**, **Moos** oder
+**Bernstein** — die Auswahl steht in den Einstellungen.
+
+Geändert wird dabei nur der Grund samt seiner Flächen und Ränder, **nicht der
+Akzent**: Der trägt Bedeutung und soll nicht mit dem Geschmack wandern.
+
+Die Werte stehen in `tokens.css` unter `[data-grund="…"]`, und zwar
+ausdrücklich **nicht** an `:root` festgenagelt. Dadurch kann ein einzelnes
+Element dasselbe Attribut tragen und zeigt dann diese Farbe — genau das macht
+der Farbtupfen in den Einstellungen. Eine zweite Liste von Hexwerten für die
+Vorschau wäre die erste, die veraltet.
+
+Dabei eine Falle, die einen kostet, wenn man sie nicht kennt: **`var()` in
+einer Custom Property wird dort aufgelöst, wo die Eigenschaft deklariert
+ist**, nicht dort, wo sie geerbt wird. `--farbe-grund` rechnet also mit dem
+`--ton-950` von `:root`, und das Ergebnis erben alle Kinder fertig
+ausgerechnet; ein Element, das `--ton-950` selbst überschreibt, ändert daran
+nichts mehr. Die Rollen, die ein Grund neu ergibt, werden deshalb am Wähler
+`[data-grund]` noch einmal deklariert.
+
 Der Dunkelmodus ist **kein invertierter Hellmodus**. Im Dunkeln braucht es
 weniger Kontrast, nicht denselben; Flächen werden angehoben statt Schatten
-verstärkt.
+verstärkt. Gezeichnet wurde der Entwurf für Dunkel; die hellen Werte sind in
+derselben Farbfamilie daraus abgeleitet. Wer die Palette ändert, ändert beide
+Seiten in einem Zug.
 
 ### Typografie
 
-Kein Webfont. Der Systemstapel rendert auf jeder Plattform nativ optimiert,
-lädt in null Millisekunden und braucht keine Verbindung nach außen — auf einem
-Pi ohne Internetzwang die richtige Wahl.
+`--schrift` nennt **Inter zuerst** und fällt auf den Systemstapel zurück.
+Geladen wird Inter **nicht**: Ein Webfont von einem fremden Server
+widerspricht dem Zweck dieser Installation, und lokal eingebunden kostet er
+den ersten Seitenaufbau. Wer Inter installiert hat, sieht Inter; alle anderen
+den Systemstapel, der auf jeder Plattform nativ optimiert rendert.
 
 | Token        | Größe | Verwendung                    |
 | ------------ | ----- | ----------------------------- |
@@ -84,26 +123,35 @@ Pi ohne Internetzwang die richtige Wahl.
 | `--text-sm`  | 13 px | Sekundärtext, Tabellen        |
 | `--text-md`  | 14 px | **Basisgröße der Oberfläche** |
 | `--text-lg`  | 16 px | Abschnittsüberschriften       |
-| `--text-2xl` | 24 px | Seitentitel                   |
+| `--text-xl`  | 19 px | „Übersicht" in der Navigation |
+| `--text-2xl` | 24 px | Seitentitel, Artefaktnamen    |
+| `--text-3xl` | 32 px | Artefakte auf der Startseite  |
+| `--text-4xl` | 40 px | die Begrüßung, und sonst nichts |
+
+Überschriften tragen Gewicht **500**, nicht 600: Die Hierarchie entsteht hier
+aus Größe und Abstand. Eine fette Überschrift über dünnem Fließtext wirkt bei
+dieser Dichte gedrängt statt geordnet. 600 bleibt für Etiketten,
+Tabellenköpfe und Zahlen, die hervorstehen sollen.
 
 Negative Laufweite (`--laufweite-eng`, `--laufweite-enger`) erst ab
 Überschriftengröße — im Fließtext macht sie die Zeile schlechter lesbar, nicht
-besser. Zahlen laufen durchgehend mit `tabular-nums`, damit Spalten nicht
-tanzen.
+besser. Positiv wird sie nur in den gesperrten Kapitälchen über einem
+Abschnitt (`--laufweite-weit`) und in der Wortmarke (`--laufweite-marke`).
+Zahlen laufen durchgehend mit `tabular-nums`, damit Spalten nicht tanzen.
 
-**Inter statt Systemstapel**, falls gewünscht: die woff2-Datei unter
-`public/schriften/` ablegen, eine `@font-face`-Regel in `basis.css` ergänzen und
-in `tokens.css` `--schrift` voranstellen. Bewusst nicht von Google Fonts — das
-wäre eine Abhängigkeit vom Internet für eine Anwendung, die gerade deshalb im
-eigenen Netz läuft.
+**Inter wirklich mitliefern**, falls gewünscht: die woff2-Datei unter
+`public/schriften/` ablegen und eine `@font-face`-Regel in `basis.css`
+ergänzen — `--schrift` nennt sie bereits an erster Stelle. Bewusst nicht von
+Google Fonts: Das wäre eine Abhängigkeit vom Internet für eine Anwendung, die
+gerade deshalb im eigenen Netz läuft.
 
 ### Maß und Bewegung
 
 Vierer-Raster: `--raum-1` (4 px) bis `--raum-20` (80 px). Jeder Abstand im
 Produkt ist ein Vielfaches davon.
 
-Rundungen: `--rundung-sm` 6 px (Etiketten), `--rundung-md` 8 px (Knöpfe,
-Felder), `--rundung-lg` 12 px (Karten).
+Rundungen: `--rundung-sm` 4 px (Etiketten, Tasten), `--rundung-md` 8 px
+(Knöpfe, Felder, Monogramme), `--rundung-lg` 14 px (Karten).
 
 | Dauer                    | Wofür                      |
 | ------------------------ | -------------------------- |
@@ -121,6 +169,15 @@ erscheinende Elemente. Beide ohne Überschwingen.
 | `Knopf`         | drei Ausprägungen: `primaer`, `sekundaer`, `leise`               |
 | `Karte`         | abgegrenzte Fläche; `blank` für Inhalte mit eigenem Innenabstand |
 | `Feld`          | Eingabe mit verbundener Beschriftung                             |
+| `Tafel`         | der Kopf einer Fläche: Titel, Zahl daneben, Handlungen rechts    |
+| `Abschnitt`     | Kapitälchen-Überschrift und ihr Inhalt als ein Block             |
+| `Tabelle` + `Reihe` + `Zelle` | dichte Liste in Spalten, Reihen klappen auf       |
+| `Regel`         | die ausblendende Trennlinie; `kurz` für schmale Spalten          |
+| `Marke`         | vier Felder, eines im Akzent — Zeichen und Navigationsknopf      |
+| `Monogramm`     | Kürzel für ein Konto (zwei Buchstaben) oder ein Artefakt (einer) |
+| `Segmentwahl`   | zwei bis vier Möglichkeiten, auf echten Optionsfeldern           |
+| `Farbwahl`      | dasselbe, aber man sieht die Farbe statt nur ihren Namen         |
+| `Schalter`      | ein Zustand, der sofort gilt, auf einem echten Kästchen          |
 | `Etikett`       | kompakter Zustand oder Kennung; `mono` für Technisches           |
 | `Statuspunkt`   | reine Dekoration, Bedeutung steht im Text daneben                |
 | `Hinweis`       | Meldung mit `role="alert"` oder `role="status"`                  |
@@ -131,32 +188,173 @@ erscheinende Elemente. Beide ohne Überschwingen.
 
 **Es gibt genau drei Knopf-Ausprägungen, und das ist Absicht.** Sobald eine
 vierte dazukommt, hat die Seite eine Hierarchie zu viel und keine ist mehr klar.
+Die Primäraktion ist dabei ein **Akzentrand auf fast nichts**, keine gefüllte
+Fläche: In einer Tabellenzeile mit drei Knöpfen stünden sonst drei Farbblöcke.
 
 Deaktiviert heißt gedämpft, nicht durchscheinend: bloße Transparenz macht aus
-einem dunklen Primärknopf einen schweren grauen Block, der mehr Aufmerksamkeit
-zieht als der aktive daneben.
+einem Primärknopf einen schweren grauen Block, der mehr Aufmerksamkeit zieht
+als der aktive daneben.
+
+**Segmentwahl und Schalter sitzen auf nativen Elementen** — Optionsfeld und
+Kästchen. Pfeiltasten, Gruppenansage und die Frage „welches ist gewählt"
+bringt der Browser mit; ein nachgebautes Element müsste das erst wieder
+lernen, und es lernt es erfahrungsgemäß halb. Das Feld selbst ist unsichtbar,
+aber nicht `display: none` — damit verschwände es auch aus der Tastaturfolge.
+
+**Jede Auswahl aus zwei bis vier Möglichkeiten ist eine `Segmentwahl.`** Im
+StaffelPilot standen dafür dreimal Knöpfe mit `aria-pressed` nebeneinander —
+dieselbe Bedeutung, dreimal von Hand gebaut, jedes Mal ohne Pfeiltasten.
+
+### Mengen stehen in einer `Tabelle`, nicht in Karten
+
+Spaltenköpfe in gesperrten Kapitälchen, darunter Reihen, die eine
+ausblendende Linie trennt. **Kein Rahmen je Zeile:** Zwanzig Zeilen in
+zwanzig Kästen sind zwanzigmal dieselbe Kante, und die liest man mit.
+
+Eine Reihe kann **aufklappen**, statt wegzuführen. Das ist der Grund, warum
+es trotz Spalten eine Liste ist und kein `<table>`: Ein Tabellenfeld, in dem
+ein ganzer Bericht aufgeht, ist für einen Screenreader eine Zelle, die
+plötzlich eine Seite enthält; als Liste mit `aria-expanded` am Reihenkopf ist
+dieselbe Bedienung erklärbar. Der Preis ist, dass die Spaltennamen nicht zu
+jedem Wert mitgesagt werden — **deshalb muss jede Zelle für sich sprechen**
+(„2 offen", nicht „2").
+
+Zwei Zustände trägt die Reihe selbst: `betont` für das, was dran ist (ein
+Hauch Akzent von links), und `leise` für Erledigtes. Erledigtes verschwindet
+nicht — wer nachsehen will, was letzte Woche war, findet es noch.
+
+Unter 48 rem löst sich das Raster auf: Die erste Zelle wird zur Überschrift
+der Reihe, die übrigen zu einer Zeile dahinter, mit Mittelpunkten getrennt.
+Eine Tabelle, die auf einem Telefon waagerecht scrollt, versteckt
+ausgerechnet die rechte Spalte — also meist den Zustand, wegen dessen man
+hinsieht.
+
+### Handlungen stehen in der Ausklappung, nicht in jeder Zeile
+
+Die Postenliste des Haushaltsbuchs trug an jeder Zeile drei Knöpfe — ändern,
+pausieren, entfernen. Bei neunzehn Posten waren das **57 Knöpfe auf einem
+Bildschirm**, und gesucht hat man trotzdem einen Namen. Dieselbe Rechnung
+galt in der Verwaltung: je Konto drei Knöpfe und ein Rechteblock.
+
+Die Regel daraus: In der Zeile steht, **wonach man sucht**; was man damit
+tun kann, steht in der Ausklappung. Das kostet einen Klick und gibt dafür
+die Liste zurück. Es gilt auch für Angaben, die nur den Einzelfall
+betreffen — wer wie viel von einem gemeinsamen Posten trägt, welche Rechte
+ein Konto hat, warum ein Startpasswort zählt.
+
+Zwei Ausnahmen, beide aus dem Betrieb: Die **eine** Handlung einer Fläche
+(„Posten anlegen", „Konto anlegen") gehört in den Kopf der Tafel, wo sie
+immer am selben Fleck steht. Und eine Handlung, die man im Durchgehen
+braucht — ein Sieger im Turnier, ein Haken an einem Spielbericht — bleibt in
+der Zeile; dort ist sie der Grund, warum man die Liste überhaupt offen hat.
+
+### Ein Formular steht nicht dauernd offen
+
+Unter beiden Listen klebte ein Formular mit einem Dutzend Feldern, auch wenn
+man nur nachsehen wollte. Ein Posten wird einmal angelegt und dann jahrelang
+nicht mehr; ein Konto noch seltener. Das Formular klappt deshalb erst auf,
+wenn jemand es verlangt — und schließt sich wieder, wenn er abbricht.
+
+Der Preis ist ein Klick vor der Eingabe. Der Gewinn ist, dass die Fläche
+zeigt, was sie ist: eine Liste, und kein Eingabebogen mit einer Liste
+darüber.
+
+### Ein Zustand steht im Text, auch wenn die Farbe ihn schon sagt
+
+Im KO-Raster trug jeder Sieger ein Etikett „weiter". Bei einem Raster für
+sechzehn ist das in der Hälfte aller Zeilen dasselbe Wort — und es sagt
+nichts, was die Zeile nicht schon sagt: Der Sieger steht halbfett mit einem
+Strich an der Kante, der Verlierer tritt zurück, und in der nächsten Runde
+steht sein Name statt „Sieger aus Spiel 13".
+
+Sichtbar ist es deshalb weg. **Vorgelesen bleibt es stehen** — als
+`nur-vorlesen`-Text. Schriftschnitt und Strich kommen bei einem Screenreader
+nicht an, und die Regel „kein Zustand nur über Farbe" gilt weiter. Das ist
+die allgemeine Form: Wo eine visuelle Auszeichnung ein Wort überflüssig
+macht, verschwindet das Wort aus dem Bild, nicht aus dem Dokument.
+
+### Wer die Überschrift setzt
+
+Für einen Bereich setzt die Modulseite den Bereichsnamen als `h1`. Das
+genügt, solange über dem Inhalt nur ein Wort stehen muss.
+
+Sobald daneben etwas gehört, das **nur der Bereich kennt** — „3 Berichte
+warten · 2 fällig", ein Filter, die eine Handlung dieser Fläche —, geht das
+nicht mehr: Die Modulseite kennt diese Zahlen nicht. Dann trägt der Bereich
+`eigenerTitel: true` im Register, baut seinen Kopf selbst mit `<Tafel>`, und
+die Modulseite hält sich heraus. Ohne diese Unterscheidung stünde dasselbe
+Wort zweimal untereinander.
 
 ## Aufbau der Oberfläche
 
-Links eine Navigationsleiste über die volle Höhe, rechts der Inhalt. Die
-Leiste trägt **beide** Ebenen: oben die Artefakte, und eingerückt darunter die
-Bereiche des gerade geöffneten.
+**Eine Zeile oben, sonst nichts.** Die Kopfleiste ist 48 px hoch und
+beantwortet genau eine Frage — wo bin ich gerade: Zeichen, Weg, Konto. Die
+vollständige Navigation ist eine **Fläche über der Seite**, die man ruft und
+wieder wegschickt.
 
-Eine zweite Leiste für die Bereiche — wie in manchen Editoren — wäre die
-naheliegende Alternative gewesen. Sie kostet dauerhaft rund 200 px, und zwar
-ausgerechnet bei den Artefakten, die Breite brauchen: Ein Artefakt mit neun
-Bereichen ist meist auch eins mit breiten Tabellen.
+Bis zu dieser Fassung stand links eine Navigationsleiste über die volle Höhe.
+Sie kostete 15 rem Breite auf **jeder** Seite, dauerhaft, und zeigte dabei
+meistens dasselbe: vier Artefakte, von denen eines offen ist. Bei einer
+Spielprüftabelle mit fünf Spalten ist das der Unterschied zwischen lesbar und
+gequetscht. Die Fläche ist seltener sichtbar, dafür ist sie dann ganz da:
+beide Ebenen **nebeneinander** statt eingerückt untereinander, in Wortgrößen,
+die man aus zwei Metern liest.
+
+Der Preis ist ein Griff mehr zum nächsten Artefakt. Deshalb liegt dieser Griff
+auf **Escape** und nicht in einem Menü — eine Taste, die jede Tastatur hat und
+auf der ohnehin „weg hier" liegt. Escape öffnet die Fläche und schließt sie
+wieder; wer gerade in einem Feld tippt, behält Escape für das Feld. Ohne
+Tastatur führt dasselbe Zeichen oben links hinein, und die Startseite nennt
+die Taste in ihrer Fußzeile — außer auf Geräten, die keine haben.
+
+Die Seite darunter bleibt schemenhaft sichtbar. Nicht als Effekt: Sie ist die
+Antwort auf „wohin komme ich zurück, wenn ich das hier wegklicke".
+
+**Wer auf ein Artefakt zeigt, sieht dessen Bereiche.** Die rechte Spalte
+folgt dem Zeiger (und dem Tastaturfokus), nicht nur dem geöffneten Artefakt.
+Vorher führte der Weg zu „Haushaltsbuch · Posten" über drei Schritte:
+Artefakt anklicken, warten, Fläche noch einmal aufziehen, Bereich anklicken —
+während die Liste der Bereiche die ganze Zeit zwei Zentimeter daneben stand.
+Das Monogramm im Akzent bleibt dabei dem **geöffneten** Artefakt: Sonst sähen
+zwei Zeilen gleich aus und keine sagte mehr, wo man wirklich ist.
 
 Ein Artefakt ohne Bereiche hat schlicht keine zweite Ebene. Kein leerer
-Platzhalter, keine Leiste, die aussieht, als fehle etwas — der Platz gehört
-dann dem Inhalt. **Derselbe Stil, unterschiedlicher Umfang.**
+Platzhalter, keine Spalte, die aussieht, als fehle etwas — **derselbe Stil,
+unterschiedlicher Umfang.**
+
+### Die Bereiche stehen in der Hülle, nicht im Inhalt
+
+Solange die Dauerleiste die Bereiche trug, erschien eine Leiste über dem
+Inhalt nur auf Telefonen: zweimal dieselbe Navigation wäre eine zu viel
+gewesen.
+
+Diese Leiste gibt es nicht mehr. Der Bereichswechsel ist aber die häufigste
+Bewegung innerhalb eines Artefakts — bei StaffelPilot zwischen zehn Flächen.
+Jedes Mal erst die Navigationsfläche zu rufen wären zwei Handgriffe statt
+einem, und zwar genau dort, wo man am häufigsten greift.
+
+Sie steht deshalb **in der Kopfleiste selbst**, hinter dem Namen des
+Artefakts — nicht im Inhalt und auch nicht als zweite Zeile darunter. Im
+Inhalt lag sie in dessen Spalte, und die ist je Bereich verschieden breit:
+Ein Bereich mit `text` ist 40 rem breit, einer mit `voll` nimmt den ganzen
+Monitor. Die Leiste wanderte also bei jedem Wechsel mit, sprang in der
+Breite und saß auf einem breiten Monitor mitten im Bild statt an einer
+Kante. Als eigene Zeile wiederum waren es zwei Zeilen für eine Aufgabe: eine,
+die sagt wo man ist, und eine, mit der man sich bewegt.
+
+Das letzte Glied der Brotkrume entfällt dafür. Welcher Bereich gilt, steht an
+der Markierung in der Leiste daneben — zweimal dasselbe Wort in einer Zeile
+ist eines zu viel.
+
+Sie zeigt nur die **sichtbaren** Unterseiten: Eine versteckte ist eine echte
+Adresse, aber kein Reiter. Ein Artefakt ohne zweite Ebene bekommt gar keine
+Leiste — ein leerer Streifen sähe aus, als fehle etwas.
 
 ### Die Breite meldet das Artefakt an, nicht die Hülle
 
 Vorher gab es genau ein `--breite-inhalt` von 68 rem für alles. Das ging so
-lange gut, wie es ein Artefakt gab. Bei dreien ist es falsch: Eine Geräteliste
-mit drei Einträgen braucht keine 1088 px, eine Spielprüftabelle hätte gern
-mehr, und auf einem 2560-px-Monitor war über die Hälfte Rand.
+lange gut, wie es ein Artefakt gab. Bei dreien ist es falsch: Ein Formular mit
+drei Feldern braucht keine 1088 px, eine Spielprüftabelle hätte gern mehr, und auf einem 2560-px-Monitor war über die Hälfte Rand.
 
 Jetzt meldet jedes Artefakt seinen Bedarf in `src/module/register.ts` an:
 
@@ -169,6 +367,13 @@ Jetzt meldet jedes Artefakt seinen Bedarf in `src/module/register.ts` an:
 
 Vier Stufen, mehr nicht. Eine fünfte wäre schon eine, bei der niemand mehr
 sagen könnte, wann man sie nimmt.
+
+**Jede Stufe hängt an der linken Kante**, nicht in der Mitte. Zentriert war
+es, solange links eine Navigationsleiste stand; ohne sie schwamm eine Spalte
+von 40 rem auf einem breiten Monitor in der Mitte, während Brotkrume,
+Bereichsleiste und Titel links standen — und beim Wechsel zwischen zwei
+verschieden breiten Bereichen sprang sie seitwärts. Was eine Stufe nicht
+braucht, bleibt rechts frei.
 
 **Auch ein einzelner Bereich darf abweichen.** Das ist kein Feinschliff,
 sondern ein Fehler, den man sofort sieht: Bei StaffelPilot braucht die
@@ -210,22 +415,26 @@ montierte neu und brächte genau den Nachteil zurück.
 
 ## Verhalten auf schmalen Geräten
 
-Drei Umbruchpunkte, mehr braucht es nicht:
+Vier Umbruchpunkte, mehr braucht es nicht:
 
-| Breite   | Was passiert                                                    |
-| -------- | --------------------------------------------------------------- |
-| < 60 rem | Navigationsleiste wird zur Schublade, Bereiche zur Reiterleiste |
-| < 40 rem | Tabellenzeilen werden zu Karten, Seitenränder schrumpfen        |
-| < 34 rem | Formularzeile wird zum Stapel                                   |
+| Breite    | Was passiert                                                 |
+| --------- | ------------------------------------------------------------ |
+| ≥ 60 rem  | die Navigationsfläche legt ihre beiden Ebenen nebeneinander  |
+| < 48 rem  | Seitenränder schrumpfen, die Linien blenden kürzer aus       |
+| < 40 rem  | Tabellenzeilen werden zu Karten, Einstellungszeilen stapeln  |
+| < 34 rem  | Formularzeile wird zum Stapel                                |
 
-Zur Schublade: Auf einem Telefon ist eine dauerhaft sichtbare Navigation
-schlicht der halbe Bildschirm. Die Bereiche wandern dort über den Inhalt, als
-waagerecht scrollende Leiste — sonst wäre der Wechsel zwischen zwei Bereichen
-zwei Antipper statt einem, und das bei der häufigsten Bewegung im Artefakt.
+Unterhalb von 60 rem stehen Artefakte und Bereiche untereinander statt
+nebeneinander — zwei Spalten à 180 px wären zwei zu schmale Spalten. Die
+Bereichsleiste über dem Inhalt scrollt waagerecht statt umzubrechen: Zehn
+Wörter brechen auf einem Telefon in drei Zeilen um, und der Inhalt darunter
+rutscht bei jedem Wechsel hoch und runter.
 
-Ab 60 rem verschwindet diese Leiste wieder: Dann steht die Navigation
-daneben und trägt dieselben Bereiche. Zweimal dieselbe Navigation wäre eine zu
-viel — und die Frage, welche von beiden gerade gilt.
+Was an einer **Tastatur** hängt, verschwindet ohne sie. Bei `pointer: coarse`
+entfällt der Esc-Hinweis auf der Startseite, und der Knopf in der
+Navigationsfläche heißt dort „Schließen" statt „Esc schließt" — ein Hinweis
+auf eine Taste, die das Gerät nicht hat, ist nicht nutzlos, sondern falsch.
+Der zugängliche Name bleibt in beiden Fällen „Navigation schließen".
 
 Die Tabelle **scrollt nicht horizontal**. Das würde ausgerechnet die
 Schaltflächen am rechten Rand verstecken — also genau das, wofür man die
@@ -260,15 +469,29 @@ Kein Zusatz, sondern Teil der Qualität:
   zurück.
 - **`prefers-reduced-motion`** schaltet alle Übergänge ab. Für Menschen mit
   vestibulären Beschwerden sind Animationen ein echtes Problem, keine
-  Geschmacksfrage.
+  Geschmacksfrage. Daneben gibt es in den Einstellungen einen eigenen
+  Schalter, der `data-bewegung="reduziert"` setzt: Auf einem Pi im Wohnzimmer
+  bedient oft jemand das Gerät, dessen Systemeinstellung jemand anderem
+  gehört. Der Schalter gilt **zusätzlich**, nie stattdessen.
+- **Die Navigationsfläche ist ein `dialog` mit `aria-modal`.** Der Fokus
+  springt beim Öffnen hinein, Tabulator bleibt darin, und beim Schließen kehrt
+  er dorthin zurück, wo er war. Ohne das bedient die Tastatur eine Seite,
+  die gerade niemand sieht.
+- **Thema und Bewegung werden vor dem ersten Rendern gesetzt**
+  (`huelle/darstellung.ts`, aufgerufen in `main.tsx`). In einem Effekt gesetzt,
+  zeigte die Seite einen Wimpernschlag lang das Thema des Systems, bevor sie
+  auf die Wahl des Benutzers umspringt — ein Aufblitzen, das man einmal sieht
+  und nicht mehr vergisst.
 - **Sprung zum Inhalt** als erstes fokussierbares Element.
 - Kontraste der Textrollen erfüllen WCAG AA in beiden Schemata.
 
 ## Anpassen
 
-**Andere Akzentfarbe:** nur `--farbe-aktion`, `--farbe-aktion-schrift` und
-`--farbe-aktion-hover` in `tokens.css`. Sonst nichts — keine Komponente kennt
-eine Farbe.
+**Andere Akzentfarbe:** die Rampe `--akzent-100` … `--akzent-900` in
+`tokens.css` und die vier Rollen darüber (`--farbe-akzent`, `-hell`,
+`-schrift`, `-fuellung`). Sonst nichts — keine Komponente kennt eine Farbe.
+Wichtig ist nur, dass `-schrift` auf hellem Grund **tiefer** liegt als
+`--farbe-akzent`: Sonst verliert jeder Akzenttext seinen Kontrast.
 
 **Dichter oder luftiger:** die `--raum-*`-Skala skalieren. Alle Abstände folgen.
 
