@@ -43,9 +43,10 @@ export function UebersichtTafel({ daten }: Props) {
       <Zeilenblock
         titel={`Im ${monatswort(uebersicht.monat)} bucht die Bank ab`}
         leer="In diesem Monat bucht nichts ab."
-        zeilen={uebersicht.faellig}
+        zeilen={seltenesZuerst(uebersicht.faellig)}
         spalte="Betrag"
         wert={(z) => z.betrag}
+        fuss={`zusammen ${alsEuro(String(summe(uebersicht.faellig, (z) => z.betrag)))}`}
       />
 
       <Zeilenblock
@@ -58,6 +59,24 @@ export function UebersichtTafel({ daten }: Props) {
       />
     </>
   );
+}
+
+/**
+ * Das Seltene nach oben.
+ *
+ * Was jeden Monat gleich abgeht, weiss man auswendig; die Frage an diese
+ * Liste ist, was DIESEN Monat anders ist. Innerhalb beider Gruppen bleibt
+ * die Reihenfolge, die der Dienst liefert - nach Kategorie und Name.
+ */
+function seltenesZuerst(zeilen: PostenZeile[]): PostenZeile[] {
+  return [
+    ...zeilen.filter((zeile) => zeile.intervall_monate > 1),
+    ...zeilen.filter((zeile) => zeile.intervall_monate <= 1),
+  ];
+}
+
+function summe(zeilen: PostenZeile[], wert: (zeile: PostenZeile) => string): number {
+  return zeilen.reduce((bisher, zeile) => bisher + alsZahl(wert(zeile)), 0);
 }
 
 function Bilanzkarte({ person }: { person: PersonBilanz }) {

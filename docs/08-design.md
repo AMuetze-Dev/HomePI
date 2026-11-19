@@ -229,6 +229,36 @@ Eine Tabelle, die auf einem Telefon waagerecht scrollt, versteckt
 ausgerechnet die rechte Spalte — also meist den Zustand, wegen dessen man
 hinsieht.
 
+### Handlungen stehen in der Ausklappung, nicht in jeder Zeile
+
+Die Postenliste des Haushaltsbuchs trug an jeder Zeile drei Knöpfe — ändern,
+pausieren, entfernen. Bei neunzehn Posten waren das **57 Knöpfe auf einem
+Bildschirm**, und gesucht hat man trotzdem einen Namen. Dieselbe Rechnung
+galt in der Verwaltung: je Konto drei Knöpfe und ein Rechteblock.
+
+Die Regel daraus: In der Zeile steht, **wonach man sucht**; was man damit
+tun kann, steht in der Ausklappung. Das kostet einen Klick und gibt dafür
+die Liste zurück. Es gilt auch für Angaben, die nur den Einzelfall
+betreffen — wer wie viel von einem gemeinsamen Posten trägt, welche Rechte
+ein Konto hat, warum ein Startpasswort zählt.
+
+Zwei Ausnahmen, beide aus dem Betrieb: Die **eine** Handlung einer Fläche
+(„Posten anlegen", „Konto anlegen") gehört in den Kopf der Tafel, wo sie
+immer am selben Fleck steht. Und eine Handlung, die man im Durchgehen
+braucht — ein Sieger im Turnier, ein Haken an einem Spielbericht — bleibt in
+der Zeile; dort ist sie der Grund, warum man die Liste überhaupt offen hat.
+
+### Ein Formular steht nicht dauernd offen
+
+Unter beiden Listen klebte ein Formular mit einem Dutzend Feldern, auch wenn
+man nur nachsehen wollte. Ein Posten wird einmal angelegt und dann jahrelang
+nicht mehr; ein Konto noch seltener. Das Formular klappt deshalb erst auf,
+wenn jemand es verlangt — und schließt sich wieder, wenn er abbricht.
+
+Der Preis ist ein Klick vor der Eingabe. Der Gewinn ist, dass die Fläche
+zeigt, was sie ist: eine Liste, und kein Eingabebogen mit einer Liste
+darüber.
+
 ### Ein Zustand steht im Text, auch wenn die Farbe ihn schon sagt
 
 Im KO-Raster trug jeder Sieger ein Etikett „weiter". Bei einem Raster für

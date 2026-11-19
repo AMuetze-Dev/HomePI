@@ -164,9 +164,11 @@ test.describe("Der Weg einer frischen Installation", () => {
     await anmelden(page, VERWALTERIN.name, VERWALTERIN.passwort);
     await artefakt(page, /Verwaltung/).click();
 
+    await page.getByRole("button", { name: "Konto anlegen" }).click();
     await page.getByLabel("Benutzername").fill(NEULING.name);
     await page.getByLabel("Anzeigename").fill(NEULING.anzeige);
-    await page.getByRole("button", { name: "Anlegen" }).click();
+    // exact: sonst trifft "Anlegen" auch den Knopf "Konto anlegen" darueber.
+    await page.getByRole("button", { name: "Anlegen", exact: true }).click();
 
     const karte = page.getByRole("heading", {
       name: `Startpasswort für ${NEULING.name}`,
@@ -181,9 +183,8 @@ test.describe("Der Weg einer frischen Installation", () => {
     await anmelden(page, VERWALTERIN.name, VERWALTERIN.passwort);
     await artefakt(page, /Verwaltung/).click();
 
-    await page
-      .getByRole("button", { name: new RegExp(`Rechte von ${NEULING.name}`) })
-      .click();
+    // Die Rechte stehen in der aufgeklappten Zeile des Kontos.
+    await page.getByRole("button", { name: new RegExp(`^${NEULING.anzeige}`) }).click();
     await page.getByLabel("Haushaltsbuch").selectOption("nutzer");
 
     await expect(page.getByLabel("Haushaltsbuch")).toHaveValue("nutzer");

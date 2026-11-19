@@ -84,9 +84,9 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
     await expect(page.getByRole("link", { name: "StaffelPilot" })).toHaveCount(0);
 
     await artefakt(page, /Verwaltung/).click();
-    await page
-      .getByRole("button", { name: new RegExp(`Rechte von ${VERWALTER.name}`) })
-      .click();
+    // Die Rechte stehen in der aufgeklappten Zeile des Kontos. Ohne
+    // Anzeigenamen traegt die Zeile den Benutzernamen.
+    await page.getByRole("button", { name: new RegExp(`^${VERWALTER.name}`) }).click();
     await page.getByLabel("StaffelPilot").selectOption("verwalter");
 
     await expect(page.getByLabel("StaffelPilot")).toHaveValue("verwalter");

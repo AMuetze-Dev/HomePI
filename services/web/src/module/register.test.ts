@@ -8,6 +8,7 @@ import {
   OBERFLAECHEN,
   oberflaecheFuer,
   sichtbareUnterseiten,
+  traegtTitelSelbst,
   unterseitenFuer,
 } from "./register";
 
@@ -51,6 +52,15 @@ describe("Das Register der Oberflächen", () => {
     expect(unterseitenFuer("staffelpilot").map((u) => u.id)).toContain("einrichten");
   });
 
+  it("lässt ein Artefakt ohne Bereiche seinen Titel selbst tragen", () => {
+    // Die Verwaltung hat keine zweite Ebene - die Angabe steht deshalb am
+    // Artefakt und nicht an einem Bereich. Ohne diesen Weg stuende ueber
+    // ihrer Tafel ein zweites Mal "Verwaltung".
+    expect(traegtTitelSelbst("verwaltung")).toBe(true);
+    expect(traegtTitelSelbst("staffelpilot", "uebersicht")).toBe(true);
+    expect(traegtTitelSelbst("gibtsnicht")).toBe(false);
+  });
+
   it("macht den ersten Bereich zur Startfläche", () => {
     expect(ersteUnterseite("staffelpilot")).toBe("uebersicht");
   });
@@ -62,9 +72,11 @@ describe("Das Register der Oberflächen", () => {
     expect(ersteUnterseite("verwaltung")).toBeUndefined();
   });
 
-  it("gibt Staffelpilot die volle Breite und den anderen die mittlere", () => {
+  it("gibt jedem Artefakt die Breite, die seine Flächen brauchen", () => {
     expect(breiteFuer("staffelpilot")).toBe("voll");
-    expect(breiteFuer("verwaltung")).toBe("normal");
+    expect(breiteFuer("verwaltung")).toBe("weit");
+    // Und wer nichts sagt, bekommt die mittlere.
+    expect(breiteFuer("gibtsnicht")).toBe(BREITE_VOREINSTELLUNG);
   });
 
   it("lässt einen Bereich von der Breite seines Moduls abweichen", () => {

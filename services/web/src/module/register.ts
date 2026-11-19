@@ -113,7 +113,10 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
   {
     id: "verwaltung",
     Komponente: VerwaltungSeite,
-    breite: "normal",
+    // Eine Liste von Konten mit Rechten daneben - sie lebt nicht von der
+    // Breite, und ein Formular ueber den ganzen Monitor ist unlesbar.
+    breite: "weit",
+    eigenerTitel: true,
   },
 ];
 
@@ -137,6 +140,26 @@ export function breiteFuer(id: string, unterseite?: string): Breite {
     ? oberflaeche?.unterseiten?.find((u) => u.id === unterseite)
     : undefined;
   return bereich?.breite ?? oberflaeche?.breite ?? BREITE_VOREINSTELLUNG;
+}
+
+/**
+ * Baut die Fläche ihre Überschrift selbst?
+ *
+ * Dieselbe Staffelung wie bei der Breite: erst der Bereich, dann das
+ * Artefakt. Ein Artefakt ohne zweite Ebene kann die Angabe nur an sich
+ * selbst tragen - die Verwaltung ist der Fall.
+ *
+ * Die Modulseite selbst fragt nicht hier, sondern liest die Oberfläche, die
+ * sie ohnehin schon geholt hat - ein zweiter Zugriff auf dasselbe Register
+ * wäre eine Abfrage zu viel. Diese Funktion ist für alle anderen da, die
+ * die Regel brauchen, ohne das Register zu kennen.
+ */
+export function traegtTitelSelbst(id: string, unterseite?: string): boolean {
+  const oberflaeche = oberflaecheFuer(id);
+  const bereich = unterseite
+    ? oberflaeche?.unterseiten?.find((u) => u.id === unterseite)
+    : undefined;
+  return bereich?.eigenerTitel ?? oberflaeche?.eigenerTitel ?? false;
 }
 
 export function unterseitenFuer(id: string): readonly Unterseite[] {

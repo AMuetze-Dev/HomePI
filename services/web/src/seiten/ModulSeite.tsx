@@ -100,7 +100,7 @@ export function ModulSeite() {
           was nur er kennt: eine Zahl, ein Filter, die eine Handlung dieser
           Fläche. Hier noch eine Überschrift daraufzusetzen hieße, dasselbe
           Wort zweimal untereinander zu schreiben. */}
-      {!offenerBereich?.eigenerTitel && (
+      {!(offenerBereich?.eigenerTitel ?? eigene?.eigenerTitel) && (
         <Seitenkopf
           titel={offenerBereich?.wort ?? modul.titel}
           beschreibung={offenerBereich ? undefined : modul.beschreibung || undefined}

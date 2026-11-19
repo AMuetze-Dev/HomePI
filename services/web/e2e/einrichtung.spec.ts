@@ -87,9 +87,9 @@ test.describe("Eine Staffelleiterin richtet ein", () => {
     await anmelden(page);
 
     await artefakt(page, /Verwaltung/).click();
-    await page
-      .getByRole("button", { name: new RegExp(`Rechte von ${VERWALTERIN.name}`) })
-      .click();
+    // Die Rechte stehen in der aufgeklappten Zeile des Kontos. Ohne
+    // Anzeigenamen traegt die Zeile den Benutzernamen.
+    await page.getByRole("button", { name: new RegExp(`^${VERWALTERIN.name}`) }).click();
     await page.getByLabel("StaffelPilot").selectOption("verwalter");
 
     await expect(page.getByLabel("StaffelPilot")).toHaveValue("verwalter");

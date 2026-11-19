@@ -102,6 +102,13 @@ export interface ModulProps {
  * gemeint: derselbe Stil, unterschiedlicher Umfang.
  */
 export interface ModulOberflaeche {
+  /**
+   * Die Fläche bringt ihre Überschrift selbst mit - wie `eigenerTitel` an
+   * einem Bereich, nur für ein Artefakt ohne zweite Ebene. Die Verwaltung
+   * ist der Fall: eine einzige Fläche, deren Kopf Zahlen trägt, die nur sie
+   * kennt.
+   */
+  eigenerTitel?: boolean | undefined;
   /** Muss der Kennung aus dem Backend-Manifest entsprechen. */
   id: string;
   Komponente: ComponentType<ModulProps>;

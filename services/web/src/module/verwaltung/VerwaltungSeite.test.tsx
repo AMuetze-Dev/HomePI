@@ -49,6 +49,23 @@ function zeige(konten: Konto[] = [ICH, konto()], artefakte = ARTEFAKTE) {
   render(mitAnmeldung(<VerwaltungSeite />));
 }
 
+/**
+ * Die Zeile eines Kontos aufklappen - dort stehen Rechte und Handlungen.
+ *
+ * Vorher trug jede Karte drei Knoepfe und einen Rechteblock. Bei zwanzig
+ * Konten war das eine Wand, durch die man den gesuchten Namen nicht mehr sah.
+ */
+async function zeileOeffnen(anzeigename = "Gast") {
+  await userEvent.click(
+    await screen.findByRole("button", { name: new RegExp(`^${anzeigename}`) }),
+  );
+}
+
+/** Das Anlegeformular steht erst auf Knopfdruck da. */
+async function anlegenOeffnen() {
+  await userEvent.click(await screen.findByRole("button", { name: "Konto anlegen" }));
+}
+
 describe("Verwaltungsseite", () => {
   it("zeigt zuerst einen Ladehinweis", () => {
     vi.spyOn(api, "ladeKonten").mockReturnValue(new Promise(() => {}));
@@ -74,9 +91,12 @@ describe("Verwaltungsseite", () => {
     zeige([ICH, konto({ passwort_wechseln: true })]);
 
     const liste = await screen.findByRole("list", { name: "Konten" });
-
     expect(within(liste).getByText("Startpasswort")).toBeInTheDocument();
-    expect(within(liste).getByText(/an kein Artefakt/)).toBeInTheDocument();
+
+    // Warum das zaehlt, steht in der offenen Zeile - das Etikett allein
+    // sagt, DASS etwas ist, nicht was daraus folgt.
+    await zeileOeffnen();
+    expect(screen.getByText(/an kein Artefakt/)).toBeInTheDocument();
   });
 
   it("weist Verwalter und Sperren aus", async () => {
@@ -101,7 +121,9 @@ describe("Verwaltungsseite", () => {
     // Ein Fehlgriff am eigenen Konto ließe sich nicht zurücknehmen.
     zeige();
 
-    expect(await screen.findByRole("button", { name: /pruefer sperren/ })).toBeDisabled();
+    await zeileOeffnen("Prüfer");
+
+    expect(screen.getByRole("button", { name: /pruefer sperren/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: /pruefer löschen/ })).toBeDisabled();
   });
 
@@ -109,7 +131,8 @@ describe("Verwaltungsseite", () => {
     const setzen = vi.spyOn(api, "setzeAktiv").mockResolvedValue(konto({ aktiv: false }));
     zeige();
 
-    await userEvent.click(await screen.findByRole("button", { name: /gast sperren/ }));
+    await zeileOeffnen();
+    await userEvent.click(screen.getByRole("button", { name: /gast sperren/ }));
 
     expect(setzen).toHaveBeenCalledWith(konto().id, false);
   });
@@ -118,7 +141,8 @@ describe("Verwaltungsseite", () => {
     const loeschen = vi.spyOn(api, "loescheKonto").mockResolvedValue(undefined);
     zeige();
 
-    await userEvent.click(await screen.findByRole("button", { name: /gast löschen/ }));
+    await zeileOeffnen();
+    await userEvent.click(screen.getByRole("button", { name: /gast löschen/ }));
 
     expect(loeschen).toHaveBeenCalledWith(konto().id);
   });
@@ -129,7 +153,8 @@ describe("Verwaltungsseite", () => {
     );
     zeige();
 
-    await userEvent.click(await screen.findByRole("button", { name: /gast löschen/ }));
+    await zeileOeffnen();
+    await userEvent.click(screen.getByRole("button", { name: /gast löschen/ }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/eigenen Konto/);
   });
@@ -149,11 +174,9 @@ describe("Verwaltungsseite", () => {
   });
 
   describe("Rechte", () => {
-    async function oeffneRechte(name = "gast") {
+    async function oeffneRechte(anzeigename = "Gast") {
       zeige();
-      await userEvent.click(
-        await screen.findByRole("button", { name: new RegExp(`Rechte von ${name}`) }),
-      );
+      await zeileOeffnen(anzeigename);
     }
 
     it("bietet je Artefakt eine Rolle an", async () => {
@@ -181,9 +204,7 @@ describe("Verwaltungsseite", () => {
       ]);
       vi.spyOn(api, "ladeArtefakte").mockResolvedValue(ARTEFAKTE);
       render(mitAnmeldung(<VerwaltungSeite />));
-      await userEvent.click(
-        await screen.findByRole("button", { name: /Rechte von gast/ }),
-      );
+      await zeileOeffnen();
 
       await userEvent.selectOptions(screen.getByLabelText("Geräte"), "-");
 
@@ -198,9 +219,7 @@ describe("Verwaltungsseite", () => {
       const laden = vi.spyOn(api, "ladeKonten").mockResolvedValue([ICH, konto()]);
       vi.spyOn(api, "ladeArtefakte").mockResolvedValue(ARTEFAKTE);
       render(mitAnmeldung(<VerwaltungSeite />));
-      await userEvent.click(
-        await screen.findByRole("button", { name: /Rechte von gast/ }),
-      );
+      await zeileOeffnen();
 
       // Ab jetzt antwortet das Backend mit dem gesetzten Recht.
       laden.mockResolvedValue([ICH, mitRecht]);
@@ -212,18 +231,16 @@ describe("Verwaltungsseite", () => {
     it("sperrt die eigene Verwaltung im Auswahlfeld", async () => {
       // Das Backend lehnt es ohnehin ab - hier steht es gar nicht erst als
       // anklickbare Falle da.
-      await oeffneRechte("pruefer");
+      await oeffneRechte("Prüfer");
 
       expect(screen.getByLabelText("Verwaltung")).toBeDisabled();
     });
   });
 
   describe("Passwort zuruecksetzen", () => {
-    async function oeffne(name = "gast") {
+    async function oeffne(anzeigename = "Gast") {
       zeige();
-      await userEvent.click(
-        await screen.findByRole("button", { name: new RegExp(`Rechte von ${name}`) }),
-      );
+      await zeileOeffnen(anzeigename);
     }
 
     it("bietet kein Feld an, in das sich eines tippen liesse", async () => {
@@ -275,7 +292,7 @@ describe("Verwaltungsseite", () => {
     it("legt ein Konto an", async () => {
       const anlegen = vi.spyOn(api, "legeKontoAn").mockResolvedValue(angelegt());
       zeige();
-      await screen.findByRole("list", { name: "Konten" });
+      await anlegenOeffnen();
 
       await userEvent.type(screen.getByLabelText("Benutzername"), "neuling");
       await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
@@ -294,15 +311,16 @@ describe("Verwaltungsseite", () => {
 
     it("lässt sich leer nicht absenden", async () => {
       zeige();
+      await anlegenOeffnen();
 
-      expect(await screen.findByRole("button", { name: "Anlegen" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Anlegen" })).toBeDisabled();
     });
 
     it("behält die Eingabe, wenn es schiefgeht", async () => {
       // Sonst tippt man nach einem vergebenen Namen alles neu.
       vi.spyOn(api, "legeKontoAn").mockRejectedValue(new ApiError("schon vergeben", 409));
       zeige();
-      await screen.findByRole("list", { name: "Konten" });
+      await anlegenOeffnen();
 
       await userEvent.type(screen.getByLabelText("Benutzername"), "gast");
       await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
@@ -313,8 +331,9 @@ describe("Verwaltungsseite", () => {
 
     it("sagt, dass ein neues Konto keine Rechte hat", async () => {
       zeige();
+      await anlegenOeffnen();
 
-      expect(await screen.findByText(/Rechte hat ein neues Konto/)).toBeInTheDocument();
+      expect(screen.getByText(/Rechte hat ein neues Konto/)).toBeInTheDocument();
     });
 
     it("zeigt das Startpasswort genau einmal", async () => {
@@ -322,7 +341,7 @@ describe("Verwaltungsseite", () => {
         angelegt({ name: "neuling", startpasswort: "abcd-efgh-ijkl-mnop" }),
       );
       zeige();
-      await screen.findByRole("list", { name: "Konten" });
+      await anlegenOeffnen();
 
       await userEvent.type(screen.getByLabelText("Benutzername"), "neuling");
       await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
@@ -337,7 +356,7 @@ describe("Verwaltungsseite", () => {
         angelegt({ startpasswort: "abcd-efgh-ijkl-mnop" }),
       );
       zeige();
-      await screen.findByRole("list", { name: "Konten" });
+      await anlegenOeffnen();
       await userEvent.type(screen.getByLabelText("Benutzername"), "neuling");
       await userEvent.click(screen.getByRole("button", { name: "Anlegen" }));
       await screen.findByText("abcd-efgh-ijkl-mnop");

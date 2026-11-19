@@ -8,80 +8,9 @@
   gap: var(--raum-4);
 }
 
-/* --- Kennzahlen --- */
-
-.kennzahlen {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-  gap: var(--raum-3);
-  margin-bottom: var(--raum-8);
-}
-
-.kennzahleintrag {
-  display: block;
-}
-
-.kennzahl {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-1);
-  padding: var(--raum-4);
-}
-
-.wert {
-  font-size: var(--text-2xl);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--laufweite-enger);
-}
-
-.warnung {
-  color: var(--signal-warnung);
-}
-
-.kennzahlname {
-  color: var(--farbe-text-gedaempft);
-  font-size: var(--text-sm);
-}
-
 /* --- Abschnitte --- */
 
-.abschnittstitel {
-  font-size: var(--text-lg);
-  margin-bottom: var(--raum-4);
-}
-
-.liste {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-3);
-  margin-bottom: var(--raum-8);
-}
-
 /* --- Ein Konto --- */
-
-.konto {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-4);
-}
-
-.kopfzeile {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-2);
-}
-
-.namen {
-  display: flex;
-  flex-direction: column;
-  gap: var(--raum-1);
-  min-width: 0;
-}
-
-.anzeigename {
-  font-weight: var(--gewicht-halbfett);
-  overflow-wrap: anywhere;
-}
 
 .benutzername {
   color: var(--farbe-text-leise);
@@ -102,6 +31,25 @@
   gap: var(--raum-2);
 }
 
+/* Was unter einer Zeile aufgeht: Hinweise, Rechte, Passwort, Handlungen -
+   untereinander, mit Luft dazwischen. */
+.ausklappung {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-5);
+  padding: var(--raum-2) var(--raum-2) var(--raum-6);
+}
+
+.leerknopf {
+  margin: var(--raum-5) 0 0;
+}
+
+.formularfuss {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--raum-3);
+}
+
 .selbsthinweis {
   color: var(--farbe-text-leise);
   font-size: var(--text-xs);
@@ -114,8 +62,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--raum-3);
-  border-top: 1px solid var(--farbe-rand);
-  padding-top: var(--raum-4);
+  /* Gedeckelt: Sonst stuenden Beschriftung und Auswahlfeld an zwei
+     Monitorraendern, und das Auge muss die Zeile suchen. */
+  max-width: var(--breite-text);
 }
 
 .rechtzeile {
@@ -160,6 +109,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--raum-3);
+  max-width: var(--breite-text);
   border-top: 1px solid var(--farbe-rand);
   padding-top: var(--raum-4);
 }

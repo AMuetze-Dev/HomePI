@@ -12,7 +12,7 @@ steht, warum ein Artefakt ein Modul im Gateway ist und kein eigener Container.
 Gebaut: Personen, Konten, Kategorien und Posten mit vollem CRUD; der
 Monatsplan mit Aufteilung nach Gewichten, Rücklagen und Sparquote je Person;
 die **Anlage aus dem Überschuss**; das Flussbild als Sankey; vier Flächen in
-der Oberfläche. 86 Artefakt-Tests (96 % Zeilen), 82 Tests der Oberfläche.
+der Oberfläche. 86 Artefakt-Tests (96 % Zeilen), 87 Tests der Oberfläche.
 
 **Die Anlage ist die jüngste Entscheidung und die mit den meisten Fallen.**
 Ein Posten mit `anlage_gewicht` hat keinen eigenen Betrag: Er bekommt seinen

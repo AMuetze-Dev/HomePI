@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 
-import { Abschnitt, Etikett, Feld, Karte, Knopf, Leerzustand } from "../../ui";
+import {
+  Abschnitt,
+  Etikett,
+  Feld,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Reihe,
+  Segmentwahl,
+  Tabelle,
+  Zelle,
+} from "../../ui";
 import {
   aenderePosten,
   entfernePosten,
@@ -10,9 +21,10 @@ import {
   type Person,
   type Posten,
   type Postenart,
+  type PostenZeile,
 } from "./api";
 import type { Daten } from "./daten";
-import { abbuchungstext, alsEuro, MONATE, rhythmus } from "./geld";
+import { abbuchungstext, alsEuro, alsZahl, MONATE, rhythmus } from "./geld";
 import stil from "./HaushaltsbuchSeite.module.css";
 
 interface Props {
@@ -40,6 +52,10 @@ function alsZahlenfeld(eingabe: string): string {
 export function PostenTafel({ daten, aktion }: Props) {
   // Welcher Posten gerade im Formular liegt. null heißt: ein neuer.
   const [bearbeitet, setBearbeitet] = useState<Posten | null>(null);
+  // Das Formular steht nicht dauernd offen. Wer hier ist, sieht meistens
+  // nach, was laeuft - und angelegt wird ein Posten einmal und dann jahrelang
+  // nicht mehr. Ein Dutzend Felder unter der Liste sagte das Gegenteil.
+  const [anlegen, setAnlegen] = useState(false);
   const berechnet = new Map(daten.uebersicht.alle.map((z) => [z.id, z]));
 
   // Nach dem Neuladen zeigt `daten` neue Objekte. Ohne das hier hinge im
@@ -64,20 +80,36 @@ export function PostenTafel({ daten, aktion }: Props) {
         berechnet={berechnet}
         aktion={aktion}
         bearbeitetId={frisch?.id}
-        onBearbeiten={setBearbeitet}
+        onBearbeiten={(posten) => {
+          setAnlegen(false);
+          setBearbeitet(posten);
+        }}
+        onAnlegen={() => {
+          setBearbeitet(null);
+          setAnlegen(true);
+        }}
       />
-      <PostenFormular
-        // Der Schlüssel wechselt mit dem Posten, damit React das Formular neu
-        // aufbaut: die Felder stehen sonst noch auf dem vorigen Eintrag.
-        key={frisch?.id ?? "neu"}
-        daten={daten}
-        aktion={aktion}
-        bearbeitet={frisch}
-        onAbbrechen={() => setBearbeitet(null)}
-      />
+
+      {(frisch !== null || anlegen) && (
+        <PostenFormular
+          // Der Schlüssel wechselt mit dem Posten, damit React das Formular neu
+          // aufbaut: die Felder stehen sonst noch auf dem vorigen Eintrag.
+          key={frisch?.id ?? "neu"}
+          daten={daten}
+          aktion={aktion}
+          bearbeitet={frisch}
+          onAbbrechen={() => {
+            setBearbeitet(null);
+            setAnlegen(false);
+          }}
+        />
+      )}
     </>
   );
 }
+
+/** Wessen Posten die Liste zeigt: alle, die gemeinsamen, oder die einer Person. */
+type Sicht = string;
 
 function Liste({
   daten,
@@ -85,139 +117,236 @@ function Liste({
   aktion,
   bearbeitetId,
   onBearbeiten,
+  onAnlegen,
 }: Props & {
-  berechnet: Map<string, { monatsrate: string; faellige_monate: number[] }>;
+  berechnet: Map<string, PostenZeile>;
   bearbeitetId: string | undefined;
   onBearbeiten: (posten: Posten) => void;
+  onAnlegen: () => void;
 }) {
+  const [offen, setOffen] = useState<string | null>(null);
+  const [sicht, setSicht] = useState<Sicht>("alle");
+
+  const name = new Map(daten.personen.map((p) => [p.id, p.name]));
+  const konto = new Map(daten.konten.map((k) => [k.id, k]));
+  const kategorie = new Map(daten.kategorien.map((k) => [k.id, k.name]));
+
   if (daten.posten.length === 0) {
     return (
       <Leerzustand titel="Noch kein Posten">
-        Trage unten ein, was jeden Monat kommt und geht — Gehalt, Miete, Versicherung. Was
+        Trage ein, was jeden Monat kommt und geht — Gehalt, Miete, Versicherung. Was
         seltener abgebucht wird, bekommt ein Intervall; die monatliche Rücklage rechnet
         das Haushaltsbuch selbst.
+        <p className={stil.leerknopf}>
+          <Knopf auspraegung="primaer" onClick={onAnlegen}>
+            Posten anlegen
+          </Knopf>
+        </p>
       </Leerzustand>
     );
   }
 
-  const name = new Map(daten.personen.map((p) => [p.id, p.name]));
-  const konto = new Map(daten.konten.map((k) => [k.id, k.name]));
-  const kategorie = new Map(daten.kategorien.map((k) => [k.id, k.name]));
+  /* Die Wahl steht in derselben Reihenfolge wie der Haushalt gedacht ist:
+     erst alles, dann der gemeinsame Topf, dann die Einzelnen. Mehr als vier
+     Felder werden eng - ein Haushalt mit fuenf Erwachsenen bekaeme hier eine
+     Liste statt einer Leiste. */
+  const sichten = [
+    { wert: "alle", wort: "Alle" },
+    { wert: "gemeinsam", wort: "Gemeinsam" },
+    ...daten.personen.map((person) => ({ wert: person.id, wort: person.name })),
+  ];
+
+  const sichtbar = daten.posten.filter((posten) => {
+    if (sicht === "alle") return true;
+    const inhaber = konto.get(posten.konto_id)?.inhaber_id ?? null;
+    return sicht === "gemeinsam" ? inhaber === null : inhaber === sicht;
+  });
+
+  // Was von den gezeigten Posten im Monat abgeht. Einnahmen bleiben
+  // draussen: Eine Differenz mit Minuszeichen muesste man erst aufloesen,
+  // und die Frage an dieser Liste ist "wie viel geht raus".
+  const summe = sichtbar.reduce((bisher, posten) => {
+    if (!posten.aktiv || posten.art === "einnahme") return bisher;
+    return bisher + alsZahl(berechnet.get(posten.id)?.monatsrate ?? posten.betrag);
+  }, 0);
 
   return (
-    <div className={stil.rollbereich}>
-      <table className={stil.tabelle}>
-        <caption className="nur-vorlesen">Alle Posten</caption>
-        <thead>
-          <tr>
-            <th scope="col">Posten</th>
-            <th scope="col">Konto</th>
-            <th scope="col">Rhythmus</th>
-            <th scope="col" className={stil.rechts}>
-              Abbuchung
-            </th>
-            <th scope="col" className={stil.rechts}>
-              monatlich
-            </th>
-            <th scope="col">Aufteilung</th>
-            <th scope="col">
-              <span className="nur-vorlesen">Aktion</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {daten.posten.map((posten) => (
-            <tr
+    <>
+      <div className={stil.listenkopf}>
+        <Segmentwahl
+          beschriftung="Wessen Posten"
+          optionen={sichten}
+          wert={sicht}
+          beiWahl={setSicht}
+        />
+        <p className={stil.summe}>
+          <span className={stil.summenwort}>Ausgaben im Monat</span>
+          {alsEuro(String(summe))}
+        </p>
+        <Knopf auspraegung="primaer" groesse="sm" onClick={onAnlegen}>
+          Posten anlegen
+        </Knopf>
+      </div>
+
+      {sichtbar.length === 0 ? (
+        <Karte>
+          <p className={stil.leer}>Auf dieser Auswahl liegt kein Posten.</p>
+        </Karte>
+      ) : (
+        <Tabelle
+          beschriftung="Alle Posten"
+          raster="1.8fr 1fr 1.2fr 0.8fr"
+          spalten={["Posten", "Konto", "Rhythmus", "im Monat"]}
+          rechtsBuendig
+        >
+          {sichtbar.map((posten) => (
+            <PostenReihe
               key={posten.id}
-              className={posten.aktiv ? "" : stil.pausiert}
-              aria-current={posten.id === bearbeitetId ? "true" : undefined}
-            >
-              <td>
-                {posten.name}
-                <span className={stil.unterzeile}>
-                  {posten.kategorie_id
-                    ? (kategorie.get(posten.kategorie_id) ?? "—")
-                    : "Ohne Kategorie"}
-                  {posten.variabel ? " · frei verfügbar" : ""}
-                </span>
-              </td>
-              <td>{konto.get(posten.konto_id) ?? "—"}</td>
-              <td>
-                {posten.anlage_gewicht ? (
-                  <>
-                    {posten.anlage_gewicht} vom Überschuss
-                    <span className={stil.unterzeile}>
-                      monatlich, so viel wie übrig bleibt
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    {rhythmus(
-                      posten.intervall_monate,
-                      berechnet.get(posten.id)?.faellige_monate ?? [],
-                    )}
-                    <span className={stil.unterzeile}>
-                      {abbuchungstext(posten.abbuchungstag)}
-                    </span>
-                  </>
-                )}
-              </td>
-              <td className={stil.rechts} data-spalte="Abbuchung">
-                {posten.anlage_gewicht ? (
-                  <span className={stil.leise}>—</span>
-                ) : (
-                  alsEuro(posten.betrag)
-                )}
-              </td>
-              <td className={`${stil.rechts} ${stil.betont}`} data-spalte="im Monat">
-                {alsEuro(berechnet.get(posten.id)?.monatsrate ?? posten.betrag)}
-              </td>
-              <td>
-                {posten.anteile.length === 0 ? (
-                  <span className={stil.leise}>—</span>
-                ) : (
-                  <span className={stil.leise}>
-                    {posten.anteile
-                      .map((a) => `${name.get(a.person_id) ?? "?"} ${a.gewicht}`)
-                      .join(" : ")}
-                  </span>
-                )}
-              </td>
-              <td className={stil.aktionszelle}>
-                <div className={stil.aktionen}>
-                  <Knopf
-                    groesse="sm"
-                    onClick={() => onBearbeiten(posten)}
-                    aria-label={`${posten.name} ändern`}
-                  >
-                    Ändern
-                  </Knopf>
-                  <Knopf
-                    groesse="sm"
-                    onClick={() =>
-                      void aktion(() =>
-                        aenderePosten(posten.id, { aktiv: !posten.aktiv }),
-                      )
-                    }
-                    aria-label={`${posten.name} ${posten.aktiv ? "pausieren" : "wieder aufnehmen"}`}
-                  >
-                    {posten.aktiv ? "Pausieren" : "Aufnehmen"}
-                  </Knopf>
-                  <Knopf
-                    groesse="sm"
-                    auspraegung="leise"
-                    onClick={() => void aktion(() => entfernePosten(posten.id))}
-                    aria-label={`${posten.name} entfernen`}
-                  >
-                    Entfernen
-                  </Knopf>
-                </div>
-              </td>
-            </tr>
+              posten={posten}
+              zeile={berechnet.get(posten.id)}
+              konto={konto.get(posten.konto_id)?.name ?? "—"}
+              kategorie={
+                posten.kategorie_id
+                  ? (kategorie.get(posten.kategorie_id) ?? "—")
+                  : "Ohne Kategorie"
+              }
+              name={name}
+              offen={offen === posten.id}
+              betont={posten.id === bearbeitetId}
+              onKlick={() => setOffen(offen === posten.id ? null : posten.id)}
+              onBearbeiten={() => onBearbeiten(posten)}
+              aktion={aktion}
+            />
           ))}
-        </tbody>
-      </table>
-    </div>
+        </Tabelle>
+      )}
+    </>
+  );
+}
+
+/**
+ * Eine Zeile - und was in ihr aufgeht.
+ *
+ * Sichtbar steht, wonach man sucht: Name, Konto, Rhythmus, Monatsbetrag.
+ * Alles Weitere - die Abbuchung, wer wie viel traegt, und die drei
+ * Handlungen - steht in der Ausklappung. Vorher trug jede Zeile drei
+ * Knoepfe; bei zwanzig Posten waren das sechzig auf einem Bildschirm, und
+ * gesucht hat man trotzdem den Namen.
+ */
+function PostenReihe({
+  posten,
+  zeile,
+  konto,
+  kategorie,
+  name,
+  offen,
+  betont,
+  onKlick,
+  onBearbeiten,
+  aktion,
+}: {
+  posten: Posten;
+  zeile: PostenZeile | undefined;
+  konto: string;
+  kategorie: string;
+  name: Map<string, string>;
+  offen: boolean;
+  betont: boolean;
+  onKlick: () => void;
+  onBearbeiten: () => void;
+  aktion: (was: () => Promise<unknown>) => Promise<boolean>;
+}) {
+  const anteile = Object.entries(zeile?.anteile ?? {});
+
+  return (
+    <Reihe
+      betont={betont}
+      leise={!posten.aktiv}
+      onKlick={onKlick}
+      offen={offen}
+      ausklappung={
+        <div className={stil.ausklappung}>
+          <dl className={stil.merkmale}>
+            <div>
+              <dt>Abbuchung</dt>
+              <dd>
+                {posten.anlage_gewicht
+                  ? "so viel wie übrig bleibt"
+                  : `${alsEuro(posten.betrag)} ${abbuchungstext(posten.abbuchungstag)}`}
+              </dd>
+            </div>
+            <div>
+              <dt>Kategorie</dt>
+              <dd>
+                {kategorie}
+                {posten.variabel ? " · frei verfügbar" : ""}
+              </dd>
+            </div>
+            {anteile.length > 0 && (
+              <div>
+                <dt>Wer trägt das</dt>
+                <dd>
+                  {posten.anteile
+                    .map(
+                      (anteil) =>
+                        `${name.get(anteil.person_id) ?? "?"} ${anteil.gewicht} · ${alsEuro(
+                          anteile.find(([wer]) => wer === anteil.person_id)?.[1] ?? "0",
+                        )}`,
+                    )
+                    .join("   ")}
+                </dd>
+              </div>
+            )}
+          </dl>
+
+          <div className={stil.aktionen}>
+            <Knopf
+              groesse="sm"
+              onClick={onBearbeiten}
+              aria-label={`${posten.name} ändern`}
+            >
+              Ändern
+            </Knopf>
+            <Knopf
+              groesse="sm"
+              onClick={() =>
+                void aktion(() => aenderePosten(posten.id, { aktiv: !posten.aktiv }))
+              }
+              aria-label={`${posten.name} ${posten.aktiv ? "pausieren" : "wieder aufnehmen"}`}
+            >
+              {posten.aktiv ? "Pausieren" : "Aufnehmen"}
+            </Knopf>
+            <Knopf
+              groesse="sm"
+              auspraegung="leise"
+              onClick={() => void aktion(() => entfernePosten(posten.id))}
+              aria-label={`${posten.name} entfernen`}
+            >
+              Entfernen
+            </Knopf>
+          </div>
+        </div>
+      }
+    >
+      <Zelle>
+        {posten.name}
+        <span className={stil.nebenwort}>
+          {kategorie}
+          {posten.variabel ? " · frei verfügbar" : ""}
+          {posten.aktiv ? "" : " · pausiert"}
+        </span>
+      </Zelle>
+      <Zelle leise>{konto}</Zelle>
+      <Zelle leise>
+        {posten.anlage_gewicht
+          ? `${posten.anlage_gewicht} vom Überschuss`
+          : rhythmus(posten.intervall_monate, zeile?.faellige_monate ?? [])}
+      </Zelle>
+      <Zelle rechts>
+        {posten.art === "einnahme" ? "+ " : ""}
+        {alsEuro(zeile?.monatsrate ?? posten.betrag)}
+      </Zelle>
+    </Reihe>
   );
 }
 

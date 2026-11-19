@@ -68,6 +68,22 @@ describe("Modulseite", () => {
     expect(screen.getByText("/messwerte/")).toBeInTheDocument();
   });
 
+  it("setzt keine Überschrift über ein Artefakt, das seine eigene trägt", async () => {
+    /* Die Verwaltung baut ihren Kopf selbst - mit den Zahlen daneben, die
+       nur sie kennt. Eine zweite Überschrift darüber waere dasselbe Wort
+       zweimal untereinander. */
+    vi.spyOn(client, "fetchModule").mockResolvedValue([
+      { ...ohneOberflaeche, id: "verwaltung", titel: "Verwaltung", pfad: "/verwaltung" },
+    ]);
+    vi.spyOn(verwaltungApi, "ladeKonten").mockResolvedValue([]);
+    vi.spyOn(verwaltungApi, "ladeArtefakte").mockResolvedValue([]);
+
+    zeige("verwaltung");
+
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
   it("nimmt für ein eingetragenes Artefakt dessen eigene Oberfläche", async () => {
     // verwaltung ist in register.ts eingetragen - hier wird die echte
     // Verdrahtung geprüft, nicht ein Mock davon.
