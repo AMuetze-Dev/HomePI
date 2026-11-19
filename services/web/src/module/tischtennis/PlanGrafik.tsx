@@ -1,6 +1,6 @@
 import { Abschnitt, Etikett, Hinweis, Karte, Leerzustand } from "../../ui";
 import type { Phase, Spiel, Tabelle } from "./api";
-import { Raster } from "./Raster";
+import { Raster, VerweisRahmen } from "./Raster";
 import stil from "./TischtennisSeite.module.css";
 
 /**
@@ -59,28 +59,30 @@ export function PlanGrafik({
   }
 
   return (
-    <div className={stil.plangrafik}>
-      {[...gruppen, ...einzeln].map((tabelle) => (
-        <Gruppenkarte
-          key={tabelle.titel}
-          tabelle={tabelle}
-          spiele={spiele.filter(
-            (spiel) =>
-              spiel.gruppe === tabelle.titel ||
-              (gruppen.length === 0 && !spiel.phase.startsWith("ko")),
-          )}
-        />
-      ))}
+    <VerweisRahmen spiele={spiele}>
+      <div className={stil.plangrafik}>
+        {[...gruppen, ...einzeln].map((tabelle) => (
+          <Gruppenkarte
+            key={tabelle.titel}
+            tabelle={tabelle}
+            spiele={spiele.filter(
+              (spiel) =>
+                spiel.gruppe === tabelle.titel ||
+                (gruppen.length === 0 && !spiel.phase.startsWith("ko")),
+            )}
+          />
+        ))}
 
-      {zweige.map((zweig) => (
-        <Zweigkarte
-          key={zweig.phase}
-          titel={zweig.titel}
-          erklaerung={zweig.erklaerung}
-          spiele={zweig.spiele}
-        />
-      ))}
-    </div>
+        {zweige.map((zweig) => (
+          <Zweigkarte
+            key={zweig.phase}
+            titel={zweig.titel}
+            erklaerung={zweig.erklaerung}
+            spiele={zweig.spiele}
+          />
+        ))}
+      </div>
+    </VerweisRahmen>
   );
 }
 

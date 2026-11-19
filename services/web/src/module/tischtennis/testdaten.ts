@@ -45,6 +45,8 @@ export function spiel(rest: Partial<Spiel> = {}): Spiel {
     gast: "Bernd",
     heim_herkunft: null,
     gast_herkunft: null,
+    heim_aus_spiel: null,
+    gast_aus_spiel: null,
     zustand: "geplant",
     tisch: 1,
     sieger_id: null,
