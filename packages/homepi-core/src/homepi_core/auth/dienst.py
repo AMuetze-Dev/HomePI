@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 import secrets
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -48,6 +48,42 @@ class Rolle(StrEnum):
 
 
 # --- Fehler ----------------------------------------------------------------
+
+
+#: Wie viele Fehlversuche je Benutzername, bevor gewartet werden muss.
+#:
+#: Fuenf und nicht drei: Wer sein Passwort sucht, vertippt sich auch mal
+#: dreimal hintereinander. Ein Skript, das raten will, kommt mit fuenf
+#: Versuchen je Viertelstunde auf 480 am Tag - gegen ein Passwort aus vier
+#: Woertern ist das nichts.
+FEHLVERSUCHE_ERLAUBT = 5
+FEHLVERSUCH_FENSTER = timedelta(minutes=15)
+
+
+def wartezeit(fehlversuche: Sequence[datetime], jetzt: datetime) -> timedelta:
+    """Wie lange ein Name noch warten muss - null heisst: er darf.
+
+    Frei wird er, sobald der aelteste der letzten erlaubten Fehlversuche aus
+    dem Fenster faellt. Nicht pauschal eine Viertelstunde ab dem letzten
+    Versuch: Wer seit zehn Minuten nichts mehr probiert hat, wartet nur noch
+    die restlichen fuenf.
+
+    Die Sperre haengt am NAMEN und nicht an der Adresse. Ein Skript, das von
+    vielen Adressen aus raet, kaeme sonst ungebremst durch - die Bremse je
+    Adresse sitzt eine Ebene davor im Reverse Proxy. Der Preis: Wer einen
+    Namen kennt, kann ihn eine Viertelstunde lang aussperren. Das ist
+    aergerlich und kein Einbruch.
+    """
+    im_fenster = sorted(z for z in fehlversuche if jetzt - z < FEHLVERSUCH_FENSTER)
+    if len(im_fenster) < FEHLVERSUCHE_ERLAUBT:
+        return timedelta(0)
+    massgeblich = im_fenster[-FEHLVERSUCHE_ERLAUBT]
+    return massgeblich + FEHLVERSUCH_FENSTER - jetzt
+
+
+class ZuVieleVersuche(ServiceError):
+    status = 429
+    title = "Zu viele Anmeldeversuche"
 
 
 class AnmeldungFehlgeschlagen(ServiceError):

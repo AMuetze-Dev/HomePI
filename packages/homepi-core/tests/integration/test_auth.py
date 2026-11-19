@@ -104,6 +104,55 @@ async def _anmelden(client: AsyncClient, name: str = "aaron", passwort: str = PA
 # --- Anmelden --------------------------------------------------------------
 
 
+class TestDrossel:
+    """Gegen Durchprobieren - Pflicht, seit die Anmeldung aus dem Internet
+    erreichbar ist."""
+
+    async def test_nach_fuenf_fehlversuchen_hilft_auch_das_richtige_passwort_nicht(
+        self, client: AsyncClient, benutzer
+    ) -> None:
+        """Sonst probiert ein Skript einfach weiter, bis es trifft - die
+        Sperre waere nur eine Verzoegerung."""
+        for _ in range(5):
+            await _anmelden(client, passwort="falsch")
+
+        antwort = await _anmelden(client)
+
+        assert antwort.status_code == 429
+        assert "Minute" in antwort.json()["detail"]
+        assert COOKIE not in antwort.cookies
+
+    async def test_eine_erfolgreiche_anmeldung_setzt_den_zaehler_zurueck(
+        self, client: AsyncClient, benutzer
+    ) -> None:
+        for _ in range(4):
+            await _anmelden(client, passwort="falsch")
+        assert (await _anmelden(client)).status_code == 200
+
+        for _ in range(4):
+            await _anmelden(client, passwort="falsch")
+
+        assert (await _anmelden(client)).status_code == 200
+
+    async def test_ein_unbekannter_name_wird_genauso_gesperrt(
+        self, client: AsyncClient, benutzer
+    ) -> None:
+        """Wuerde nur ein echtes Konto gesperrt, verriete die Sperre, welche
+        Namen es gibt."""
+        for _ in range(5):
+            await _anmelden(client, name="gibtsnicht", passwort="falsch")
+
+        antwort = await _anmelden(client, name="gibtsnicht", passwort="falsch")
+
+        assert antwort.status_code == 429
+
+    async def test_die_sperre_trifft_nur_diesen_namen(self, client: AsyncClient, benutzer) -> None:
+        for _ in range(5):
+            await _anmelden(client, name="gibtsnicht", passwort="falsch")
+
+        assert (await _anmelden(client)).status_code == 200
+
+
 class TestAnmelden:
     async def test_richtige_daten_setzen_ein_cookie(self, client: AsyncClient, benutzer) -> None:
         antwort = await _anmelden(client)

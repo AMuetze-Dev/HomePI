@@ -3,12 +3,12 @@
     from homepi_core import ServiceSettings, create_service
 
     class Settings(ServiceSettings):
-        service_name: str = "geraete"
+        service_name: str = "beispiel"
 
     settings = Settings()
     app = create_service(settings)
 
-    @app.get("/geraete")
+    @app.get("/beispiel")
     async def liste() -> list[str]:
         ...
 
@@ -23,13 +23,14 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .auth.drossel import Anmeldedrossel
 from .cache import Cache
 from .db import Database
 from .errors import install_error_handlers
@@ -66,6 +67,9 @@ class ServiceContext:
     db: Database | None = None
     cache: Cache | None = None
     module: Modulregister | None = None
+    #: Fehlversuche bei der Anmeldung. Je App eines - zwei Apps im selben
+    #: Prozess (in Tests ist das die Regel) teilen sich sonst eine Sperre.
+    drossel: Anmeldedrossel = field(default_factory=Anmeldedrossel)
 
     def require_db(self) -> Database:
         if self.db is None:

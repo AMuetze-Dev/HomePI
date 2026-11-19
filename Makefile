@@ -30,6 +30,10 @@ up-core: render
 up-dns:
 	$(DC) -f stacks/dns/docker-compose.yml up -d
 
+## up-internet: DuckDNS auf die oeffentliche Adresse - erst nach der Portfreigabe (docs/14-internet.md)
+up-internet:
+	$(DC) -f stacks/dns/docker-compose.yml --profile internet up -d
+
 ## up-data: Postgres, pgAdmin, Redis
 up-data:
 	$(DC) -f stacks/data/docker-compose.yml up -d

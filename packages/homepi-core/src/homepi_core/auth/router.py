@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import math
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Request, Response, status
 
-from ..deps import DbSitzung, Einstellungen
+from ..deps import DbSitzung, Einstellungen, Kontext
 from . import cookies, speicher
 from .deps import Sitzungsbenutzer
-from .dienst import AnmeldungFehlgeschlagen, pruefe_passwort
+from .dienst import AnmeldungFehlgeschlagen, ZuVieleVersuche, pruefe_passwort, wartezeit
 from .modelle import Benutzer
 from .schemas import Anmeldung, BenutzerAusgabe, PasswortAendern
 
@@ -36,8 +39,31 @@ async def anmelden(
     antwort: Response,
     sitzung: DbSitzung,
     einstellungen: Einstellungen,
+    kontext: Kontext,
 ) -> BenutzerAusgabe:
-    benutzer, token = await speicher.melde_an(sitzung, daten.name, daten.passwort)
+    drossel = kontext.drossel
+    jetzt = datetime.now(UTC)
+
+    # VOR dem Passwort pruefen, nicht danach: Sonst verraet die Antwort auf
+    # das richtige Passwort, dass es das richtige war - und die Sperre waere
+    # nur eine Verzoegerung.
+    if (warten := wartezeit(drossel.fehlversuche(daten.name), jetzt)) > timedelta(0):
+        minuten = max(1, math.ceil(warten.total_seconds() / 60))
+        raise ZuVieleVersuche(
+            f"Zu viele Fehlversuche mit diesem Namen. Versuch es in {minuten} "
+            f"{'Minute' if minuten == 1 else 'Minuten'} noch einmal.",
+            warten_sekunden=math.ceil(warten.total_seconds()),
+        )
+
+    try:
+        benutzer, token = await speicher.melde_an(sitzung, daten.name, daten.passwort)
+    except AnmeldungFehlgeschlagen:
+        # Auch fuer Namen, die es nicht gibt - sonst verriete die Sperre,
+        # welche es gibt.
+        drossel.vermerke(daten.name, jetzt)
+        raise
+
+    drossel.vergiss(daten.name)
     cookies.setze(antwort, token, einstellungen)
     return _ausgabe(benutzer)
 

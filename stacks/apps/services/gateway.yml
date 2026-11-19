@@ -26,8 +26,20 @@ services:
     labels:
       traefik.enable: "true"
       traefik.http.routers.gateway.rule: "Host(`api.${DOMAIN}`)"
-      traefik.http.routers.gateway.entrypoints: "websecure"
+      # Auch aus dem Internet - docs/14-internet.md.
+      traefik.http.routers.gateway.entrypoints: "websecure,internet"
       traefik.http.routers.gateway.middlewares: "api-cors@file,rate-limit@file"
+      # Die Anmeldung bekommt eine eigene, enge Bremse je Adresse. Sie sitzt
+      # VOR dem Gateway: Das Gateway sperrt einen Namen nach fuenf
+      # Fehlversuchen, erfaehrt aber nicht, wer von wo wie viele Namen
+      # durchprobiert. Das sieht nur der Reverse Proxy.
+      #
+      # Die laengere Regel gewinnt in Traefik von selbst - dieser Router
+      # schlaegt den allgemeinen fuer genau diesen einen Pfad.
+      traefik.http.routers.gateway-anmelden.rule: "Host(`api.${DOMAIN}`) && Path(`/auth/anmelden`)"
+      traefik.http.routers.gateway-anmelden.entrypoints: "websecure,internet"
+      traefik.http.routers.gateway-anmelden.middlewares: "api-cors@file,anmelde-bremse@file"
+      traefik.http.routers.gateway-anmelden.service: "gateway"
       traefik.http.services.gateway.loadbalancer.server.port: "8000"
     healthcheck:
       test:

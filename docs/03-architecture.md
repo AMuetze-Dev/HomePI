@@ -137,6 +137,11 @@ das unangenehm geworden. Mach das nur, wenn du wirklich keine Domain willst.
 Subnet-Router für 192.168.1.0/24) und auf deinen Geräten. Dann funktionieren dieselben
 Hostnamen mit denselben Zertifikaten von unterwegs, ohne dass etwas im Internet steht.
 
+**Öffentlich, für Menschen ohne Tailscale** — die Spieler beim Turnier etwa:
+[14-internet.md](14-internet.md). Dort bekommen App und API einen eigenen
+Traefik-Eingang auf Port 8443, auf den der Router weiterleitet; alles andere
+bleibt im LAN.
+
 ## Eureka: brauchst du hier nicht
 
 Ehrlich: nein. Eureka löst die Frage "welche Instanzen von Service X gibt es gerade und

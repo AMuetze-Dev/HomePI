@@ -172,3 +172,4 @@ ist alles ohne horizontales Scrollen erreichbar.
 | Artefakt bauen, Schritt für Schritt | [docs/09-artefakt-bauen.md](docs/09-artefakt-bauen.md) |
 | Auftrag zum Übergeben an einen Agenten | [docs/10-auftrag-artefakt.md](docs/10-auftrag-artefakt.md) |
 | Konten, Rechte, Sichtbarkeit von Artefakten | [docs/11-anmeldung.md](docs/11-anmeldung.md) |
+| Aus dem Internet erreichbar — was öffentlich ist und was nicht | [docs/14-internet.md](docs/14-internet.md) |
