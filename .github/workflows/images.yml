@@ -94,10 +94,14 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=release-${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=release-${{ matrix.service }}
-          # VITE_API_URL landet zur Build-Zeit im Bundle. Als Repository-
-          # Variable hinterlegen: Settings -> Variables -> VITE_API_URL
+          # VITE_API_URL landet zur Build-Zeit im Bundle - und ist fest
+          # "/api": Die Website ruft ihre API unter derselben Adresse auf,
+          # Traefik schneidet das Praefix ab (stacks/apps/services/gateway.yml).
+          # Eine Variable je Installation braucht es dafuer nicht mehr; mit
+          # einer festen Adresse wie https://api.<domain> lief die Seite
+          # unter jedem anderen Port ins Leere.
           build-args: |
-            VITE_API_URL=${{ vars.VITE_API_URL }}
+            VITE_API_URL=/api
 
       - name: Ergebnis
         if: steps.gate.outputs.skip != 'true'

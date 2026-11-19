@@ -35,11 +35,11 @@ services:
       FTLCONF_dns_listeningMode: all
       FTLCONF_dns_dnssec: "true"
       # Die eigene Domain samt ALLEN Unternamen zeigt im LAN auf den Pi -
-      # egal, was das oeffentliche DNS sagt. Ohne das ginge nach dem
-      # Umstellen auf die oeffentliche Adresse (docs/14-internet.md) jeder
-      # Aufruf aus dem Wohnzimmer erst zum Router und zurueck, landete dort
-      # am Internet-Eingang - und Dashboard, Logs und Home Assistant waeren
-      # im eigenen Netz nicht mehr erreichbar.
+      # egal, was das oeffentliche DNS sagt. Das oeffentliche sagt die
+      # Adresse des Anschlusses: Die Fritz!Box haelt DuckDNS darauf aktuell
+      # (docs/14-internet.md). Ohne diese Zeile ginge jeder Aufruf aus dem
+      # Wohnzimmer erst hinaus zum Router, und Dashboard, Logs und Home
+      # Assistant waeren im eigenen Netz nicht mehr erreichbar.
       #
       # Nebenbei erledigt das die Fritz!Box-Falle aus docs/03: Fragt das LAN
       # Pi-hole, kommt die Antwort nie beim DNS-Rebind-Schutz des Routers an.
@@ -76,34 +76,6 @@ services:
 #     volumes:
 #       - ${DATA_ROOT}/pihole/etc-pihole:/etc/pihole
 #       - ${DATA_ROOT}/pihole/etc-dnsmasq.d:/etc/dnsmasq.d
-  # Haelt den DuckDNS-Eintrag auf der oeffentlichen Adresse des
-  # Anschlusses. Nur mit "--profile internet" (make up-internet): Ohne
-  # Portfreigabe am Router zeigte der Name sonst ins Leere, und die Wohnung
-  # verloere den Namen, den sie im LAN benutzt - der kommt dann aber ohnehin
-  # aus Pi-hole (siehe FTLCONF_misc_dnsmasq_lines oben).
-  #
-  # Ein curl in einer Schleife und kein fertiges Updater-Abbild: Das ist
-  # die ganze Aufgabe, und so steht sie lesbar hier. "ip=" leer laesst
-  # DuckDNS die Absenderadresse nehmen - genau die, die von aussen sichtbar
-  # ist. Ausgegeben wird nur DuckDNS' Antwort ("OK"/"KO"), nie die Adresse
-  # mit dem Token darin.
-  duckdns:
-    image: curlimages/curl:8.11.1
-    container_name: duckdns
-    restart: unless-stopped
-    profiles: ["internet"]
-    environment:
-      DOMAIN: ${DOMAIN}
-      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        name="$${DOMAIN%.duckdns.org}"
-        while true; do
-          antwort=$$(curl -fsS --max-time 20 "https://www.duckdns.org/update?domains=$${name}&token=$${DUCKDNS_TOKEN}&ip=" || echo "keine Antwort")
-          echo "$$(date -Iseconds) DuckDNS $${name}: $${antwort}"
-          sleep 300
-        done
 
 networks:
   edge:

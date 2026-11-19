@@ -2,8 +2,11 @@
  * Zugriff auf das Gateway.
  *
  * VITE_API_URL wird zur BUILD-Zeit in das Bundle geschrieben, nicht zur
- * Laufzeit gelesen. Ein Image, das gegen api.home.example.com gebaut wurde,
- * spricht auch nur mit dieser Adresse.
+ * Laufzeit gelesen - und ist überall "/api": in der Entwicklung, in den
+ * Oberflächentests und in Produktion. Die API liegt damit immer unter
+ * derselben Adresse wie die Seite. Eine feste Adresse wie
+ * https://api.<domain> lief unter jedem anderen Port ins Leere - aus dem
+ * Internet ist die Seite unter :8443 erreichbar (docs/14-internet.md).
  */
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";

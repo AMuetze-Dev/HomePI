@@ -6,8 +6,9 @@ import { defineConfig } from "vitest/config";
  * Der Weg zur API - fuer den Entwicklungsserver UND fuer die Vorschau.
  *
  * Damit spricht der Browser nur mit dem Vite-Server: kein CORS, keine zweite
- * Adresse in der Konfiguration. In Produktion uebernimmt Traefik diese Rolle,
- * und VITE_API_URL zeigt direkt auf api.<domain>.
+ * Adresse in der Konfiguration. In Produktion uebernimmt Traefik dieselbe
+ * Rolle mit demselben Praefix - app.<domain>/api, abgeschnitten vom Router
+ * "app-api" (stacks/apps/services/gateway.yml).
  *
  * Beide brauchen ihn, und zwar denselben: die Oberflaechentests laufen gegen
  * die Vorschau (`vite preview`), also gegen das fertige Bundle. Zwei Fassungen
