@@ -1,11 +1,61 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import type { ModulEintrag } from "../api/client";
+import { fetchOeffentlicheUrl, type ModulEintrag } from "../api/client";
 import { Anmeldeformular } from "../anmeldung/Anmeldeformular";
 import { useAnmeldung } from "../anmeldung/kontext";
 import { useModule } from "../module/useModule";
-import { Etikett, Leerzustand, Platzhalter, Regel } from "../ui";
+import { Etikett, Knopf, Leerzustand, Platzhalter, Regel } from "../ui";
+import { QrKarte } from "./QrKarte";
 import stil from "./Start.module.css";
+
+const QR_SCHLUESSEL = "homepi.qr-code";
+
+function qrGemerkt(): boolean {
+  try {
+    return localStorage.getItem(QR_SCHLUESSEL) === "an";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ob der QR-Code steht, und für welche Adresse.
+ *
+ * Gemerkt im Browser, nicht im Konto: Er gehört zu dem Rechner, der bei
+ * der Vorstellung am Beamer hängt, nicht zu dem, der dort angemeldet ist.
+ * Die Adresse wird erst geholt, wenn der Code das erste Mal zu sehen ist.
+ */
+function useQrCode() {
+  const [sichtbar, setSichtbar] = useState(qrGemerkt);
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!sichtbar || url !== null) return;
+    const abbruch = new AbortController();
+    // Kennt das Gateway keine öffentliche Adresse - oder antwortet es gar
+    // nicht -, gilt die, unter der die Seite gerade läuft. Ein Code, der
+    // im Heimnetz funktioniert, ist besser als eine Fehlermeldung.
+    fetchOeffentlicheUrl(abbruch.signal)
+      .then((oeffentlich) => setUrl(oeffentlich ?? window.location.origin))
+      .catch(() => {
+        if (!abbruch.signal.aborted) setUrl(window.location.origin);
+      });
+    return () => abbruch.abort();
+  }, [sichtbar, url]);
+
+  function umschalten() {
+    const neu = !sichtbar;
+    setSichtbar(neu);
+    try {
+      localStorage.setItem(QR_SCHLUESSEL, neu ? "an" : "aus");
+    } catch {
+      // Ohne Speicher steht er eben nach dem Neuladen nicht mehr da.
+    }
+  }
+
+  return { sichtbar, url, umschalten };
+}
 
 /**
  * Die Startseite: eine Liste von Namen, sonst nichts.
@@ -24,6 +74,7 @@ export function Start() {
   // Dieselbe Liste, die auch die Navigation zeigt - einmal geholt.
   const zustand = useModule();
   const { zustand: anmeldung, benutzer } = useAnmeldung();
+  const qr = useQrCode();
 
   // Solange das Manifest unterwegs ist, steht noch nicht fest, ob diese
   // Seite eine Übersicht wird oder ein Anmeldeformular. Deshalb hier nur
@@ -61,44 +112,58 @@ export function Start() {
 
   return (
     <div className={stil.buehne}>
-      <div className={stil.mitte}>
-        <h1 className={stil.gruss}>
-          {begruessung()}
-          {benutzer ? `, ${vorname(benutzer.anzeigename || benutzer.name)}.` : "."}
-        </h1>
-        <p className={stil.unterzeile}>
-          {satzZurAnzahl(module.length)} Es steht hier nur, wofür du berechtigt bist.
-        </p>
+      <div className={qr.sichtbar ? stil.inhaltMitQr : stil.inhalt}>
+        <div className={stil.mitte}>
+          <h1 className={stil.gruss}>
+            {begruessung()}
+            {benutzer ? `, ${vorname(benutzer.anzeigename || benutzer.name)}.` : "."}
+          </h1>
+          <p className={stil.unterzeile}>
+            {satzZurAnzahl(module.length)} Es steht hier nur, wofür du berechtigt bist.
+          </p>
 
-        {zustand.phase === "fehler" && (
-          <Leerzustand titel="Verzeichnis nicht abrufbar">
-            Das Gateway hat nicht geantwortet: {zustand.nachricht}
-          </Leerzustand>
-        )}
+          {zustand.phase === "fehler" && (
+            <Leerzustand titel="Verzeichnis nicht abrufbar">
+              Das Gateway hat nicht geantwortet: {zustand.nachricht}
+            </Leerzustand>
+          )}
 
-        {zustand.phase === "fertig" && module.length === 0 && (
-          <Leerzustand titel="Noch kein Artefakt angemeldet">
-            Ein neues legst du mit <code>homepi new &lt;name&gt;</code> an. Nach dem
-            Deploy erscheint es hier von selbst — am Frontend ist dafür nichts zu ändern.
-          </Leerzustand>
-        )}
+          {zustand.phase === "fertig" && module.length === 0 && (
+            <Leerzustand titel="Noch kein Artefakt angemeldet">
+              Ein neues legst du mit <code>homepi new &lt;name&gt;</code> an. Nach dem
+              Deploy erscheint es hier von selbst — am Frontend ist dafür nichts zu
+              ändern.
+            </Leerzustand>
+          )}
 
-        {module.length > 0 && (
-          <ul className={stil.liste} aria-label="Artefakte">
-            <Regel />
-            {module.map((modul, i) => (
-              <li key={modul.id}>
-                <Zeile modul={modul} nummer={i + 1} />
-                <Regel />
-              </li>
-            ))}
-          </ul>
-        )}
+          {module.length > 0 && (
+            <ul className={stil.liste} aria-label="Artefakte">
+              <Regel />
+              {module.map((modul, i) => (
+                <li key={modul.id}>
+                  <Zeile modul={modul} nummer={i + 1} />
+                  <Regel />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {qr.sichtbar && <QrKarte url={qr.url} />}
       </div>
 
-      <p className={stil.fuss}>
-        Alles erreichbar über <kbd className={stil.taste}>Esc</kbd>
-      </p>
+      <div className={stil.fuss}>
+        <p className={stil.tastenhinweis}>
+          Alles erreichbar über <kbd className={stil.taste}>Esc</kbd>
+        </p>
+        <Knopf
+          groesse="sm"
+          auspraegung="leise"
+          aria-controls={qr.sichtbar ? "qr-code" : undefined}
+          onClick={qr.umschalten}
+        >
+          {qr.sichtbar ? "QR-Code ausblenden" : "QR-Code zeigen"}
+        </Knopf>
+      </div>
     </div>
   );
 }

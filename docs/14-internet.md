@@ -109,6 +109,13 @@ Browser:
 Danach zeigt `tailscale funnel status` die Adresse. Die Einstellung übersteht
 Neustarts; `make funnel` muss nur einmal laufen.
 
+**Die Adresse in die `.env`** — als `OEFFENTLICHE_URL='https://homelab.<tailnet>.ts.net'`,
+danach `make up-apps`. Die Startseite zeigt sie dann als QR-Code (Knopf
+„QR-Code zeigen“ unten), und zwar auch, wenn sie selbst im LAN unter
+`app.<domain>` läuft: Diesen Namen löst nur das Pi-hole auf, ein Handy im
+Mobilfunk käme dort nie an. Ohne Eintrag nimmt der Code die Adresse, unter der
+die Seite gerade geöffnet ist.
+
 **Von außen prüfen** — WLAN am Handy aus, mobile Daten an:
 
 - `https://homelab.<tailnet>.ts.net` zeigt die Startseite mit gültigem Schloss.

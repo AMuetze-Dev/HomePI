@@ -14,10 +14,77 @@
   min-height: calc(100dvh - var(--hoehe-kopf) - var(--raum-10) - var(--raum-16));
 }
 
+/* Liste und QR-Code. Ohne Code ist das nur die Liste; mit Code steht er
+   auf breiten Schirmen rechts daneben - so bleibt die Liste, wo sie war,
+   und der Code steht auf Augenhoehe statt unter dem Rand des Beamers. */
+.inhalt,
+.inhaltMitQr {
+  display: grid;
+  gap: var(--raum-12);
+  width: 100%;
+  margin-bottom: auto;
+}
+
+@media (width >= 60rem) {
+  .inhaltMitQr {
+    grid-template-columns: minmax(0, 62rem) auto;
+    align-items: start;
+  }
+}
+
 .mitte {
   width: 100%;
   max-width: 62rem;
-  margin-bottom: auto;
+}
+
+/* ── QR-Code ────────────────────────────────────────────────────────── */
+
+.qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--raum-4);
+  margin: 0;
+  justify-self: center;
+}
+
+/* Gross genug fuer drei Meter Abstand, klein genug fuer ein Telefon. */
+.qrfeld {
+  display: block;
+  width: clamp(12rem, 24vw, 20rem);
+  aspect-ratio: 1;
+  border-radius: var(--rundung-lg);
+  overflow: hidden;
+}
+
+/* Immer dunkel auf hell, auch im Dunkelmodus: Einen umgekehrten Code liest
+   nicht jede Kamera. Deshalb die Tonstufen und nicht die Rollenfarben, die
+   im Dunkelmodus kippen. */
+.qrgrund {
+  fill: var(--ton-50);
+}
+
+.qrmuster {
+  fill: var(--ton-950);
+}
+
+.qrtext {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--raum-1);
+  text-align: center;
+}
+
+.qrhinweis {
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.qradresse {
+  font-family: var(--schrift-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
 }
 
 .gruss {
@@ -123,12 +190,21 @@
 
 .fuss {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--raum-3);
   margin-top: var(--raum-12);
   padding-left: var(--raum-4);
   font-size: var(--text-xs);
   color: var(--farbe-text-leise);
+}
+
+.tastenhinweis {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-3);
+  margin: 0;
 }
 
 .taste {
@@ -139,9 +215,11 @@
   font-size: var(--text-xs);
 }
 
-/* Ohne Tastatur ist der Hinweis auf eine Taste ein Hinweis ins Leere. */
+/* Ohne Tastatur ist der Hinweis auf eine Taste ein Hinweis ins Leere. Der
+   Knopf fuer den QR-Code bleibt: Auch ein Tablet am Beamer soll ihn zeigen
+   koennen. */
 @media (pointer: coarse) {
-  .fuss {
+  .tastenhinweis {
     display: none;
   }
 }

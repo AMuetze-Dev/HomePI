@@ -25,6 +25,36 @@ async def test_info_nennt_die_abhaengigkeiten(client: AsyncClient) -> None:
     assert koerper["abhaengigkeiten"] == []
 
 
+async def test_info_nennt_die_oeffentliche_adresse() -> None:
+    """Die Startseite zeigt sie als QR-Code. Im Heimnetz laeuft sie unter
+    einer Adresse, die ein Handy im Mobilfunk nicht erreicht - deshalb
+    steht die oeffentliche hier, und nicht die, unter der man gerade ist."""
+    einstellungen = ServiceSettings(
+        service_name="mit-adresse",
+        oeffentliche_url="https://homelab.example.ts.net/",
+    )
+    app = create_service(einstellungen)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        koerper = (await c.get("/info")).json()
+
+    # Ohne Schraegstrich am Ende: Die Oberflaeche haengt keinen Pfad an,
+    # und ein Code mit "ts.net/" und einer mit "ts.net" waeren zwei Codes.
+    assert koerper["oeffentliche_url"] == "https://homelab.example.ts.net"
+
+
+async def test_ohne_oeffentliche_adresse_steht_dort_nichts(client: AsyncClient) -> None:
+    assert (await client.get("/info")).json()["oeffentliche_url"] is None
+
+
+def test_eine_oeffentliche_adresse_ohne_schema_faellt_beim_start_auf() -> None:
+    # "homelab.ts.net" im QR-Code oeffnet auf manchen Handys eine Suche
+    # statt der Seite. Das soll beim Start auffallen, nicht bei der
+    # Vorstellung.
+    with pytest.raises(ValueError, match="OEFFENTLICHE_URL"):
+        ServiceSettings(oeffentliche_url="homelab.example.ts.net")
+
+
 async def test_request_id_wird_erzeugt(client: AsyncClient) -> None:
     antwort = await client.get("/info")
 
