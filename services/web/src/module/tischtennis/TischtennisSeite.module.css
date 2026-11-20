@@ -404,6 +404,8 @@
    Der weiche Rand rechts sagt, dass dort noch etwas kommt - ohne eine
    Bildlaufleiste, die auf dem Handy ohnehin niemand sieht. */
 .raster {
+  /* Bezugspunkt für die Linien, die darin liegen. */
+  position: relative;
   display: flex;
   gap: var(--raum-8);
   overflow-x: auto;
@@ -550,14 +552,30 @@
   border-radius: var(--rundung-sm);
 }
 
-/* Der Strich nach rechts, der zur nächsten Runde zeigt. */
-.rasterspalte:not(:last-child) .rasterspiel::after {
-  content: "";
+/* Die Linien von einem Spiel in den Platz, auf den sein Sieger kommt.
+   Gezeichnet werden sie in Raster.tsx, weil sie wissen müssen, wo die
+   Karten stehen. Die Fläche ist einen Pixel groß und lässt die Linien
+   überstehen: So scrollen sie mit, ohne die Breite des Rasters selbst
+   zu bestimmen. Die Karten liegen darüber. */
+.rasterlinien {
   position: absolute;
-  top: 50%;
-  right: calc(-1 * var(--raum-8));
-  width: var(--raum-8);
-  border-top: 1px solid var(--farbe-rand);
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.rasterlinien path {
+  fill: none;
+  stroke: var(--farbe-rand);
+  stroke-width: 1;
+  transition: stroke var(--dauer-schnell);
+}
+
+/* Zeigt ein Verweis auf das Spiel, leuchtet auch sein Weg nach vorn. */
+.rasterlinien path[data-markiert] {
+  stroke: var(--farbe-akzent);
+  stroke-width: 1.5;
 }
 
 .rasterplatz {
