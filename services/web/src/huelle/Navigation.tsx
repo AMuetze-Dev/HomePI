@@ -7,6 +7,16 @@ import { sichtbareUnterseiten } from "../module/register";
 import { useModule } from "../module/useModule";
 import { Marke, Monogramm, Platzhalter, Regel } from "../ui";
 import stil from "./Navigation.module.css";
+import { anfangDerBewegung, type Spurpunkt, zieltAuf } from "./zielen";
+
+/** Mehr Punkte braucht die Richtung nicht - der Rest wäre Ballast. */
+const SPURLAENGE = 32;
+/** Wie lange die rechte Spalte wartet, ob der Zeiger dort ankommt. */
+const WARTEZEIT_MS = 300;
+/** So lange ohne Bewegung, und der Zeiger gilt als angekommen. */
+const STILLSTAND_MS = 100;
+/** Etwas über die Spalte hinaus: Niemand zielt pixelgenau auf ihre Ecke. */
+const ZIELSPIELRAUM = 48;
 
 interface Props {
   beiSchliessen: () => void;
@@ -68,6 +78,51 @@ export function Navigation({ beiSchliessen }: Props) {
   const gezeigt = module.find((m) => m.id === (vorschau ?? offenesModul));
   const bereiche = gezeigt ? sichtbareUnterseiten(gezeigt.id) : [];
 
+  /*
+   * Der Weg hinüber zu den Bereichen.
+   *
+   * Schräg nach rechts streift der Zeiger andere Artefakte. Zielt er dabei
+   * erkennbar auf die rechte Spalte, schlägt sie nicht sofort um, sondern
+   * wartet einen Moment: Kommt er dort an, war es nur Weg. Bleibt er
+   * stehen, war es gemeint - dann schlägt sie um.
+   */
+  const bereichsspalte = useRef<HTMLDivElement>(null);
+  const spur = useRef<Spurpunkt[]>([]);
+  const warten = useRef<number | undefined>(undefined);
+
+  useEffect(() => () => window.clearTimeout(warten.current), []);
+
+  function aufhoerenZuWarten() {
+    window.clearTimeout(warten.current);
+  }
+
+  function zeigen(id: string) {
+    window.clearTimeout(warten.current);
+    const vorher = anfangDerBewegung(spur.current);
+    const jetzt = spur.current.at(-1);
+    const kasten = bereichsspalte.current?.getBoundingClientRect();
+    // Ruht der Zeiger, ist er angekommen - dann gilt das Artefakt unter
+    // ihm, egal wohin er vorher zielte.
+    const steht = jetzt !== undefined && performance.now() - jetzt.t > STILLSTAND_MS;
+
+    if (
+      bereiche.length > 0 &&
+      kasten &&
+      vorher &&
+      jetzt &&
+      !steht &&
+      zieltAuf(vorher, jetzt, {
+        links: kasten.left,
+        oben: kasten.top - ZIELSPIELRAUM,
+        unten: kasten.bottom + ZIELSPIELRAUM,
+      })
+    ) {
+      warten.current = window.setTimeout(() => zeigen(id), WARTEZEIT_MS);
+      return;
+    }
+    setVorschau(id);
+  }
+
   return (
     <div className={stil.schleier}>
       {/* Der Hintergrund schliesst, ist aber kein Ziel fuer die Tastatur -
@@ -115,7 +170,26 @@ export function Navigation({ beiSchliessen }: Props) {
           </button>
         </div>
 
-        <div className={stil.spalten}>
+        <div
+          className={stil.spalten}
+          onMouseMove={(e) => {
+            spur.current = [
+              ...spur.current,
+              { x: e.clientX, y: e.clientY, t: e.timeStamp },
+            ].slice(-SPURLAENGE);
+          }}
+          /* Zurück auf das geöffnete Artefakt erst, wenn der Zeiger BEIDE
+             Spalten verlässt. Vorher hing das an der Artefaktliste - und
+             schlug genau auf dem Weg zu den Bereichen zurück, die man
+             anklicken wollte. Bei der Tastatur passiert das nicht: Dort
+             bleibt stehen, was zuletzt den Fokus hatte, und von dort geht
+             es mit dem Tabulator in die Bereiche daneben. */
+          onMouseLeave={() => {
+            aufhoerenZuWarten();
+            spur.current = [];
+            setVorschau(null);
+          }}
+        >
           <div className={stil.artefakte}>
             <NavLink
               to="/"
@@ -160,22 +234,18 @@ export function Navigation({ beiSchliessen }: Props) {
                 jede Suche nach einem Eintrag trifft doppelt. Den Namen
                 trägt hier der Dialog darum herum. */}
             {module.length > 0 && (
-              <ul
-                className={stil.liste}
-                /* Zurück auf das geöffnete Artefakt, sobald der Zeiger die
-                   Liste verlässt. Bei der Tastatur passiert das nicht --
-                   dort bleibt stehen, was zuletzt den Fokus hatte, und das
-                   ist richtig so: Von dort geht es mit dem Tabulator in die
-                   Bereiche daneben. */
-                onMouseLeave={() => setVorschau(null)}
-              >
+              <ul className={stil.liste}>
                 {module.map((modul) => (
                   <li key={modul.id}>
                     <Artefakt
                       modul={modul}
                       offen={modul.id === offenesModul}
                       gezeigt={modul.id === gezeigt?.id}
-                      beiVorschau={() => setVorschau(modul.id)}
+                      beiZeigen={() => zeigen(modul.id)}
+                      beiFokus={() => {
+                        aufhoerenZuWarten();
+                        setVorschau(modul.id);
+                      }}
                     />
                   </li>
                 ))}
@@ -183,7 +253,12 @@ export function Navigation({ beiSchliessen }: Props) {
             )}
           </div>
 
-          <div className={stil.bereichsspalte}>
+          <div
+            ref={bereichsspalte}
+            className={stil.bereichsspalte}
+            // Angekommen: Was unterwegs gestreift wurde, schlägt nicht mehr um.
+            onMouseEnter={aufhoerenZuWarten}
+          >
             {gezeigt && bereiche.length > 0 && (
               <>
                 <p className={stil.gruppe}>Bereiche in {gezeigt.titel}</p>
@@ -238,21 +313,23 @@ function Artefakt({
   modul,
   offen,
   gezeigt,
-  beiVorschau,
+  beiZeigen,
+  beiFokus,
 }: {
   modul: ModulEintrag;
   /** Dieses Artefakt ist gerade aufgeschlagen. */
   offen: boolean;
   /** Seine Bereiche stehen gerade rechts. */
   gezeigt: boolean;
-  beiVorschau: () => void;
+  beiZeigen: () => void;
+  beiFokus: () => void;
 }) {
   return (
     <NavLink
       to={`/modul/${modul.id}`}
       className={(offen || gezeigt ? stil.artefaktHier : stil.artefakt) ?? ""}
-      onMouseEnter={beiVorschau}
-      onFocus={beiVorschau}
+      onMouseEnter={beiZeigen}
+      onFocus={beiFokus}
     >
       {/* Das Monogramm im Akzent bleibt dem GEOEFFNETEN Artefakt. Wer nur
           darauf zeigt, bekommt die volle Schriftfarbe - sonst sehen zwei
