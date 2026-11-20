@@ -4,12 +4,16 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 import type { Spiel } from "./api";
+import { pfad, verbindungen } from "./rasterlinien";
 import stil from "./TischtennisSeite.module.css";
 
 /**
@@ -108,8 +112,8 @@ export function VerweisRahmen({
  * Eine Spalte je Runde, die Paarungen darin gleichmäßig verteilt: damit
  * steht das Halbfinale auf der Höhe zwischen seinen beiden Viertelfinals,
  * und der Weg nach vorn ist zu sehen, ohne ihn aus Spielnummern
- * zusammenzusuchen. Die Verbindungslinien sind reine Dekoration aus CSS —
- * sie tragen keine Aussage, die nicht schon im Text steht.
+ * zusammenzusuchen. Die Linien führen von einem Spiel in genau den Platz,
+ * auf den sein Sieger kommt; wohin genau, steht in `rasterlinien.ts`.
  *
  * Bewusst keine Zeichnung mit festen Koordinaten: Namen sind
  * unterschiedlich lang, und ein Raster, das bei „Maximilian“ bricht, ist
@@ -124,9 +128,22 @@ export function Raster({
 }) {
   const runden = [...new Set(spiele.map((spiel) => spiel.runde))].sort((a, b) => a - b);
   const verweise = useContext(VerweisKontext);
+  const flaeche = useRef<HTMLDivElement>(null);
+  const wege = useLinienwege(flaeche, spiele);
 
   return (
-    <div className={stil.raster} role="group" aria-label={beschriftung}>
+    <div ref={flaeche} className={stil.raster} role="group" aria-label={beschriftung}>
+      {/* Hinter den Karten: Eine Linie, die über eine Runde hinwegführt,
+          verschwindet unter der Karte dazwischen, statt sie zu kreuzen. */}
+      <svg className={stil.rasterlinien} width="1" height="1" aria-hidden="true">
+        {wege.map((weg) => (
+          <path
+            key={weg.schluessel}
+            d={weg.d}
+            data-markiert={verweise?.markiert === weg.von ? "" : undefined}
+          />
+        ))}
+      </svg>
       {runden.map((runde) => {
         const dieser = spiele.filter((spiel) => spiel.runde === runde);
         return (
@@ -139,6 +156,7 @@ export function Raster({
                 <li
                   key={spiel.id}
                   id={verweise?.kennung(spiel.nummer)}
+                  data-nummer={spiel.nummer}
                   className={stil.rasterspiel}
                   aria-label={`Spiel ${spiel.nummer}`}
                   aria-current={verweise?.markiert === spiel.nummer ? true : undefined}
@@ -163,6 +181,79 @@ export function Raster({
   );
 }
 
+interface Linienweg {
+  schluessel: string;
+  d: string;
+  von: number;
+}
+
+/**
+ * Misst, wo die Karten stehen, und legt die Linien dazwischen.
+ *
+ * Gemessen statt gerechnet, aus demselben Grund, aus dem das Raster
+ * keine festen Koordinaten hat: Ein langer Name macht eine Karte höher,
+ * und am Telefon bricht er um. Gemessen wird neu, sobald sich die Fläche
+ * oder eine Spalte in der Größe ändert.
+ */
+function useLinienwege(
+  flaeche: RefObject<HTMLDivElement | null>,
+  spiele: Spiel[],
+): Linienweg[] {
+  const linien = useMemo(() => verbindungen(spiele), [spiele]);
+  const [wege, setWege] = useState<Linienweg[]>([]);
+
+  useLayoutEffect(() => {
+    const raster = flaeche.current;
+    if (!raster || linien.length === 0) {
+      setWege([]);
+      return;
+    }
+    const feld = raster;
+
+    function messen() {
+      const rahmen = feld.getBoundingClientRect();
+      // Der Knick liegt mitten in der Lücke vor dem Ziel - so breit, wie
+      // das Stylesheet die Spalten auseinanderstellt.
+      const luecke = parseFloat(getComputedStyle(feld).columnGap) || 0;
+      const ort = (element: Element) => {
+        const kasten = element.getBoundingClientRect();
+        return {
+          links: kasten.left - rahmen.left + feld.scrollLeft,
+          rechts: kasten.right - rahmen.left + feld.scrollLeft,
+          mitte: (kasten.top + kasten.bottom) / 2 - rahmen.top + feld.scrollTop,
+        };
+      };
+
+      setWege(
+        linien.flatMap((linie) => {
+          const quelle = feld.querySelector(`[data-nummer="${linie.von}"]`);
+          const ziel = feld.querySelector(`[data-nummer="${linie.nach}"]`);
+          const platz = ziel?.querySelector(`[data-platz="${linie.platz}"]`);
+          if (!quelle || !ziel || !platz) return [];
+          const von = ort(quelle);
+          const nach = { x: ort(ziel).links, y: ort(platz).mitte };
+          return [
+            {
+              schluessel: `${linie.von}-${linie.nach}-${linie.platz}`,
+              d: pfad({ x: von.rechts, y: von.mitte }, nach, nach.x - luecke / 2),
+              von: linie.von,
+            },
+          ];
+        }),
+      );
+    }
+
+    messen();
+    if (typeof ResizeObserver === "undefined") return;
+    const beobachter = new ResizeObserver(messen);
+    beobachter.observe(feld);
+    for (const spalte of Array.from(feld.children)) beobachter.observe(spalte);
+    return () => beobachter.disconnect();
+  }, [flaeche, linien]);
+
+  return wege;
+}
+
 /**
  * Ein Platz im Raster.
  *
@@ -181,6 +272,7 @@ function Seite({ spiel, wer }: { spiel: Spiel; wer: "heim" | "gast" }) {
 
   return (
     <div
+      data-platz={wer}
       className={[
         stil.rasterplatz,
         gewonnen ? stil.rastersieger : "",
