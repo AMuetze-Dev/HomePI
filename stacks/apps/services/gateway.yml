@@ -17,6 +17,9 @@ services:
       # im Netz "data".
       DATABASE_URL: postgresql+asyncpg://app:${APP_DB_PASSWORD}@postgres:5432/app
       CORS_ORIGINS: https://app.${DOMAIN}
+      # Die Adresse, die die Startseite als QR-Code zeigt - leer heisst,
+      # sie nimmt die, unter der sie gerade laeuft. Siehe docs/14-internet.md.
+      OEFFENTLICHE_URL: ${OEFFENTLICHE_URL:-}
       # In Produktion aus: ein Schema aendert man mit einer Migration, nicht
       # beim Start. Siehe docs/04-runbook.md.
       DB_SCHEMA_ANLEGEN: "false"

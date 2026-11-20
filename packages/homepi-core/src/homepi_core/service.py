@@ -319,6 +319,9 @@ def _install_standard_routen(app: FastAPI, kontext: ServiceContext, *, anmeldung
             # Namen der Artefakte gehen nur den etwas an, der sie sehen darf.
             # Wer wissen will, welche es sind, fragt /module.
             "module": len(kontext.module.ids) if kontext.module else 0,
+            # Kein Geheimnis: Genau diese Adresse zeigt die Startseite als
+            # QR-Code jedem, der davorsteht.
+            "oeffentliche_url": einstellungen.oeffentliche_url or None,
         }
 
     if kontext.module is not None:

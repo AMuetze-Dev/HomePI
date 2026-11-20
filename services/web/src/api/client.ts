@@ -92,6 +92,27 @@ async function hole(pfad: string, signal?: AbortSignal): Promise<Response> {
 }
 
 /**
+ * Wo die Seite aus dem Internet erreichbar ist - `null`, wenn das Gateway
+ * keine Adresse kennt.
+ *
+ * Die Startseite zeigt sie als QR-Code. Die Adresse, unter der die Seite
+ * gerade läuft, taugt dafür nicht immer: Im Heimnetz ist das ein Name, den
+ * nur das Pi-hole auflöst.
+ */
+export async function fetchOeffentlicheUrl(signal?: AbortSignal): Promise<string | null> {
+  const antwort = await hole("/info", signal);
+  if (!antwort.ok) {
+    throw new ApiError(`Unerwartete Antwort ${antwort.status}`, antwort.status);
+  }
+  const koerper: unknown = await antwort.json();
+  if (!istObjekt(koerper)) {
+    throw new ApiError("Antwort hat nicht die erwartete Form", antwort.status);
+  }
+  const url = koerper.oeffentliche_url;
+  return typeof url === "string" && url !== "" ? url : null;
+}
+
+/**
  * Holt den Gesundheitszustand.
  *
  * Auch 503 liefert einen gültigen Bericht - genau dann will die Oberfläche ja

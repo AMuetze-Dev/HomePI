@@ -19,7 +19,7 @@ from enum import StrEnum
 from functools import lru_cache
 from typing import Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -68,6 +68,21 @@ class ServiceSettings(BaseSettings):
 
     # --- HTTP ----------------------------------------------------------
     cors_origins: str = ""
+    #: Wo die Seite aus dem Internet erreichbar ist - die Adresse, die die
+    #: Startseite als QR-Code zeigt. Leer heisst: keine; dann nimmt die
+    #: Oberflaeche die Adresse, unter der sie gerade laeuft.
+    oeffentliche_url: str = ""
+
+    @field_validator("oeffentliche_url")
+    @classmethod
+    def _oeffentliche_url_ist_eine_adresse(cls, wert: str) -> str:
+        wert = wert.strip().rstrip("/")
+        if wert and not wert.startswith(("https://", "http://")):
+            raise ValueError(
+                "OEFFENTLICHE_URL braucht ein Schema, also https://... - ohne "
+                "oeffnet ein Handy beim Scannen eine Suche statt der Seite"
+            )
+        return wert
 
     @property
     def cors_origin_list(self) -> list[str]:

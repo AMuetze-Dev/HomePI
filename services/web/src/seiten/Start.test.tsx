@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -30,9 +31,14 @@ function modul(rest: Partial<client.ModulEintrag> = {}): client.ModulEintrag {
   };
 }
 
-function zeige(module: client.ModulEintrag[], angemeldet = true) {
+function zeige(
+  module: client.ModulEintrag[],
+  angemeldet = true,
+  oeffentlicheUrl: string | null = null,
+) {
   vi.spyOn(client, "fetchHealth").mockResolvedValue(gesund);
   vi.spyOn(client, "fetchModule").mockResolvedValue(module);
+  vi.spyOn(client, "fetchOeffentlicheUrl").mockResolvedValue(oeffentlicheUrl);
   render(
     <MemoryRouter>{mitAnmeldung(<Start />, angemeldet ? undefined : null)}</MemoryRouter>,
   );
@@ -109,5 +115,71 @@ describe("Startseite", () => {
     render(<MemoryRouter>{mitAnmeldung(<Start />)}</MemoryRouter>);
 
     expect(await screen.findByText(/Gateway weg/)).toBeInTheDocument();
+  });
+});
+
+describe("Der QR-Code zum Mitnehmen", () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("ist zuerst verborgen und erscheint auf Knopfdruck", async () => {
+    // Im Alltag braucht ihn niemand - er ist fuer die Vorstellung, wenn die
+    // Startseite an der Wand haengt.
+    zeige([modul()], true, "https://homelab.example.ts.net");
+    const knopf = await screen.findByRole("button", { name: "QR-Code zeigen" });
+    expect(screen.queryByRole("img", { name: /QR-Code/ })).not.toBeInTheDocument();
+
+    await userEvent.click(knopf);
+
+    expect(
+      await screen.findByRole("img", {
+        name: "QR-Code für https://homelab.example.ts.net",
+      }),
+    ).toBeInTheDocument();
+    // Die Adresse steht auch als Text da - fuer jede Kamera, die keinen
+    // QR-Code liest.
+    expect(screen.getByText("homelab.example.ts.net")).toBeInTheDocument();
+  });
+
+  it("zeigt die oeffentliche Adresse, nicht die, unter der die Seite gerade laeuft", async () => {
+    // Im Heimnetz laeuft die Seite unter einem Namen, den nur das Pi-hole
+    // kennt. Ein Handy im Mobilfunk kaeme dort nie an.
+    zeige([modul()], true, "https://homelab.example.ts.net");
+    await userEvent.click(await screen.findByRole("button", { name: "QR-Code zeigen" }));
+
+    expect(
+      await screen.findByRole("img", { name: /homelab\.example\.ts\.net/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: new RegExp(location.host) })).toBeNull();
+  });
+
+  it("nimmt die eigene Adresse, wenn keine oeffentliche eingetragen ist", async () => {
+    zeige([modul()], true, null);
+    await userEvent.click(await screen.findByRole("button", { name: "QR-Code zeigen" }));
+
+    expect(
+      await screen.findByRole("img", { name: `QR-Code für ${location.origin}` }),
+    ).toBeInTheDocument();
+  });
+
+  it("verschwindet wieder und merkt sich, ob er zu sehen war", async () => {
+    // Der Rechner bei der Vorstellung laedt die Seite vielleicht neu - der
+    // Code soll dann nicht wieder fehlen.
+    zeige([modul()], true, "https://homelab.example.ts.net");
+    await userEvent.click(await screen.findByRole("button", { name: "QR-Code zeigen" }));
+    expect(localStorage.getItem("homepi.qr-code")).toBe("an");
+
+    await userEvent.click(screen.getByRole("button", { name: "QR-Code ausblenden" }));
+
+    expect(screen.queryByRole("img", { name: /QR-Code/ })).not.toBeInTheDocument();
+    expect(localStorage.getItem("homepi.qr-code")).toBe("aus");
+  });
+
+  it("steht beim Neuladen wieder da, wenn er zuletzt zu sehen war", async () => {
+    localStorage.setItem("homepi.qr-code", "an");
+    zeige([modul()], true, "https://homelab.example.ts.net");
+
+    expect(await screen.findByRole("img", { name: /QR-Code/ })).toBeInTheDocument();
   });
 });
