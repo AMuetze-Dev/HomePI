@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -212,7 +212,33 @@ describe("Die Bereiche beim Zeigen", () => {
     ).toBeInTheDocument();
   });
 
-  it("fällt auf das geöffnete Artefakt zurück, sobald der Zeiger die Liste verlässt", async () => {
+  it("hält die Bereiche fest, während der Zeiger zu ihnen hinüberwandert", async () => {
+    // Vorher sprang die rechte Spalte zurück auf das geöffnete Artefakt,
+    // sobald der Zeiger die Artefaktliste verließ - also genau auf dem Weg
+    // zu dem Bereich, den man anklicken wollte.
+    zeige("/modul/staffelpilot/spiele", [
+      modul(),
+      modul({ id: "haushaltsbuch", titel: "Haushaltsbuch" }),
+    ]);
+    const haushalt = await screen.findByRole("link", { name: /Haushaltsbuch/ });
+
+    await userEvent.hover(haushalt);
+    const monatsplan = within(
+      await screen.findByRole("list", { name: "Bereiche von Haushaltsbuch" }),
+    ).getByRole("link", { name: "Monatsplan" });
+    // Von Hand wie im Browser: mouseout mit dem Ziel als relatedTarget.
+    // userEvent.hover setzt es nicht, und ohne das sieht React nie, dass
+    // die Liste verlassen wurde - der Test bliebe grün, egal was passiert.
+    fireEvent.mouseOut(haushalt, { relatedTarget: monatsplan });
+    fireEvent.mouseOver(monatsplan, { relatedTarget: haushalt });
+
+    expect(
+      screen.getByRole("list", { name: "Bereiche von Haushaltsbuch" }),
+    ).toBeInTheDocument();
+    expect(monatsplan).toBeInTheDocument();
+  });
+
+  it("fällt auf das geöffnete Artefakt zurück, sobald der Zeiger die Fläche verlässt", async () => {
     zeige("/modul/staffelpilot/spiele", [
       modul(),
       modul({ id: "haushaltsbuch", titel: "Haushaltsbuch" }),
