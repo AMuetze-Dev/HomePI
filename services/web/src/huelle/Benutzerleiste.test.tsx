@@ -39,6 +39,35 @@ describe("Benutzerleiste", () => {
     );
   });
 
+  it("führt auch ohne Konto zu den Einstellungen", async () => {
+    // Das Farbschema gehört dem Gerät, nicht dem Konto. Wer noch keins hat,
+    // soll trotzdem in den Dunkelmodus wechseln können.
+    zeige(null);
+
+    expect(await screen.findByRole("link", { name: "Einstellungen" })).toHaveAttribute(
+      "href",
+      "/einstellungen",
+    );
+  });
+
+  it("führt auch von der Anmeldeseite zu den Einstellungen", async () => {
+    // Gerade dort sitzt man nachts vor einem hellen Formular.
+    zeige(null, "/anmelden");
+
+    expect(
+      await screen.findByRole("link", { name: "Einstellungen" }),
+    ).toBeInTheDocument();
+  });
+
+  it("nennt die Einstellungen nicht ein zweites Mal, wenn man schon dort ist", async () => {
+    // Der Pfad links sagt bereits "HomePI / Einstellungen". Am Telefon
+    // stand das Wort sonst zweimal in einer Zeile.
+    zeige(null, "/einstellungen");
+
+    expect(await screen.findByRole("link", { name: "Anmelden" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Einstellungen" })).not.toBeInTheDocument();
+  });
+
   it("wirbt auf der Anmeldeseite nicht für die Anmeldeseite", async () => {
     zeige(null, "/anmelden");
 

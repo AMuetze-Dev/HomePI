@@ -23,6 +23,30 @@
   outline-offset: -6px;
 }
 
+.ohneKonto {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-5);
+}
+
+/* Neben „Anmelden" und leiser als es: Der Weg hinein ist die Handlung,
+   die Einstellungen sind der Nebenweg. */
+.leise {
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+  transition: color var(--dauer-schnell) var(--verlauf);
+}
+
+.leise:hover {
+  color: var(--farbe-text);
+}
+
+.leise:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+  border-radius: var(--rundung-sm);
+}
+
 .anmelden {
   font-size: var(--text-sm);
   color: var(--farbe-akzent-schrift);

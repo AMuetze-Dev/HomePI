@@ -23,6 +23,22 @@
   color: var(--farbe-text-gedaempft);
 }
 
+.verweis {
+  color: var(--farbe-akzent-schrift);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.verweis:hover {
+  color: var(--farbe-akzent-hell);
+}
+
+.verweis:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+  border-radius: var(--rundung-sm);
+}
+
 /* ── Abschnitte ─────────────────────────────────────────────────────── */
 
 /* ── Eine Zeile: Satz links, Bedienelement rechts ───────────────────── */
