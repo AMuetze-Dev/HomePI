@@ -3,6 +3,7 @@ import { StaffelpilotSeite } from "./staffelpilot/StaffelpilotSeite";
 import { VerwaltungSeite } from "./verwaltung/VerwaltungSeite";
 import { HaushaltsbuchSeite } from "./haushaltsbuch/HaushaltsbuchSeite";
 import { TischtennisSeite } from "./tischtennis/TischtennisSeite";
+import { KinderzimmerSeite } from "./kinderzimmer/KinderzimmerSeite";
 
 /**
  * Eigene Oberflächen der Artefakte.
@@ -22,6 +23,24 @@ import { TischtennisSeite } from "./tischtennis/TischtennisSeite";
  * Artefakte zueinander verhalten, statt verteilt auf drei Dateien.
  */
 export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
+  {
+    id: "kinderzimmer",
+    Komponente: KinderzimmerSeite,
+    // Texte und Listen, keine Raster: Die Spiele sind Absätze zum Lesen, die
+    // Listen haben vier Spalten. Mehr Breite machte nur die Zeilen länger.
+    breite: "normal",
+    // Jeder Bereich baut seinen Kopf selbst: daneben steht die Zahl der
+    // Figuren, der Stand, und die eine Handlung der Fläche.
+    unterseiten: [
+      // Zuerst, weil hier steht, warum es das alles gibt.
+      { id: "spiele", wort: "Spiele", eigenerTitel: true },
+      { id: "figuren", wort: "Figuren", eigenerTitel: true },
+      { id: "aufnahmen", wort: "Aufnahmen", eigenerTitel: true },
+      { id: "tagebuch", wort: "Tagebuch", eigenerTitel: true },
+      { id: "einstellungen", wort: "Einstellungen", breite: "text", eigenerTitel: true },
+      { id: "geraete", wort: "Geräte", breite: "text", eigenerTitel: true },
+    ],
+  },
   {
     id: "haushaltsbuch",
     Komponente: HaushaltsbuchSeite,
