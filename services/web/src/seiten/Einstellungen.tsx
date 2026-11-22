@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
-import { aenderePasswort, type Rolle } from "../api/anmeldung";
+import { aenderePasswort, type Benutzer, type Rolle } from "../api/anmeldung";
 import { useAnmeldung } from "../anmeldung/kontext";
 import { SystemStatus } from "./SystemStatus";
 import { GRUENDE } from "../huelle/darstellung";
@@ -44,17 +45,31 @@ const ROLLENWORT: Record<Rolle, string> = {
  * angeht, steht in der Nutzerverwaltung.
  */
 export function Einstellungen() {
-  const { benutzer } = useAnmeldung();
+  const { zustand, benutzer } = useAnmeldung();
   const { thema, setzeThema } = useThema();
   const { reduziert, setzeReduziert } = useBewegung();
   const { grund, setzeGrund } = useGrund();
+  // Ohne Konto bleibt die Darstellung - sie liegt im Browser, nicht im
+  // Konto. Konto und Rechte wären hier leere Felder, die aussehen wie ein
+  // kaputtes Konto.
+  const ohneKonto = zustand === "abgemeldet";
 
   return (
     <div className={stil.seite}>
       <h1 className={stil.titel}>Einstellungen</h1>
-      <p className={stil.unterzeile}>
-        Gilt für dieses Konto, nicht für die Installation.
-      </p>
+      {ohneKonto ? (
+        <p className={stil.unterzeile}>
+          Gilt für diesen Browser. Konto, Passwort und Rechte stehen hier nach dem{" "}
+          <Link to="/anmelden" className={stil.verweis}>
+            Anmelden
+          </Link>
+          .
+        </p>
+      ) : (
+        <p className={stil.unterzeile}>
+          Gilt für dieses Konto, nicht für die Installation.
+        </p>
+      )}
 
       <Abschnitt regel titel="Darstellung">
         <Zeile wort="Farbschema" erklaerung="Folgt dem Gerät, bis du es hier festlegst.">
@@ -90,6 +105,15 @@ export function Einstellungen() {
         </Zeile>
       </Abschnitt>
 
+      {!ohneKonto && <Kontoteil benutzer={benutzer} />}
+    </div>
+  );
+}
+
+/** Was nur mit Konto Sinn ergibt: wer man ist, das Passwort, die Rechte. */
+function Kontoteil({ benutzer }: { benutzer: Benutzer | null }) {
+  return (
+    <>
       <Abschnitt regel titel="Konto">
         <div className={stil.felder}>
           <Feld beschriftung="Anzeigename" value={benutzer?.anzeigename ?? ""} readOnly />
@@ -116,7 +140,7 @@ export function Einstellungen() {
       <Abschnitt regel titel="System">
         <SystemStatus />
       </Abschnitt>
-    </div>
+    </>
   );
 }
 

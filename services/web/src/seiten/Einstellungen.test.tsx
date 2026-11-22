@@ -27,7 +27,7 @@ const gesund: client.Health = {
   checks: { database: true },
 };
 
-function zeige(benutzer: Benutzer = TESTBENUTZER) {
+function zeige(benutzer: Benutzer | null = TESTBENUTZER) {
   vi.spyOn(client, "fetchHealth").mockResolvedValue(gesund);
   vi.spyOn(client, "fetchModule").mockResolvedValue([
     {
@@ -44,6 +44,40 @@ function zeige(benutzer: Benutzer = TESTBENUTZER) {
 
   render(<MemoryRouter>{mitAnmeldung(<Einstellungen />, benutzer)}</MemoryRouter>);
 }
+
+describe("Einstellungen ohne Anmeldung", () => {
+  it("bietet die Darstellung an und sagt, dass sie für dieses Gerät gilt", async () => {
+    zeige(null);
+
+    expect(await screen.findByRole("radio", { name: "Dunkel" })).toBeInTheDocument();
+    expect(screen.getByText(/für diesen Browser/)).toBeInTheDocument();
+  });
+
+  it("schaltet auch ohne Konto in den Dunkelmodus", async () => {
+    zeige(null);
+
+    await userEvent.click(await screen.findByRole("radio", { name: "Dunkel" }));
+
+    expect(document.documentElement).toHaveAttribute("data-thema", "dunkel");
+  });
+
+  it("zeigt kein leeres Konto und keine Rechte, sondern den Weg zur Anmeldung", async () => {
+    // Leere Felder "Anzeigename" und "Benutzername" sähen aus wie ein
+    // kaputtes Konto - es gibt hier schlicht keins.
+    zeige(null);
+    await screen.findByRole("radio", { name: "Dunkel" });
+
+    expect(screen.queryByRole("heading", { name: "Konto" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Rechte" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Anzeigename" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Anmelden" })).toHaveAttribute(
+      "href",
+      "/anmelden",
+    );
+  });
+});
 
 describe("Einstellungen", () => {
   it("sagt im ersten Satz, für wen sie gelten", async () => {

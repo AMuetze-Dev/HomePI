@@ -28,13 +28,24 @@ export function Benutzerleiste() {
   }
 
   if (zustand === "abgemeldet") {
-    if (ort.pathname === "/anmelden") {
-      return <span className={stil.platz} aria-hidden="true" />;
-    }
+    // Die Einstellungen auch ohne Konto: Farbschema und Bewegung gehören
+    // dem Gerät, nicht dem Konto. Wer noch keins hat, sitzt sonst vor einem
+    // hellen Anmeldeformular und kommt nicht in den Dunkelmodus.
+    // Wo man schon ist, steht der Verweis nicht noch einmal: Der Pfad links
+    // nennt die Seite bereits.
     return (
-      <Link to="/anmelden" className={stil.anmelden}>
-        Anmelden
-      </Link>
+      <span className={stil.ohneKonto}>
+        {ort.pathname !== "/einstellungen" && (
+          <Link to="/einstellungen" className={stil.leise}>
+            Einstellungen
+          </Link>
+        )}
+        {ort.pathname !== "/anmelden" && (
+          <Link to="/anmelden" className={stil.anmelden}>
+            Anmelden
+          </Link>
+        )}
+      </span>
     );
   }
 
