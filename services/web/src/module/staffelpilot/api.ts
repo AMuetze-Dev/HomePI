@@ -21,9 +21,6 @@ export interface Staffel {
   /** Das zustaendige Sportgericht, wortgleich mit der Auswahl in DFBnet. */
   sportgericht: string;
   aktiv: boolean;
-  /** Wer sie leitet. Leer: niemand, dann prüft der Prüflauf mit den Vorgaben. */
-  staffelleiter: string;
-  leite_ich: boolean;
 }
 
 export interface Befund {
@@ -180,6 +177,8 @@ export interface AuftragZeile {
 
 export interface Auftrag extends AuftragZeile {
   protokoll: { zeit: string; text: string }[];
+  /** Wie viele Aufträge anderer Konten vorher drankommen. */
+  vor_dir: number;
 }
 
 export type UebertragungAktion = "prueferfreigabe" | "fallanlage";
@@ -542,19 +541,6 @@ export function aendereStaffel(
   daten: Partial<Omit<Staffel, "id">>,
 ): Promise<Staffel> {
   return anfrage<Staffel>(`/staffeln/${id}`, mitKoerper("PATCH", daten));
-}
-
-export function uebernimmStaffel(id: string): Promise<Staffel> {
-  return anfrage<Staffel>(`/staffeln/${id}/leitung`, { method: "POST" });
-}
-
-export function gibStaffelAb(id: string): Promise<Staffel> {
-  return anfrage<Staffel>(`/staffeln/${id}/leitung`, { method: "DELETE" });
-}
-
-/** Alle Staffeln ohne Staffelleiter auf einmal. */
-export function uebernimmFreieStaffeln(): Promise<{ uebernommen: number }> {
-  return anfrage<{ uebernommen: number }>("/staffeln/leitung", { method: "POST" });
 }
 
 export function loescheStaffel(id: string): Promise<void> {

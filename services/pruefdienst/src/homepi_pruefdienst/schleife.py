@@ -27,6 +27,10 @@ class Prueflauf:
     """Ein Durchgang durch die Aufträge und die Übertragungen."""
 
     def __init__(self, gateway: Gateway, leser: Leser, darf_schreiben: bool = False) -> None:
+        # Das eigene Konto: es sieht alle Auftraege und alle Uebertragungen.
+        self._alle = gateway
+        # Fuer wen gerade gearbeitet wird. Waehrend eines Auftrags das Gateway
+        # dessen, der ihn angefordert hat -- siehe `Gateway.fuer`.
         self._gateway = gateway
         self._leser = leser
         self._darf_schreiben = darf_schreiben
@@ -45,7 +49,7 @@ class Prueflauf:
         """
         gearbeitet = False
 
-        auftrag = self._gateway.offener_auftrag()
+        auftrag = self._alle.offener_auftrag()
         if auftrag is not None:
             self._auftrag(auftrag)
             gearbeitet = True
@@ -60,9 +64,15 @@ class Prueflauf:
     def _auftrag(self, auftrag: dict[str, Any]) -> None:
         kennung = str(auftrag["id"])
         art = str(auftrag["art"])
+        konto = str(auftrag.get("konto") or "")
         logger.info("Auftrag %s (%s) übernommen", kennung, art)
 
         try:
+            if not konto:
+                # Ohne das wuesste niemand, mit wessen Zugang -- und mit leerem
+                # Konto saehe der Lauf die Staffeln aller.
+                raise RuntimeError("Zu diesem Auftrag steht nicht, wer ihn angefordert hat")
+            self._gateway = self._alle.fuer(konto)
             if art == "anmeldeprobe":
                 self._anmeldeprobe(kennung)
             elif art == "fallprobe":
@@ -86,6 +96,7 @@ class Prueflauf:
             self._melden_dass_gescheitert(kennung, fehler)
         finally:
             self._leser.schliessen()
+            self._gateway = self._alle
 
     def _zusehen(self, kennung: str, schritt: str, art: str = "aktuell") -> None:
         """Ein Abbild der Seite ans Artefakt, fuer das Vorschaufenster.
@@ -267,41 +278,36 @@ class Prueflauf:
             )
             return set()
 
-        # Nur die Vorgaben. Was wirklich gilt, steht je Staffel im Regelsatz
-        # dessen, der sie leitet -- siehe `_regelsatz_fuer`.
+        # Nur fuer den Fall, dass der Regelsatz gleich nicht zu lesen ist --
+        # siehe `_regelsatz`.
         return {str(r["schluessel"]) for r in stand if not r.get("aktiv", True)}
 
-    def _regelsatz_fuer(
-        self, kennung: str, staffel: dict[str, Any], vorgabe: set[str]
+    def _regelsatz(
+        self, kennung: str, vorgabe: set[str]
     ) -> tuple[set[str], dict[str, dict[str, Any]]]:
-        """Was an dieser Staffel aus ist, und welche Werte gelten.
+        """Was aus ist, und welche Werte gelten -- beim Anforderer des Laufs.
 
         Geht es schief, wird mit den Vorgaben geprüft -- und das steht im
         Protokoll: wer eine Kulanz eingestellt hat und trotzdem eine
         Verspätung sieht, soll lesen können, warum.
         """
-        name = str(staffel["name"])
         try:
-            satz = self._gateway.regelsatz(str(staffel["id"]))
+            satz = self._gateway.regelsatz()
         except Exception:
-            logger.exception("Der Regelsatz zu %s liess sich nicht lesen", name)
+            logger.exception("Der Regelsatz liess sich nicht lesen")
             self._gateway.fortschritt(
                 kennung,
-                zeile=(
-                    f"{name}: Der Regelsatz liess sich nicht lesen -- geprüft wird mit den Vorgaben"
-                ),
+                zeile="Der Regelsatz liess sich nicht lesen -- geprüft wird mit den Vorgaben",
             )
             return vorgabe, {}
 
         aus = {str(r) for r in satz.get("aus", [])}
         leiter = str(satz.get("staffelleiter") or "")
-        wessen = (
-            f"Regelsatz von {leiter}" if leiter else "ohne Staffelleiter, es gelten die Vorgaben"
-        )
+        wessen = f"Regelsatz von {leiter}" if leiter else "Eigener Regelsatz"
         # Nicht verschweigen: eine abgeschaltete Regel ist nicht dasselbe wie
         # eine, die nichts gefunden hat.
         zusatz = f", {len(aus)} Regel(n) abgeschaltet" if aus else ""
-        self._gateway.fortschritt(kennung, zeile=f"{name}: {wessen}{zusatz}")
+        self._gateway.fortschritt(kennung, zeile=f"{wessen}{zusatz}")
         return aus, dict(satz.get("werte") or {})
 
     def _mannschaften_von(self, staffel: dict[str, Any]) -> list[dict[str, Any]]:
@@ -543,6 +549,7 @@ class Prueflauf:
         # Lauf zaehlen.
         self._regeln_spiegeln(kennung)
         vorgabe_aus = self._katalog_melden(kennung)
+        abgeschaltet, regelwerte = self._regelsatz(kennung, vorgabe_aus)
 
         gepruefte = befunde = 0
         nicht_geprueft: list[str] = []
@@ -594,7 +601,6 @@ class Prueflauf:
                 )
 
             mannschaften = self._mannschaften_von(staffel)
-            abgeschaltet, regelwerte = self._regelsatz_fuer(kennung, staffel, vorgabe_aus)
 
             if zeilen:
                 self._gateway.fortschritt(
@@ -749,8 +755,11 @@ class Prueflauf:
         Artefakt, der andere in der Umgebung dieses Dienstes. Eine
         Prüferfreigabe ist eine Handlung, die ein Verein sieht; sie soll nicht
         passieren, weil ein Container gestartet wurde.
+
+        Der im Artefakt gehört jedem Staffelleiter selbst: dort kommt nur
+        heraus, was sein Besitzer freigegeben hat.
         """
-        stand = self._gateway.uebertragung()
+        stand = self._alle.uebertragung()
         erlaubnis = dienst.Erlaubnis(
             pausiert=bool(stand["pausiert"]), darf_schreiben=self._darf_schreiben
         )
@@ -768,17 +777,66 @@ class Prueflauf:
             return False
 
         gemacht = 0
-        while (zeile := self._gateway.uebertragung_uebernehmen()) is not None:
-            geklappt, meldung, aktenzeichen = self._eintragen(zeile)
-            self._gateway.uebertragung_abschliessen(
-                str(zeile["id"]),
-                "fertig" if geklappt else "fehler",
-                meldung[:900],
-                aktenzeichen,
-            )
-            gemacht += 1
+        while (zeile := self._alle.uebertragung_uebernehmen()) is not None:
+            gemacht += self._uebertragungen_von(str(zeile.get("konto") or ""), zeile)
         logger.info("%d Übertragung(en) abgearbeitet", gemacht)
         return gemacht > 0
+
+    def _uebertragungen_von(self, konto: str, erste: dict[str, Any]) -> int:
+        """Alles, was ein Staffelleiter vorgemerkt hat, mit seinem Zugang.
+
+        Am Stück und nicht in der Reihenfolge des Vormerkens: sonst meldete
+        sich der Dienst bei zwei fleißigen Staffelleitern nach jeder Zeile um.
+
+        Scheitert die Anmeldung, wird sie **nicht wiederholt**: nach ein paar
+        falschen Passwörtern sperrt DFBnet das Konto. Die Zeilen scheitern dann
+        alle mit demselben Grund, und der nächste Versuch ist der Knopf.
+        """
+        self._gateway = self._alle.fuer(konto)
+        try:
+            hindernis = self._fuer_uebertragung_anmelden()
+            zeile: dict[str, Any] | None = erste
+            gemacht = 0
+            while zeile is not None:
+                geklappt, meldung, aktenzeichen = (
+                    (False, hindernis, "") if hindernis else self._versucht(zeile)
+                )
+                self._gateway.uebertragung_abschliessen(
+                    str(zeile["id"]),
+                    "fertig" if geklappt else "fehler",
+                    meldung[:900],
+                    aktenzeichen,
+                )
+                gemacht += 1
+                zeile = self._gateway.uebertragung_uebernehmen()
+            return gemacht
+        finally:
+            self._leser.schliessen()
+            self._gateway = self._alle
+
+    def _fuer_uebertragung_anmelden(self) -> str:
+        """Sich anmelden. Gibt zurück, was dabei im Weg stand -- oder nichts."""
+        if isinstance(self._leser, BeispielLeser):
+            return ""
+        # Zusehen gilt fuer einen Lauf, den jemand vor sich hat.
+        self._leser.sichtbar = False
+        try:
+            self._leser.anmelden(*self._gateway.zugang())
+        except Exception as fehler:
+            logger.exception("Anmeldung für die Übertragung gescheitert")
+            # Nur die erste Zeile: Playwright haengt an, was es eingetippt hat.
+            grund = (str(fehler).splitlines() or [type(fehler).__name__])[0]
+            return f"Die Anmeldung bei DFBnet ist gescheitert: {grund}"
+        return ""
+
+    def _versucht(self, zeile: dict[str, Any]) -> tuple[bool, str, str]:
+        """Eine Zeile eintragen. Scheitert sie, sagt sie warum -- und hält die
+        Zeilen der anderen nicht auf."""
+        try:
+            return self._eintragen(zeile)
+        except Exception as fehler:
+            logger.exception("Übertragung %s gescheitert", zeile.get("id"))
+            return False, str(fehler), ""
 
     def _eintragen(self, zeile: dict[str, Any]) -> tuple[bool, str, str]:
         """Eine vorgemerkte Handlung in DFBnet ausführen.

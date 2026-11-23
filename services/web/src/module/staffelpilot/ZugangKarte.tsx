@@ -92,8 +92,9 @@ export function ZugangKarte() {
       <Karte>
         <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
           <p className={stil.vorgangHinweis}>
-            Damit meldet sich der Prüfdienst an. Das Passwort wird verschlüsselt abgelegt
-            und kommt nie wieder heraus — auch nicht in dieses Formular.
+            Damit meldet sich der Prüfdienst an, wenn du etwas anforderst oder zur
+            Übertragung freigibst. Das Passwort wird verschlüsselt abgelegt und kommt nie
+            wieder heraus — auch nicht in dieses Formular.
           </p>
 
           {stand !== null && !stand.schluessel_vorhanden && (

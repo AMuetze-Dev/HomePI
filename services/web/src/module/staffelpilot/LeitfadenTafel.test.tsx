@@ -62,4 +62,19 @@ describe("Leitfaden", () => {
 
     expect(screen.getByText(/Verschickt wird nichts/)).toBeInTheDocument();
   });
+
+  it("sagt, dass Konten voneinander nichts sehen", () => {
+    render(<LeitfadenTafel onWechsel={vi.fn()} />);
+
+    expect(screen.getByText(/eigenen Staffeln/)).toBeInTheDocument();
+    expect(screen.queryByText(/alle Konten alle Staffeln/)).toBeNull();
+    expect(screen.queryByText(/Zugang ist gemeinsam/)).toBeNull();
+  });
+
+  it("sagt, was geschieht, wenn zwei dieselbe Staffel haben", () => {
+    render(<LeitfadenTafel onWechsel={vi.fn()} />);
+
+    expect(screen.getByText(/zu zweit/)).toBeInTheDocument();
+    expect(screen.getByText(/jeder für sich/)).toBeInTheDocument();
+  });
 });

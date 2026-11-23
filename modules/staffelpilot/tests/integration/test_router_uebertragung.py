@@ -9,14 +9,40 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
-from .hilfen import UNBEKANNT, befund, einspielen, spiel, staffel_anlegen
+from .hilfen import (
+    UNBEKANNT,
+    befund,
+    einspielen,
+    erster_befund,
+    spiel,
+    staffel_anlegen,
+)
 
 pytestmark = pytest.mark.integration
 
 
-async def einreihen(client: AsyncClient, **daten: object) -> dict[str, object]:
-    vorgabe = {"aktion": "prueferfreigabe", "referenz": "M-1"}
-    antwort = await client.post("/staffelpilot/uebertragungen", json={**vorgabe, **daten})
+async def spiel_zu(client: AsyncClient, dfbnet_id: str) -> str:
+    """Ein Spiel mit dieser Kennung -- angelegt, falls es noch keines gibt."""
+    staffeln = (await client.get("/staffelpilot/staffeln")).json()
+    staffel_id = staffeln[0]["id"] if staffeln else await staffel_anlegen(client)
+    zeilen = {z["dfbnet_id"]: z["id"] for z in (await client.get("/staffelpilot/")).json()}
+    if dfbnet_id not in zeilen:
+        await einspielen(client, staffel_id, spiel(dfbnet_id, befunde=[befund(weg="sportgericht")]))
+        zeilen = {z["dfbnet_id"]: z["id"] for z in (await client.get("/staffelpilot/")).json()}
+    return str(zeilen[dfbnet_id])
+
+
+async def einreihen(
+    client: AsyncClient, aktion: str = "prueferfreigabe", dfbnet_id: str = "M-1"
+) -> dict[str, object]:
+    referenz = await spiel_zu(client, dfbnet_id)
+    if aktion == "fallanlage":
+        befund_id = (await erster_befund(client, referenz))["id"]
+        vorgang = await client.post(f"/staffelpilot/befunde/{befund_id}/vorgang", json={})
+        referenz = vorgang.json()["id"]
+    antwort = await client.post(
+        "/staffelpilot/uebertragungen", json={"aktion": aktion, "referenz": referenz}
+    )
     assert antwort.status_code == 201, antwort.text
     return dict(antwort.json())
 
@@ -110,6 +136,17 @@ class TestEinreihen:
 
         assert antwort.status_code == 422
 
+    @pytest.mark.parametrize("referenz", ["M-1", UNBEKANNT])
+    @pytest.mark.parametrize("aktion", ["prueferfreigabe", "fallanlage"])
+    async def test_zu_nichts_laesst_sich_nichts_vormerken(
+        self, client: AsyncClient, aktion: str, referenz: str
+    ) -> None:
+        antwort = await client.post(
+            "/staffelpilot/uebertragungen", json={"aktion": aktion, "referenz": referenz}
+        )
+
+        assert antwort.status_code == 404
+
 
 class TestAbhaken:
     async def test_abhaken_merkt_die_freigabe_vor(self, client: AsyncClient) -> None:
@@ -196,8 +233,8 @@ class TestWiederholen:
         """Nach einem Netzausfall stehen dort zwanzig Zeilen mit demselben
         Fehler. Die einzeln anzuklicken ist keine Arbeit, sondern eine
         Strafe."""
-        erste = await einreihen(client, referenz="M-1")
-        zweite = await einreihen(client, referenz="M-2")
+        erste = await einreihen(client, dfbnet_id="M-1")
+        zweite = await einreihen(client, dfbnet_id="M-2")
         await scheitern(client, str(erste["id"]))
         await scheitern(client, str(zweite["id"]))
 
@@ -207,8 +244,8 @@ class TestWiederholen:
         assert stand["offen"] == 2
 
     async def test_eine_einzelne(self, client: AsyncClient) -> None:
-        erste = await einreihen(client, referenz="M-1")
-        zweite = await einreihen(client, referenz="M-2")
+        erste = await einreihen(client, dfbnet_id="M-1")
+        zweite = await einreihen(client, dfbnet_id="M-2")
         await scheitern(client, str(erste["id"]))
         await scheitern(client, str(zweite["id"]))
 
@@ -239,6 +276,11 @@ class TestWiederholen:
 
 
 class TestUebernehmen:
+    @pytest.fixture(autouse=True)
+    async def freigegeben(self, client: AsyncClient) -> None:
+        """Angehalten kommt nichts heraus -- siehe `test_router_trennung.py`."""
+        await client.post("/staffelpilot/uebertragungen/pause", json={"pausiert": False})
+
     async def test_ohne_offene_kommt_null(self, client: AsyncClient) -> None:
         """Der Pruefdienst fragt das im Takt ab. Ein 404 waere dort ein Fehler
         und kein Ergebnis."""
@@ -266,12 +308,12 @@ class TestUebernehmen:
         assert zweite is None
 
     async def test_die_aelteste_zuerst(self, client: AsyncClient) -> None:
-        await einreihen(client, referenz="M-1")
-        await einreihen(client, referenz="M-2")
+        await einreihen(client, dfbnet_id="M-1")
+        await einreihen(client, dfbnet_id="M-2")
 
         erste = (await client.post("/staffelpilot/uebertragungen/naechste")).json()
 
-        assert erste["referenz"] == "M-1"
+        assert erste["spiel_id"] == await spiel_zu(client, "M-1")
 
     async def test_eine_gescheiterte_wird_nicht_uebernommen(self, client: AsyncClient) -> None:
         """Erst wiederholen, dann laufen - sonst haengt der Dienst an einer

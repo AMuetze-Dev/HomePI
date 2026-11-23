@@ -16,21 +16,12 @@ import {
 import {
   type Parameter,
   type Regel,
-  type Staffel,
   formuliereRegel,
   ladeRegeln,
   schalteRegel,
   stelleRegelEin,
-  uebernimmFreieStaffeln,
 } from "./api";
-import {
-  anzeigename,
-  aufzaehlung,
-  eingabenAus,
-  feldname,
-  fristsatz,
-  nachThemen,
-} from "./regelsatz";
+import { anzeigename, eingabenAus, feldname, fristsatz, nachThemen } from "./regelsatz";
 import eigen from "./RegelnTafel.module.css";
 import stil from "./StaffelpilotSeite.module.css";
 import { meldung } from "../../api/client";
@@ -87,27 +78,19 @@ const FILTERWAHL = (Object.keys(FILTER) as Filter[]).map((wert) => ({
   wort: FILTER[wert],
 }));
 
-const KEINE_STAFFELN: readonly Staffel[] = [];
-
 /**
  * Der eigene Regelsatz: was geprüft wird, und wie streng.
  *
  * Der Katalog kommt vom Prüfdienst; dieses Artefakt kennt die Spielordnung
- * nicht. Schalter und Werte gehören dem, der hier angemeldet ist, und gelten
- * für die Staffeln, die er leitet.
+ * nicht. Schalter, Werte und Sätze gehören dem, der hier angemeldet ist, und
+ * gelten für alle seine Staffeln.
  *
  * In der Zeile steht, wonach man sucht, und der eine Handgriff, den man im
  * Durchgehen braucht: der Schalter. Alles andere — Erklärung, Werte, Sätze —
  * steht in der Ausklappung. Vierzig Regeln mit offenen Feldern wären ein
  * Formular, durch das sich niemand arbeitet.
  */
-export function RegelnTafel({
-  staffeln = KEINE_STAFFELN,
-  onStaffelnGeaendert,
-}: {
-  staffeln?: readonly Staffel[];
-  onStaffelnGeaendert?: () => void;
-}) {
+export function RegelnTafel() {
   const [regeln, setRegeln] = useState<Regel[] | null>(null);
   const [fehler, setFehler] = useState("");
   const [filter, setFilter] = useState<Filter>("alle");
@@ -132,16 +115,6 @@ export function RegelnTafel({
     setFehler("");
     try {
       ersetzen(await schalteRegel(regel.id, !regel.aktiv));
-    } catch (f) {
-      setFehler(meldung(f));
-    }
-  }
-
-  async function uebernehmen() {
-    setFehler("");
-    try {
-      await uebernimmFreieStaffeln();
-      onStaffelnGeaendert?.();
     } catch (f) {
       setFehler(meldung(f));
     }
@@ -204,7 +177,12 @@ export function RegelnTafel({
         </Hinweis>
       )}
 
-      <Geltung staffeln={staffeln} onUebernehmen={() => void uebernehmen()} />
+      {/* Ohne diese Zeile schaltet jemand, wundert sich, dass sich nichts
+          ändert, und sucht den Fehler im Prüfdienst. */}
+      <p className={eigen.geltung}>
+        Dein Regelsatz, für alle deine Staffeln. Andere Konten haben ihren eigenen.
+        Änderungen gelten ab dem nächsten Prüflauf.
+      </p>
 
       <div className={stil.werkzeugleiste}>
         <input
@@ -246,50 +224,6 @@ export function RegelnTafel({
         </Abschnitt>
       ))}
     </Tafel>
-  );
-}
-
-/**
- * Für welche Staffeln der Regelsatz gilt.
- *
- * Ohne diese Zeile schaltet jemand, wundert sich, dass sich nichts ändert, und
- * sucht den Fehler im Prüfdienst. Stillgelegte Staffeln zählen nicht: sie
- * werden nicht geprüft.
- */
-function Geltung({
-  staffeln,
-  onUebernehmen,
-}: {
-  staffeln: readonly Staffel[];
-  onUebernehmen: () => void;
-}) {
-  const aktive = staffeln.filter((s) => s.aktiv);
-  if (aktive.length === 0) return null;
-
-  const meine = aktive.filter((s) => s.leite_ich).map((s) => s.name);
-  const freie = aktive.filter((s) => s.staffelleiter === "").map((s) => s.name);
-
-  return (
-    <>
-      <p className={eigen.geltung}>
-        {meine.length > 0
-          ? `Dein Regelsatz prüft ${aufzaehlung(meine)}. Andere Staffelleiter haben ihren eigenen. Änderungen gelten ab dem nächsten Prüflauf.`
-          : "Du leitest noch keine Staffel. Was du hier einstellst, gilt erst, wenn du eine übernimmst."}
-      </p>
-      {freie.length > 0 && (
-        <Hinweis ton="warnung">
-          <span className={eigen.freie}>
-            <span>
-              Ohne Staffelleiter und deshalb mit den Vorgaben geprüft:{" "}
-              {aufzaehlung(freie)}.
-            </span>
-            <Knopf groesse="sm" onClick={onUebernehmen}>
-              {freie.length === 1 ? "Übernehmen" : `Alle ${freie.length} übernehmen`}
-            </Knopf>
-          </span>
-        </Hinweis>
-      )}
-    </>
   );
 }
 
@@ -576,7 +510,7 @@ function Saetze({
       </div>
 
       <p className={stil.vorgangHinweis}>
-        Gilt ab dem nächsten Schreiben und für alle Staffelleiter. Schon erstellte
+        Gilt ab dem nächsten Schreiben und nur für deine Schreiben. Schon erstellte
         Entwürfe ändern sich nicht — ihr Text liegt am Vorgang.
       </p>
     </details>

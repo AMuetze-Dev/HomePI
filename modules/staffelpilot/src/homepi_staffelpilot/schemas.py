@@ -142,16 +142,6 @@ class StaffelAusgabe(BaseModel):
     #: Die Nummer, unter der DFBnet sie fuehrt. Leer bei Handarbeit.
     dfbnet_kennung: str = ""
     aktiv: bool
-    #: Wer sie leitet, mit Anzeigenamen. Leer: niemand -- dann prueft der
-    #: Prueflauf sie mit den Vorgaben.
-    staffelleiter: str = ""
-    #: Ob das der Aufrufer ist. Die Oberflaeche bietet danach "Uebernehmen"
-    #: oder "Abgeben" an.
-    leite_ich: bool = False
-
-
-class LeitungUebernommen(BaseModel):
-    uebernommen: int = 0
 
 
 # ── Befund ────────────────────────────────────────────────────────────────
@@ -396,7 +386,7 @@ class Beispieldatenstand(BaseModel):
 
 
 class EinstellungenAusgabe(BaseModel):
-    """Was fuer die ganze Installation gilt.
+    """Was ein Staffelleiter fuer sich eingestellt hat.
 
     Die Voreinstellungen stehen in `dienst.Einstellungen` und nicht hier:
     sonst gaebe es zwei Stellen, an denen 30 Tage steht, und irgendwann zwei
@@ -810,7 +800,7 @@ class RegelAendern(BaseModel):
 
 
 class RegelsatzAusgabe(BaseModel):
-    """Was der Prüflauf fuer eine Staffel braucht: was aus ist, welche Werte gelten.
+    """Womit ein Staffelleiter prueft: was aus ist, welche Werte gelten.
 
     Die Werte stehen **vollstaendig** da, mit den Vorgaben aufgefuellt. Der
     Prüfdienst soll nicht wissen muessen, was hier als Vorgabe gilt.
@@ -930,6 +920,10 @@ class AuftragAusgabe(BaseModel):
     gestartet_am: dt.datetime | None
     beendet_am: dt.datetime | None
     angelegt: dt.datetime
+    #: Wer ihn angefordert hat. Der Prüfdienst arbeitet mit dessen Zugang.
+    konto: uuid.UUID | None = None
+    #: Wie viele Aufträge anderer vorher drankommen. Wessen, steht hier nicht.
+    vor_dir: int = 0
 
 
 class AuftragZeile(BaseModel):
@@ -1006,8 +1000,8 @@ class UebertragungEinreihen(BaseModel):
     """
 
     aktion: UebertragungAktion
+    #: Die Kennung des Spielberichts, bei der Fallanlage die des Vorgangs.
     referenz: NameFeld
-    spiel_id: uuid.UUID | None = None
 
     @field_validator("referenz", mode="before")
     @classmethod
@@ -1027,6 +1021,9 @@ class UebertragungAusgabe(BaseModel):
     letzter_fehler: str
     erledigt_am: dt.datetime | None
     angelegt: dt.datetime
+    #: Wem die Staffel gehoert -- mit dessen Zugang geht sie hinaus. Nur in der
+    #: Antwort an den Prüfdienst gefuellt.
+    konto: uuid.UUID | None = None
 
 
 class UebertragungStand(BaseModel):
@@ -1092,7 +1089,7 @@ class ZugangGeheim(BaseModel):
     """Die Antwort für den Prüfdienst — und nur für ihn.
 
     Der einzige Ort, an dem das Passwort wieder herauskommt. Der Endpunkt
-    dazu verlangt die Rolle `verwalter`.
+    dazu antwortet nur dem Konto des Prüfdienstes.
     """
 
     benutzer: str

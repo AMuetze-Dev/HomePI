@@ -7,10 +7,10 @@ import os
 import uuid
 
 from homepi_core.auth.modelle import Benutzer
-from sqlalchemy import delete, func, select
+from sqlalchemy import ColumnElement, Select, delete, func, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import InstrumentedAttribute, selectinload
 
 from . import dienst, texte
 from .dienst import (
@@ -20,7 +20,6 @@ from .dienst import (
     RegelUnbekannt,
     SpielUnbekannt,
     StaffelUnbekannt,
-    StaffelVergeben,
     UebertragungUnbekannt,
     VorgangUnbekannt,
     VorgangVergeben,
@@ -28,24 +27,27 @@ from .dienst import (
 from .modelle import (
     Ansicht,
     Auftrag,
+    Auftraggeber,
     Befund,
     Einstellung,
     Karte,
+    Kontoeinstellung,
+    Kontotext,
+    Kontozugang,
     Mannschaft,
     Regel,
     Regeldatei,
     Regelparameter,
-    Regeltext,
     Regelwahl,
     Spielbericht,
     Staffel,
-    Staffelleitung,
+    Staffelkonto,
     Uebertragung,
     Vorgang,
-    Zugang,
 )
 from .schemas import (
     Abschluss,
+    BefundEingang,
     EinstellungenSetzen,
     Fortschritt,
     ImportAuftrag,
@@ -58,71 +60,70 @@ from .schemas import (
     StaffelAnlegen,
     StaffelnAusDfbnet,
     UebertragungAbschluss,
-    UebertragungEinreihen,
     VorgangAnlegen,
     VorlagenUebergeben,
     ZugangSetzen,
 )
 
+# ── Wer was sieht ─────────────────────────────────────────────────────────
+
+#: Mit wessen Augen gelesen wird. `None` heisst *alles*, und das gibt es nur
+#: beim Pruefdienst (`dienst.Blick`).
+#:
+#: Ohne Vorgabewert an jeder Funktion: wer ihn vergisst, soll am Typpruefer
+#: scheitern und nicht die Berichte aller anderen lesen.
+Konto = uuid.UUID | None
+
+
+def _in_meinen(spalte: InstrumentedAttribute[uuid.UUID], konto: Konto) -> ColumnElement[bool]:
+    """Nur Staffeln, die diesem Konto gehoeren."""
+    if konto is None:
+        return true()
+    return spalte.in_(select(Staffelkonto.staffel_id).where(Staffelkonto.benutzer_id == konto))
+
+
+def _von_mir(spalte: InstrumentedAttribute[uuid.UUID], konto: Konto) -> ColumnElement[bool]:
+    """Nur Zeilen dieses Kontos."""
+    return true() if konto is None else spalte == konto
+
+
 # ── Staffeln ──────────────────────────────────────────────────────────────
 
 
-async def staffeln(sitzung: AsyncSession) -> list[Staffel]:
-    ergebnis = await sitzung.execute(select(Staffel).order_by(Staffel.name))
+async def staffeln(sitzung: AsyncSession, konto: Konto) -> list[Staffel]:
+    ergebnis = await sitzung.execute(
+        select(Staffel).where(_in_meinen(Staffel.id, konto)).order_by(Staffel.name)
+    )
     return list(ergebnis.scalars())
 
 
-async def staffel(sitzung: AsyncSession, staffel_id: uuid.UUID) -> Staffel:
-    gefunden = await sitzung.get(Staffel, staffel_id)
+async def staffel(sitzung: AsyncSession, konto: Konto, staffel_id: uuid.UUID) -> Staffel:
+    ergebnis = await sitzung.execute(
+        select(Staffel).where(Staffel.id == staffel_id, _in_meinen(Staffel.id, konto))
+    )
+    gefunden = ergebnis.scalar_one_or_none()
     if gefunden is None:
         raise StaffelUnbekannt(f"Es gibt keine Staffel mit der Kennung {staffel_id}")
     return gefunden
 
 
-async def leitungen(sitzung: AsyncSession) -> dict[uuid.UUID, tuple[uuid.UUID, str]]:
-    """Wer welche Staffel leitet: Staffel -> (Konto, Anzeigename)."""
-    ergebnis = await sitzung.execute(
-        select(Staffelleitung.staffel_id, Benutzer.id, Benutzer.anzeigename).join(
-            Benutzer, Benutzer.id == Staffelleitung.benutzer_id
-        )
-    )
-    return {staffel_id: (konto, name) for staffel_id, konto, name in ergebnis.all()}
-
-
-async def leitung_setzen(
-    sitzung: AsyncSession, staffel_id: uuid.UUID, benutzer_id: uuid.UUID
-) -> None:
-    await leitung_loeschen(sitzung, staffel_id)
-    sitzung.add(Staffelleitung(staffel_id=staffel_id, benutzer_id=benutzer_id))
-    await sitzung.flush()
-
-
-async def leitung_loeschen(sitzung: AsyncSession, staffel_id: uuid.UUID) -> None:
-    await sitzung.execute(delete(Staffelleitung).where(Staffelleitung.staffel_id == staffel_id))
-    await sitzung.flush()
-
-
-async def freie_uebernehmen(sitzung: AsyncSession, benutzer_id: uuid.UUID) -> int:
-    """Jede Staffel ohne Staffelleiter an dieses Konto."""
-    geleitet = select(Staffelleitung.staffel_id)
-    ergebnis = await sitzung.execute(select(Staffel.id).where(Staffel.id.notin_(geleitet)))
-    freie = list(ergebnis.scalars())
-    for staffel_id in freie:
-        sitzung.add(Staffelleitung(staffel_id=staffel_id, benutzer_id=benutzer_id))
-    await sitzung.flush()
-    return len(freie)
-
-
-async def staffel_anlegen(sitzung: AsyncSession, daten: StaffelAnlegen) -> Staffel:
-    neue = Staffel(**daten.model_dump())
-    sitzung.add(neue)
-    try:
-        await sitzung.flush()
-    except IntegrityError as fehler:
-        await sitzung.rollback()
-        # Die Datenbank ist die einzige Stelle, die das zuverlaessig weiss.
-        raise StaffelVergeben(f"Eine Staffel namens '{daten.name}' gibt es bereits") from fehler
+async def staffel_anlegen(
+    sitzung: AsyncSession, konto: uuid.UUID, daten: StaffelAnlegen
+) -> Staffel:
+    """Sie gehoert dem, der sie anlegt."""
+    dienst.name_frei(daten.name, (s.name for s in await staffeln(sitzung, konto)))
+    neue = await _staffel_fuer(sitzung, konto, Staffel(**daten.model_dump()))
     await sitzung.refresh(neue)
+    return neue
+
+
+async def _staffel_fuer(sitzung: AsyncSession, konto: uuid.UUID, neue: Staffel) -> Staffel:
+    """Anlegen und zuordnen -- beides oder keines. Eine Staffel ohne Konto saehe
+    niemand."""
+    sitzung.add(neue)
+    await sitzung.flush()
+    sitzung.add(Staffelkonto(staffel_id=neue.id, benutzer_id=konto))
+    await sitzung.flush()
     return neue
 
 
@@ -225,14 +226,19 @@ async def regeldatei_loeschen(sitzung: AsyncSession, datei_id: uuid.UUID) -> Non
 
 
 async def ansicht_setzen(
-    sitzung: AsyncSession, auftrag_id: uuid.UUID, art: str, bild: bytes, schritt: str
+    sitzung: AsyncSession,
+    konto: Konto,
+    auftrag_id: uuid.UUID,
+    art: str,
+    bild: bytes,
+    schritt: str,
 ) -> None:
     """Das Abbild zu diesem Auftrag ablegen -- ersetzt, nicht angehaeuft.
 
     Hoechstens zwei je Auftrag (siehe `modelle.Ansicht`). Ein Band aus Bildern
     waere nach drei Prueflaeufen groesser als die ganze uebrige Datenbank.
     """
-    await auftrag(sitzung, auftrag_id)
+    await auftrag(sitzung, konto, auftrag_id)
     vorhanden = await sitzung.execute(
         select(Ansicht).where(Ansicht.auftrag_id == auftrag_id, Ansicht.art == art)
     )
@@ -244,8 +250,9 @@ async def ansicht_setzen(
     await sitzung.flush()
 
 
-async def ansicht(sitzung: AsyncSession, auftrag_id: uuid.UUID, art: str) -> Ansicht:
+async def ansicht(sitzung: AsyncSession, konto: Konto, auftrag_id: uuid.UUID, art: str) -> Ansicht:
     """Das Abbild, oder 404. Kein leeres Bild und kein Platzhalter."""
+    await auftrag(sitzung, konto, auftrag_id)
     gefunden = await sitzung.execute(
         select(Ansicht).where(Ansicht.auftrag_id == auftrag_id, Ansicht.art == art)
     )
@@ -255,12 +262,13 @@ async def ansicht(sitzung: AsyncSession, auftrag_id: uuid.UUID, art: str) -> Ans
     return ziel
 
 
-async def ansicht_arten(sitzung: AsyncSession, auftrag_id: uuid.UUID) -> list[str]:
+async def ansicht_arten(sitzung: AsyncSession, konto: Konto, auftrag_id: uuid.UUID) -> list[str]:
     """Welche Abbilder es zu diesem Auftrag gibt.
 
     Damit die Oberflaeche nicht auf zwei Adressen raten muss, von denen eine
     404 gibt -- ein Fehler im Protokoll des Browsers, den niemand bestellt hat.
     """
+    await auftrag(sitzung, konto, auftrag_id)
     gefunden = await sitzung.execute(
         select(Ansicht.art).where(Ansicht.auftrag_id == auftrag_id).order_by(Ansicht.art)
     )
@@ -268,9 +276,12 @@ async def ansicht_arten(sitzung: AsyncSession, auftrag_id: uuid.UUID) -> list[st
 
 
 async def staffeln_aus_dfbnet(
-    sitzung: AsyncSession, eingang: StaffelnAusDfbnet
+    sitzung: AsyncSession, konto: uuid.UUID, eingang: StaffelnAusDfbnet
 ) -> tuple[int, int, list[str]]:
     """Die Liste "Eigene Staffeln" uebernehmen. Gibt (angelegt, aktualisiert, Namen).
+
+    Abgeglichen wird nur mit den **eigenen** Staffeln. Fuehrt ein anderes
+    Konto dieselbe, hat es seine -- und diese hier wird trotzdem angelegt.
 
     Gesucht wird **zuerst ueber die Kennung** und erst dann ueber den Namen.
     Die Kennung ist das einzig Stabile: die Bezeichnung traegt einen
@@ -285,7 +296,7 @@ async def staffeln_aus_dfbnet(
     `aktiv` bleibt unberuehrt: ob eine Staffel mitlaeuft, entscheidet der
     Staffelleiter und nicht DFBnet.
     """
-    vorhanden = await staffeln(sitzung)
+    vorhanden = await staffeln(sitzung, konto)
     nach_kennung = {s.dfbnet_kennung: s for s in vorhanden if s.dfbnet_kennung}
 
     def passende(wert: str) -> list[Staffel]:
@@ -319,15 +330,18 @@ async def staffeln_aus_dfbnet(
                     break
 
         if ziel is None:
-            ziel = Staffel(
-                name=zeile.name,
-                altersklasse=zeile.altersklasse,
-                spielklasse=zeile.spielklasse,
-                saison=zeile.saison,
-                spieltage=zeile.spieltage,
-                dfbnet_kennung=zeile.kennung,
+            await _staffel_fuer(
+                sitzung,
+                konto,
+                Staffel(
+                    name=zeile.name,
+                    altersklasse=zeile.altersklasse,
+                    spielklasse=zeile.spielklasse,
+                    saison=zeile.saison,
+                    spieltage=zeile.spieltage,
+                    dfbnet_kennung=zeile.kennung,
+                ),
             )
-            sitzung.add(ziel)
             angelegt += 1
         else:
             ziel.name = zeile.name
@@ -348,30 +362,29 @@ async def staffeln_aus_dfbnet(
 
 
 async def staffel_aendern(
-    sitzung: AsyncSession, staffel_id: uuid.UUID, daten: StaffelAendern
+    sitzung: AsyncSession, konto: Konto, staffel_id: uuid.UUID, daten: StaffelAendern
 ) -> Staffel:
     """Nur die mitgeschickten Felder. Ausgelassene bleiben stehen."""
-    gefunden = await staffel(sitzung, staffel_id)
+    gefunden = await staffel(sitzung, konto, staffel_id)
     felder = daten.model_dump(exclude_none=True)
+    if "name" in felder:
+        uebrige = (s.name for s in await staffeln(sitzung, konto) if s.id != staffel_id)
+        dienst.name_frei(felder["name"], uebrige)
     for name, wert in felder.items():
         setattr(gefunden, name, wert)
-    try:
-        await sitzung.flush()
-    except IntegrityError as fehler:
-        await sitzung.rollback()
-        raise StaffelVergeben(
-            f"Eine Staffel namens '{felder.get('name')}' gibt es bereits"
-        ) from fehler
+    await sitzung.flush()
     return gefunden
 
 
-async def staffel_loeschen(sitzung: AsyncSession, staffel_id: uuid.UUID) -> None:
-    await sitzung.delete(await staffel(sitzung, staffel_id))
+async def staffel_loeschen(sitzung: AsyncSession, konto: Konto, staffel_id: uuid.UUID) -> None:
+    await sitzung.delete(await staffel(sitzung, konto, staffel_id))
 
 
-async def anzahl_aktiver_staffeln(sitzung: AsyncSession) -> int:
+async def anzahl_aktiver_staffeln(sitzung: AsyncSession, konto: Konto) -> int:
     ergebnis = await sitzung.execute(
-        select(func.count()).select_from(Staffel).where(Staffel.aktiv.is_(True))
+        select(func.count())
+        .select_from(Staffel)
+        .where(Staffel.aktiv.is_(True), _in_meinen(Staffel.id, konto))
     )
     return int(ergebnis.scalar_one())
 
@@ -379,7 +392,9 @@ async def anzahl_aktiver_staffeln(sitzung: AsyncSession) -> int:
 # ── Spielberichte ─────────────────────────────────────────────────────────
 
 
-async def spiele(sitzung: AsyncSession, staffel_id: uuid.UUID | None = None) -> list[Spielbericht]:
+async def spiele(
+    sitzung: AsyncSession, konto: Konto, staffel_id: uuid.UUID | None = None
+) -> list[Spielbericht]:
     """Immer mit Befunden.
 
     Der Aufrufer zaehlt sie -- ohne `selectinload` waere das ein Nachladen
@@ -388,6 +403,7 @@ async def spiele(sitzung: AsyncSession, staffel_id: uuid.UUID | None = None) -> 
     frage = (
         select(Spielbericht)
         .options(selectinload(Spielbericht.befunde))
+        .where(_in_meinen(Spielbericht.staffel_id, konto))
         .order_by(Spielbericht.datum.desc(), Spielbericht.heim)
     )
     if staffel_id is not None:
@@ -396,11 +412,11 @@ async def spiele(sitzung: AsyncSession, staffel_id: uuid.UUID | None = None) -> 
     return list(ergebnis.scalars())
 
 
-async def spiel(sitzung: AsyncSession, spiel_id: uuid.UUID) -> Spielbericht:
+async def spiel(sitzung: AsyncSession, konto: Konto, spiel_id: uuid.UUID) -> Spielbericht:
     ergebnis = await sitzung.execute(
         select(Spielbericht)
         .options(selectinload(Spielbericht.befunde))
-        .where(Spielbericht.id == spiel_id)
+        .where(Spielbericht.id == spiel_id, _in_meinen(Spielbericht.staffel_id, konto))
     )
     gefunden = ergebnis.scalar_one_or_none()
     if gefunden is None:
@@ -408,44 +424,45 @@ async def spiel(sitzung: AsyncSession, spiel_id: uuid.UUID) -> Spielbericht:
     return gefunden
 
 
-async def befund(sitzung: AsyncSession, befund_id: uuid.UUID) -> Befund:
-    gefunden = await sitzung.get(Befund, befund_id)
+async def befund(sitzung: AsyncSession, konto: Konto, befund_id: uuid.UUID) -> Befund:
+    ergebnis = await sitzung.execute(
+        select(Befund)
+        .join(Spielbericht, Spielbericht.id == Befund.spiel_id)
+        .where(Befund.id == befund_id, _in_meinen(Spielbericht.staffel_id, konto))
+    )
+    gefunden = ergebnis.scalar_one_or_none()
     if gefunden is None:
         raise BefundUnbekannt(f"Es gibt keinen Befund mit der Kennung {befund_id}")
     return gefunden
 
 
-async def einspielen(sitzung: AsyncSession, auftrag: ImportAuftrag) -> tuple[int, int, int]:
+async def einspielen(
+    sitzung: AsyncSession, konto: uuid.UUID, auftrag: ImportAuftrag
+) -> tuple[int, int, int]:
     """Spielberichte anlegen oder auffrischen. Gibt (angelegt, aktualisiert,
     Befunde) zurueck.
 
-    Ein erneuter Import desselben Spiels ersetzt seine Befunde vollstaendig -
-    ein Prueflauf ist die vollstaendige Aussage ueber einen Bericht, nicht ein
-    Nachtrag. Getroffene Entscheidungen zu bereits bekannten Befunden bleiben
-    dabei erhalten; sie an derselben Regel und derselben Person wiederzufinden
-    ist das, was den zweiten Prueflauf ertraeglich macht.
+    Ein Prueflauf ist die vollstaendige Aussage ueber einen Bericht, nicht ein
+    Nachtrag. Ein Befund, den es schon gab, wird dabei **weitergefuehrt** und
+    nicht ersetzt: an seiner Kennung haengen die Entscheidung und der Vorgang,
+    und mit der Zeile ginge das Schreiben verloren. Welcher das ist, entscheidet
+    `dienst.abgleichen`.
     """
-    await staffel(sitzung, auftrag.staffel_id)
+    await staffel(sitzung, konto, auftrag.staffel_id)
     # Vor dem ersten Schreiben und nicht je Spiel: ein halb eingespielter Lauf
     # waere schlimmer als ein abgewiesener.
-    werte = await einstellungen(sitzung)
+    werte = await einstellungen(sitzung, konto)
     dienst.beispieldaten_pruefen([s.dfbnet_id for s in auftrag.spiele], werte.beispieldaten)
     angelegt = aktualisiert = befunde_gesamt = 0
 
     for eingang in auftrag.spiele:
         vorhanden = await sitzung.execute(
-            select(Spielbericht)
-            .options(selectinload(Spielbericht.befunde))
-            .where(
+            select(Spielbericht).where(
                 Spielbericht.staffel_id == auftrag.staffel_id,
                 Spielbericht.dfbnet_id == eingang.dfbnet_id,
             )
         )
         bericht = vorhanden.scalar_one_or_none()
-        # Was der Staffelleiter zu einem Befund schon entschieden hat, nach
-        # Regel und Person. Genau das wiederzufinden macht den zweiten
-        # Prueflauf ertraeglich.
-        frueher: dict[tuple[str, str], Befund] = {}
 
         if bericht is None:
             bericht = Spielbericht(
@@ -484,35 +501,10 @@ async def einspielen(sitzung: AsyncSession, auftrag: ImportAuftrag) -> tuple[int
                 wert = getattr(eingang, feld)
                 if wert:
                     setattr(bericht, feld, wert)
-            frueher = {(b.regel, b.person): b for b in bericht.befunde}
-            # Ein Prueflauf ist die vollstaendige Aussage ueber einen Bericht:
-            # was er nicht mehr meldet, ist keine offene Arbeit mehr.
-            await sitzung.execute(delete(Befund).where(Befund.spiel_id == bericht.id))
             aktualisiert += 1
 
-        for rang, b in enumerate(eingang.befunde):
-            alt = frueher.get((b.regel, b.person))
-            # Ueber die Fremdschluesselspalte und nicht ueber die Beziehung:
-            # `bericht.befunde` waere unter async ein Nachladen an einer
-            # Stelle, an der nicht await gesagt werden kann.
-            sitzung.add(
-                Befund(
-                    spiel_id=bericht.id,
-                    regel=b.regel,
-                    schwere=b.schwere,
-                    titel=b.titel,
-                    text=b.text,
-                    person=b.person,
-                    mannschaft=b.mannschaft,
-                    weg=b.weg,
-                    einzelheiten=b.einzelheiten,
-                    rang=rang,
-                    entscheidung=alt.entscheidung if alt else "offen",
-                    grund=alt.grund if alt else "",
-                    entschieden_am=alt.entschieden_am if alt else None,
-                )
-            )
-            befunde_gesamt += 1
+        await _befunde_abgleichen(sitzung, bericht.id, eingang.befunde)
+        befunde_gesamt += len(eingang.befunde)
 
         # Die Karten desselben Spiels ebenso: ein Prueflauf ist die
         # vollstaendige Aussage ueber einen Bericht. Wuerden sie sich
@@ -539,8 +531,53 @@ async def einspielen(sitzung: AsyncSession, auftrag: ImportAuftrag) -> tuple[int
     return angelegt, aktualisiert, befunde_gesamt
 
 
+async def _befunde_abgleichen(
+    sitzung: AsyncSession, spiel_id: uuid.UUID, eingang: list[BefundEingang]
+) -> None:
+    # Gesperrt, bevor nach Vorgaengen gefragt wird: ein Schreiben, das jemand
+    # gerade anlegt, wartet dann auf diesen Lauf, statt mit dem Befund zu gehen.
+    ergebnis = await sitzung.execute(
+        select(Befund)
+        .where(Befund.spiel_id == spiel_id)
+        .order_by(Befund.rang)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    frueher = list(ergebnis.scalars())
+    mit_vorgang = await vorgaenge_zu_befunden(sitzung, [b.id for b in frueher])
+    abgleich = dienst.abgleichen(
+        [
+            dienst.BefundSpur(b.regel, b.person, b.mannschaft, b.text, b.id in mit_vorgang)
+            for b in frueher
+        ],
+        [dienst.BefundSpur(b.regel, b.person, b.mannschaft, b.text) for b in eingang],
+    )
+
+    for rang, (b, stelle) in enumerate(zip(eingang, abgleich.weiter, strict=True)):
+        # Ueber die Fremdschluesselspalte und nicht ueber die Beziehung:
+        # `bericht.befunde` waere unter async ein Nachladen an einer Stelle,
+        # an der nicht await gesagt werden kann.
+        ziel = Befund(spiel_id=spiel_id) if stelle is None else frueher[stelle]
+        ziel.regel = b.regel
+        ziel.schwere = b.schwere
+        ziel.titel = b.titel
+        ziel.text = b.text
+        ziel.person = b.person
+        ziel.mannschaft = b.mannschaft
+        ziel.weg = b.weg
+        ziel.einzelheiten = b.einzelheiten
+        ziel.rang = rang
+        sitzung.add(ziel)
+    for rang, stelle in enumerate(abgleich.bleiben, start=len(eingang)):
+        frueher[stelle].rang = rang
+    await sitzung.execute(
+        delete(Befund).where(Befund.id.in_([frueher[i].id for i in abgleich.gehen]))
+    )
+
+
 async def karten(
     sitzung: AsyncSession,
+    konto: Konto,
     pass_nr: str,
     wettbewerb: str = "",
     seit: dt.date | None = None,
@@ -555,7 +592,7 @@ async def karten(
     Pokal und Meisterschaft getrennt, und nach einer verwirkten Sperre faengt
     der Zaehler von vorn an.
     """
-    anfrage = select(Karte).where(Karte.pass_nr == pass_nr)
+    anfrage = select(Karte).where(Karte.pass_nr == pass_nr, _in_meinen(Karte.staffel_id, konto))
     if wettbewerb:
         anfrage = anfrage.where(Karte.wettbewerb == wettbewerb)
     if seit is not None:
@@ -565,9 +602,9 @@ async def karten(
 
 
 async def entscheidung_setzen(
-    sitzung: AsyncSession, befund_id: uuid.UUID, art: str, grund: str
+    sitzung: AsyncSession, konto: Konto, befund_id: uuid.UUID, art: str, grund: str
 ) -> Befund:
-    gefunden = await befund(sitzung, befund_id)
+    gefunden = await befund(sitzung, konto, befund_id)
     gefunden.entscheidung = art
     gefunden.grund = grund
     gefunden.entschieden_am = dt.datetime.now(dt.UTC)
@@ -575,25 +612,29 @@ async def entscheidung_setzen(
     return gefunden
 
 
-async def entscheidung_zuruecknehmen(sitzung: AsyncSession, befund_id: uuid.UUID) -> Befund:
+async def entscheidung_zuruecknehmen(
+    sitzung: AsyncSession, konto: Konto, befund_id: uuid.UUID
+) -> Befund:
     """Der Befund ist wieder offen - und das Spiel damit nicht mehr abgehakt.
 
     Den Haken stehen zu lassen waere die eine Zusage dieses Artefakts
     gebrochen: abgehakt heisst, zu jedem Befund liegt eine Entscheidung vor.
     """
-    gefunden = await befund(sitzung, befund_id)
+    gefunden = await befund(sitzung, konto, befund_id)
     gefunden.entscheidung = "offen"
     gefunden.grund = ""
     gefunden.entschieden_am = None
-    bericht = await spiel(sitzung, gefunden.spiel_id)
+    bericht = await spiel(sitzung, konto, gefunden.spiel_id)
     bericht.abgehakt = False
     bericht.abgehakt_am = None
     await sitzung.flush()
     return gefunden
 
 
-async def haken_setzen(sitzung: AsyncSession, spiel_id: uuid.UUID, gesetzt: bool) -> Spielbericht:
-    bericht = await spiel(sitzung, spiel_id)
+async def haken_setzen(
+    sitzung: AsyncSession, konto: Konto, spiel_id: uuid.UUID, gesetzt: bool
+) -> Spielbericht:
+    bericht = await spiel(sitzung, konto, spiel_id)
     bericht.abgehakt = gesetzt
     bericht.abgehakt_am = dt.datetime.now(dt.UTC) if gesetzt else None
     await sitzung.flush()
@@ -603,50 +644,63 @@ async def haken_setzen(sitzung: AsyncSession, spiel_id: uuid.UUID, gesetzt: bool
 # ── Einstellungen ─────────────────────────────────────────────────────────
 
 
-async def einstellungen(sitzung: AsyncSession) -> dienst.Einstellungen:
+async def einstellungen(sitzung: AsyncSession, konto: uuid.UUID) -> dienst.Einstellungen:
     """Die geprueften Werte, nicht die rohen Zeilen.
 
     Die Pruefung steht in `dienst.einstellungen_aus` und damit an einer
     Stelle: sonst entscheidet jeder Aufrufer selbst, was eine leere
     Zeichenkette bedeutet.
     """
-    ergebnis = await sitzung.execute(select(Einstellung))
+    ergebnis = await sitzung.execute(
+        select(Kontoeinstellung).where(Kontoeinstellung.benutzer_id == konto)
+    )
     return dienst.einstellungen_aus({e.schluessel: e.wert for e in ergebnis.scalars()})
 
 
-async def einrichtungsstand(sitzung: AsyncSession) -> tuple[bool, int, bool]:
+async def freigegebene_konten(sitzung: AsyncSession) -> set[uuid.UUID]:
+    """Wessen Uebertragungen hinaus duerfen."""
+    roh: dict[uuid.UUID, dict[str, str]] = {}
+    for e in (await sitzung.execute(select(Kontoeinstellung))).scalars():
+        roh.setdefault(e.benutzer_id, {})[e.schluessel] = e.wert
+    return dienst.freigegebene(roh)
+
+
+async def einrichtungsstand(sitzung: AsyncSession, konto: uuid.UUID) -> tuple[bool, int, bool]:
     """Zugang vorhanden, Anzahl aktiver Staffeln, abgehakt.
 
     Die Entscheidung daraus faellt `dienst.einrichtung_schritt`; hier wird nur
     gelesen.
     """
-    gefunden = await _zugang(sitzung)
-    anzahl = await sitzung.scalar(
-        select(func.count()).select_from(Staffel).where(Staffel.aktiv.is_(True))
-    )
-    werte = await einstellungen(sitzung)
-    return gefunden is not None, int(anzahl or 0), werte.einrichtung_erledigt
+    gefunden = await _zugang(sitzung, konto)
+    anzahl = await anzahl_aktiver_staffeln(sitzung, konto)
+    werte = await einstellungen(sitzung, konto)
+    return gefunden is not None, anzahl, werte.einrichtung_erledigt
 
 
 async def einstellungen_setzen(
-    sitzung: AsyncSession, daten: EinstellungenSetzen
+    sitzung: AsyncSession, konto: uuid.UUID, daten: EinstellungenSetzen
 ) -> dienst.Einstellungen:
     """Nur die mitgeschickten Felder. Ausgelassene bleiben stehen."""
-    vorhanden = {e.schluessel: e for e in (await sitzung.execute(select(Einstellung))).scalars()}
+    ergebnis = await sitzung.execute(
+        select(Kontoeinstellung).where(Kontoeinstellung.benutzer_id == konto)
+    )
+    vorhanden = {e.schluessel: e for e in ergebnis.scalars()}
     for schluessel, wert in daten.model_dump(exclude_none=True).items():
         if schluessel in vorhanden:
             vorhanden[schluessel].wert = str(wert)
         else:
-            sitzung.add(Einstellung(schluessel=schluessel, wert=str(wert)))
+            sitzung.add(Kontoeinstellung(benutzer_id=konto, schluessel=schluessel, wert=str(wert)))
     await sitzung.flush()
-    return await einstellungen(sitzung)
+    return await einstellungen(sitzung, konto)
 
 
 # ── Mannschaften ──────────────────────────────────────────────────────────
 
 
-async def mannschaften(sitzung: AsyncSession, staffel_id: uuid.UUID) -> list[Mannschaft]:
-    await staffel(sitzung, staffel_id)
+async def mannschaften(
+    sitzung: AsyncSession, konto: Konto, staffel_id: uuid.UUID
+) -> list[Mannschaft]:
+    await staffel(sitzung, konto, staffel_id)
     ergebnis = await sitzung.execute(
         select(Mannschaft)
         .where(Mannschaft.staffel_id == staffel_id)
@@ -656,7 +710,10 @@ async def mannschaften(sitzung: AsyncSession, staffel_id: uuid.UUID) -> list[Man
 
 
 async def mannschaften_setzen(
-    sitzung: AsyncSession, staffel_id: uuid.UUID, eingang: list[MannschaftEingang]
+    sitzung: AsyncSession,
+    konto: Konto,
+    staffel_id: uuid.UUID,
+    eingang: list[MannschaftEingang],
 ) -> list[Mannschaft]:
     """Die Meldung als Ganzes, nicht als Aenderung.
 
@@ -666,7 +723,7 @@ async def mannschaften_setzen(
     wegzuwerfen -- und genau das ist der Fehler, vor dem die Zuordnung
     schuetzen soll. Der Name traegt sie hinueber.
     """
-    alt = {m.name: m for m in await mannschaften(sitzung, staffel_id)}
+    alt = {m.name: m for m in await mannschaften(sitzung, konto, staffel_id)}
     geraten = dienst.hoehere_raten([m.name for m in eingang])
 
     await sitzung.execute(delete(Mannschaft).where(Mannschaft.staffel_id == staffel_id))
@@ -693,29 +750,42 @@ async def mannschaften_setzen(
             )
         )
     await sitzung.flush()
-    return await mannschaften(sitzung, staffel_id)
+    return await mannschaften(sitzung, konto, staffel_id)
 
 
 # ── Vorgaenge ─────────────────────────────────────────────────────────────
 
 
-async def vorgaenge(sitzung: AsyncSession, zustand: str | None = None) -> list[Vorgang]:
-    frage = select(Vorgang).order_by(Vorgang.aktenzeichen.desc())
+def _vorgaenge(konto: Konto) -> Select[tuple[Vorgang]]:
+    """Vorgaenge zu Spielen der eigenen Staffeln."""
+    return (
+        select(Vorgang)
+        .join(Befund, Befund.id == Vorgang.befund_id)
+        .join(Spielbericht, Spielbericht.id == Befund.spiel_id)
+        .where(_in_meinen(Spielbericht.staffel_id, konto))
+    )
+
+
+async def vorgaenge(
+    sitzung: AsyncSession, konto: Konto, zustand: str | None = None
+) -> list[Vorgang]:
+    frage = _vorgaenge(konto).order_by(Vorgang.aktenzeichen.desc())
     if zustand is not None:
         frage = frage.where(Vorgang.zustand == zustand)
     ergebnis = await sitzung.execute(frage)
     return list(ergebnis.scalars())
 
 
-async def vorgang(sitzung: AsyncSession, vorgang_id: uuid.UUID) -> Vorgang:
-    gefunden = await sitzung.get(Vorgang, vorgang_id)
+async def vorgang(sitzung: AsyncSession, konto: Konto, vorgang_id: uuid.UUID) -> Vorgang:
+    ergebnis = await sitzung.execute(_vorgaenge(konto).where(Vorgang.id == vorgang_id))
+    gefunden = ergebnis.scalar_one_or_none()
     if gefunden is None:
         raise VorgangUnbekannt(f"Es gibt keinen Vorgang mit der Kennung {vorgang_id}")
     return gefunden
 
 
 async def vorgang_mit_spiel(
-    sitzung: AsyncSession, vorgang_id: uuid.UUID
+    sitzung: AsyncSession, konto: Konto, vorgang_id: uuid.UUID
 ) -> tuple[Vorgang, Befund, Spielbericht, Staffel]:
     """Ein Vorgang samt allem, was auf dem Mahnungsformular steht.
 
@@ -729,7 +799,7 @@ async def vorgang_mit_spiel(
         .join(Befund, Befund.id == Vorgang.befund_id)
         .join(Spielbericht, Spielbericht.id == Befund.spiel_id)
         .join(Staffel, Staffel.id == Spielbericht.staffel_id)
-        .where(Vorgang.id == vorgang_id)
+        .where(Vorgang.id == vorgang_id, _in_meinen(Spielbericht.staffel_id, konto))
     )
     zeile = ergebnis.first()
     if zeile is None:
@@ -742,30 +812,29 @@ async def vorgang_zu_befund(sitzung: AsyncSession, befund_id: uuid.UUID) -> Vorg
     return ergebnis.scalar_one_or_none()
 
 
-async def anzahl_entwuerfe(sitzung: AsyncSession) -> int:
-    ergebnis = await sitzung.execute(
-        select(func.count()).select_from(Vorgang).where(Vorgang.zustand == "entwurf")
-    )
+async def anzahl_entwuerfe(sitzung: AsyncSession, konto: Konto) -> int:
+    entwuerfe = _vorgaenge(konto).where(Vorgang.zustand == "entwurf").subquery()
+    ergebnis = await sitzung.execute(select(func.count()).select_from(entwuerfe))
     return int(ergebnis.scalar_one())
 
 
-async def _naechstes_aktenzeichen(sitzung: AsyncSession, saison: str) -> str:
-    """Fortlaufend je Saison.
+async def _naechstes_aktenzeichen(sitzung: AsyncSession, konto: uuid.UUID, saison: str) -> str:
+    """Fortlaufend je Saison und Konto.
+
+    Je Konto: eine Luecke in der eigenen Zaehlung verriete, wie viele Schreiben
+    andere verschicken.
 
     Gezaehlt wird, was schon vergeben ist, und nicht ein Zaehler in einer
-    eigenen Zeile: ein geloeschter Vorgang darf keine Luecke lassen, die beim
-    naechsten Anlegen zur Kollision wird. Die Eindeutigkeit steht ohnehin in
-    der Datenbank -- zwei gleichzeitige Anlagen scheitern dort und nicht hier.
+    eigenen Zeile: ein geloeschter Vorgang darf keine Luecke lassen.
     """
     kern = saison.strip().replace("/", "-") or "ohne-saison"
-    ergebnis = await sitzung.execute(
-        select(func.count()).select_from(Vorgang).where(Vorgang.aktenzeichen.like(f"{kern}-%"))
-    )
+    meine = _vorgaenge(konto).where(Vorgang.aktenzeichen.like(f"{kern}-%")).subquery()
+    ergebnis = await sitzung.execute(select(func.count()).select_from(meine))
     return dienst.aktenzeichen(saison, int(ergebnis.scalar_one()) + 1)
 
 
 async def vorgang_anlegen(
-    sitzung: AsyncSession, befund_id: uuid.UUID, daten: VorgangAnlegen
+    sitzung: AsyncSession, konto: uuid.UUID, befund_id: uuid.UUID, daten: VorgangAnlegen
 ) -> Vorgang:
     """Aus einem Befund einen Entwurf machen.
 
@@ -777,13 +846,13 @@ async def vorgang_anlegen(
     nicht eine Abfrage davor: die waere ein Rennen zwischen zwei gleichzeitigen
     Anlagen und zugleich eine zweite Stelle, an der dieselbe Regel steht.
     """
-    gefunden = await befund(sitzung, befund_id)
+    gefunden = await befund(sitzung, konto, befund_id)
     art = dienst.art_aus_weg(gefunden.weg)
-    bericht = await spiel(sitzung, gefunden.spiel_id)
-    staffel_dazu = await staffel(sitzung, bericht.staffel_id)
-    werte = await einstellungen(sitzung)
-    # Die Saetze koennen in der Regeluebersicht ueberschrieben sein.
-    eigener = await regeltext_zu(sitzung, gefunden.regel)
+    bericht = await spiel(sitzung, konto, gefunden.spiel_id)
+    staffel_dazu = await staffel(sitzung, konto, bericht.staffel_id)
+    # Name, Verband und Saetze dessen, der das Schreiben anlegt: er schickt es.
+    werte = await einstellungen(sitzung, konto)
+    eigener = (await kontotexte(sitzung, konto)).get(gefunden.regel)
 
     anlass = dienst.Anlass(
         staffel=staffel_dazu.name,
@@ -808,7 +877,7 @@ async def vorgang_anlegen(
     neuer = Vorgang(
         befund_id=befund_id,
         art=art,
-        aktenzeichen=await _naechstes_aktenzeichen(sitzung, staffel_dazu.saison),
+        aktenzeichen=await _naechstes_aktenzeichen(sitzung, konto, staffel_dazu.saison),
         verein=anlass.verein,
         betroffener=anlass.betroffener,
         grund=anlass.grund,
@@ -827,17 +896,19 @@ async def vorgang_anlegen(
 
 
 async def vorgang_aendern(
-    sitzung: AsyncSession, vorgang_id: uuid.UUID, felder: dict[str, str]
+    sitzung: AsyncSession, konto: Konto, vorgang_id: uuid.UUID, felder: dict[str, str]
 ) -> Vorgang:
-    gefunden = await vorgang(sitzung, vorgang_id)
+    gefunden = await vorgang(sitzung, konto, vorgang_id)
     for name, wert in felder.items():
         setattr(gefunden, name, wert)
     await sitzung.flush()
     return gefunden
 
 
-async def vorgang_zustand(sitzung: AsyncSession, vorgang_id: uuid.UUID, neu: str) -> Vorgang:
-    gefunden = await vorgang(sitzung, vorgang_id)
+async def vorgang_zustand(
+    sitzung: AsyncSession, konto: Konto, vorgang_id: uuid.UUID, neu: str
+) -> Vorgang:
+    gefunden = await vorgang(sitzung, konto, vorgang_id)
     gefunden.zustand = dienst.zustand_weiter(gefunden.zustand, neu)
     # Nur beim ersten Mal. Wer ein Schreiben zurueckholt und erneut abschickt,
     # hat es trotzdem an dem Tag versandt, an dem es beim Verein ankam.
@@ -847,8 +918,8 @@ async def vorgang_zustand(sitzung: AsyncSession, vorgang_id: uuid.UUID, neu: str
     return gefunden
 
 
-async def vorgang_loeschen(sitzung: AsyncSession, vorgang_id: uuid.UUID) -> None:
-    await sitzung.delete(await vorgang(sitzung, vorgang_id))
+async def vorgang_loeschen(sitzung: AsyncSession, konto: Konto, vorgang_id: uuid.UUID) -> None:
+    await sitzung.delete(await vorgang(sitzung, konto, vorgang_id))
 
 
 async def vorgaenge_zu_befunden(
@@ -870,18 +941,21 @@ async def vorgaenge_zu_befunden(
 # ── Regelkatalog ──────────────────────────────────────────────────────────
 
 
-async def beispieldaten_zaehlen(sitzung: AsyncSession) -> int:
+async def beispieldaten_zaehlen(sitzung: AsyncSession, konto: Konto) -> int:
     """Wie viele erfundene Spiele noch in den Listen stehen."""
     ergebnis = await sitzung.execute(
         select(func.count())
         .select_from(Spielbericht)
-        .where(Spielbericht.dfbnet_id.startswith(dienst.BEISPIEL_PRAEFIX))
+        .where(
+            Spielbericht.dfbnet_id.startswith(dienst.BEISPIEL_PRAEFIX),
+            _in_meinen(Spielbericht.staffel_id, konto),
+        )
     )
     return int(ergebnis.scalar_one())
 
 
-async def beispieldaten_loeschen(sitzung: AsyncSession) -> int:
-    """Alle erfundenen Spiele weg, mit allem, was an ihnen haengt.
+async def beispieldaten_loeschen(sitzung: AsyncSession, konto: Konto) -> int:
+    """Die erfundenen Spiele der eigenen Staffeln weg, mit allem daran.
 
     Befunde und Karten gehen am Fremdschluessel mit. Vorgaenge haengen am
     Befund und damit ebenso -- ein Schreiben zu einem Spiel, das es nie gab,
@@ -893,9 +967,12 @@ async def beispieldaten_loeschen(sitzung: AsyncSession) -> int:
     """
     # Erst zaehlen, dann loeschen: `rowcount` ist je nach Treiber nicht
     # zugesichert, und die Zahl steht hinterher in der Oberflaeche.
-    gefunden = await beispieldaten_zaehlen(sitzung)
+    gefunden = await beispieldaten_zaehlen(sitzung, konto)
     await sitzung.execute(
-        delete(Spielbericht).where(Spielbericht.dfbnet_id.startswith(dienst.BEISPIEL_PRAEFIX))
+        delete(Spielbericht).where(
+            Spielbericht.dfbnet_id.startswith(dienst.BEISPIEL_PRAEFIX),
+            _in_meinen(Spielbericht.staffel_id, konto),
+        )
     )
     await sitzung.flush()
     return gefunden
@@ -990,48 +1067,41 @@ async def regelwahl_setzen(
     return wahl
 
 
-async def regel_aendern(
-    sitzung: AsyncSession, regel_id: uuid.UUID, daten: RegelAendern
-) -> tuple[Regel, Regeltext | None]:
-    """Schalter und Saetze -- jedes fuer sich.
+async def regeltext_setzen(
+    sitzung: AsyncSession, konto: uuid.UUID, schluessel: str, daten: RegelAendern
+) -> Kontotext | None:
+    """Die eigenen Saetze zu einer Regel -- jeder fuer sich.
 
     Was nicht mitgeschickt wurde, bleibt, wie es war. Sonst loeschte ein
     Umschalten die Saetze, die jemand vorher geschrieben hat.
     """
-    gefunden = await regel(sitzung, regel_id)
-    # Der Schalter steht nicht mehr hier, sondern je Staffelleiter in
-    # `Regelwahl`. `Regel.aktiv` ist die Vorgabe fuer alle.
-
-    text = await regeltext_zu(sitzung, gefunden.schluessel)
+    text = (await kontotexte(sitzung, konto)).get(schluessel)
     if daten.sachverhalt is not None or daten.hinweis is not None:
         if text is None:
-            text = Regeltext(schluessel=gefunden.schluessel)
+            text = Kontotext(benutzer_id=konto, schluessel=schluessel)
             sitzung.add(text)
         if daten.sachverhalt is not None:
             text.sachverhalt = daten.sachverhalt.strip()
         if daten.hinweis is not None:
             text.hinweis = daten.hinweis.strip()
     await sitzung.flush()
-    return gefunden, text
+    return text
 
 
-async def regeltext_zu(sitzung: AsyncSession, schluessel: str) -> Regeltext | None:
-    """Die eigenen Saetze zu einer Regel -- oder keine.
+async def kontotexte(sitzung: AsyncSession, konto: uuid.UUID) -> dict[str, Kontotext]:
+    """Die eigenen Saetze eines Staffelleiters, alle auf einmal.
 
-    Keine ist der Normalfall: dann gelten die mitgelieferten.
-    """
-    ergebnis = await sitzung.execute(select(Regeltext).where(Regeltext.schluessel == schluessel))
-    return ergebnis.scalars().first()
-
-
-async def regeltexte(sitzung: AsyncSession) -> dict[str, Regeltext]:
-    """Alle eigenen Saetze auf einmal.
-
-    Fuer die Liste: vierzig Regeln einzeln nachzuschlagen waeren vierzig
+    Keine sind der Normalfall: dann gelten die mitgelieferten. Alle auf einmal
+    fuer die Liste: vierzig Regeln einzeln nachzuschlagen waeren vierzig
     Abfragen, und das faellt erst auf dem Pi auf.
     """
-    ergebnis = await sitzung.execute(select(Regeltext))
+    ergebnis = await sitzung.execute(select(Kontotext).where(Kontotext.benutzer_id == konto))
     return {t.schluessel: t for t in ergebnis.scalars()}
+
+
+async def anzeigename(sitzung: AsyncSession, konto: uuid.UUID) -> str:
+    ergebnis = await sitzung.execute(select(Benutzer.anzeigename).where(Benutzer.id == konto))
+    return ergebnis.scalar_one_or_none() or ""
 
 
 # ── Alle Befunde auf einmal ───────────────────────────────────────────────
@@ -1039,6 +1109,7 @@ async def regeltexte(sitzung: AsyncSession) -> dict[str, Regeltext]:
 
 async def alle_befunde(
     sitzung: AsyncSession,
+    konto: Konto,
     staffel_id: uuid.UUID | None = None,
     nur_offen: bool = False,
 ) -> list[tuple[Befund, Spielbericht]]:
@@ -1051,6 +1122,7 @@ async def alle_befunde(
     frage = (
         select(Befund, Spielbericht)
         .join(Spielbericht, Befund.spiel_id == Spielbericht.id)
+        .where(_in_meinen(Spielbericht.staffel_id, konto))
         .order_by(Spielbericht.datum.desc(), Spielbericht.heim, Befund.rang)
     )
     if staffel_id is not None:
@@ -1064,25 +1136,39 @@ async def alle_befunde(
 # ── Auftraege ─────────────────────────────────────────────────────────────
 
 
-async def auftraege(sitzung: AsyncSession, grenze: int = 50) -> list[Auftrag]:
+def _auftraege(konto: Konto) -> Select[tuple[Auftrag]]:
+    """Auftraege dieses Kontos. Ein Auftrag ohne Anforderer gehoert niemandem
+    -- auch der Pruefdienst kann ihn nicht ausfuehren, denn mit wessen Zugang?"""
+    return (
+        select(Auftrag)
+        .join(Auftraggeber, Auftraggeber.auftrag_id == Auftrag.id)
+        .where(_von_mir(Auftraggeber.benutzer_id, konto))
+    )
+
+
+async def auftraege(sitzung: AsyncSession, konto: Konto, grenze: int = 50) -> list[Auftrag]:
     """Die juengsten zuerst -- das ist der, nach dem gerade gefragt wird."""
     ergebnis = await sitzung.execute(
-        select(Auftrag).order_by(Auftrag.angelegt.desc()).limit(grenze)
+        _auftraege(konto).order_by(Auftrag.angelegt.desc()).limit(grenze)
     )
     return list(ergebnis.scalars())
 
 
-async def auftrag(sitzung: AsyncSession, auftrag_id: uuid.UUID) -> Auftrag:
-    gefunden = await sitzung.get(Auftrag, auftrag_id)
+async def auftrag(sitzung: AsyncSession, konto: Konto, auftrag_id: uuid.UUID) -> Auftrag:
+    ergebnis = await sitzung.execute(_auftraege(konto).where(Auftrag.id == auftrag_id))
+    gefunden = ergebnis.scalar_one_or_none()
     if gefunden is None:
         raise AuftragUnbekannt(f"Es gibt keinen Auftrag mit der Kennung {auftrag_id}")
     return gefunden
 
 
-async def offener_auftrag(sitzung: AsyncSession) -> Auftrag | None:
-    """Der eine, der gerade laeuft oder wartet -- oder keiner."""
+async def offener_auftrag(sitzung: AsyncSession, konto: Konto) -> Auftrag | None:
+    """Der eine, der gerade laeuft oder wartet -- oder keiner.
+
+    Fuer den Pruefdienst der aelteste von allen.
+    """
     ergebnis = await sitzung.execute(
-        select(Auftrag)
+        _auftraege(konto)
         .where(Auftrag.zustand.in_(dienst.OFFENE_ZUSTAENDE))
         .order_by(Auftrag.angelegt)
         .limit(1)
@@ -1090,20 +1176,44 @@ async def offener_auftrag(sitzung: AsyncSession) -> Auftrag | None:
     return ergebnis.scalar_one_or_none()
 
 
+async def auftraggeber(sitzung: AsyncSession, auftrag_id: uuid.UUID) -> uuid.UUID:
+    ergebnis = await sitzung.execute(
+        select(Auftraggeber.benutzer_id).where(Auftraggeber.auftrag_id == auftrag_id)
+    )
+    return ergebnis.scalar_one()
+
+
+async def auftraege_davor(sitzung: AsyncSession, auftrag: Auftrag) -> int:
+    """Wie viele offene Auftraege vor diesem drankommen."""
+    davor = (
+        _auftraege(None)
+        .where(Auftrag.zustand.in_(dienst.OFFENE_ZUSTAENDE), Auftrag.angelegt < auftrag.angelegt)
+        .subquery()
+    )
+    ergebnis = await sitzung.execute(select(func.count()).select_from(davor))
+    return int(ergebnis.scalar_one())
+
+
 async def auftrag_anfordern(
-    sitzung: AsyncSession, art: str, staffel_id: uuid.UUID | None, referenz: str = ""
+    sitzung: AsyncSession,
+    konto: uuid.UUID,
+    art: str,
+    staffel_id: uuid.UUID | None,
+    referenz: str = "",
 ) -> Auftrag:
     if staffel_id is not None:
-        await staffel(sitzung, staffel_id)
+        await staffel(sitzung, konto, staffel_id)
     neuer = Auftrag(art=art, staffel_id=staffel_id, referenz=referenz)
     sitzung.add(neuer)
+    await sitzung.flush()
+    sitzung.add(Auftraggeber(auftrag_id=neuer.id, benutzer_id=konto))
     await sitzung.flush()
     await sitzung.refresh(neuer)
     return neuer
 
 
 async def auftrag_fortschreiben(
-    sitzung: AsyncSession, auftrag_id: uuid.UUID, daten: Fortschritt
+    sitzung: AsyncSession, konto: Konto, auftrag_id: uuid.UUID, daten: Fortschritt
 ) -> Auftrag:
     """Was der Pruefdienst meldet, waehrend er laeuft.
 
@@ -1111,7 +1221,7 @@ async def auftrag_fortschreiben(
     Beleg dafuer, dass er angefangen hat. Ein eigener Startaufruf waere eine
     zweite Stelle, an der derselbe Umstand steht.
     """
-    gefunden = await auftrag(sitzung, auftrag_id)
+    gefunden = await auftrag(sitzung, konto, auftrag_id)
     dienst.darf_fortschreiben(gefunden.zustand)
     if gefunden.zustand == "angefordert":
         gefunden.zustand = dienst.auftrag_weiter(gefunden.zustand, "laeuft")
@@ -1135,9 +1245,9 @@ async def auftrag_fortschreiben(
 
 
 async def auftrag_abschliessen(
-    sitzung: AsyncSession, auftrag_id: uuid.UUID, daten: Abschluss
+    sitzung: AsyncSession, konto: Konto, auftrag_id: uuid.UUID, daten: Abschluss
 ) -> Auftrag:
-    gefunden = await auftrag(sitzung, auftrag_id)
+    gefunden = await auftrag(sitzung, konto, auftrag_id)
     gefunden.zustand = dienst.auftrag_weiter(gefunden.zustand, daten.zustand)
     gefunden.beendet_am = dt.datetime.now(dt.UTC)
     if daten.meldung:
@@ -1151,38 +1261,79 @@ async def auftrag_abschliessen(
 # ── Uebertragung nach DFBnet ──────────────────────────────────────────────
 
 
-async def uebertragungen(sitzung: AsyncSession) -> list[Uebertragung]:
-    ergebnis = await sitzung.execute(select(Uebertragung).order_by(Uebertragung.angelegt.desc()))
+def _uebertragungen(konto: Konto) -> Select[tuple[Uebertragung]]:
+    """Was zu Spielen der eigenen Staffeln vorgemerkt ist."""
+    return (
+        select(Uebertragung)
+        .join(Spielbericht, Spielbericht.id == Uebertragung.spiel_id)
+        .join(Staffelkonto, Staffelkonto.staffel_id == Spielbericht.staffel_id)
+        .where(_von_mir(Staffelkonto.benutzer_id, konto))
+    )
+
+
+async def uebertragungen(sitzung: AsyncSession, konto: Konto) -> list[Uebertragung]:
+    ergebnis = await sitzung.execute(_uebertragungen(konto).order_by(Uebertragung.angelegt.desc()))
     return list(ergebnis.scalars())
 
 
-async def uebertragung(sitzung: AsyncSession, uebertragung_id: uuid.UUID) -> Uebertragung:
-    gefunden = await sitzung.get(Uebertragung, uebertragung_id)
+async def uebertragung(
+    sitzung: AsyncSession, konto: Konto, uebertragung_id: uuid.UUID
+) -> Uebertragung:
+    ergebnis = await sitzung.execute(
+        _uebertragungen(konto).where(Uebertragung.id == uebertragung_id)
+    )
+    gefunden = ergebnis.scalar_one_or_none()
     if gefunden is None:
         raise UebertragungUnbekannt(f"Es gibt keine Uebertragung mit der Kennung {uebertragung_id}")
     return gefunden
 
 
-async def uebertragung_stand(sitzung: AsyncSession) -> dict[str, int]:
-    """Die Zahlen je Zustand, in einer Abfrage."""
+async def uebertragungskonto(sitzung: AsyncSession, uebertragung_id: uuid.UUID) -> uuid.UUID:
+    """Mit wessen Zugang sie hinausgeht: dem dessen, dem die Staffel gehoert."""
     ergebnis = await sitzung.execute(
-        select(Uebertragung.zustand, func.count()).group_by(Uebertragung.zustand)
+        select(Staffelkonto.benutzer_id)
+        .join(Spielbericht, Spielbericht.staffel_id == Staffelkonto.staffel_id)
+        .join(Uebertragung, Uebertragung.spiel_id == Spielbericht.id)
+        .where(Uebertragung.id == uebertragung_id)
+    )
+    return ergebnis.scalar_one()
+
+
+async def uebertragung_stand(sitzung: AsyncSession, konto: Konto) -> dict[str, int]:
+    """Die Zahlen je Zustand, in einer Abfrage."""
+    meine = _uebertragungen(konto).subquery()
+    ergebnis = await sitzung.execute(
+        select(meine.c.zustand, func.count()).group_by(meine.c.zustand)
     )
     gezaehlt = {zustand: int(anzahl) for zustand, anzahl in ergebnis.all()}
     return {z: gezaehlt.get(z, 0) for z in ("offen", "laeuft", "fertig", "fehler")}
 
 
+async def freigegeben_offen(sitzung: AsyncSession) -> int:
+    """Wie viele offene hinaus duerfen -- die Zahl fuer den Pruefdienst."""
+    darf = await freigegebene_konten(sitzung)
+    offene = (
+        _uebertragungen(None)
+        .where(Uebertragung.zustand == "offen", Staffelkonto.benutzer_id.in_(darf))
+        .subquery()
+    )
+    ergebnis = await sitzung.execute(select(func.count()).select_from(offene))
+    return int(ergebnis.scalar_one())
+
+
 async def uebertragung_einreihen(
-    sitzung: AsyncSession, daten: UebertragungEinreihen
+    sitzung: AsyncSession, aktion: str, referenz: uuid.UUID, spiel_id: uuid.UUID
 ) -> Uebertragung:
     """Idempotent ueber (aktion, referenz).
 
     Eine gescheiterte Zeile wird dabei zurueckgesetzt: das zweite Abhaken ist
     der Staffelleiter, der es noch einmal versucht.
+
+    Das Spiel gehoert dazu: an ihm haengt, mit wessen Zugang sie hinausgeht.
     """
     ergebnis = await sitzung.execute(
         select(Uebertragung).where(
-            Uebertragung.aktion == daten.aktion, Uebertragung.referenz == daten.referenz
+            Uebertragung.aktion == aktion, Uebertragung.referenz == str(referenz)
         )
     )
     vorhanden = ergebnis.scalar_one_or_none()
@@ -1193,14 +1344,16 @@ async def uebertragung_einreihen(
         await sitzung.flush()
         return vorhanden
 
-    neue = Uebertragung(aktion=daten.aktion, referenz=daten.referenz, spiel_id=daten.spiel_id)
+    neue = Uebertragung(aktion=aktion, referenz=str(referenz), spiel_id=spiel_id)
     sitzung.add(neue)
     await sitzung.flush()
     await sitzung.refresh(neue)
     return neue
 
 
-async def uebertragung_wiederholen(sitzung: AsyncSession, uebertragung_id: uuid.UUID | None) -> int:
+async def uebertragung_wiederholen(
+    sitzung: AsyncSession, konto: Konto, uebertragung_id: uuid.UUID | None
+) -> int:
     """Gescheitertes zurueck in die Schlange. Gibt zurueck, wie viele.
 
     Ohne Kennung alle -- nach einem Netzausfall stehen dort zwanzig Zeilen mit
@@ -1208,14 +1361,14 @@ async def uebertragung_wiederholen(sitzung: AsyncSession, uebertragung_id: uuid.
     eine Strafe.
     """
     if uebertragung_id is not None:
-        gefunden = await uebertragung(sitzung, uebertragung_id)
+        gefunden = await uebertragung(sitzung, konto, uebertragung_id)
         dienst.darf_wiederholt_werden(gefunden.zustand)
         gefunden.zustand = "offen"
         gefunden.letzter_fehler = ""
         await sitzung.flush()
         return 1
 
-    ergebnis = await sitzung.execute(select(Uebertragung).where(Uebertragung.zustand == "fehler"))
+    ergebnis = await sitzung.execute(_uebertragungen(konto).where(Uebertragung.zustand == "fehler"))
     betroffen = list(ergebnis.scalars())
     for zeile in betroffen:
         zeile.zustand = "offen"
@@ -1224,19 +1377,22 @@ async def uebertragung_wiederholen(sitzung: AsyncSession, uebertragung_id: uuid.
     return len(betroffen)
 
 
-async def uebertragung_uebernehmen(sitzung: AsyncSession) -> Uebertragung | None:
+async def uebertragung_uebernehmen(sitzung: AsyncSession, konto: Konto) -> Uebertragung | None:
     """Die naechste offene Zeile - und sie gehoert dann dem Aufrufer.
 
     Uebernehmen und nicht nur lesen: sonst greifen zwei Dienste nach derselben
     Zeile und tragen dieselbe Freigabe zweimal in DFBnet ein. `FOR UPDATE SKIP
     LOCKED` laesst den zweiten die naechste nehmen, statt zu warten.
+
+    Nur Zeilen von Konten, die ihre Uebertragung freigegeben haben.
     """
+    darf = await freigegebene_konten(sitzung)
     ergebnis = await sitzung.execute(
-        select(Uebertragung)
-        .where(Uebertragung.zustand == "offen")
+        _uebertragungen(konto)
+        .where(Uebertragung.zustand == "offen", Staffelkonto.benutzer_id.in_(darf))
         .order_by(Uebertragung.angelegt)
         .limit(1)
-        .with_for_update(skip_locked=True)
+        .with_for_update(of=Uebertragung, skip_locked=True)
     )
     gefunden = ergebnis.scalar_one_or_none()
     if gefunden is None:
@@ -1247,9 +1403,12 @@ async def uebertragung_uebernehmen(sitzung: AsyncSession) -> Uebertragung | None
 
 
 async def uebertragung_abschliessen(
-    sitzung: AsyncSession, uebertragung_id: uuid.UUID, daten: UebertragungAbschluss
+    sitzung: AsyncSession,
+    konto: Konto,
+    uebertragung_id: uuid.UUID,
+    daten: UebertragungAbschluss,
 ) -> Uebertragung:
-    gefunden = await uebertragung(sitzung, uebertragung_id)
+    gefunden = await uebertragung(sitzung, konto, uebertragung_id)
     gefunden.zustand = dienst.uebertragung_weiter(gefunden.zustand, daten.zustand)
     gefunden.versuche += 1
     gefunden.letzter_fehler = daten.meldung if daten.zustand == "fehler" else ""
@@ -1269,12 +1428,9 @@ async def uebertragung_abschliessen(
 
 # ── DFBnet-Zugang ─────────────────────────────────────────────────────────
 
-#: Es gibt genau einen je Installation.
-DIENST = "dfbnet"
 
-
-async def _zugang(sitzung: AsyncSession) -> Zugang | None:
-    ergebnis = await sitzung.execute(select(Zugang).where(Zugang.dienst == DIENST))
+async def _zugang(sitzung: AsyncSession, konto: uuid.UUID) -> Kontozugang | None:
+    ergebnis = await sitzung.execute(select(Kontozugang).where(Kontozugang.benutzer_id == konto))
     return ergebnis.scalar_one_or_none()
 
 
@@ -1282,34 +1438,39 @@ def schluessel_vorhanden() -> bool:
     return bool(os.environ.get(dienst.SCHLUESSEL_VARIABLE, "").strip())
 
 
-async def zugang_stand(sitzung: AsyncSession) -> tuple[bool, str]:
+def dienstkonto() -> str:
+    """Welches Konto der Pruefdienst ist. Leer: keines."""
+    return os.environ.get(dienst.DIENSTKONTO_VARIABLE, "")
+
+
+async def zugang_stand(sitzung: AsyncSession, konto: uuid.UUID) -> tuple[bool, str]:
     """Ob etwas hinterlegt ist und fuer wen. Nie das Passwort."""
-    gefunden = await _zugang(sitzung)
+    gefunden = await _zugang(sitzung, konto)
     return (gefunden is not None, gefunden.benutzer if gefunden else "")
 
 
-async def zugang_setzen(sitzung: AsyncSession, daten: ZugangSetzen) -> None:
+async def zugang_setzen(sitzung: AsyncSession, konto: uuid.UUID, daten: ZugangSetzen) -> None:
     schluessel = dienst.schluessel_aus(os.environ)
     token = dienst.verschluesseln(daten.passwort, schluessel)
-    gefunden = await _zugang(sitzung)
+    gefunden = await _zugang(sitzung, konto)
     if gefunden is None:
-        sitzung.add(Zugang(dienst=DIENST, benutzer=daten.benutzer, geheimnis=token))
+        sitzung.add(Kontozugang(benutzer_id=konto, benutzer=daten.benutzer, geheimnis=token))
     else:
         gefunden.benutzer = daten.benutzer
         gefunden.geheimnis = token
     await sitzung.flush()
 
 
-async def zugang_loeschen(sitzung: AsyncSession) -> None:
-    gefunden = await _zugang(sitzung)
+async def zugang_loeschen(sitzung: AsyncSession, konto: uuid.UUID) -> None:
+    gefunden = await _zugang(sitzung, konto)
     if gefunden is not None:
         await sitzung.delete(gefunden)
         await sitzung.flush()
 
 
-async def zugang_abholen(sitzung: AsyncSession) -> tuple[str, str]:
+async def zugang_abholen(sitzung: AsyncSession, konto: uuid.UUID) -> tuple[str, str]:
     """Der einzige Ort, an dem das Passwort wieder herauskommt."""
-    gefunden = await _zugang(sitzung)
+    gefunden = await _zugang(sitzung, konto)
     if gefunden is None:
         raise KeinZugang("Es ist kein DFBnet-Zugang hinterlegt")
     schluessel = dienst.schluessel_aus(os.environ)

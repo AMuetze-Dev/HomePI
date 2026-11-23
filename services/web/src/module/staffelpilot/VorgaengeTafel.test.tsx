@@ -344,6 +344,7 @@ describe("Ein Vorgang", () => {
         beendet_am: null,
         angelegt: "2026-10-26T10:00:00Z",
         protokoll: [],
+        vor_dir: 0,
       });
       render(<VorgaengeTafel />);
       await aufklappen();

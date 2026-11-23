@@ -1,4 +1,4 @@
-import type { Parameter, Regel, Staffel } from "./api";
+import type { Parameter, Regel } from "./api";
 
 /** Bausteine für die Tests rund um den Regelsatz. Nur Tests importieren das. */
 
@@ -59,22 +59,6 @@ export function stunden(rest: Partial<Parameter> = {}): Parameter {
     groesst: 72,
     erklaerung: "Kommt auf die Frist obendrauf.",
     wert: null,
-    ...rest,
-  };
-}
-
-export function staffel(rest: Partial<Staffel> = {}): Staffel {
-  return {
-    id: "s1",
-    name: "Stadtliga C",
-    altersklasse: "maenner",
-    spielklasse: "3.Kreisliga (C)",
-    saison: "26/27",
-    spieltage: 0,
-    sportgericht: "",
-    aktiv: true,
-    staffelleiter: "Aaron",
-    leite_ich: true,
     ...rest,
   };
 }

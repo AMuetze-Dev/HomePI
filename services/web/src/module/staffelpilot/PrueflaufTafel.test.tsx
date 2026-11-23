@@ -17,8 +17,6 @@ function staffel(rest: Partial<api.Staffel> = {}): api.Staffel {
     spieltage: 0,
     sportgericht: "",
     aktiv: true,
-    staffelleiter: "Aaron",
-    leite_ich: true,
     ...rest,
   };
 }
@@ -39,6 +37,7 @@ function auftrag(rest: Partial<api.Auftrag> = {}): api.Auftrag {
     gestartet_am: null,
     beendet_am: null,
     angelegt: "2026-09-19T10:00:00Z",
+    vor_dir: 0,
     ...rest,
   };
 }
@@ -67,6 +66,20 @@ function mitStand(
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("Wer wartet", () => {
+  it.each([
+    [1, "Wartet, vor dir ist noch ein Auftrag"],
+    [3, "Wartet, vor dir sind noch 3 Aufträge"],
+  ])("sieht, wie viele vor ihm sind (%i)", async (vorDir, satz) => {
+    // Der Prüfdienst arbeitet die Aufträge aller Konten nacheinander ab. Ohne
+    // die Zahl sähe Warten aus wie ein Dienst, der nicht läuft.
+    mitStand(auftrag({ vor_dir: vorDir }));
+    render(<PrueflaufTafel staffeln={[staffel()]} />);
+
+    expect(await screen.findByText(new RegExp(satz))).toBeInTheDocument();
+  });
 });
 
 describe("Einen Prüflauf anfordern", () => {

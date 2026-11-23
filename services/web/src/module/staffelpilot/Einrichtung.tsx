@@ -10,6 +10,7 @@ import {
   speichereEinstellungen,
   speichereZugang,
 } from "./api";
+import { wartesatz } from "./ergebnis";
 import stil from "./Einrichtung.module.css";
 import { meldung } from "../../api/client";
 
@@ -378,9 +379,7 @@ function Zugang({
         </div>
       </form>
 
-      {auftrag !== null && (
-        <Lauf auftrag={auftrag} wartetext="Wartet auf den Prüfdienst" />
-      )}
+      {auftrag !== null && <Lauf auftrag={auftrag} />}
 
       {auftrag?.zustand === "gescheitert" && (
         <Hinweis ton="fehler" dringend>
@@ -426,9 +425,7 @@ function Staffeln({
         </Knopf>
       </div>
 
-      {auftrag !== null && (
-        <Lauf auftrag={auftrag} wartetext="Wartet auf den Prüfdienst" />
-      )}
+      {auftrag !== null && <Lauf auftrag={auftrag} />}
 
       {auftrag?.zustand === "gescheitert" && (
         <Hinweis ton="fehler" dringend>
@@ -489,7 +486,7 @@ function Fertig({
  * der Dienst nicht läuft, passiert nichts. Ein Balken, der trotzdem kriecht,
  * wäre eine Lüge, die genau dann auffällt, wenn jemand Hilfe braucht.
  */
-function Lauf({ auftrag, wartetext }: { auftrag: Auftrag; wartetext: string }) {
+function Lauf({ auftrag }: { auftrag: Auftrag }) {
   const wartet = auftrag.zustand === "angefordert";
   const laeuft = auftrag.zustand === "laeuft";
   const letzte = auftrag.protokoll.at(-1)?.text ?? "";
@@ -507,7 +504,7 @@ function Lauf({ auftrag, wartetext }: { auftrag: Auftrag; wartetext: string }) {
           }
         >
           {wartet
-            ? wartetext
+            ? wartesatz(auftrag.vor_dir)
             : laeuft
               ? auftrag.schritt || "Läuft"
               : auftrag.meldung || "Fertig"}

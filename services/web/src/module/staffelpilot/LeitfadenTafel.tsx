@@ -17,7 +17,7 @@ export const SCHRITTE = [
   },
   {
     titel: "Regeln einstellen",
-    text: "Alle Regeln der Spielordnung sind vorbelegt, du musst nichts tun. Was du nicht brauchst, schaltest du aus. Bei Fristen kannst du die Werte ändern. Beides gilt nur für dich und die Staffeln, die du leitest.",
+    text: "Alle Regeln der Spielordnung sind vorbelegt, du musst nichts tun. Was du nicht brauchst, schaltest du aus. Bei Fristen kannst du die Werte ändern. Beides gilt nur für dich und deine Staffeln.",
     ziel: "regeln",
     wort: "Zu den Regeln",
   },
@@ -41,7 +41,7 @@ export const SCHRITTE = [
   },
   {
     titel: "Abhaken",
-    text: "Sind alle Befunde eines Spiels entschieden, hakst du es ab. Damit wird die Prüferfreigabe in DFBnet vorgemerkt. Eingetragen wird sie erst, wenn du unter „Prüflauf“ die Übertragung freigibst; am Anfang ist sie angehalten.",
+    text: "Sind alle Befunde eines Spiels entschieden, hakst du es ab. Damit wird die Prüferfreigabe in DFBnet vorgemerkt. Eingetragen wird sie mit deinem DFBnet-Zugang, und erst, wenn du unter „Prüflauf“ die Übertragung freigibst; am Anfang ist sie angehalten.",
     ziel: "spiele",
     wort: "Zur Spielprüfung",
   },
@@ -64,9 +64,19 @@ const FRAGEN = [
       "Der Filter „Angepasst“ zeigt alles, was bei dir von der Vorgabe abweicht. „Auf Vorgabe zurücksetzen“ in der Ausklappung stellt die Werte einer Regel wieder her.",
   },
   {
-    frage: "Wir sind mehrere Staffelleiter. Wer stellt was ein?",
+    frage: "Wir sind mehrere Staffelleiter. Wer sieht was?",
     antwort:
-      "Jeder hat sein eigenes Konto und seinen eigenen Regelsatz. Welcher an einem Spiel gilt, hängt an der Staffel: an dem, der sie leitet. Das steht unter „Staffeln“, dort kannst du eine Staffel übernehmen oder abgeben. Sehen können zurzeit alle Konten alle Staffeln, und der DFBnet-Zugang ist gemeinsam.",
+      "Jedes Konto hat seine eigenen Staffeln, Einstellungen, Regeln und Sätze und seinen eigenen DFBnet-Zugang. Andere Konten sehen davon nichts, auch ein Verwalter nicht. Wie viele Staffeln du hast, ist egal: StaffelPilot nimmt die, die du anlegst oder aus DFBnet holst.",
+  },
+  {
+    frage: "Wir betreuen eine Staffel zu zweit. Teilen wir uns die Berichte?",
+    antwort:
+      "Nein. Jeder holt die Staffel in sein Konto und prüft und entscheidet jeder für sich. Sprecht ab, wer schreibt und wer in DFBnet freigibt. Was der andere dort schon freigegeben hat, lässt dein nächster Prüflauf aus.",
+  },
+  {
+    frage: "Mein Auftrag wartet. Läuft der Prüfdienst nicht?",
+    antwort:
+      "Er arbeitet die Aufträge aller Konten nacheinander ab. Unter „Prüflauf“ steht, wie viele vor dir sind. Steht dort keine Zahl und nichts bewegt sich, frag den Betreiber.",
   },
   {
     frage: "Was passiert mit den Befunden, wenn ich noch einmal prüfe?",

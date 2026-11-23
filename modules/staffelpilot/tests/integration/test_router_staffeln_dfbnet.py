@@ -17,7 +17,7 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
-from .hilfen import einspielen, spiel, staffel_anlegen
+from .hilfen import einspielen, konto_von, spiel, staffel_anlegen
 
 pytestmark = pytest.mark.integration
 
@@ -44,29 +44,40 @@ AUS_DFBNET = {
 }
 
 
-async def uebernehmen(client: AsyncClient, daten: dict | None = None) -> dict:
-    antwort = await client.put("/staffelpilot/staffeln/aus-dfbnet", json=daten or AUS_DFBNET)
+async def uebernehmen(
+    pruefdienst: AsyncClient, client: AsyncClient, daten: dict | None = None
+) -> dict:
+    """Der Pruefdienst bringt sie, fuer den, der sie angefordert hat."""
+    antwort = await pruefdienst.put(
+        "/staffelpilot/staffeln/aus-dfbnet",
+        params={"konto": await konto_von(client)},
+        json=daten or AUS_DFBNET,
+    )
     assert antwort.status_code == 200, antwort.text
     return dict(antwort.json())
 
 
 class TestZumErstenMal:
-    async def test_sie_werden_angelegt(self, client: AsyncClient) -> None:
-        ergebnis = await uebernehmen(client)
+    async def test_sie_werden_angelegt(self, client: AsyncClient, pruefdienst: AsyncClient) -> None:
+        ergebnis = await uebernehmen(pruefdienst, client)
 
         assert ergebnis["angelegt"] == 2
         assert ergebnis["aktualisiert"] == 0
 
-    async def test_die_kennung_bleibt_haengen(self, client: AsyncClient) -> None:
+    async def test_die_kennung_bleibt_haengen(
+        self, client: AsyncClient, pruefdienst: AsyncClient
+    ) -> None:
         """Sie ist das einzig Stabile: Bezeichnungen tragen Sponsornamen."""
-        await uebernehmen(client)
+        await uebernehmen(pruefdienst, client)
 
         liste = (await client.get("/staffelpilot/staffeln")).json()
 
         assert sorted(s["dfbnet_kennung"] for s in liste) == ["633203", "633222"]
 
-    async def test_spielklasse_und_altersklasse_kommen_mit(self, client: AsyncClient) -> None:
-        await uebernehmen(client)
+    async def test_spielklasse_und_altersklasse_kommen_mit(
+        self, client: AsyncClient, pruefdienst: AsyncClient
+    ) -> None:
+        await uebernehmen(pruefdienst, client)
 
         liste = {
             s["dfbnet_kennung"]: s for s in (await client.get("/staffelpilot/staffeln")).json()
@@ -79,16 +90,20 @@ class TestZumErstenMal:
 class TestZumZweitenMal:
     """Der Teil, der beim ersten Anlauf kaputt war."""
 
-    async def test_dieselbe_liste_legt_nichts_neu_an(self, client: AsyncClient) -> None:
-        await uebernehmen(client)
+    async def test_dieselbe_liste_legt_nichts_neu_an(
+        self, client: AsyncClient, pruefdienst: AsyncClient
+    ) -> None:
+        await uebernehmen(pruefdienst, client)
 
-        ergebnis = await uebernehmen(client)
+        ergebnis = await uebernehmen(pruefdienst, client)
 
         assert ergebnis["angelegt"] == 0
         assert ergebnis["aktualisiert"] == 2
         assert len((await client.get("/staffelpilot/staffeln")).json()) == 2
 
-    async def test_eine_von_hand_getippte_wird_wiedererkannt(self, client: AsyncClient) -> None:
+    async def test_eine_von_hand_getippte_wird_wiedererkannt(
+        self, client: AsyncClient, pruefdienst: AsyncClient
+    ) -> None:
         """`1. Kreisklasse` von Hand, `1.Kreisklasse` aus DFBnet.
 
         Das Leerzeichen nach dem Punkt war der ganze Unterschied — und es hat
@@ -102,12 +117,14 @@ class TestZumZweitenMal:
             altersklasse="ue35",
         )
 
-        ergebnis = await uebernehmen(client, {"staffeln": [AUS_DFBNET["staffeln"][1]]})
+        ergebnis = await uebernehmen(pruefdienst, client, {"staffeln": [AUS_DFBNET["staffeln"][1]]})
 
         assert ergebnis["angelegt"] == 0
         assert ergebnis["aktualisiert"] == 1
 
-    async def test_die_spielberichte_bleiben_an_ihrer_staffel(self, client: AsyncClient) -> None:
+    async def test_die_spielberichte_bleiben_an_ihrer_staffel(
+        self, client: AsyncClient, pruefdienst: AsyncClient
+    ) -> None:
         """Die eigentliche Zusicherung. Ein Doppelgänger nähme sie nicht mit —
         er ließe sie an der alten Staffel zurück, und die Warteschlange zeigte
         sie unter einem Namen, den DFBnet nicht kennt."""
@@ -116,7 +133,7 @@ class TestZumZweitenMal:
         )
         await einspielen(client, staffel_id, spiel("031DHM03"))
 
-        await uebernehmen(client, {"staffeln": [AUS_DFBNET["staffeln"][1]]})
+        await uebernehmen(pruefdienst, client, {"staffeln": [AUS_DFBNET["staffeln"][1]]})
 
         liste = (await client.get("/staffelpilot/staffeln")).json()
         assert len(liste) == 1
@@ -124,7 +141,9 @@ class TestZumZweitenMal:
         assert liste[0]["name"] == "1. Stadtklasse Ü35"
         assert len((await client.get("/staffelpilot/?nur_faellig=false")).json()) == 1
 
-    async def test_zwei_kandidaten_werden_nicht_geraten(self, client: AsyncClient) -> None:
+    async def test_zwei_kandidaten_werden_nicht_geraten(
+        self, client: AsyncClient, pruefdienst: AsyncClient
+    ) -> None:
         """Dann legt es lieber eine neue an.
 
         Eine zusammengelegte Staffel, die es nicht war, nimmt die
@@ -137,23 +156,27 @@ class TestZumZweitenMal:
             client, name="anders", spielklasse="1.Kreisklasse", altersklasse="ue35"
         )
 
-        ergebnis = await uebernehmen(client, {"staffeln": [AUS_DFBNET["staffeln"][1]]})
+        ergebnis = await uebernehmen(pruefdienst, client, {"staffeln": [AUS_DFBNET["staffeln"][1]]})
 
         assert ergebnis["angelegt"] == 1
 
 
 class TestWasUnberuehrtBleibt:
-    async def test_eine_fremde_staffel_wird_nicht_geloescht(self, client: AsyncClient) -> None:
+    async def test_eine_fremde_staffel_wird_nicht_geloescht(
+        self, client: AsyncClient, pruefdienst: AsyncClient
+    ) -> None:
         """Sie kann aus einer früheren Saison stammen — und sie zu entfernen
         nähme ihre Spielberichte mit."""
         await staffel_anlegen(client, name="Aus 25/26", spielklasse="Kreisoberliga")
 
-        await uebernehmen(client)
+        await uebernehmen(pruefdienst, client)
 
         namen = [s["name"] for s in (await client.get("/staffelpilot/staffeln")).json()]
         assert "Aus 25/26" in namen
 
-    async def test_stillgelegt_bleibt_stillgelegt(self, client: AsyncClient) -> None:
+    async def test_stillgelegt_bleibt_stillgelegt(
+        self, client: AsyncClient, pruefdienst: AsyncClient
+    ) -> None:
         """Ob eine Staffel mitläuft, entscheidet der Staffelleiter, nicht
         DFBnet."""
         staffel_id = await staffel_anlegen(
@@ -161,13 +184,13 @@ class TestWasUnberuehrtBleibt:
         )
         await client.patch(f"/staffelpilot/staffeln/{staffel_id}", json={"aktiv": False})
 
-        await uebernehmen(client, {"staffeln": [AUS_DFBNET["staffeln"][1]]})
+        await uebernehmen(pruefdienst, client, {"staffeln": [AUS_DFBNET["staffeln"][1]]})
 
         liste = (await client.get("/staffelpilot/staffeln")).json()
         assert liste[0]["aktiv"] is False
 
     async def test_eine_null_bei_spieltagen_ueberschreibt_keine_zahl(
-        self, client: AsyncClient
+        self, client: AsyncClient, pruefdienst: AsyncClient
     ) -> None:
         """0 heißt *nicht bekannt*. Siehe `modelle.Staffel.spieltage`."""
         await staffel_anlegen(
@@ -179,25 +202,33 @@ class TestWasUnberuehrtBleibt:
         )
 
         ohne = {**AUS_DFBNET["staffeln"][1], "spieltage": 0}
-        await uebernehmen(client, {"staffeln": [ohne]})
+        await uebernehmen(pruefdienst, client, {"staffeln": [ohne]})
 
         assert (await client.get("/staffelpilot/staffeln")).json()[0]["spieltage"] == 18
 
 
 class TestAbgewiesen:
-    async def test_ohne_kennung_geht_es_nicht(self, client: AsyncClient) -> None:
+    async def test_ohne_kennung_geht_es_nicht(
+        self, client: AsyncClient, pruefdienst: AsyncClient
+    ) -> None:
         """Ohne sie waere der naechste Abgleich wieder auf Namen angewiesen."""
         ohne = {**AUS_DFBNET["staffeln"][0], "kennung": ""}
 
-        antwort = await client.put("/staffelpilot/staffeln/aus-dfbnet", json={"staffeln": [ohne]})
+        antwort = await pruefdienst.put(
+            "/staffelpilot/staffeln/aus-dfbnet", json={"staffeln": [ohne]}
+        )
 
         assert antwort.status_code == 422
 
-    async def test_eine_unbekannte_altersklasse_wird_abgewiesen(self, client: AsyncClient) -> None:
+    async def test_eine_unbekannte_altersklasse_wird_abgewiesen(
+        self, client: AsyncClient, pruefdienst: AsyncClient
+    ) -> None:
         """Eine geratene liest beim naechsten Lauf die Spiele einer anderen
         Mannschaft."""
         falsch = {**AUS_DFBNET["staffeln"][0], "altersklasse": "senioren"}
 
-        antwort = await client.put("/staffelpilot/staffeln/aus-dfbnet", json={"staffeln": [falsch]})
+        antwort = await pruefdienst.put(
+            "/staffelpilot/staffeln/aus-dfbnet", json={"staffeln": [falsch]}
+        )
 
         assert antwort.status_code == 422

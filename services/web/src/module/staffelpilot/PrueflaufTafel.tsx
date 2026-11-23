@@ -27,7 +27,7 @@ import {
   setzeUebertragungPause,
   wiederholeUebertragung,
 } from "./api";
-import { ergebnisSatz } from "./ergebnis";
+import { ergebnisSatz, wartesatz } from "./ergebnis";
 import stil from "./StaffelpilotSeite.module.css";
 import { meldung } from "../../api/client";
 
@@ -301,7 +301,7 @@ function Laufend({
       <p className={stil.vorgangHinweis}>
         {auftrag.fortschritt} % ·{" "}
         {auftrag.schritt ||
-          (auftrag.zustand === "angefordert" ? "Wartet auf den Prüfdienst" : "Arbeitet")}
+          (auftrag.zustand === "angefordert" ? wartesatz(auftrag.vor_dir) : "Arbeitet")}
       </p>
 
       {auftrag.protokoll.length > 0 && (
