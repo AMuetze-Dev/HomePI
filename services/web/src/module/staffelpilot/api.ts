@@ -269,7 +269,8 @@ export interface VorgangZeile {
   id: string;
   befund_id: string;
   art: VorgangArt;
-  aktenzeichen: string;
+  /** Das des Sportgerichts. Leer, solange es keines vergeben hat. */
+  dfbnet_aktenzeichen: string;
   verein: string;
   betroffener: string;
   betreff: string;
@@ -283,14 +284,6 @@ export interface Vorgang extends VorgangZeile {
   versandt_am: string | null;
   /** Das Spiel dahinter. Der Vorgang hängt am Befund, der am Spiel. */
   spiel_id: string | null;
-  /**
-   * Die Nummer, die **DFBnet** dem Sportgerichtsfall gegeben hat.
-   *
-   * Eine andere Sache als `aktenzeichen`: das vergibt diese Anwendung
-   * fortlaufend je Saison. Aus dieser hier entsteht die Mail an den
-   * Sportrichter; leer, solange der Fall nicht angelegt ist.
-   */
-  dfbnet_aktenzeichen: string;
   /** Beilagen der Mail, in Worten. Leer lässt die Zeile weg. */
   anlagen: string;
   /** Der Satz am Ende. Leer erlaubt. */

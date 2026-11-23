@@ -591,7 +591,8 @@ class VorgangZeile(BaseModel):
     id: uuid.UUID
     befund_id: uuid.UUID
     art: VorgangArt
-    aktenzeichen: str
+    #: Das des Sportgerichts. Leer, solange es keines vergeben hat.
+    dfbnet_aktenzeichen: str = ""
     verein: str
     betroffener: str
     betreff: str

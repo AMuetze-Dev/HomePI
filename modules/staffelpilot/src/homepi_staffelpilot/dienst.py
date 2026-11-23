@@ -620,6 +620,9 @@ def zustand_weiter(alt: str, neu: str) -> str:
 def aktenzeichen(saison: str, laufnummer: int) -> str:
     """Fortlaufend je Saison, gleich lang und damit sortierbar.
 
+    Eine **innere** Nummer: das Aktenzeichen, das draussen gilt, vergibt das
+    Sportgericht. Diese hier sortiert die Liste und steht auf keinem Schreiben.
+
     Der Schraegstrich der Saison wird zum Bindestrich: das Aktenzeichen steht
     auch in Dateinamen, und ein Schraegstrich ist dort ein Verzeichnis.
     """
@@ -1175,16 +1178,33 @@ def mannschaftsart_fuer(altersklasse: str, aus_dfbnet: str = "") -> str:
     return MANNSCHAFTSART.get((altersklasse or "").strip().lower(), "")
 
 
-def betreff_fuer(aktenzeichen: str, heim: str, gast: str, datum: date | None) -> str:
-    """Die Betreffzeile eines Schreibens.
+def betreff_fuer(heim: str, gast: str, datum: date | None) -> str:
+    """Die Betreffzeile eines Schreibens: das Spiel und sein Tag.
 
-    Aktenzeichen zuerst: daran findet der Verein die Sache wieder, und daran
-    ordnet der Staffelleiter die Antwort zu.
+    Ohne Nummer. Ein Aktenzeichen vergibt das Sportgericht; die eigene
+    Zaehlung daneben zu stellen hiesse, dass jemand sie dafuer haelt.
     """
-    teile = [t for t in (aktenzeichen, f"{heim} - {gast}" if heim or gast else "") if t]
+    teile = [f"{heim} - {gast}"] if heim or gast else []
     if datum is not None:
         teile.append(datum.strftime("%d.%m.%Y"))
     return " | ".join(teile)
+
+
+_UMLAUTE = str.maketrans(
+    {"ä": "ae", "ö": "oe", "ü": "ue", "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "ß": "ss"}
+)
+
+
+def _als_dateiname(text: str) -> str:
+    """Nur Buchstaben, Ziffern und Striche. Vereinsnamen tragen Schraegstriche
+    und Umlaute, und der Name steht in einem HTTP-Kopf."""
+    return re.sub(r"[^A-Za-z0-9]+", "-", text.translate(_UMLAUTE)).strip("-") or "unbekannt"
+
+
+def mahnung_dateiname(heim: str, gast: str, datum: date) -> str:
+    """Nach dem Spiel: daran findet man sie unter zwanzig im Ordner wieder, und
+    der Tag vorn sortiert sie."""
+    return f"Mahnung_{datum.isoformat()}_{_als_dateiname(heim)}_{_als_dateiname(gast)}.pdf"
 
 
 # ── Regelsatz je Staffelleiter ────────────────────────────────────────────

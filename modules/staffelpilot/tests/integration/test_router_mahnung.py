@@ -83,14 +83,15 @@ class TestFormular:
         assert antwort.headers["content-type"] == "application/pdf"
         assert antwort.content.startswith(b"%PDF")
 
-    async def test_es_heisst_nach_dem_aktenzeichen(self, client: AsyncClient) -> None:
+    async def test_es_heisst_nach_dem_spiel(self, client: AsyncClient) -> None:
         """Daran findet der Staffelleiter es wieder, wenn zwanzig davon im
         Ordner liegen."""
         vorgang_id, _ = await vorgang_mit_befund(client)
 
         antwort = await client.get(f"/staffelpilot/vorgaenge/{vorgang_id}/mahnung.pdf")
 
-        assert "Mahnung_" in antwort.headers["content-disposition"]
+        kopf = antwort.headers["content-disposition"]
+        assert "Mahnung_2026-09-05_SV-Loschwitz_SG-Gittersee.pdf" in kopf
 
     async def test_was_fehlt_wird_benannt(self, client: AsyncClient) -> None:
         """Und nicht mit einem Platzhalter gefüllt."""

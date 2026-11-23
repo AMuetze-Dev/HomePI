@@ -172,6 +172,12 @@ button.betont:hover {
     color: var(--farbe-text-leise);
   }
 
+  /* Eine leere Zelle hielte ihren Mittelpunkt fest, und zwischen zwei Angaben
+     stünden zwei davon. */
+  .zelle:empty {
+    display: none;
+  }
+
   .rechts {
     justify-content: flex-start;
     text-align: left;

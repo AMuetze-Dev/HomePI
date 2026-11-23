@@ -218,16 +218,36 @@ class TestMahnungsformular:
         assert dienst.mannschaftsart_fuer("ue99") == ""
         assert dienst.mannschaftsart_fuer("") == ""
 
-    def test_der_betreff_beginnt_mit_dem_aktenzeichen(self) -> None:
-        """Daran findet der Verein die Sache wieder."""
-        betreff = dienst.betreff_fuer(
-            "2026/0007", "SV Loschwitz", "SG Gittersee", _datum(2026, 9, 5)
-        )
+    def test_der_betreff_nennt_spiel_und_tag(self) -> None:
+        """Daran findet der Verein die Sache wieder. Ein Aktenzeichen vergibt
+        das Sportgericht und nicht dieses Programm."""
+        betreff = dienst.betreff_fuer("SV Loschwitz", "SG Gittersee", _datum(2026, 9, 5))
 
-        assert betreff == "2026/0007 | SV Loschwitz - SG Gittersee | 05.09.2026"
+        assert betreff == "SV Loschwitz - SG Gittersee | 05.09.2026"
 
     def test_ohne_datum_bleibt_der_rest(self) -> None:
-        assert dienst.betreff_fuer("2026/0007", "A", "B", None) == "2026/0007 | A - B"
+        assert dienst.betreff_fuer("A", "B", None) == "A - B"
 
     def test_ohne_paarung_auch(self) -> None:
-        assert dienst.betreff_fuer("2026/0007", "", "", None) == "2026/0007"
+        assert dienst.betreff_fuer("", "", _datum(2026, 9, 5)) == "05.09.2026"
+
+    def test_der_dateiname_nennt_spiel_und_tag(self) -> None:
+        name = dienst.mahnung_dateiname("SG Gittersee", "SV Fortschritt", _datum(2026, 9, 13))
+
+        assert name == "Mahnung_2026-09-13_SG-Gittersee_SV-Fortschritt.pdf"
+
+    @pytest.mark.parametrize(
+        ("verein", "erwartet"),
+        [
+            ("SpG Kickers 2 / Hafen 2", "SpG-Kickers-2-Hafen-2"),
+            ("FV Löbtauer Großweiß", "FV-Loebtauer-Grossweiss"),
+            ('A"; filename="x\r\nB', "A-filename-x-B"),
+            ("../../etc", "etc"),
+            ("", "unbekannt"),
+        ],
+    )
+    def test_er_steht_in_einem_kopf_und_wird_eine_datei(self, verein: str, erwartet: str) -> None:
+        """Vereinsnamen kommen aus DFBnet und tragen Schrägstriche und Umlaute."""
+        name = dienst.mahnung_dateiname(verein, "B", _datum(2026, 9, 13))
+
+        assert name == f"Mahnung_2026-09-13_{erwartet}_B.pdf"

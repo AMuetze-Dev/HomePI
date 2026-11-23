@@ -11,7 +11,7 @@ function zeile(rest: Partial<api.VorgangZeile> = {}): api.VorgangZeile {
     id: "v1",
     befund_id: "b1",
     art: "mahnung",
-    aktenzeichen: "26-27-0001",
+    dfbnet_aktenzeichen: "",
     verein: "SG Gittersee",
     betroffener: "Max Müller",
     betreff: "Mahnung SG Gittersee – SV Fortschritt am 13.09.2026",
@@ -28,7 +28,6 @@ function vorgang(rest: Partial<api.Vorgang> = {}): api.Vorgang {
     text: "Sehr geehrte Damen und Herren,\n\nFeldverweis in Minute 71.",
     versandt_am: null,
     spiel_id: "sp1",
-    dfbnet_aktenzeichen: "",
     anlagen: "",
     hinweis: "",
     ...rest,
@@ -70,12 +69,28 @@ afterEach(() => {
 });
 
 describe("Die Liste", () => {
-  it("zeigt Aktenzeichen, Art und Zustand", async () => {
+  it("zeigt das Aktenzeichen des Sportgerichts", async () => {
+    mitListe([zeile({ art: "sportgericht", dfbnet_aktenzeichen: "00042-26/27-SPG_DD" })]);
+    render(<VorgaengeTafel />);
+
+    const liste = await screen.findByRole("list", { name: "Vorgänge" });
+    expect(within(liste).getByText("00042-26/27-SPG_DD")).toBeInTheDocument();
+  });
+
+  it("sagt, wenn das Sportgericht noch keines vergeben hat", async () => {
+    mitListe([zeile({ art: "sportgericht" })]);
+    render(<VorgaengeTafel />);
+
+    const liste = await screen.findByRole("list", { name: "Vorgänge" });
+    expect(within(liste).getByText("noch keines")).toBeInTheDocument();
+  });
+
+  it("zeigt Art und Zustand, und an einer Mahnung kein Aktenzeichen", async () => {
     mitListe();
     render(<VorgaengeTafel />);
 
     const liste = await screen.findByRole("list", { name: "Vorgänge" });
-    expect(within(liste).getByText("26-27-0001")).toBeInTheDocument();
+    expect(within(liste).queryByText("noch keines")).toBeNull();
     expect(within(liste).getByText("Mahnung")).toBeInTheDocument();
     expect(within(liste).getByText("Entwurf")).toBeInTheDocument();
   });

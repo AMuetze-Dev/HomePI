@@ -331,6 +331,19 @@ class TestVorgangListe:
         assert len(zeilen) == 1
         assert "text" not in zeilen[0]
 
+    async def test_sie_nennt_das_aktenzeichen_des_sportgerichts(self, client: AsyncClient) -> None:
+        """Und keine selbst gezaehlte Nummer: die haelt jeder fuer die echte."""
+        vorgang = await vorgang_anlegen(client, weg="sportgericht")
+        await client.patch(
+            f"/staffelpilot/vorgaenge/{vorgang['id']}",
+            json={"dfbnet_aktenzeichen": "00042-26/27-SPG_DD"},
+        )
+
+        zeile = (await client.get("/staffelpilot/vorgaenge")).json()[0]
+
+        assert zeile["dfbnet_aktenzeichen"] == "00042-26/27-SPG_DD"
+        assert "aktenzeichen" not in zeile
+
     async def test_nach_zustand_filtern(self, client: AsyncClient) -> None:
         vorgang = await vorgang_anlegen(client)
         await client.post(
