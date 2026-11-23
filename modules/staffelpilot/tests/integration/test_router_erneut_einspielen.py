@@ -41,6 +41,13 @@ async def schreiben(
     return next(v for v in await vorgaenge(client) if v["id"] == vorgang_id)
 
 
+async def innere_nummer(client: AsyncClient, vorgang: dict[str, Any]) -> str:
+    """Die Liste zeigt sie nicht mehr, der einzelne Vorgang fuehrt sie noch."""
+    return str(
+        (await client.get(f"/staffelpilot/vorgaenge/{vorgang['id']}")).json()["aktenzeichen"]
+    )
+
+
 async def vorgaenge(client: AsyncClient) -> list[dict[str, Any]]:
     return list((await client.get("/staffelpilot/vorgaenge")).json())
 
@@ -82,7 +89,7 @@ class TestDerselbeBefund:
         nach_person = {b["person"]: b["id"] for b in await befunde_des_spiels(client)}
         andere = await schreiben(client, nach_person["Jan Klein"])
 
-        assert erste["aktenzeichen"] != andere["aktenzeichen"]
+        assert await innere_nummer(client, erste) != await innere_nummer(client, andere)
 
     async def test_er_zeigt_was_der_letzte_lauf_gemeldet_hat(self, client: AsyncClient) -> None:
         staffel_id = await staffel_anlegen(client)
