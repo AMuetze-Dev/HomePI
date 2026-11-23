@@ -47,6 +47,7 @@ from .modelle import (
 )
 from .schemas import (
     Abschluss,
+    BefundEingang,
     EinstellungenSetzen,
     Fortschritt,
     ImportAuftrag,
@@ -441,11 +442,11 @@ async def einspielen(
     """Spielberichte anlegen oder auffrischen. Gibt (angelegt, aktualisiert,
     Befunde) zurueck.
 
-    Ein erneuter Import desselben Spiels ersetzt seine Befunde vollstaendig -
-    ein Prueflauf ist die vollstaendige Aussage ueber einen Bericht, nicht ein
-    Nachtrag. Getroffene Entscheidungen zu bereits bekannten Befunden bleiben
-    dabei erhalten; sie an derselben Regel und derselben Person wiederzufinden
-    ist das, was den zweiten Prueflauf ertraeglich macht.
+    Ein Prueflauf ist die vollstaendige Aussage ueber einen Bericht, nicht ein
+    Nachtrag. Ein Befund, den es schon gab, wird dabei **weitergefuehrt** und
+    nicht ersetzt: an seiner Kennung haengen die Entscheidung und der Vorgang,
+    und mit der Zeile ginge das Schreiben verloren. Welcher das ist, entscheidet
+    `dienst.abgleichen`.
     """
     await staffel(sitzung, konto, auftrag.staffel_id)
     # Vor dem ersten Schreiben und nicht je Spiel: ein halb eingespielter Lauf
@@ -456,18 +457,12 @@ async def einspielen(
 
     for eingang in auftrag.spiele:
         vorhanden = await sitzung.execute(
-            select(Spielbericht)
-            .options(selectinload(Spielbericht.befunde))
-            .where(
+            select(Spielbericht).where(
                 Spielbericht.staffel_id == auftrag.staffel_id,
                 Spielbericht.dfbnet_id == eingang.dfbnet_id,
             )
         )
         bericht = vorhanden.scalar_one_or_none()
-        # Was der Staffelleiter zu einem Befund schon entschieden hat, nach
-        # Regel und Person. Genau das wiederzufinden macht den zweiten
-        # Prueflauf ertraeglich.
-        frueher: dict[tuple[str, str], Befund] = {}
 
         if bericht is None:
             bericht = Spielbericht(
@@ -506,35 +501,10 @@ async def einspielen(
                 wert = getattr(eingang, feld)
                 if wert:
                     setattr(bericht, feld, wert)
-            frueher = {(b.regel, b.person): b for b in bericht.befunde}
-            # Ein Prueflauf ist die vollstaendige Aussage ueber einen Bericht:
-            # was er nicht mehr meldet, ist keine offene Arbeit mehr.
-            await sitzung.execute(delete(Befund).where(Befund.spiel_id == bericht.id))
             aktualisiert += 1
 
-        for rang, b in enumerate(eingang.befunde):
-            alt = frueher.get((b.regel, b.person))
-            # Ueber die Fremdschluesselspalte und nicht ueber die Beziehung:
-            # `bericht.befunde` waere unter async ein Nachladen an einer
-            # Stelle, an der nicht await gesagt werden kann.
-            sitzung.add(
-                Befund(
-                    spiel_id=bericht.id,
-                    regel=b.regel,
-                    schwere=b.schwere,
-                    titel=b.titel,
-                    text=b.text,
-                    person=b.person,
-                    mannschaft=b.mannschaft,
-                    weg=b.weg,
-                    einzelheiten=b.einzelheiten,
-                    rang=rang,
-                    entscheidung=alt.entscheidung if alt else "offen",
-                    grund=alt.grund if alt else "",
-                    entschieden_am=alt.entschieden_am if alt else None,
-                )
-            )
-            befunde_gesamt += 1
+        await _befunde_abgleichen(sitzung, bericht.id, eingang.befunde)
+        befunde_gesamt += len(eingang.befunde)
 
         # Die Karten desselben Spiels ebenso: ein Prueflauf ist die
         # vollstaendige Aussage ueber einen Bericht. Wuerden sie sich
@@ -559,6 +529,50 @@ async def einspielen(
         await sitzung.refresh(bericht, ["befunde"])
 
     return angelegt, aktualisiert, befunde_gesamt
+
+
+async def _befunde_abgleichen(
+    sitzung: AsyncSession, spiel_id: uuid.UUID, eingang: list[BefundEingang]
+) -> None:
+    # Gesperrt, bevor nach Vorgaengen gefragt wird: ein Schreiben, das jemand
+    # gerade anlegt, wartet dann auf diesen Lauf, statt mit dem Befund zu gehen.
+    ergebnis = await sitzung.execute(
+        select(Befund)
+        .where(Befund.spiel_id == spiel_id)
+        .order_by(Befund.rang)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    frueher = list(ergebnis.scalars())
+    mit_vorgang = await vorgaenge_zu_befunden(sitzung, [b.id for b in frueher])
+    abgleich = dienst.abgleichen(
+        [
+            dienst.BefundSpur(b.regel, b.person, b.mannschaft, b.text, b.id in mit_vorgang)
+            for b in frueher
+        ],
+        [dienst.BefundSpur(b.regel, b.person, b.mannschaft, b.text) for b in eingang],
+    )
+
+    for rang, (b, stelle) in enumerate(zip(eingang, abgleich.weiter, strict=True)):
+        # Ueber die Fremdschluesselspalte und nicht ueber die Beziehung:
+        # `bericht.befunde` waere unter async ein Nachladen an einer Stelle,
+        # an der nicht await gesagt werden kann.
+        ziel = Befund(spiel_id=spiel_id) if stelle is None else frueher[stelle]
+        ziel.regel = b.regel
+        ziel.schwere = b.schwere
+        ziel.titel = b.titel
+        ziel.text = b.text
+        ziel.person = b.person
+        ziel.mannschaft = b.mannschaft
+        ziel.weg = b.weg
+        ziel.einzelheiten = b.einzelheiten
+        ziel.rang = rang
+        sitzung.add(ziel)
+    for rang, stelle in enumerate(abgleich.bleiben, start=len(eingang)):
+        frueher[stelle].rang = rang
+    await sitzung.execute(
+        delete(Befund).where(Befund.id.in_([frueher[i].id for i in abgleich.gehen]))
+    )
 
 
 async def karten(

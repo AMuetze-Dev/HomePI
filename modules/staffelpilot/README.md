@@ -65,9 +65,34 @@ Menschen, in seinem Mailprogramm.
 ## Die Entscheidungen, die hier stecken
 
 **Ein Prueflauf ist die vollstaendige Aussage ueber einen Bericht**, kein
-Nachtrag: ein erneutes Einspielen ersetzt die Befunde. Getroffene
-Entscheidungen bleiben trotzdem, wiedergefunden an Regel und Person - das ist
-es, was den zweiten Prueflauf ertraeglich macht.
+Nachtrag: was er nicht mehr meldet, ist keine offene Arbeit mehr. Was es schon
+gab, wird **weitergefuehrt und nicht ersetzt** - an der Kennung des Befundes
+haengen Entscheidung und Vorgang. Bis zum 23.11.2026 wurde ersetzt, und mit
+jedem Lauf verschwanden alle Mahnungen und Antraege des Spiels, auch versandte;
+ihre Nummer bekam das naechste Schreiben.
+
+Wiedererkannt wird an Regel, Person und Mannschaft. Die Mannschaft gehoert dazu,
+weil nicht jede Regel eine Person nennt: zwei verspaetete Bestaetigungen in
+einem Spiel sind zwei, und das Schreiben an den Heimverein gehoert nicht an den
+Befund des Gastes. Stimmt alles drei bei mehreren ueberein, entscheidet der
+Text; ist keiner am Text zu erkennen und sind es gleich viele, gilt die
+Reihenfolge (die Regel hat neu formuliert). Sonst wird nicht geraten: ein Befund
+zu viel faellt auf, ein Schreiben am falschen Befund nicht.
+
+**Ein Befund mit Vorgang bleibt, auch wenn der Lauf ihn nicht mehr meldet** -
+in jedem Zustand, hinter den gemeldeten:
+
+- *versandt* oder *erledigt*, weil der Verein das Schreiben hat. Eine Akte, die
+  es nicht kennt, waere falsch, und seine Nummer bekaeme ein anderes.
+- ein *Entwurf*, weil ein Lauf auch dann weniger meldet, wenn DFBnet die
+  Aufstellung gerade nicht hergab. Der Text kann von Hand geschrieben und der
+  Fall beim Sportgericht schon angelegt sein; was ein Mensch angelegt hat,
+  verwirft kein Prueflauf.
+
+Der Preis: dem Entwurf sieht man nicht an, dass der letzte Lauf den Verstoss
+nicht mehr gemeldet hat. Wer ihn verwirft, ist mit dem naechsten Lauf auch den
+Befund los. Solange der Befund steht, braucht er wie jeder andere eine
+Entscheidung, bevor der Bericht abgehakt werden kann.
 
 **Der Weg eines Befundes kommt von aussen.** Ob aus einem Feldverweis ein
 Sportgerichtsfall wird, steht in der Spielordnung, und die kennt dieses

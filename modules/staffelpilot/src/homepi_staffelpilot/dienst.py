@@ -10,7 +10,7 @@ Faustregel: Entscheidungen sind rein, Seiteneffekte sind dumm.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -241,6 +241,73 @@ def darf_zurueckgenommen_werden(vorgang_zustand: str | None) -> None:
             "Zu diesem Befund ist ein Schreiben versandt. Erst den Vorgang "
             "zurueck in den Entwurf stellen oder verwerfen."
         )
+
+
+# ── Ein zweiter Prueflauf ─────────────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class BefundSpur:
+    """Woran ein Befund im naechsten Prueflauf wiederzuerkennen ist."""
+
+    regel: str
+    person: str
+    mannschaft: str
+    text: str
+    mit_vorgang: bool = False
+
+    @property
+    def wer(self) -> tuple[str, str, str]:
+        """Regel, Person und Mannschaft.
+
+        Die Mannschaft, weil nicht jede Regel eine Person nennt: eine
+        verspaetete Bestaetigung kann es je Spiel zweimal geben, und das
+        Schreiben an den Heimverein gehoert nicht an den Befund des Gastes.
+        """
+        return (self.regel, self.person, self.mannschaft)
+
+
+@dataclass(frozen=True, slots=True)
+class Abgleich:
+    """Was aus den Befunden des frueheren Laufs wird. Alles sind Stellen darin."""
+
+    #: Je gemeldetem Befund der fruehere, der er ist -- oder `None`: ein neuer.
+    weiter: list[int | None]
+    #: Nicht mehr gemeldet, aber es haengt ein Vorgang daran.
+    bleiben: list[int]
+    #: Nicht mehr gemeldet, und nichts haengt daran.
+    gehen: list[int]
+
+
+def abgleichen(frueher: Sequence[BefundSpur], gemeldet: Sequence[BefundSpur]) -> Abgleich:
+    """Die Befunde zweier Laeufe desselben Spiels einander zuordnen.
+
+    Stehen zwei mit gleicher Regel, Person und Mannschaft da, entscheidet der
+    Text. Was danach uebrig ist, gilt nur dann als dasselbe, wenn keiner am Text
+    zu erkennen war und es gleich viele sind: dann hat die Regel neu formuliert.
+    Sonst wird **nicht geraten** -- ein Befund zu viel faellt auf, ein Schreiben
+    am falschen Befund nicht.
+    """
+    weiter: list[int | None] = [None] * len(gemeldet)
+    for wer in {g.wer for g in gemeldet}:
+        alte = [i for i, f in enumerate(frueher) if f.wer == wer]
+        neue = [i for i, g in enumerate(gemeldet) if g.wer == wer]
+        uebrig = list(alte)
+        for n in neue:
+            treffer = next((a for a in uebrig if frueher[a].text == gemeldet[n].text), None)
+            if treffer is not None:
+                weiter[n] = treffer
+                uebrig.remove(treffer)
+        if len(uebrig) == len(alte) == len(neue):
+            for n, a in zip(neue, alte, strict=True):
+                weiter[n] = a
+
+    ohne = [i for i in range(len(frueher)) if i not in weiter]
+    return Abgleich(
+        weiter=weiter,
+        bleiben=[i for i in ohne if frueher[i].mit_vorgang],
+        gehen=[i for i in ohne if not frueher[i].mit_vorgang],
+    )
 
 
 # ── Reihenfolge ───────────────────────────────────────────────────────────
