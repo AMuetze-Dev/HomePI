@@ -1,0 +1,4 @@
+.pio/
+.vscode/
+# Zugangsdaten: WLAN, Token, Adresse. Vorlage: include/secrets.beispiel.h
+include/secrets.h

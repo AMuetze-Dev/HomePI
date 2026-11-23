@@ -15,6 +15,8 @@ function staffel(rest: Partial<api.Staffel> = {}): api.Staffel {
     spieltage: 0,
     sportgericht: "",
     aktiv: true,
+    staffelleiter: "Aaron",
+    leite_ich: true,
     ...rest,
   };
 }
@@ -23,15 +25,19 @@ function tafel(staffeln: api.Staffel[] = [staffel()]) {
   const anlegen = vi.fn().mockResolvedValue(true);
   const aendern = vi.fn().mockResolvedValue(true);
   const loeschen = vi.fn().mockResolvedValue(true);
+  const uebernehmen = vi.fn().mockResolvedValue(true);
+  const abgeben = vi.fn().mockResolvedValue(true);
   render(
     <StaffelnTafel
       staffeln={staffeln}
       onAnlegen={anlegen}
       onAendern={aendern}
       onLoeschen={loeschen}
+      onUebernehmen={uebernehmen}
+      onAbgeben={abgeben}
     />,
   );
-  return { anlegen, aendern, loeschen };
+  return { anlegen, aendern, loeschen, uebernehmen, abgeben };
 }
 
 beforeEach(() => {
@@ -126,6 +132,8 @@ describe("Staffeln verwalten", () => {
         onAnlegen={vi.fn().mockResolvedValue(false)}
         onAendern={vi.fn()}
         onLoeschen={vi.fn()}
+        onUebernehmen={vi.fn()}
+        onAbgeben={vi.fn()}
       />,
     );
 
@@ -225,5 +233,51 @@ describe("Staffeln verwalten", () => {
     await waitFor(() =>
       expect(api.ladeMannschaften).toHaveBeenCalledWith("s1", expect.anything()),
     );
+  });
+});
+
+describe("Wer eine Staffel leitet", () => {
+  const oeffnen = () =>
+    userEvent.click(screen.getByRole("button", { name: /Stadtliga C/ }));
+
+  it("nennt ihn schon in der Zeile", () => {
+    tafel([
+      staffel(),
+      staffel({ id: "s2", name: "B", staffelleiter: "Erika", leite_ich: false }),
+      staffel({ id: "s3", name: "C", staffelleiter: "", leite_ich: false }),
+    ]);
+
+    const liste = screen.getByRole("list", { name: "Staffeln" });
+    expect(within(liste).getByText("von dir geleitet")).toBeInTheDocument();
+    expect(within(liste).getByText("Erika")).toBeInTheDocument();
+    expect(within(liste).getByText("ohne Staffelleiter")).toBeInTheDocument();
+  });
+
+  it("lässt eine freie übernehmen", async () => {
+    const { uebernehmen } = tafel([staffel({ staffelleiter: "", leite_ich: false })]);
+    await oeffnen();
+
+    await userEvent.click(screen.getByRole("button", { name: "Staffel übernehmen" }));
+
+    expect(uebernehmen).toHaveBeenCalledWith("s1");
+  });
+
+  it("lässt die eigene abgeben und sagt, was dann gilt", async () => {
+    const { abgeben } = tafel();
+    await oeffnen();
+
+    expect(screen.getByText(/mit den Vorgaben geprüft/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Staffel abgeben" }));
+
+    expect(abgeben).toHaveBeenCalledWith("s1");
+  });
+
+  it("bietet bei einer fremden nichts an, was das Backend abwiese", async () => {
+    tafel([staffel({ staffelleiter: "Erika", leite_ich: false })]);
+    await oeffnen();
+
+    expect(screen.getByText(/Erika leitet diese Staffel/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Staffel abgeben/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Staffel übernehmen/ })).toBeNull();
   });
 });

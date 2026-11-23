@@ -6,6 +6,7 @@ import datetime as dt
 import os
 import uuid
 
+from homepi_core.auth.modelle import Benutzer
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,9 +34,12 @@ from .modelle import (
     Mannschaft,
     Regel,
     Regeldatei,
+    Regelparameter,
     Regeltext,
+    Regelwahl,
     Spielbericht,
     Staffel,
+    Staffelleitung,
     Uebertragung,
     Vorgang,
     Zugang,
@@ -73,6 +77,40 @@ async def staffel(sitzung: AsyncSession, staffel_id: uuid.UUID) -> Staffel:
     if gefunden is None:
         raise StaffelUnbekannt(f"Es gibt keine Staffel mit der Kennung {staffel_id}")
     return gefunden
+
+
+async def leitungen(sitzung: AsyncSession) -> dict[uuid.UUID, tuple[uuid.UUID, str]]:
+    """Wer welche Staffel leitet: Staffel -> (Konto, Anzeigename)."""
+    ergebnis = await sitzung.execute(
+        select(Staffelleitung.staffel_id, Benutzer.id, Benutzer.anzeigename).join(
+            Benutzer, Benutzer.id == Staffelleitung.benutzer_id
+        )
+    )
+    return {staffel_id: (konto, name) for staffel_id, konto, name in ergebnis.all()}
+
+
+async def leitung_setzen(
+    sitzung: AsyncSession, staffel_id: uuid.UUID, benutzer_id: uuid.UUID
+) -> None:
+    await leitung_loeschen(sitzung, staffel_id)
+    sitzung.add(Staffelleitung(staffel_id=staffel_id, benutzer_id=benutzer_id))
+    await sitzung.flush()
+
+
+async def leitung_loeschen(sitzung: AsyncSession, staffel_id: uuid.UUID) -> None:
+    await sitzung.execute(delete(Staffelleitung).where(Staffelleitung.staffel_id == staffel_id))
+    await sitzung.flush()
+
+
+async def freie_uebernehmen(sitzung: AsyncSession, benutzer_id: uuid.UUID) -> int:
+    """Jede Staffel ohne Staffelleiter an dieses Konto."""
+    geleitet = select(Staffelleitung.staffel_id)
+    ergebnis = await sitzung.execute(select(Staffel.id).where(Staffel.id.notin_(geleitet)))
+    freie = list(ergebnis.scalars())
+    for staffel_id in freie:
+        sitzung.add(Staffelleitung(staffel_id=staffel_id, benutzer_id=benutzer_id))
+    await sitzung.flush()
+    return len(freie)
 
 
 async def staffel_anlegen(sitzung: AsyncSession, daten: StaffelAnlegen) -> Staffel:
@@ -894,12 +932,62 @@ async def regelkatalog_setzen(sitzung: AsyncSession, eingang: list[RegelEingang]
     for r in eingang:
         ziel = vorhanden.get(r.schluessel)
         if ziel is None:
-            sitzung.add(Regel(**r.model_dump(), aktiv=vorher.get(r.schluessel, True)))
+            sitzung.add(
+                Regel(**r.model_dump(exclude={"parameter"}), aktiv=vorher.get(r.schluessel, True))
+            )
         else:
             ziel.name, ziel.beschreibung = r.name, r.beschreibung
             ziel.schwere, ziel.weg = r.schwere, r.weg
+
+    # Die Parameter kommen mit dem Katalog und gehen mit ihm: ersetzt als
+    # Ganzes. Die eigenen Werte stehen in `Regelwahl` und bleiben.
+    await sitzung.execute(delete(Regelparameter))
+    for r in eingang:
+        for stelle, p in enumerate(r.parameter):
+            sitzung.add(Regelparameter(regel=r.schluessel, reihenfolge=stelle, **p.model_dump()))
     await sitzung.flush()
     return await regeln(sitzung)
+
+
+async def regelparameter(sitzung: AsyncSession) -> dict[str, list[Regelparameter]]:
+    """Die Parameter aller Regeln, je Regel in der gemeldeten Reihenfolge."""
+    ergebnis = await sitzung.execute(
+        select(Regelparameter).order_by(Regelparameter.regel, Regelparameter.reihenfolge)
+    )
+    je_regel: dict[str, list[Regelparameter]] = {}
+    for p in ergebnis.scalars():
+        je_regel.setdefault(p.regel, []).append(p)
+    return je_regel
+
+
+async def regelwahlen(sitzung: AsyncSession, benutzer_id: uuid.UUID) -> dict[str, Regelwahl]:
+    """Der Regelsatz eines Staffelleiters: nur, was er abweichend hat."""
+    ergebnis = await sitzung.execute(select(Regelwahl).where(Regelwahl.benutzer_id == benutzer_id))
+    return {w.regel: w for w in ergebnis.scalars()}
+
+
+async def regelwahl_setzen(
+    sitzung: AsyncSession,
+    benutzer_id: uuid.UUID,
+    regel: Regel,
+    aktiv: bool | None,
+    werte: dict[str, int | str] | None,
+) -> Regelwahl:
+    """Schalter und Werte eines Staffelleiters an einer Regel.
+
+    `aktiv=None` und `werte=None` lassen stehen, was war. Ob eine Wahl der
+    Vorgabe entspricht, hat `dienst.eigene_wahl` vorher entschieden.
+    """
+    wahl = (await regelwahlen(sitzung, benutzer_id)).get(regel.schluessel)
+    if wahl is None:
+        wahl = Regelwahl(benutzer_id=benutzer_id, regel=regel.schluessel, aktiv=None, werte={})
+        sitzung.add(wahl)
+    if aktiv is not None:
+        wahl.aktiv = dienst.eigene_wahl(regel.aktiv, aktiv)
+    if werte is not None:
+        wahl.werte = werte
+    await sitzung.flush()
+    return wahl
 
 
 async def regel_aendern(
@@ -911,8 +999,8 @@ async def regel_aendern(
     Umschalten die Saetze, die jemand vorher geschrieben hat.
     """
     gefunden = await regel(sitzung, regel_id)
-    if daten.aktiv is not None:
-        gefunden.aktiv = daten.aktiv
+    # Der Schalter steht nicht mehr hier, sondern je Staffelleiter in
+    # `Regelwahl`. `Regel.aktiv` ist die Vorgabe fuer alle.
 
     text = await regeltext_zu(sitzung, gefunden.schluessel)
     if daten.sachverhalt is not None or daten.hinweis is not None:

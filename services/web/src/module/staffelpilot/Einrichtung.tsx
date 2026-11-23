@@ -56,7 +56,13 @@ function beendet(auftrag: Auftrag | null): boolean {
  * Prüfdienst. Läuft der nicht, bleibt die Probe auf „Wartet" stehen — und das
  * steht auch so da, statt einen Fortschritt vorzutäuschen.
  */
-export function Einrichtung({ onFertig }: { onFertig: () => void }) {
+export function Einrichtung({
+  onFertig,
+  onLeitfaden,
+}: {
+  onFertig: () => void;
+  onLeitfaden?: () => void;
+}) {
   const [stand, setStand] = useState<Einrichtungsstand | null>(null);
   const [schritt, setSchritt] = useState<Schritt>("willkommen");
   const [benutzer, setBenutzer] = useState("");
@@ -195,6 +201,7 @@ export function Einrichtung({ onFertig }: { onFertig: () => void }) {
             stand={stand}
             onWeiter={() => setSchritt("zugang")}
             onSpaeter={abschliessen}
+            onLeitfaden={onLeitfaden}
             laeuft={laeuft}
           />
         )}
@@ -233,11 +240,13 @@ function Willkommen({
   stand,
   onWeiter,
   onSpaeter,
+  onLeitfaden,
   laeuft,
 }: {
   stand: Einrichtungsstand | null;
   onWeiter: () => void;
   onSpaeter: () => void;
+  onLeitfaden: (() => void) | undefined;
   laeuft: boolean;
 }) {
   return (
@@ -284,6 +293,11 @@ function Willkommen({
         <Knopf auspraegung="leise" onClick={onSpaeter} disabled={laeuft}>
           Später, ich richte selbst ein
         </Knopf>
+        {onLeitfaden && (
+          <Knopf auspraegung="leise" onClick={onLeitfaden}>
+            Leitfaden lesen
+          </Knopf>
+        )}
       </div>
 
       {stand !== null && !stand.schluessel_vorhanden && (

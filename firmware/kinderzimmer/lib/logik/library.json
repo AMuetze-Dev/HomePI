@@ -1,0 +1,10 @@
+{
+  "name": "logik",
+  "version": "0.1.0",
+  "description": "Spiellogik des Kinderzimmer-Geraets. Kein Arduino, kein Flash, kein WLAN: nur Entscheidungen, damit sie auf dem PC testbar sind.",
+  "frameworks": "*",
+  "platforms": "*",
+  "dependencies": {
+    "bblanchon/ArduinoJson": "7.2.1"
+  }
+}

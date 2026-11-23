@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -1109,3 +1110,183 @@ def betreff_fuer(aktenzeichen: str, heim: str, gast: str, datum: date | None) ->
     if datum is not None:
         teile.append(datum.strftime("%d.%m.%Y"))
     return " | ".join(teile)
+
+
+# ── Regelsatz je Staffelleiter ────────────────────────────────────────────
+#
+# Jeder Staffelleiter schaltet die Regeln fuer sich selbst und stellt ihre
+# Parameter ein -- die Frist am Spieltag, die Kulanz. **Gespeichert wird nur,
+# was von der Vorgabe abweicht.** Leer heisst: die Vorgabe gilt. Sonst hielte
+# das erste Speichern den heutigen Stand fest, und eine spaeter geaenderte
+# Vorgabe kaeme bei niemandem mehr an.
+
+
+class ParameterUngueltig(ServiceError):
+    status = 422
+    title = "Wert nicht zulässig"
+
+
+class StaffelGeleitet(ServiceError):
+    status = 409
+    title = "Staffel hat schon einen Staffelleiter"
+
+
+_UHRZEIT = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
+
+
+@dataclass(frozen=True)
+class ParameterSicht:
+    """Was eine Regel einstellbar macht -- so, wie der Pruefdienst es meldet."""
+
+    schluessel: str
+    art: str
+    vorgabe: int | str
+    name: str = ""
+    kleinst: int | None = None
+    groesst: int | None = None
+
+
+def wert_pruefen(parameter: ParameterSicht, wert: object) -> int | str:
+    """Ein Wert fuer diesen Parameter -- geprueft und vereinheitlicht.
+
+    Die Meldung nennt, was zulaessig ist: "zwischen 0 und 24" hilft, "ungueltig"
+    nicht.
+    """
+    if parameter.art == "uhrzeit":
+        treffer = _UHRZEIT.match(wert.strip()) if isinstance(wert, str) else None
+        if treffer is None:
+            raise ParameterUngueltig("Bitte eine Uhrzeit wie 18:00 angeben.")
+        return f"{int(treffer.group(1)):02d}:{treffer.group(2)}"
+
+    zahl = _ganze_zahl(wert)
+    if zahl is None:
+        raise ParameterUngueltig("Bitte eine ganze Zahl angeben.")
+    unten, oben = parameter.kleinst, parameter.groesst
+    if (unten is not None and zahl < unten) or (oben is not None and zahl > oben):
+        if unten is not None and oben is not None:
+            raise ParameterUngueltig(f"Bitte einen Wert zwischen {unten} und {oben} angeben.")
+        if unten is not None:
+            raise ParameterUngueltig(f"Bitte mindestens {unten} angeben.")
+        raise ParameterUngueltig(f"Bitte höchstens {oben} angeben.")
+    return zahl
+
+
+def _ganze_zahl(wert: object) -> int | None:
+    # `bool` ist in Python eine Zahl -- als Kulanz waere `True` eine Stunde,
+    # die niemand eingegeben hat.
+    if isinstance(wert, bool):
+        return None
+    if isinstance(wert, int):
+        return wert
+    if isinstance(wert, str) and re.fullmatch(r"\s*-?\d+\s*", wert):
+        return int(wert)
+    return None
+
+
+def eigene_werte(
+    parameter: Iterable[ParameterSicht], eingang: Mapping[str, object]
+) -> dict[str, int | str]:
+    """Was von den Vorgaben abweicht -- nur das wird gespeichert.
+
+    Leer und `None` heissen "Vorgabe". Ein Wert gleich der Vorgabe ebenso:
+    gespeichert hielte er den heutigen Stand fest.
+    """
+    bekannt = {p.schluessel: p for p in parameter}
+    werte: dict[str, int | str] = {}
+    for schluessel, roh in eingang.items():
+        p = bekannt.get(schluessel)
+        if p is None:
+            raise ParameterUngueltig(f"Diese Regel kennt keinen Wert „{schluessel}“.")
+        if roh is None or (isinstance(roh, str) and not roh.strip()):
+            continue
+        try:
+            wert = wert_pruefen(p, roh)
+        except ParameterUngueltig as fehler:
+            raise ParameterUngueltig(f"{p.name or p.schluessel}: {fehler.detail}") from fehler
+        if wert != p.vorgabe:
+            werte[schluessel] = wert
+    return werte
+
+
+def wirksam_aktiv(vorgabe: bool, eigen: bool | None) -> bool:
+    """Ob eine Regel fuer diesen Staffelleiter prueft."""
+    return vorgabe if eigen is None else eigen
+
+
+def eigene_wahl(vorgabe: bool, gewuenscht: bool) -> bool | None:
+    """Was zu speichern ist. `None`, wenn es der Vorgabe entspricht."""
+    return None if gewuenscht == vorgabe else gewuenscht
+
+
+def gueltige_werte(
+    parameter: Iterable[ParameterSicht], eigene: Mapping[str, object]
+) -> dict[str, int | str]:
+    """Die gespeicherten Werte, die heute noch passen.
+
+    Ein veralteter -- die Regel hat den Parameter nicht mehr, oder die Grenzen
+    sind enger geworden -- faellt heraus. Ein Prueflauf soll an einer alten
+    Einstellung nicht scheitern, und im Feld soll nicht stehen, wonach niemand
+    mehr prueft.
+    """
+    werte: dict[str, int | str] = {}
+    for p in parameter:
+        if p.schluessel in eigene:
+            with suppress(ParameterUngueltig):
+                werte[p.schluessel] = wert_pruefen(p, eigene[p.schluessel])
+    return werte
+
+
+def wirksame_werte(
+    parameter: Iterable[ParameterSicht], eigene: Mapping[str, object]
+) -> dict[str, int | str]:
+    """Alle Parameter einer Regel mit dem Wert, der gilt."""
+    bekannt = list(parameter)
+    return {p.schluessel: p.vorgabe for p in bekannt} | gueltige_werte(bekannt, eigene)
+
+
+def regelsatz_aus(
+    katalog: Iterable[tuple[str, bool]],
+    parameter: Mapping[str, Iterable[ParameterSicht]],
+    wahl: Mapping[str, tuple[bool | None, Mapping[str, object]]],
+) -> tuple[list[str], dict[str, dict[str, int | str]]]:
+    """Was der Prueflauf an einer Staffel braucht: was aus ist, welche Werte gelten.
+
+    `katalog` sind (Schluessel, Vorgabe) je Regel, `wahl` die Abweichungen des
+    Staffelleiters. Die Werte stehen vollstaendig da, mit Vorgaben aufgefuellt.
+    """
+    aus: list[str] = []
+    werte: dict[str, dict[str, int | str]] = {}
+    for schluessel, vorgabe in katalog:
+        eigen_aktiv, eigene = wahl.get(schluessel, (None, {}))
+        if not wirksam_aktiv(vorgabe, eigen_aktiv):
+            aus.append(schluessel)
+        definitionen = list(parameter.get(schluessel, ()))
+        if definitionen:
+            werte[schluessel] = wirksame_werte(definitionen, eigene)
+    return sorted(aus), werte
+
+
+def ist_angepasst(
+    eigen_aktiv: bool | None, eigene: Mapping[str, object], parameter: Iterable[ParameterSicht]
+) -> bool:
+    """Ob der Staffelleiter an dieser Regel etwas anders hat als die Vorgabe."""
+    return eigen_aktiv is not None or bool(gueltige_werte(parameter, eigene))
+
+
+def uebernahme_pruefen(*, leiter: str | None, ich: str, leiter_name: str = "") -> None:
+    """Eine Staffel uebernehmen: nur eine freie, oder die eigene."""
+    if leiter is not None and leiter != ich:
+        raise StaffelGeleitet(
+            f"Diese Staffel leitet {leiter_name or 'jemand anderes'}. "
+            "Erst wenn sie abgegeben ist, lässt sie sich übernehmen."
+        )
+
+
+def abgabe_pruefen(*, leiter: str | None, ich: str, verwalter: bool) -> None:
+    """Eine Staffel abgeben: der Staffelleiter selbst, oder ein Verwalter.
+
+    Der Verwalter, weil sonst die Staffel eines Staffelleiters, der aufhoert,
+    fuer immer bei ihm bliebe.
+    """
+    if leiter is not None and leiter != ich and not verwalter:
+        raise StaffelGeleitet("Abgeben kann eine Staffel nur, wer sie leitet.")

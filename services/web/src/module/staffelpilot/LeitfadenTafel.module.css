@@ -1,0 +1,67 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
+.einleitung {
+  margin: 0;
+  max-width: var(--breite-text);
+  font-size: var(--text-md);
+  line-height: var(--zeile-weit);
+}
+
+.schritte {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schritt {
+  display: flex;
+  align-items: baseline;
+  gap: var(--raum-4);
+}
+
+/* Eine Zahl im Rand statt eines Kreises: sie ordnet, sie schmueckt nicht. */
+.zahl {
+  flex: 0 0 var(--raum-5);
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+  color: var(--farbe-akzent);
+}
+
+.inhalt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  min-width: 0;
+}
+
+.titel {
+  margin: 0;
+  font-size: var(--text-md);
+  letter-spacing: var(--laufweite-eng);
+}
+
+.text {
+  margin: 0;
+  max-width: var(--breite-text);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-gedaempft);
+}
+
+.fragen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+.fragen .text {
+  margin-top: var(--raum-2);
+}
+
+.linie {
+  margin-top: var(--raum-4);
+}

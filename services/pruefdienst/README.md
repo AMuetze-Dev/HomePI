@@ -279,6 +279,17 @@ Altersband. Das ist der Wert aus dem laufenden Betrieb im Kreis Dresden,
 mündlich bestätigt am 06.09.2026; eine schriftliche Fundstelle gibt es nicht.
 Genau deshalb steht er in einer Datei, die sich ändern lässt.
 
+### Wessen Regelsatz gilt
+
+Je Staffel holt der Lauf `GET /staffelpilot/regelsatz`: was aus ist und welche
+Werte gelten, bei dem, der sie leitet. Das Protokoll nennt ihn. Kommt keine
+Antwort, wird mit den Vorgaben geprüft, und auch das steht im Protokoll.
+
+Einstellbar sind heute die Fristen nach § 59 (17): `Fristen` in `regeln.py`,
+gemeldet mit dem Katalog (`_parameter_zu`). Vorgabe und geprüfte Zahl stehen an
+derselben Stelle, und ein Test hält sie zusammen. Regeldateien können noch
+keine Parameter melden.
+
 ### Was die Regeln noch nicht wissen
 
 Der Katalog läuft im Prüflauf mit — neben den eingebauten Regeln, nicht statt

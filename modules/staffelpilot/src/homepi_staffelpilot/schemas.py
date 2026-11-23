@@ -142,6 +142,16 @@ class StaffelAusgabe(BaseModel):
     #: Die Nummer, unter der DFBnet sie fuehrt. Leer bei Handarbeit.
     dfbnet_kennung: str = ""
     aktiv: bool
+    #: Wer sie leitet, mit Anzeigenamen. Leer: niemand -- dann prueft der
+    #: Prueflauf sie mit den Vorgaben.
+    staffelleiter: str = ""
+    #: Ob das der Aufrufer ist. Die Oberflaeche bietet danach "Uebernehmen"
+    #: oder "Abgeben" an.
+    leite_ich: bool = False
+
+
+class LeitungUebernommen(BaseModel):
+    uebernommen: int = 0
 
 
 # ── Befund ────────────────────────────────────────────────────────────────
@@ -601,6 +611,29 @@ class VorgangZeile(BaseModel):
 # ── Regelkatalog ──────────────────────────────────────────────────────────
 
 
+#: Was ein Parameter einer Regel sein kann. Die Uhrzeit ist Text ("18:00"),
+#: alles andere eine ganze Zahl in der Einheit, die die Art nennt.
+ParameterArt = Literal["uhrzeit", "minuten", "stunden", "zahl"]
+
+
+class ParameterEingang(BaseModel):
+    """Was eine Regel einstellbar macht -- vom Prüfdienst mitgemeldet."""
+
+    schluessel: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$", max_length=60)]
+    name: NameFeld
+    art: ParameterArt
+    vorgabe: int | str
+    kleinst: int | None = None
+    groesst: int | None = None
+    #: Ein Satz, was der Wert bewirkt. Steht in der Oberfläche unter dem Feld.
+    erklaerung: Annotated[str, Field(max_length=500)] = ""
+
+
+class ParameterAusgabe(ParameterEingang):
+    #: Der eigene Wert des Aufrufers. `None` heisst: die Vorgabe gilt.
+    wert: int | str | None = None
+
+
 class RegelEingang(BaseModel):
     """Eine Regel, wie sie der Prüfdienst meldet."""
 
@@ -609,6 +642,8 @@ class RegelEingang(BaseModel):
     beschreibung: Annotated[str, Field(max_length=1000)] = ""
     schwere: Schwere = "hinweis"
     weg: Weg = "kein"
+    #: Leer bei einem Prüfdienst, der noch keine Parameter kennt.
+    parameter: list[ParameterEingang] = Field(default_factory=list)
 
     @field_validator("schluessel", "name", "beschreibung", mode="before")
     @classmethod
@@ -753,6 +788,10 @@ class RegelAusgabe(BaseModel):
     #: sichtbar ist, was ein leeres Feld bedeutet.
     vorgabe_sachverhalt: str = ""
     vorgabe_hinweis: str = ""
+    #: Die einstellbaren Werte, mit Vorgabe und eigenem Wert.
+    parameter: list[ParameterAusgabe] = Field(default_factory=list)
+    #: Ob der Aufrufer an dieser Regel etwas anders hat als die Vorgabe.
+    angepasst: bool = False
 
 
 class RegelAendern(BaseModel):
@@ -765,6 +804,21 @@ class RegelAendern(BaseModel):
     aktiv: bool | None = None
     sachverhalt: Annotated[str, Field(max_length=2000)] | None = None
     hinweis: Annotated[str, Field(max_length=2000)] | None = None
+    #: Die eigenen Werte **als Ganzes**: was fehlt oder leer ist, gilt mit
+    #: der Vorgabe. `{}` setzt alle zurueck.
+    werte: dict[str, int | str | None] | None = None
+
+
+class RegelsatzAusgabe(BaseModel):
+    """Was der Prüflauf fuer eine Staffel braucht: was aus ist, welche Werte gelten.
+
+    Die Werte stehen **vollstaendig** da, mit den Vorgaben aufgefuellt. Der
+    Prüfdienst soll nicht wissen muessen, was hier als Vorgabe gilt.
+    """
+
+    staffelleiter: str = ""
+    aus: list[str] = Field(default_factory=list)
+    werte: dict[str, dict[str, int | str]] = Field(default_factory=dict)
 
 
 class MailEntwurf(BaseModel):
