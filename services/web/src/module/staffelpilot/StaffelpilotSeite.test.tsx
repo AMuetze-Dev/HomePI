@@ -599,7 +599,6 @@ describe("Aus einem Befund einen Entwurf machen", () => {
       id: "v1",
       befund_id: "b1",
       art: "sportgericht",
-      aktenzeichen: "26-27-0001",
       verein: "SG Gittersee",
       betroffener: "Max Müller",
       betreff: "Antrag",

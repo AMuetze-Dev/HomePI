@@ -289,8 +289,9 @@ class Vorgang(Base, ZeitstempelMixin):
         index=True,
     )
     art: Mapped[str] = mapped_column(String(20), nullable=False)
-    #: Fortlaufend je Saison und Konto, vergeben beim Anlegen. Steht auf jedem
-    #: Schreiben. Nicht eindeutig: jeder Staffelleiter zaehlt fuer sich.
+    #: Fortlaufend je Saison und Konto, vergeben beim Anlegen. Eine **innere**
+    #: Nummer: sie sortiert die Liste und steht auf keinem Schreiben. Nicht
+    #: eindeutig: jeder Staffelleiter zaehlt fuer sich.
     aktenzeichen: Mapped[str] = mapped_column(String(40), nullable=False)
     #: Die Nummer, die **DFBnet** dem Sportgerichtsfall gibt -- eine andere
     #: Sache als das eigene Aktenzeichen oben.

@@ -723,7 +723,7 @@ async def vorgang_mahnung(vorgang_id: uuid.UUID, sitzung: DbSitzung, blick: Hier
 
     formular = _formular(vorgang, befund, spiel, staffel, werte.staffelleiter)
     inhalt = mahnung.als_pdf(formular)
-    name = f"Mahnung_{vorgang.aktenzeichen.replace('/', '-')}.pdf"
+    name = dienst.mahnung_dateiname(spiel.heim, spiel.gast, spiel.datum)
     return Response(
         content=inhalt,
         media_type="application/pdf",
@@ -752,8 +752,7 @@ async def vorgang_mail(vorgang_id: uuid.UUID, sitzung: DbSitzung, blick: HierBli
     if vorgang.art == "mahnung":
         return MailEntwurf(
             empfaenger=vorgang.empfaenger,
-            betreff=vorgang.betreff
-            or betreff_fuer(vorgang.aktenzeichen, spiel.heim, spiel.gast, spiel.datum),
+            betreff=vorgang.betreff or betreff_fuer(spiel.heim, spiel.gast, spiel.datum),
             text=vorgang.text,
             anhang=f"/staffelpilot/vorgaenge/{vorgang_id}/mahnung.pdf",
             fehlende_felder=_formular(
@@ -784,8 +783,7 @@ async def vorgang_mail(vorgang_id: uuid.UUID, sitzung: DbSitzung, blick: HierBli
     if not vorgang.dfbnet_aktenzeichen.strip():
         return MailEntwurf(
             empfaenger=vorgang.empfaenger,
-            betreff=vorgang.betreff
-            or betreff_fuer(vorgang.aktenzeichen, spiel.heim, spiel.gast, spiel.datum),
+            betreff=vorgang.betreff or betreff_fuer(spiel.heim, spiel.gast, spiel.datum),
             text=vorgang.text,
             anhang="",
             fehlende_felder=fall.fehlende_felder(),

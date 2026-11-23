@@ -261,7 +261,7 @@ function StaffelAnlegen({
         />
         <Feld
           beschriftung="Saison"
-          hinweis="Zum Beispiel 26/27. Sie steht auf jedem Aktenzeichen."
+          hinweis="Zum Beispiel 26/27. DFBnet sucht danach."
           value={saison}
           onChange={(e) => setSaison(e.target.value)}
         />

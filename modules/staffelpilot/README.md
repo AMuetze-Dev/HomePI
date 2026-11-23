@@ -471,8 +471,12 @@ Gemeinsam bleiben der Regelkatalog und die Regeldateien. Sie sind Programm und
 kein Inhalt; aendern darf sie nur ein Verwalter.
 
 **Fremdes ist 404, nicht 403.** Dass es etwas gibt, ist auch schon eine
-Auskunft. Aus demselben Grund zaehlt jeder seine Aktenzeichen selbst: eine Luecke
-verriete, wie viele Schreiben andere verschicken.
+Auskunft.
+
+**Aktenzeichen vergibt das Sportgericht**, nicht dieses Programm. Angezeigt wird
+nur seines (`dfbnet_aktenzeichen`); eine Mahnung hat keines. Die eigene Zaehlung
+(`aktenzeichen`) bleibt als innere Nummer, weil die Spalte Pflicht ist: sie
+sortiert die Liste, zaehlt je Konto und steht auf keinem Schreiben.
 
 **Die Rolle aendert daran nichts.** `nutzer` genuegt fuer alles Eigene, auch fuer
 den Zugang und die Fallanlage. Ein Verwalter betreibt das Artefakt (Katalog,

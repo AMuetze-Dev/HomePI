@@ -175,8 +175,8 @@ export function VorgaengeTafel() {
       ) : (
         <Tabelle
           beschriftung="Vorgänge"
-          raster="2fr 0.9fr 0.8fr 0.8fr"
-          spalten={["Betreff", "Aktenzeichen", "Weg", "Zustand"]}
+          raster="2fr 0.8fr 0.9fr 0.8fr"
+          spalten={["Betreff", "Weg", "Aktenzeichen", "Zustand"]}
           rechtsBuendig
         >
           {zeilen.map((zeile) => (
@@ -232,8 +232,12 @@ function VorgangReihe({
       }
     >
       <Zelle>{zeile.betreff}</Zelle>
-      <Zelle leise>{zeile.aktenzeichen}</Zelle>
       <Zelle leise>{ART_WORT[zeile.art]}</Zelle>
+      {/* Nur das des Sportgerichts. Eine Mahnung hat keines, und eine selbst
+          gezählte Nummer hielte jeder für die echte. */}
+      <Zelle leise>
+        {zeile.dfbnet_aktenzeichen || (zeile.art === "sportgericht" ? "noch keines" : "")}
+      </Zelle>
       <Zelle rechts>
         <Etikett ton={ZUSTAND_TON[zeile.zustand]}>{ZUSTAND_WORT[zeile.zustand]}</Etikett>
       </Zelle>
