@@ -7,7 +7,7 @@ import os
 import uuid
 
 from homepi_core.auth.modelle import Benutzer
-from sqlalchemy import ColumnElement, Select, delete, func, select, true
+from sqlalchemy import ColumnElement, Select, delete, func, select, true, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, selectinload
@@ -447,6 +447,8 @@ async def einspielen(
     nicht ersetzt: an seiner Kennung haengen die Entscheidung und der Vorgang,
     und mit der Zeile ginge das Schreiben verloren. Welcher das ist, entscheidet
     `dienst.abgleichen`.
+
+    Bleibt danach ein Befund offen, faellt der Haken des Spiels.
     """
     await staffel(sitzung, konto, auftrag.staffel_id)
     # Vor dem ersten Schreiben und nicht je Spiel: ein halb eingespielter Lauf
@@ -527,8 +529,31 @@ async def einspielen(
         await sitzung.flush()
         # Die Beziehung haelt sonst den Stand von vor dem Loeschen.
         await sitzung.refresh(bericht, ["befunde"])
+        sichten = [dienst.BefundSicht(b.schwere, b.entscheidung) for b in bericht.befunde]
+        if not dienst.darf_abgehakt_werden(sichten).erlaubt:
+            await _wieder_offen(sitzung, bericht.id)
 
     return angelegt, aktualisiert, befunde_gesamt
+
+
+async def _wieder_offen(sitzung: AsyncSession, spiel_id: uuid.UUID) -> None:
+    """Der Haken faellt, und die vorgemerkte Freigabe mit ihm.
+
+    Beides als Anweisung und nicht am geladenen Objekt: was nebenher jemand
+    abhakt oder der Pruefdienst uebernimmt, saehe das Objekt nicht.
+    """
+    await sitzung.execute(
+        update(Spielbericht)
+        .where(Spielbericht.id == spiel_id, Spielbericht.abgehakt)
+        .values(abgehakt=False, abgehakt_am=None)
+    )
+    await sitzung.execute(
+        delete(Uebertragung).where(
+            Uebertragung.aktion == "prueferfreigabe",
+            Uebertragung.spiel_id == spiel_id,
+            Uebertragung.zustand.in_(dienst.ZURUECKZIEHBAR),
+        )
+    )
 
 
 async def _befunde_abgleichen(
