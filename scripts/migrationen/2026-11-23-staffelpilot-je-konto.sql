@@ -10,6 +10,16 @@
 -- waeren die alten Staffeln also nicht weg, aber unsichtbar.
 --
 -- Alles geht an EIN Konto, denn bis hierher gab es nur einen Staffelleiter.
+-- Welches, findet die Datei selbst:
+--
+--   1. wer als Einziger Staffeln leitet (seit fd658fb),
+--   2. sonst das einzige Konto mit einem Recht auf staffelpilot, das des
+--      Pruefdienstes ausgenommen.
+--
+-- Ist das nicht eindeutig, passiert NICHTS, und die Meldung nennt die Konten,
+-- die in Frage kommen. Dann sagt man es ihr (konto=...). Geraten wird nicht:
+-- mit den Staffeln geht auch ein DFBnet-Zugang an dieses Konto.
+--
 -- Hat es an einer Stelle schon etwas Eigenes, gewinnt das Eigene. Einzige
 -- Ausnahme: wer unter fd658fb eine Staffel uebernommen hatte, behaelt sie.
 --
@@ -22,18 +32,32 @@
 --
 -- Einspielen, vorher sichern (siehe README.md in diesem Ordner):
 --   docker exec -i postgres psql -U app -d app -v ON_ERROR_STOP=1 \
---     -v konto=<benutzername> \
 --     -f - < scripts/migrationen/2026-11-23-staffelpilot-je-konto.sql
+--
+-- Nur wenn noetig:
+--   -v konto=<benutzername>   welches Konto es wird
+--   -v dienst=<benutzername>  wie das Konto des Pruefdienstes heisst,
+--                             wenn nicht "pruefdienst"
 --
 -- Danach kann das Passwort in `staffelpilot_zugang` nirgends mehr gelesen
 -- werden; die Zeile wandert mit und verschwindet dort. Die uebrigen alten
 -- Zeilen bleiben stehen, es liest sie nur niemand mehr.
 
+\if :{?konto}
+\else
+\set konto ''
+\endif
+\if :{?dienst}
+\else
+\set dienst pruefdienst
+\endif
+
 BEGIN;
 
 -- In eine Einstellung der Sitzung: in einem DO-Block gibt es keine
 -- psql-Variablen.
-SELECT set_config('homepi.konto', :'konto', true);
+SELECT set_config('homepi.konto', :'konto', true) AS konto,
+       set_config('homepi.dienst', :'dienst', true) AS dienst;
 
 ALTER TABLE staffelpilot_staffeln
     DROP CONSTRAINT IF EXISTS staffelpilot_staffeln_name_key;
@@ -42,12 +66,41 @@ ALTER TABLE staffelpilot_vorgaenge
 
 DO $$
 DECLARE
+    genannt text := current_setting('homepi.konto');
+    kandidaten uuid[];
+    namen text;
     wer uuid;
 BEGIN
-    SELECT id INTO wer FROM benutzer WHERE name = current_setting('homepi.konto');
-    IF wer IS NULL THEN
-        RAISE EXCEPTION 'Es gibt kein Konto namens "%"', current_setting('homepi.konto');
+    IF genannt <> '' THEN
+        SELECT array_agg(id) INTO kandidaten FROM benutzer WHERE name = genannt;
+        IF kandidaten IS NULL THEN
+            RAISE EXCEPTION 'Es gibt kein Konto namens "%"', genannt;
+        END IF;
+    ELSE
+        IF to_regclass('staffelpilot_staffelleitung') IS NOT NULL THEN
+            SELECT array_agg(DISTINCT benutzer_id) INTO kandidaten
+            FROM staffelpilot_staffelleitung;
+        END IF;
+        IF kandidaten IS NULL THEN
+            SELECT array_agg(b.id) INTO kandidaten
+            FROM benutzer b
+            JOIN benutzer_rechte r ON r.benutzer_id = b.id
+            WHERE r.artefakt = 'staffelpilot'
+              AND b.name <> current_setting('homepi.dienst');
+        END IF;
     END IF;
+
+    IF kandidaten IS NULL THEN
+        RAISE EXCEPTION 'Kein Konto hat ein Recht auf staffelpilot. Nichts geaendert.';
+    END IF;
+    SELECT string_agg(name, ', ' ORDER BY name) INTO namen
+    FROM benutzer WHERE id = ANY (kandidaten);
+    IF array_length(kandidaten, 1) > 1 THEN
+        RAISE EXCEPTION 'Nicht eindeutig: %. Nichts geaendert. Noch einmal mit -v konto=<name>.',
+            namen;
+    END IF;
+    wer := kandidaten[1];
+    RAISE NOTICE 'Was keinem gehoert, geht an: %', namen;
 
     -- Wer unter fd658fb schon als Staffelleiter eingetragen war, behaelt sie.
     IF to_regclass('staffelpilot_staffelleitung') IS NOT NULL THEN

@@ -499,9 +499,10 @@ in einer eigenen Tabelle und nicht als Spalte an der Staffel. Wer sie los sein
 will, loescht sie vorher in der Oberflaeche.
 
 **Was vor der Trennung da war, sieht zunaechst niemand.** Es gehoert keinem Konto.
-`scripts/migrationen/2026-11-23-staffelpilot-je-konto.sql` legt es auf eines und
-loest zwei Eindeutigkeiten (Staffelname, Aktenzeichen), die je Installation
-galten. Beim Ausrollen einmal von Hand.
+`scripts/migrationen/2026-11-23-staffelpilot-je-konto.sql` findet das eine Konto
+selbst, legt es ihm zu und loest zwei Eindeutigkeiten (Staffelname, Aktenzeichen),
+die je Installation galten. Ist das Konto nicht eindeutig, aendert es nichts und
+nennt die, die in Frage kommen. Beim Ausrollen einmal von Hand.
 
 ### Wer ueber wem spielt
 
