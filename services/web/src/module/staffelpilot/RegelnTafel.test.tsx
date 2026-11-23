@@ -5,51 +5,63 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/client";
 import { RegelnTafel } from "./RegelnTafel";
 import * as api from "./api";
-
-function regel(rest: Partial<api.Regel> = {}): api.Regel {
-  return {
-    id: "r1",
-    schluessel: "rote_karte",
-    name: "Feldverweis auf Dauer",
-    beschreibung: "Meldet jeden Feldverweis auf Dauer.",
-    schwere: "kritisch",
-    weg: "sportgericht",
-    aktiv: true,
-    sachverhalt: "",
-    hinweis: "",
-    vorgabe_sachverhalt: "",
-    vorgabe_hinweis: "",
-    ...rest,
-  };
-}
+import { minuten, regel, staffel, stunden, uhrzeit } from "./regelsatz.hilfen";
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
+async function aufklappen(name: RegExp | string) {
+  await userEvent.click(await screen.findByRole("button", { name }));
+}
+
 describe("Regelkatalog", () => {
-  it("sagt beim leeren Stand, wer den Katalog liefert", async () => {
+  it("sagt beim leeren Stand, was als Nächstes zu tun ist", async () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue([]);
     render(<RegelnTafel />);
 
-    expect(await screen.findByText("Kein Regelkatalog")).toBeInTheDocument();
+    expect(await screen.findByText("Noch keine Regeln")).toBeInTheDocument();
+    expect(screen.getByText(/ersten Prüflauf/)).toBeInTheDocument();
   });
 
-  it("zeigt Name, Schwere und Weg", async () => {
+  it("zeigt Namen und Schwere, gruppiert nach Thema", async () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
     render(<RegelnTafel />);
 
-    const liste = await screen.findByRole("list", { name: "Regeln" });
+    const liste = await screen.findByRole("list", { name: "Karten und Sperren" });
+    expect(within(liste).getByText("Feldverweis auf Dauer")).toBeInTheDocument();
     expect(within(liste).getByText("kritisch")).toBeInTheDocument();
-    expect(within(liste).getByText("führt vors Sportgericht")).toBeInTheDocument();
-    expect(within(liste).getByText("rote_karte")).toBeInTheDocument();
+  });
+
+  it("zeigt Erklärung, Weg und Kennung erst beim Aufklappen", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
+    render(<RegelnTafel />);
+
+    await screen.findByText("Feldverweis auf Dauer");
+    expect(screen.queryByText("Meldet jeden Feldverweis auf Dauer.")).toBeNull();
+
+    await aufklappen(/Feldverweis auf Dauer/);
+
+    expect(screen.getByText("Meldet jeden Feldverweis auf Dauer.")).toBeInTheDocument();
+    expect(screen.getByText("führt vors Sportgericht")).toBeInTheDocument();
+    expect(screen.getByText("red_card")).toBeInTheDocument();
+  });
+
+  it("klappt wieder zu", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
+    render(<RegelnTafel />);
+
+    await aufklappen(/Feldverweis auf Dauer/);
+    await aufklappen(/Feldverweis auf Dauer/);
+
+    expect(screen.queryByText("red_card")).toBeNull();
   });
 
   it("nennt keinen Weg, wenn die Regel zu nichts führt", async () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel({ weg: "kein" })]);
     render(<RegelnTafel />);
 
-    await screen.findByRole("list", { name: "Regeln" });
+    await aufklappen(/Feldverweis auf Dauer/);
     expect(screen.queryByText(/führt/)).not.toBeInTheDocument();
   });
 
@@ -57,15 +69,16 @@ describe("Regelkatalog", () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
     const schalten = vi
       .spyOn(api, "schalteRegel")
-      .mockResolvedValue(regel({ aktiv: false }));
+      .mockResolvedValue(regel({ aktiv: false, angepasst: true }));
     render(<RegelnTafel />);
 
-    await userEvent.click(
-      await screen.findByRole("checkbox", { name: /Feldverweis auf Dauer/ }),
-    );
+    const schalter = await screen.findByRole("checkbox", {
+      name: "Feldverweis auf Dauer prüfen",
+    });
+    await userEvent.click(schalter);
 
     await waitFor(() => expect(schalten).toHaveBeenCalledWith("r1", false));
-    expect(await screen.findByText(/Abgeschaltet/)).toBeInTheDocument();
+    await waitFor(() => expect(schalter).not.toBeChecked());
   });
 
   it("schaltet sie wieder an", async () => {
@@ -74,24 +87,26 @@ describe("Regelkatalog", () => {
     render(<RegelnTafel />);
 
     await userEvent.click(
-      await screen.findByRole("checkbox", { name: /Feldverweis auf Dauer/ }),
+      await screen.findByRole("checkbox", { name: "Feldverweis auf Dauer prüfen" }),
     );
 
     await waitFor(() => expect(schalten).toHaveBeenCalledWith("r1", true));
   });
 
-  it("lässt den Haken stehen, wenn das Schalten scheitert", async () => {
-    // Sonst zeigte die Oberflaeche "aus" und der Pruefdienst meldete weiter -
-    // genau die Luecke, vor der diese Ansicht schuetzen soll.
+  it("lässt den Schalter stehen, wenn das Schalten scheitert", async () => {
+    // Sonst zeigte die Oberfläche "aus" und der Prüfdienst meldete weiter -
+    // genau die Lücke, vor der diese Ansicht schützen soll.
     vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
     vi.spyOn(api, "schalteRegel").mockRejectedValue(new ApiError("kaputt", 500));
     render(<RegelnTafel />);
 
-    const haken = await screen.findByRole("checkbox", { name: /Feldverweis auf Dauer/ });
-    await userEvent.click(haken);
+    const schalter = await screen.findByRole("checkbox", {
+      name: "Feldverweis auf Dauer prüfen",
+    });
+    await userEvent.click(schalter);
 
-    await screen.findByRole("alert");
-    expect(haken).toBeChecked();
+    expect(await screen.findByRole("alert")).toHaveTextContent("kaputt");
+    expect(schalter).toBeChecked();
   });
 
   it("zeigt einen Ladefehler statt einer leeren Liste", async () => {
@@ -99,6 +114,253 @@ describe("Regelkatalog", () => {
     render(<RegelnTafel />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("kein Zugriff");
+  });
+});
+
+describe("Werte einer Regel", () => {
+  const mitFrist = (rest: Partial<api.Regel> = {}) =>
+    regel({
+      schluessel: "confirmation_late",
+      name: "Bestätigung zu spät (eingebaut)",
+      weg: "mahnung",
+      parameter: [uhrzeit(), minuten(), stunden()],
+      ...rest,
+    });
+
+  const angepasst = () =>
+    mitFrist({
+      angepasst: true,
+      parameter: [uhrzeit(), minuten(), stunden({ wert: 6 })],
+    });
+
+  it("zeigt sie erst beim Aufklappen, mit Einheit und geltendem Wert", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitFrist()]);
+    render(<RegelnTafel />);
+
+    await screen.findByText("Bestätigung zu spät");
+    expect(screen.queryByLabelText("Frist am Spieltag")).toBeNull();
+
+    await aufklappen(/Bestätigung zu spät/);
+
+    expect(screen.getByLabelText("Frist am Spieltag")).toHaveValue("18:00");
+    expect(screen.getByLabelText("Zeit nach Spielende (Minuten)")).toHaveValue(60);
+    expect(screen.getByLabelText("Kulanz (Stunden)")).toHaveValue(0);
+  });
+
+  it("nennt zu jedem Wert die Vorgabe", async () => {
+    // Wer etwas verstellt hat, soll sehen, wovon er abweicht.
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([angepasst()]);
+    render(<RegelnTafel />);
+
+    await aufklappen(/Bestätigung zu spät/);
+
+    expect(screen.getByLabelText("Kulanz (Stunden)")).toHaveValue(6);
+    expect(
+      screen.getByText(/Kommt auf die Frist obendrauf\. Vorgabe: 0\./),
+    ).toBeVisible();
+  });
+
+  it("rechnet beim Tippen mit, was am Ende gilt", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitFrist()]);
+    render(<RegelnTafel />);
+    await aufklappen(/Bestätigung zu spät/);
+
+    const feld = screen.getByLabelText("Kulanz (Stunden)");
+    await userEvent.clear(feld);
+    await userEvent.type(feld, "6");
+
+    expect(screen.getByText(/dazu 6 Std\. Kulanz/)).toBeInTheDocument();
+  });
+
+  it("speichert alle Werte und zeigt die Regel als angepasst", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitFrist()]);
+    const speichern = vi.spyOn(api, "stelleRegelEin").mockResolvedValue(angepasst());
+    render(<RegelnTafel />);
+    await aufklappen(/Bestätigung zu spät/);
+
+    const feld = screen.getByLabelText("Kulanz (Stunden)");
+    await userEvent.clear(feld);
+    await userEvent.type(feld, "6");
+    await userEvent.click(screen.getByRole("button", { name: "Werte speichern" }));
+
+    await waitFor(() =>
+      expect(speichern).toHaveBeenCalledWith("r1", {
+        frist_uhrzeit: "18:00",
+        nach_spielende: "60",
+        kulanz: "6",
+      }),
+    );
+    expect(await screen.findByText("angepasst")).toBeInTheDocument();
+  });
+
+  it("zeigt eine angepasste Frist schon in der Zeile", async () => {
+    // Sonst müsste man jede Regel öffnen, um zu sehen, was man verstellt hat.
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([angepasst()]);
+    render(<RegelnTafel />);
+
+    expect(await screen.findByText(/dazu 6 Std\. Kulanz/)).toBeInTheDocument();
+
+    // Offen steht er beim Formular - ein zweites Mal darüber wäre Lärm.
+    await aufklappen(/Bestätigung zu spät/);
+    expect(screen.getAllByText(/dazu 6 Std\. Kulanz/)).toHaveLength(1);
+  });
+
+  it("behält die Eingabe und sagt, was geht, wenn der Wert nicht passt", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitFrist()]);
+    vi.spyOn(api, "stelleRegelEin").mockRejectedValue(
+      new ApiError("Kulanz: Bitte einen Wert zwischen 0 und 72 angeben.", 422),
+    );
+    render(<RegelnTafel />);
+    await aufklappen(/Bestätigung zu spät/);
+
+    const feld = screen.getByLabelText("Kulanz (Stunden)");
+    await userEvent.clear(feld);
+    await userEvent.type(feld, "99");
+    await userEvent.click(screen.getByRole("button", { name: "Werte speichern" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("zwischen 0 und 72");
+    expect(feld).toHaveValue(99);
+  });
+
+  it("setzt auf die Vorgabe zurück", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([angepasst()]);
+    const speichern = vi.spyOn(api, "stelleRegelEin").mockResolvedValue(mitFrist());
+    render(<RegelnTafel />);
+    await aufklappen(/Bestätigung zu spät/);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Auf Vorgabe zurücksetzen" }),
+    );
+
+    await waitFor(() => expect(speichern).toHaveBeenCalledWith("r1", {}));
+    expect(screen.getByLabelText("Kulanz (Stunden)")).toHaveValue(0);
+    expect(
+      screen.queryByRole("button", { name: "Auf Vorgabe zurücksetzen" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("bietet ohne Änderung weder Speichern noch Zurücksetzen an", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitFrist()]);
+    render(<RegelnTafel />);
+    await aufklappen(/Bestätigung zu spät/);
+
+    expect(screen.getByRole("button", { name: "Werte speichern" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Auf Vorgabe zurücksetzen" })).toBeNull();
+  });
+
+  it("zeigt bei einer Regel ohne Werte kein leeres Formular", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
+    render(<RegelnTafel />);
+    await aufklappen(/Feldverweis auf Dauer/);
+
+    expect(screen.queryByRole("button", { name: "Werte speichern" })).toBeNull();
+  });
+});
+
+describe("Für welche Staffeln der Regelsatz gilt", () => {
+  it("nennt die eigenen", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
+    render(
+      <RegelnTafel
+        staffeln={[
+          staffel(),
+          staffel({ id: "s2", name: "Stadtliga D" }),
+          staffel({
+            id: "s3",
+            name: "Fremde",
+            staffelleiter: "Erika",
+            leite_ich: false,
+          }),
+        ]}
+      />,
+    );
+
+    expect(
+      await screen.findByText(/prüft Stadtliga C und Stadtliga D\./),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Fremde/)).toBeNull();
+  });
+
+  it("sagt, wenn er noch für nichts gilt", async () => {
+    // Sonst schaltet jemand und wundert sich, dass nichts passiert.
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
+    render(
+      <RegelnTafel staffeln={[staffel({ staffelleiter: "Erika", leite_ich: false })]} />,
+    );
+
+    expect(await screen.findByText(/Du leitest noch keine Staffel/)).toBeInTheDocument();
+  });
+
+  it("bietet an, freie Staffeln zu übernehmen", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
+    const uebernehmen = vi
+      .spyOn(api, "uebernimmFreieStaffeln")
+      .mockResolvedValue({ uebernommen: 1 });
+    const neuLaden = vi.fn();
+    render(
+      <RegelnTafel
+        staffeln={[staffel({ name: "Freie", staffelleiter: "", leite_ich: false })]}
+        onStaffelnGeaendert={neuLaden}
+      />,
+    );
+
+    expect(await screen.findByText(/Freie/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Übernehmen" }));
+
+    await waitFor(() => expect(uebernehmen).toHaveBeenCalled());
+    expect(neuLaden).toHaveBeenCalled();
+  });
+
+  it("sagt, dass der Knopf alle nimmt, wenn es mehrere sind", async () => {
+    // Wer mit "Übernehmen" eine meint und alle bekommt, prüft ab dann die
+    // Staffeln anderer mit seinem Regelsatz.
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
+    const frei = { staffelleiter: "", leite_ich: false };
+    render(<RegelnTafel staffeln={[staffel(frei), staffel({ ...frei, id: "s2" })]} />);
+
+    expect(
+      await screen.findByRole("button", { name: "Alle 2 übernehmen" }),
+    ).toBeInTheDocument();
+  });
+
+  it("sagt, wenn das Übernehmen scheitert", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
+    vi.spyOn(api, "uebernimmFreieStaffeln").mockRejectedValue(
+      new ApiError("Für 'staffelpilot' fehlt die Rolle 'nutzer'", 403),
+    );
+    const neuLaden = vi.fn();
+    render(
+      <RegelnTafel
+        staffeln={[staffel({ staffelleiter: "", leite_ich: false })]}
+        onStaffelnGeaendert={neuLaden}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Übernehmen" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("fehlt die Rolle");
+    expect(neuLaden).not.toHaveBeenCalled();
+  });
+
+  it("lässt stillgelegte Staffeln aus", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
+    render(
+      <RegelnTafel
+        staffeln={[
+          staffel(),
+          staffel({
+            id: "s2",
+            name: "Vorjahr",
+            aktiv: false,
+            staffelleiter: "",
+            leite_ich: false,
+          }),
+        ]}
+      />,
+    );
+
+    await screen.findByText(/prüft Stadtliga C\./);
+    expect(screen.queryByText(/Vorjahr/)).toBeNull();
   });
 });
 
@@ -116,7 +378,7 @@ describe("Die Sätze fürs Schreiben", () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz({ weg: "kein" })]);
     render(<RegelnTafel />);
 
-    await screen.findByText("Feldverweis auf Dauer");
+    await aufklappen(/Feldverweis auf Dauer/);
     expect(screen.queryByText("Text fürs Schreiben")).not.toBeInTheDocument();
   });
 
@@ -125,8 +387,9 @@ describe("Die Sätze fürs Schreiben", () => {
     // Wortlaut eingefroren - samt Paragraf, samt späterer Korrektur.
     vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz()]);
     render(<RegelnTafel />);
+    await aufklappen(/Feldverweis auf Dauer/);
 
-    const feld = await screen.findByLabelText("Sachverhalt");
+    const feld = screen.getByLabelText("Sachverhalt");
     expect(feld).toHaveValue("");
     expect(feld).toHaveAttribute("placeholder", "wurde durch {verein} nicht bestätigt.");
   });
@@ -137,8 +400,9 @@ describe("Die Sätze fürs Schreiben", () => {
       .spyOn(api, "formuliereRegel")
       .mockResolvedValue(mitSatz({ sachverhalt: "war anders." }));
     render(<RegelnTafel />);
+    await aufklappen(/Feldverweis auf Dauer/);
 
-    await userEvent.type(await screen.findByLabelText("Sachverhalt"), "war anders.");
+    await userEvent.type(screen.getByLabelText("Sachverhalt"), "war anders.");
     await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
@@ -155,8 +419,9 @@ describe("Die Sätze fürs Schreiben", () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz()]);
     vi.spyOn(api, "formuliereRegel").mockRejectedValue(new ApiError("zu lang", 422));
     render(<RegelnTafel />);
+    await aufklappen(/Feldverweis auf Dauer/);
 
-    const feld = await screen.findByLabelText("Sachverhalt");
+    const feld = screen.getByLabelText("Sachverhalt");
     await userEvent.type(feld, "war anders.");
     await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
@@ -164,23 +429,44 @@ describe("Die Sätze fürs Schreiben", () => {
     expect(feld).toHaveValue("war anders.");
   });
 
+  it("verwirft eine Änderung auf Wunsch", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz()]);
+    render(<RegelnTafel />);
+    await aufklappen(/Feldverweis auf Dauer/);
+
+    await userEvent.type(screen.getByLabelText("Hinweis"), "anders");
+    await userEvent.click(screen.getByRole("button", { name: "Verwerfen" }));
+
+    expect(screen.getByLabelText("Hinweis")).toHaveValue("");
+  });
+
   it("lässt nicht speichern, solange nichts geändert ist", async () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz()]);
     render(<RegelnTafel />);
+    await aufklappen(/Feldverweis auf Dauer/);
 
-    await screen.findByLabelText("Sachverhalt");
     expect(screen.getByRole("button", { name: "Speichern" })).toBeDisabled();
+  });
+
+  it("sagt, dass sie für alle Staffelleiter gelten", async () => {
+    // Schalter und Werte gehören jedem selbst, die Sätze nicht. Das steht da,
+    // bevor jemand einen überschreibt.
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz()]);
+    render(<RegelnTafel />);
+    await aufklappen(/Feldverweis auf Dauer/);
+
+    expect(screen.getByText(/für alle Staffelleiter/)).toBeInTheDocument();
   });
 });
 
 describe("Einschränken", () => {
   const dreiRegeln = () => [
-    // Jede mit eigener Beschreibung: die Vorgabe traegt selbst das Wort
-    // "Feldverweis", und dann traefe die Suche danach zwei Regeln.
+    // Jede mit eigener Beschreibung: die Vorgabe trägt selbst das Wort
+    // "Feldverweis", und dann träfe die Suche danach zwei Regeln.
     regel({
       id: "r1",
       name: "Feldverweis auf Dauer",
-      schluessel: "rote_karte",
+      schluessel: "red_card",
       weg: "sportgericht",
       beschreibung: "Meldet jeden Platzverweis.",
     }),
@@ -189,6 +475,7 @@ describe("Einschränken", () => {
       name: "Bestätigung fehlt",
       schluessel: "confirmation_missing",
       weg: "mahnung",
+      angepasst: true,
       beschreibung: "Eine Mannschaft hat nicht bestätigt.",
     }),
     regel({
@@ -197,17 +484,23 @@ describe("Einschränken", () => {
       schluessel: "documents_present",
       weg: "kein",
       aktiv: false,
-      beschreibung: "Nennt Anhaenge am Bericht.",
+      angepasst: true,
+      beschreibung: "Nennt Anhänge am Bericht.",
     }),
   ];
 
-  it("zählt, wie viele von wie vielen zu sehen sind", async () => {
-    // Vierundvierzig Karten ohne diese Zeile sind fünf Bildschirme, von denen
-    // man nicht weiß, ob sie vollständig sind.
+  it("zählt, was an und was angepasst ist", async () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue(dreiRegeln());
     render(<RegelnTafel />);
 
-    expect(await screen.findByText("3 Regeln")).toBeInTheDocument();
+    expect(await screen.findByText("2 von 3 an · 2 angepasst")).toBeInTheDocument();
+  });
+
+  it("lässt das Angepasste weg, wenn nichts angepasst ist", async () => {
+    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
+    render(<RegelnTafel />);
+
+    expect(await screen.findByText("1 von 1 an")).toBeInTheDocument();
   });
 
   it("sucht im Namen", async () => {
@@ -216,7 +509,7 @@ describe("Einschränken", () => {
 
     await userEvent.type(await screen.findByLabelText("Suchen"), "Feldverweis");
 
-    expect(await screen.findByText("1 von 3")).toBeInTheDocument();
+    expect(await screen.findByText("1 von 3 Regeln zu sehen")).toBeInTheDocument();
     expect(screen.queryByText("Bestätigung fehlt")).toBeNull();
   });
 
@@ -228,26 +521,22 @@ describe("Einschränken", () => {
 
     await userEvent.type(await screen.findByLabelText("Suchen"), "confirmation");
 
-    expect(await screen.findByText("1 von 3")).toBeInTheDocument();
+    expect(await screen.findByText("Bestätigung fehlt")).toBeInTheDocument();
+    expect(screen.queryByText("Feldverweis auf Dauer")).toBeNull();
   });
 
-  it("zeigt auf Wunsch nur die abgeschalteten", async () => {
+  it.each([
+    ["Aus", "Dokumente am Spielbericht", 1],
+    ["An", "Feldverweis auf Dauer", 2],
+    ["Angepasst", "Bestätigung fehlt", 2],
+  ])("zeigt auf Wunsch nur: %s", async (wort, name, anzahl) => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue(dreiRegeln());
     render(<RegelnTafel />);
 
-    await userEvent.click(await screen.findByRole("radio", { name: "Aus" }));
+    await userEvent.click(await screen.findByRole("radio", { name: wort }));
 
-    expect(await screen.findByText("1 von 3")).toBeInTheDocument();
-    expect(screen.getByText("Dokumente am Spielbericht")).toBeInTheDocument();
-  });
-
-  it("zeigt auf Wunsch nur die, aus denen ein Schreiben entsteht", async () => {
-    vi.spyOn(api, "ladeRegeln").mockResolvedValue(dreiRegeln());
-    render(<RegelnTafel />);
-
-    await userEvent.click(await screen.findByRole("radio", { name: "Mit Schreiben" }));
-
-    expect(await screen.findByText("2 von 3")).toBeInTheDocument();
+    expect(screen.getByText(name)).toBeInTheDocument();
+    expect(screen.getByText(`${anzahl} von 3 Regeln zu sehen`)).toBeInTheDocument();
   });
 
   it("sagt es, wenn die Einschränkung alles wegnimmt", async () => {

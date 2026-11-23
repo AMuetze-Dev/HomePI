@@ -267,14 +267,42 @@ class Prueflauf:
             )
             return set()
 
-        aus = {str(r["schluessel"]) for r in stand if not r.get("aktiv", True)}
-        if aus:
-            # Nicht verschweigen: eine abgeschaltete Regel ist nicht dasselbe
-            # wie eine, die nichts gefunden hat.
+        # Nur die Vorgaben. Was wirklich gilt, steht je Staffel im Regelsatz
+        # dessen, der sie leitet -- siehe `_regelsatz_fuer`.
+        return {str(r["schluessel"]) for r in stand if not r.get("aktiv", True)}
+
+    def _regelsatz_fuer(
+        self, kennung: str, staffel: dict[str, Any], vorgabe: set[str]
+    ) -> tuple[set[str], dict[str, dict[str, Any]]]:
+        """Was an dieser Staffel aus ist, und welche Werte gelten.
+
+        Geht es schief, wird mit den Vorgaben geprüft -- und das steht im
+        Protokoll: wer eine Kulanz eingestellt hat und trotzdem eine
+        Verspätung sieht, soll lesen können, warum.
+        """
+        name = str(staffel["name"])
+        try:
+            satz = self._gateway.regelsatz(str(staffel["id"]))
+        except Exception:
+            logger.exception("Der Regelsatz zu %s liess sich nicht lesen", name)
             self._gateway.fortschritt(
-                kennung, zeile=f"{len(aus)} von {len(stand)} Regeln sind abgeschaltet"
+                kennung,
+                zeile=(
+                    f"{name}: Der Regelsatz liess sich nicht lesen -- geprüft wird mit den Vorgaben"
+                ),
             )
-        return aus
+            return vorgabe, {}
+
+        aus = {str(r) for r in satz.get("aus", [])}
+        leiter = str(satz.get("staffelleiter") or "")
+        wessen = (
+            f"Regelsatz von {leiter}" if leiter else "ohne Staffelleiter, es gelten die Vorgaben"
+        )
+        # Nicht verschweigen: eine abgeschaltete Regel ist nicht dasselbe wie
+        # eine, die nichts gefunden hat.
+        zusatz = f", {len(aus)} Regel(n) abgeschaltet" if aus else ""
+        self._gateway.fortschritt(kennung, zeile=f"{name}: {wessen}{zusatz}")
+        return aus, dict(satz.get("werte") or {})
 
     def _mannschaften_von(self, staffel: dict[str, Any]) -> list[dict[str, Any]]:
         """Die Meldung dieser Staffel -- für § 68 die halbe Miete.
@@ -295,6 +323,7 @@ class Prueflauf:
         staffel: dict[str, Any],
         auskunft: GatewayAuskunft | None,
         abgeschaltet: set[str],
+        werte: dict[str, dict[str, Any]],
         mannschaften: list[dict[str, Any]],
     ) -> tuple[list[dict[str, object]], list[dict[str, object]], str, dict[str, str]]:
         """Den Bericht holen, prüfen — und sagen, was er enthielt.
@@ -322,7 +351,7 @@ class Prueflauf:
         if bericht is None:
             return regeln.nicht_gelesen("der Prüfdienst hat ihn nicht bekommen"), [], "", {}
 
-        befunde = regeln.befunde_aus(bericht, abgeschaltet) + katalog.befunde_aus(
+        befunde = regeln.befunde_aus(bericht, abgeschaltet, werte) + katalog.befunde_aus(
             bericht,
             katalog.staffelangabe(staffel, mannschaften),
             auskunft=auskunft,
@@ -513,7 +542,7 @@ class Prueflauf:
         # im Ordner, und eine frisch hochgeladene Regel soll schon in diesem
         # Lauf zaehlen.
         self._regeln_spiegeln(kennung)
-        abgeschaltet = self._katalog_melden(kennung)
+        vorgabe_aus = self._katalog_melden(kennung)
 
         gepruefte = befunde = 0
         nicht_geprueft: list[str] = []
@@ -565,6 +594,7 @@ class Prueflauf:
                 )
 
             mannschaften = self._mannschaften_von(staffel)
+            abgeschaltet, regelwerte = self._regelsatz_fuer(kennung, staffel, vorgabe_aus)
 
             if zeilen:
                 self._gateway.fortschritt(
@@ -574,7 +604,7 @@ class Prueflauf:
             ausbeute = dienst.Ausbeute()
             for nummer, zeile in enumerate(zeilen):
                 gefunden, karten, wettbewerb, kopfdaten = self._pruefung_zu(
-                    zeile, staffel, auskunft, abgeschaltet, mannschaften
+                    zeile, staffel, auskunft, abgeschaltet, regelwerte, mannschaften
                 )
                 ausbeute.aufnehmen(zeile, gefunden, karten, wettbewerb, kopfdaten)
                 # Je Bericht eine Meldung: ein Lauf ueber achtzig Berichte

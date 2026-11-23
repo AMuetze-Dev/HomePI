@@ -80,6 +80,7 @@ class FalschesGateway:
         self.werte: dict[str, Any] = {"pruefzeitraum_tage": 30, "frist_tage": 14}
         self.katalog: list[dict[str, Any]] = []
         self.abgeschaltet: set[str] = set()
+        self.regelsaetze: dict[str, dict[str, Any]] = {}
         self.spiele_nach_id: dict[str, dict[str, Any]] | None = {
             "sp1": {
                 "id": "sp1",
@@ -160,6 +161,11 @@ class FalschesGateway:
     def regelkatalog_setzen(self, regeln: list[dict[str, Any]]) -> list[dict[str, Any]]:
         self.katalog = regeln
         return [{**r, "aktiv": r["schluessel"] not in self.abgeschaltet} for r in regeln]
+
+    def regelsatz(self, staffel_id: str) -> dict[str, Any]:
+        return self.regelsaetze.get(
+            staffel_id, {"staffelleiter": "", "aus": sorted(self.abgeschaltet), "werte": {}}
+        )
 
     def spiel(self, spiel_id: str) -> dict[str, Any]:
         if self.spiele_nach_id is None:
@@ -344,6 +350,108 @@ class TestRegelkatalog:
 
         assert gateway.abschluesse[0][1] == "fertig"
         assert gateway.importe
+
+
+class TestRegelsatzJeStaffel:
+    """Welcher Regelsatz gilt, hängt an der Staffel -- an dem, der sie leitet."""
+
+    @staticmethod
+    def _bericht(kennung: str) -> MatchReport:
+        gestern = (HEUTE - dt.timedelta(days=1)).strftime("%d.%m.%Y")
+        return MatchReport(
+            meta=MatchMeta(
+                match_id=kennung,
+                home_team="SG Gittersee",
+                away_team="SV Fortschritt",
+                match_date=gestern,
+                kickoff="15:00",
+                end_time="16:45",
+                referee_release_at=f"{gestern} 20:00",
+            ),
+        )
+
+    def _lauf(
+        self, regelsaetze: dict[str, dict[str, Any]], klasse: type[FalschesGateway] | None = None
+    ) -> FalschesGateway:
+        zweite = {**STAFFEL, "id": "s2", "name": "Stadtliga D"}
+        gateway = (klasse or FalschesGateway)(
+            {"id": "a1", "art": "pruflauf", "staffel_id": None}, staffeln=[STAFFEL, zweite]
+        )
+        gateway.regelsaetze = regelsaetze
+        leser = DemoLeser(
+            {"Stadtliga C": [zeile("M-1")], "Stadtliga D": [zeile("M-2")]},
+            berichte_je_spiel={"M-1": self._bericht("M-1"), "M-2": self._bericht("M-2")},
+        )
+        lauf(gateway, leser).runde()
+        return gateway
+
+    @staticmethod
+    def _befunde(gateway: FalschesGateway) -> dict[str, set[str]]:
+        return {
+            staffel_id: {str(b["regel"]) for s in spiele for b in s["befunde"]}
+            for staffel_id, spiele in gateway.importe
+        }
+
+    def test_jede_staffel_bekommt_ihren_schalter(self) -> None:
+        gateway = self._lauf(
+            {"s1": {"staffelleiter": "Erika", "aus": ["release_late"], "werte": {}}}
+        )
+
+        befunde = self._befunde(gateway)
+        assert "release_late" not in befunde["s1"]
+        assert "release_late" in befunde["s2"]
+
+    def test_und_ihre_werte(self) -> None:
+        gateway = self._lauf(
+            {
+                "s1": {
+                    "staffelleiter": "Erika",
+                    "aus": [],
+                    "werte": {"release_late": {"kulanz": 6}},
+                }
+            }
+        )
+
+        befunde = self._befunde(gateway)
+        assert "release_late" not in befunde["s1"]
+        assert "release_late" in befunde["s2"]
+
+    def test_das_protokoll_nennt_wessen_satz_galt(self) -> None:
+        gateway = self._lauf(
+            {"s1": {"staffelleiter": "Erika", "aus": ["release_late"], "werte": {}}}
+        )
+
+        zeilen = [str(f.get("zeile", "")) for f in gateway.fortschritte]
+        assert "Stadtliga C: Regelsatz von Erika, 1 Regel(n) abgeschaltet" in zeilen
+        assert "Stadtliga D: ohne Staffelleiter, es gelten die Vorgaben" in zeilen
+
+    def test_ohne_regelsatz_wird_mit_den_vorgaben_geprueft(self) -> None:
+        """Und zwar laut: wer eine Kulanz eingestellt hat und trotzdem eine
+        Verspätung sieht, soll im Protokoll lesen können, warum."""
+
+        class Stumm(FalschesGateway):
+            def regelsatz(self, staffel_id: str) -> dict[str, Any]:
+                raise GatewayFehler("Artefakt weg")
+
+        gateway = self._lauf({}, Stumm)
+
+        assert gateway.abschluesse[0][1] == "fertig"
+        assert "release_late" in self._befunde(gateway)["s1"]
+        zeilen = [str(f.get("zeile", "")) for f in gateway.fortschritte]
+        assert any("Regelsatz liess sich nicht lesen" in z for z in zeilen)
+
+    def test_dann_gelten_auch_die_schalter_der_vorgabe(self) -> None:
+        class Stumm(FalschesGateway):
+            def regelsatz(self, staffel_id: str) -> dict[str, Any]:
+                raise GatewayFehler("Artefakt weg")
+
+            def regelkatalog_setzen(self, regeln: list[dict[str, Any]]) -> list[dict[str, Any]]:
+                self.abgeschaltet = {"release_late"}
+                return super().regelkatalog_setzen(regeln)
+
+        gateway = self._lauf({}, Stumm)
+
+        assert "release_late" not in self._befunde(gateway)["s1"]
 
 
 class TestAnmeldeprobe:

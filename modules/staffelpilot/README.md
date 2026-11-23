@@ -41,7 +41,9 @@ Menschen, in seinem Mailprogramm.
 |---|---|
 | `GET/POST /staffeln`, `PATCH/DELETE /staffeln/{id}` | Staffeln verwalten |
 | `GET/PUT /staffeln/{id}/mannschaften` | Mannschaften und ihr Aufbau |
-| `GET/PUT /regeln`, `PATCH /regeln/{id}` | Regelkatalog und die Schalter |
+| `GET/PUT /regeln`, `PATCH /regeln/{id}` | Regelkatalog, und darin der eigene Regelsatz |
+| `POST/DELETE /staffeln/{id}/leitung` | eine Staffel übernehmen oder abgeben |
+| `POST /staffeln/leitung` | alle Staffeln ohne Staffelleiter übernehmen |
 | `GET/PUT /einstellungen` | Staffelleiter, Verband, Zeitraeume, Pause |
 | `GET/PUT/DELETE /zugang` | DFBnet-Zugangsdaten (verschluesselt) |
 | `POST /import` | geprueftte Berichte einspielen |
@@ -60,6 +62,7 @@ Menschen, in seinem Mailprogramm.
 | `POST /uebertragungen/wiederholen` | Gescheitertes zurueck in die Schlange |
 | `POST /uebertragungen/{id}/abschluss` | vom Pruefdienst |
 | `POST /zugang/abholen` | Zugangsdaten fuer den Pruefdienst |
+| `GET /regelsatz?staffel_id=` | womit diese Staffel geprueft wird (nur Verwalter) |
 
 ## Die Entscheidungen, die hier stecken
 
@@ -82,10 +85,11 @@ traegt jede Zeile "geraten" oder "bestaetigt", eine Spielgemeinschaft gilt als
 angehaengte Zahl ueber 20 ist eine Jahreszahl und keine Mannschaftsnummer
 ("Dresdner SC 1898").
 
-**`aktiv` an einer Regel gehoert dem Staffelleiter.** Der Katalog meldet, was
-es gibt - nicht, was jemand davon sehen will. Was der Prueflauf nicht mehr
-meldet, verschwindet: ein Schalter fuer eine Regel, die niemand mehr prueft,
-verspricht etwas, das nicht passiert.
+**Der Schalter an einer Regel gehoert dem Staffelleiter** - jedem sein eigener,
+siehe "Der Regelsatz". Der Katalog meldet, was es gibt - nicht, was jemand
+davon sehen will. Was der Prueflauf nicht mehr meldet, verschwindet: ein
+Schalter fuer eine Regel, die niemand mehr prueft, verspricht etwas, das nicht
+passiert.
 
 **`faellig` wird berechnet, nicht gespeichert.** Der Pruefzeitraum verschiebt
 sich mit jedem Tag; ein geschriebener Wert waere am Morgen darauf falsch.
@@ -414,6 +418,40 @@ vorhandenen Signalfarben und erfuellen AA in beiden Ansichten (gemessen am
 24.10.2026: hell 4.67:1 bis 6.89:1, dunkel 5.76:1 bis 7.73:1) -- deshalb steht
 der Quelltext-Blau in `tokens.css` als eigener Wert: als Rand reicht
 `--farbe-fokus`, als Schrift auf heller Flaeche nicht.
+
+### Der Regelsatz
+
+Jeder Staffelleiter hat seinen eigenen: welche Regeln an sind, und mit welchen
+Werten sie pruefen. Welcher an einem Spiel gilt, haengt an der **Staffel** - an
+dem, der sie leitet (`staffelpilot_staffelleitung`). Leitet sie niemand, gelten
+die Vorgaben; die Oberflaeche sagt das und bietet das Uebernehmen an.
+
+**Gespeichert wird nur, was abweicht** (`staffelpilot_regelwahl`). Ein Schalter
+wie die Vorgabe ist keine Zeile, ein Wert gleich der Vorgabe auch nicht. Sonst
+hielte das erste Speichern den heutigen Stand fest, und eine spaeter geaenderte
+Vorgabe kaeme bei niemandem mehr an.
+
+**Die Vorgabe des Schalters ist `Regel.aktiv`.** Die Spalte gab es vorher schon,
+als es nur einen Staffelleiter gab. Was damals abgeschaltet war, bleibt damit
+fuer alle aus, bis es jemand fuer sich einschaltet. Ueber die Oberflaeche aendert
+sie niemand mehr.
+
+**Was einstellbar ist, meldet die Regel selbst** - Name, Art (`uhrzeit`,
+`minuten`, `stunden`, `zahl`), Vorgabe, Grenzen, ein erklaerender Satz. Dieses
+Artefakt kennt die Spielordnung weiterhin nicht; es prueft nur, ob ein Wert zu
+dem passt, was die Regel zulaesst. Heute tun das zwei: die Bestaetigung durch
+die Mannschaften und die Freigabe durch den Schiedsrichter, beide nach
+Paragraf 59 (17). Ein weiterer Parameter braucht hier **keine** Aenderung.
+
+**Alles in neuen Tabellen.** Eine Spalte an `Staffel` oder `Regel` waere
+naheliegender gewesen, hielte das Gateway aber an (siehe "Wenn das Schema sich
+geaendert hat"). Neue Tabellen kommen von allein.
+
+Was noch **gemeinsam** ist: die Saetze fuers Schreiben, die Einstellungen, der
+DFBnet-Zugang - und jedes Konto sieht alle Staffeln. Das zu trennen ist der
+naechste Schritt, sobald ein zweiter Staffelleiter wirklich anfaengt. Ein
+Verwalter liest ueber `GET /regelsatz` den Satz anderer; die Oberflaeche zeigt
+ihn nirgends, aber der Pruefdienst meldet sich nun einmal als Verwalter an.
 
 ### Wer ueber wem spielt
 

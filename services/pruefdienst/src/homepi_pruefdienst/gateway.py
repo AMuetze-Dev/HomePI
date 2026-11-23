@@ -203,6 +203,16 @@ class Gateway:
             "PUT", "/staffelpilot/regeln", json={"regeln": regeln}
         )
 
+    def regelsatz(self, staffel_id: str) -> dict[str, Any]:
+        """Womit diese Staffel geprueft wird: was aus ist, welche Werte gelten.
+
+        Es ist der Satz dessen, der sie leitet. Leitet sie niemand, kommen die
+        Vorgaben zurueck.
+        """
+        return self._json(  # type: ignore[no-any-return]
+            "GET", "/staffelpilot/regelsatz", params={"staffel_id": staffel_id}
+        )
+
     def einstellungen(self) -> dict[str, Any]:
         return self._json("GET", "/staffelpilot/einstellungen")  # type: ignore[no-any-return]
 

@@ -282,7 +282,13 @@ test.describe("Ein Staffelleiter richtet ein und prüft", () => {
     await zuStaffelpilot(page);
     await bereich(page, "Regeln").click();
 
-    await expect(page.getByRole("list", { name: /Regeln/ })).toBeVisible();
+    await expect(
+      page.getByRole("list", { name: "Bestätigung und Freigabe" }),
+    ).toBeVisible();
+
+    // Die Werte kommen vom Prüfdienst: er meldet, was einstellbar ist.
+    await page.getByRole("button", { name: /Bestätigung zu spät/ }).click();
+    await expect(page.getByLabel("Kulanz (Stunden)")).toHaveValue("0");
   });
 
   test("die Ergebnisse zählen mit", async ({ page }) => {

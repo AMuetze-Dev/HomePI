@@ -193,7 +193,7 @@ class TestPruefe:
                 )
             ]
 
-        monkeypatch.setattr(regeln, "alle_regeln", lambda: [kaputt, heil])
+        monkeypatch.setattr(regeln, "alle_regeln", lambda werte=None: [kaputt, heil])
         gefunden = regeln.pruefe(bericht())
 
         assert regelnamen(gefunden) == ["rule_error", "documents_present"]

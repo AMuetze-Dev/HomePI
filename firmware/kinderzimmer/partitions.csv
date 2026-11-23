@@ -1,0 +1,9 @@
+# 16 MB Flash. Eine App mit 3 MB, der Rest fuer LittleFS (Aufnahmen,
+# Stand, Ereignispuffer). Ein zweiter App-Slot fuer Updates ueber WLAN
+# kaeme spaeter auf Kosten der Aufnahmen.
+# Name,   Type, SubType,  Offset,   Size
+nvs,      data, nvs,      0x9000,   0x5000
+otadata,  data, ota,      0xe000,   0x2000
+app0,     app,  ota_0,    0x10000,  0x300000
+spiffs,   data, spiffs,   0x310000, 0xCE0000
+coredump, data, coredump, 0xFF0000, 0x10000

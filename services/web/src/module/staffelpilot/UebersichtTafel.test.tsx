@@ -115,6 +115,18 @@ describe("Die Übersicht", () => {
     expect(await screen.findByText("Keine aktive Staffel")).toBeInTheDocument();
   });
 
+  it("bietet im Erstzustand den Leitfaden an", async () => {
+    vi.spyOn(api, "ladeZusammenfassung").mockResolvedValue(
+      uebersicht({ staffeln_aktiv: 0 }),
+    );
+    const gehe = vi.fn();
+    render(<UebersichtTafel onWechsel={gehe} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Leitfaden lesen" }));
+
+    expect(gehe).toHaveBeenCalledWith("leitfaden");
+  });
+
   it("zeigt einen laufenden Auftrag mit seinem Schritt", async () => {
     vi.spyOn(api, "ladeOffenenAuftrag").mockResolvedValue({
       id: "a1",

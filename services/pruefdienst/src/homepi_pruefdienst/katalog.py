@@ -218,7 +218,7 @@ _WEG_IM_ARTEFAKT = {
 }
 
 
-def katalog(ordner: Path | None = None) -> list[dict[str, str]]:
+def katalog(ordner: Path | None = None) -> list[dict[str, object]]:
     """Die Regeln des Staffelleiters, wie der Regelkatalog sie fuehrt."""
     return [
         {

@@ -1,0 +1,354 @@
+/* Nur Tokens aus src/styles/tokens.css. Siehe docs/08-design.md.
+
+   Eine Datei für alle Flächen dieses Artefakts: Spiele, Figuren, Aufnahmen,
+   Einstellungen, Geräte und Tagebuch teilen Formulare, Zeilen und
+   Nebensätze. */
+
+.laden {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+.nebensache {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--farbe-text-leise);
+  line-height: var(--zeile-normal);
+}
+
+.beiwortTrenner {
+  padding-inline: var(--raum-2);
+  color: var(--farbe-text-leise);
+}
+
+/* ------------------------------------------------------------------ Spiele */
+
+.phase {
+  display: grid;
+  gap: var(--raum-8);
+}
+
+/* Ein Spiel ist ein Text zum Lesen, keine Kachel: drei Absätze unter einer
+   Überschrift, in einer Spalte, die das Auge ohne Suchen findet. */
+.spiel {
+  display: grid;
+  gap: var(--raum-3);
+  max-width: var(--breite-text);
+}
+
+.spielkopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--raum-2) var(--raum-3);
+}
+
+.spieltitel {
+  margin: 0;
+  font-size: var(--text-xl);
+  letter-spacing: var(--laufweite-eng);
+  color: var(--farbe-text);
+}
+
+.spielnummer {
+  font-variant-numeric: tabular-nums;
+  color: var(--farbe-text-leise);
+}
+
+.spieltexte {
+  display: grid;
+  gap: var(--raum-3);
+  margin: 0;
+}
+
+.spieltexte dt {
+  font-size: var(--text-xs);
+  font-weight: var(--gewicht-halbfett);
+  letter-spacing: var(--laufweite-weit);
+  text-transform: uppercase;
+  color: var(--farbe-text-gedaempft);
+}
+
+.spieltexte dd {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text);
+}
+
+.geplant .spieltitel {
+  color: var(--farbe-text-gedaempft);
+}
+
+/* ---------------------------------------------------------------- Formular */
+
+.formular {
+  display: grid;
+  gap: var(--raum-4);
+}
+
+.zweispaltig {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--raum-4);
+}
+
+.formularfuss {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--raum-2);
+}
+
+.auswahl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--gewicht-mittel);
+  color: var(--farbe-text-gedaempft);
+}
+
+.auswahl select,
+.textfeld textarea {
+  width: 100%;
+  padding: var(--raum-2) var(--raum-3);
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--gewicht-normal);
+  transition: border-color var(--dauer-schnell) var(--verlauf);
+}
+
+.auswahl select {
+  height: 2.25rem;
+  padding-block: 0;
+}
+
+.textfeld {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  font-size: var(--text-sm);
+  font-weight: var(--gewicht-mittel);
+  color: var(--farbe-text-gedaempft);
+}
+
+.textfeld textarea {
+  min-height: 6rem;
+  resize: vertical;
+  line-height: var(--zeile-normal);
+}
+
+.auswahl select:hover,
+.textfeld textarea:hover {
+  border-color: var(--farbe-text-leise);
+}
+
+.auswahl select:focus-visible,
+.textfeld textarea:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+/* Schieberegler mit der Zahl daneben: Eine Grenze, die man nicht ablesen
+   kann, stellt niemand bewusst ein. */
+.regler {
+  display: grid;
+  gap: var(--raum-2);
+  font-size: var(--text-sm);
+  font-weight: var(--gewicht-mittel);
+  color: var(--farbe-text-gedaempft);
+}
+
+.reglerzeile {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-3);
+}
+
+.reglerzeile input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--farbe-akzent);
+}
+
+.reglerzeile output {
+  min-width: 3.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--farbe-text);
+}
+
+.schalterzeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-4);
+  max-width: 24rem;
+  color: var(--farbe-text);
+}
+
+/* ------------------------------------------------------------------- Knöpfe */
+
+.knoepfe {
+  display: grid;
+  gap: var(--raum-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.knopfzeile {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--raum-3);
+}
+
+.knopfname {
+  align-self: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--farbe-text);
+}
+
+.farbfeld {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.farbfeld input {
+  width: 2.75rem;
+  height: 2.25rem;
+  padding: var(--raum-1);
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+}
+
+/* Die Farbe des Knopfs als Tupfen in der Liste. Der Wert kommt aus den
+   Daten des Geräts, nicht aus der Palette - deshalb inline gesetzt. */
+.tupfen {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-inline-end: var(--raum-2);
+  border-radius: var(--rundung-voll);
+  box-shadow: var(--schatten-sm);
+  vertical-align: middle;
+}
+
+@media (max-width: 30rem) {
+  .knopfzeile {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------------- Zeilen */
+
+.ausklappung {
+  display: grid;
+  gap: var(--raum-3);
+}
+
+.handlungen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+}
+
+/* Titel, Art und die beiden Knöpfe in einer Zeile: Die Knöpfe stehen auf
+   Höhe der Felder, nicht auf Höhe der Beschriftungen darüber. */
+.umbenennen {
+  align-items: end;
+}
+
+.mono {
+  font-family: var(--schrift-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.unbekannt {
+  display: grid;
+  gap: var(--raum-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.unbekanntzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-2) var(--raum-4);
+}
+
+/* -------------------------------------------------------------- Aufnahme */
+
+.aufnahme {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-3);
+}
+
+.aufnahme audio,
+.ausklappung audio {
+  width: 100%;
+  max-width: 24rem;
+}
+
+.dateiwahl {
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.dateiwahl input {
+  display: block;
+  max-width: 100%;
+  margin-top: var(--raum-2);
+  font: inherit;
+}
+
+/* ------------------------------------------------------------- Tagebuch */
+
+.eintraege {
+  display: grid;
+  gap: var(--raum-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.eintrag {
+  display: grid;
+  gap: var(--raum-1);
+  max-width: var(--breite-text);
+}
+
+.eintragsdatum {
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.eintragstext {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text);
+}
+
+.token {
+  display: grid;
+  gap: var(--raum-2);
+}

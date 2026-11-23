@@ -20,10 +20,16 @@ Initialisierung, Uebertragungswarteschlange nach DFBnet, DFBnet-Zugang
 verschluesselt. 230 Artefakt-Tests mit 100 % Zeilen und Zweigen; Oberflaeche
 mit sieben Reitern, 325 Frontend-Tests.
 
+Seit dem 23.11.2026: Regelsatz je Staffelleiter mit Parametern, Staffelleitung
+(uebernehmen, abgeben) und ein Leitfaden als eigener Bereich. Begruendung in der
+README unter "Der Regelsatz".
+
 Offen, in der Reihenfolge, in der es sich lohnt:
 
 | | |
 |---|---|
+| **Mehrere Staffelleiter ganz trennen** | eigene Sichtbarkeit, eigene Einstellungen, eigener DFBnet-Zugang je Konto. Heute trennt nur der Regelsatz |
+| **Parameter fuer weitere Regeln** | Regeldateien (`@regel(...)`) koennen noch keine melden; Schwellen wie das Fotoalter stehen im Quelltext |
 | **Regelpruefung im Pruefdienst** | der Dienst steht (`services/pruefdienst`) und holt Spiele herein -- aber mit `befunde: []`. Die 31 Regeln liegen fertig in `D:/DevLibrary/StaffelPilot/src/rules/` und werden uebernommen, nicht neu geschrieben |
 | **DFBnet-Automation vervollstaendigen** | Meldung einer Staffel holen (Initialisierung) und das Eintragen (Prueferfreigabe, Fallanlage). Vorlagen: `src/automation/staffel_initialisierung.py`, `freigabe.py`, `fallanlage.py` |
 | **Mahnung als PDF** | der Vordruck des Verbandes. Text und Felder stehen, das Formular fehlt. Vorlage: `D:/DevLibrary/StaffelPilot/src/core/mahnung.py` |
