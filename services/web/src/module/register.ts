@@ -96,6 +96,9 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
       { id: "regeldateien", wort: "Regeldateien", breite: "normal", eigenerTitel: true },
       { id: "einstellungen", wort: "Einstellungen", breite: "text", eigenerTitel: true },
       { id: "zugang", wort: "DFBnet-Zugang", breite: "text", eigenerTitel: true },
+      // Zuletzt, weil man ihn selten braucht -- aber sichtbar, weil man ihn
+      // sucht, wenn man ihn braucht. Der Erstzustand verweist ohnehin darauf.
+      { id: "leitfaden", wort: "Leitfaden", breite: "text", eigenerTitel: true },
       // Ein Weg, keine Flaeche: einmal durchlaufen, danach nur noch bei
       // Bedarf aus den Einstellungen heraus. Deshalb versteckt -- in der
       // Leiste waere es ein Eintrag, der ab dem zweiten Tag nur stoert.

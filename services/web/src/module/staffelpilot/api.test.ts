@@ -12,6 +12,7 @@ import {
   entscheide,
   fordereAuftragAn,
   formuliereRegel,
+  gibStaffelAb,
   hakeAb,
   ladeAlleBefunde,
   ladeAnsichten,
@@ -51,6 +52,9 @@ import {
   speichereMannschaften,
   speichereRegeldatei,
   speichereZugang,
+  stelleRegelEin,
+  uebernimmFreieStaffeln,
+  uebernimmStaffel,
   verwerfeVorgang,
   wiederholeUebertragung,
   type Staffel,
@@ -65,6 +69,8 @@ const staffel: Staffel = {
   spieltage: 0,
   sportgericht: "",
   aktiv: true,
+  staffelleiter: "Aaron",
+  leite_ich: true,
 };
 
 function antworteMit(body: unknown, status = 200): ReturnType<typeof vi.fn> {
@@ -577,6 +583,30 @@ describe("Die uebrigen Endpunkte", () => {
       () => schalteRegel("r1", false),
       "/staffelpilot/regeln/r1",
       "PATCH",
+    ],
+    [
+      "eine Regel einstellen",
+      () => stelleRegelEin("r1", { kulanz: "6" }),
+      "/staffelpilot/regeln/r1",
+      "PATCH",
+    ],
+    [
+      "eine Staffel übernehmen",
+      () => uebernimmStaffel("s1"),
+      "/staffelpilot/staffeln/s1/leitung",
+      "POST",
+    ],
+    [
+      "eine Staffel abgeben",
+      () => gibStaffelAb("s1"),
+      "/staffelpilot/staffeln/s1/leitung",
+      "DELETE",
+    ],
+    [
+      "alle freien Staffeln übernehmen",
+      () => uebernimmFreieStaffeln(),
+      "/staffelpilot/staffeln/leitung",
+      "POST",
     ],
     [
       "eine Regel formulieren",

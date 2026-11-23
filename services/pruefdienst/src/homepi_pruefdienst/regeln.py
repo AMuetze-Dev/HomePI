@@ -28,10 +28,11 @@ from __future__ import annotations
 
 import datetime as _dt
 import re
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
+from functools import partial
 from typing import Any
 
 from .bericht import CardEvent, Confirmation, MatchReport, Player, TeamSquad
@@ -311,11 +312,127 @@ _SCHWERE_IM_KATALOG = {
     "rule_error": "warnung",
 }
 
+#: Was eine Regel tut, in der Sprache dessen, der sie ein- oder ausschaltet.
+_BESCHREIBUNG = {
+    "aufstellung_fehlt": (
+        "Die Aufstellung war im Bericht nicht zu bekommen. Spielrecht, Spielerfoto und "
+        "Ordnungsdienst sind für dieses Spiel dann ungeprüft."
+    ),
+    "bericht_ungelesen": (
+        "Der Spielbericht ließ sich nicht öffnen. Das Spiel ist dann ungeprüft und muss von "
+        "Hand angesehen werden."
+    ),
+    "confirmation_comment": (
+        "Eine Mannschaft oder der Schiedsrichter hat zur Bestätigung etwas geschrieben. "
+        "Der Text wird vorgelegt, nicht bewertet."
+    ),
+    "confirmation_late": (
+        "Eine Mannschaft hat den Spielbericht erst nach Ablauf der Frist bestätigt (§ 59 (17) SpO)."
+    ),
+    "confirmation_missing": (
+        "Eine Mannschaft hat den Spielbericht nicht bestätigt. Gemessen wird an derselben "
+        "Frist wie bei „Bestätigung zu spät“."
+    ),
+    "confirmation_unlesbar": (
+        "Der Zeitpunkt einer Bestätigung war nicht zu lesen. Ob sie rechtzeitig war, ist "
+        "dann offen."
+    ),
+    "dfbnet_warning": "DFBnet selbst zeigt am Bericht eine Warnung zu einem Spieler.",
+    "documents_present": (
+        "Am Spielbericht hängen Dokumente, etwa ein Sonderbericht des Schiedsrichters."
+    ),
+    "incidents": (
+        "Der Schiedsrichter hat Vorkommnisse eingetragen. Sie werden vorgelegt, nicht bewertet."
+    ),
+    "order_manager_dual_role": (
+        "Wer als Ordnungsdienst eingetragen ist, steht zugleich in einer anderen Rolle im Bericht."
+    ),
+    "order_manager_is_player": "Wer als Ordnungsdienst eingetragen ist, hat zugleich gespielt.",
+    "order_manager_missing": "Die Heimmannschaft hat keinen Ordnungsdienst benannt.",
+    "player_eligibility": (
+        "Ein Spieler ist in der Aufstellung als nicht spielberechtigt oder gesperrt gekennzeichnet."
+    ),
+    "release_late": (
+        "Der Schiedsrichter hat den Spielbericht erst nach Ablauf der Frist freigegeben "
+        "(§ 59 (17) SpO)."
+    ),
+    "rule_error": (
+        "Eine Regel ist beim Prüfen abgebrochen. Was sie prüfen sollte, ist für dieses Spiel offen."
+    ),
+}
+
 #: Woher diese Regeln kommen -- steht in der Uebersicht hinter dem Namen.
 HERKUNFT = "eingebaut"
 
 
-def katalog() -> list[dict[str, str]]:
+def _parameter_zu(kennung: str) -> list[dict[str, object]]:
+    """Was an dieser Regel einstellbar ist -- mit den Zahlen, nach denen geprueft wird."""
+    if kennung == "confirmation_late":
+        return [
+            _p_uhrzeit(CONFIRMATION_DEADLINE_HOUR, "Bis wann am Spieltag bestätigt sein muss."),
+            _p_nach_spielende(CONFIRMATION_GRACE_MINUTES),
+            {
+                "schluessel": "nach_freigabe",
+                "name": "Zeit nach der Freigabe",
+                "art": "minuten",
+                "vorgabe": CONFIRMATION_GRACE_MINUTES,
+                "kleinst": 0,
+                "groesst": 1440,
+                "erklaerung": (
+                    "So lange bleibt nach der Freigabe durch den Schiedsrichter. Ohne "
+                    "Schiedsrichter zählt die Bestätigung der Heimmannschaft."
+                ),
+            },
+            _p_kulanz(),
+        ]
+    if kennung == "release_late":
+        return [
+            _p_uhrzeit(
+                REFEREE_RELEASE_DEADLINE_HOUR, "Bis wann am Spieltag freigegeben sein muss."
+            ),
+            _p_nach_spielende(RELEASE_GRACE_MINUTES),
+            _p_kulanz(),
+        ]
+    return []
+
+
+def _p_uhrzeit(stunde: int, erklaerung: str) -> dict[str, object]:
+    return {
+        "schluessel": "frist_uhrzeit",
+        "name": "Frist am Spieltag",
+        "art": "uhrzeit",
+        "vorgabe": f"{stunde:02d}:00",
+        "erklaerung": erklaerung,
+    }
+
+
+def _p_nach_spielende(minuten: int) -> dict[str, object]:
+    return {
+        "schluessel": "nach_spielende",
+        "name": "Zeit nach Spielende",
+        "art": "minuten",
+        "vorgabe": minuten,
+        "kleinst": 0,
+        "groesst": 1440,
+        "erklaerung": "So lange bleibt nach dem Abpfiff mindestens, auch nach Ablauf der Uhrzeit.",
+    }
+
+
+def _p_kulanz() -> dict[str, object]:
+    return {
+        "schluessel": "kulanz",
+        "name": "Kulanz",
+        "art": "stunden",
+        "vorgabe": 0,
+        "kleinst": 0,
+        "groesst": 72,
+        "erklaerung": (
+            "Kommt auf die fertige Frist obendrauf. Mit 6 Stunden wird aus 18:00 Uhr Mitternacht."
+        ),
+    }
+
+
+def katalog() -> list[dict[str, object]]:
     """Die eingebauten Regeln, wie der Regelkatalog sie fuehrt.
 
     Sie stehen neben denen des Staffelleiters in derselben Liste, damit die
@@ -327,16 +444,24 @@ def katalog() -> list[dict[str, str]]:
         {
             "schluessel": kennung,
             "name": f"{titel} ({HERKUNFT})",
-            "beschreibung": "",
+            "beschreibung": _BESCHREIBUNG.get(kennung, ""),
             "schwere": _SCHWERE_IM_KATALOG.get(kennung, "warnung"),
             "weg": _WEG.get(kennung, "kein"),
+            "parameter": _parameter_zu(kennung),
         }
         for kennung, titel in sorted(_TITEL.items(), key=lambda paar: paar[1])
     ]
 
 
-def befunde_aus(report: MatchReport, abgeschaltet: Collection[str] = ()) -> list[dict[str, object]]:
+def befunde_aus(
+    report: MatchReport,
+    abgeschaltet: Collection[str] = (),
+    werte: Regelwerte | None = None,
+) -> list[dict[str, object]]:
     """Alle Regeln ueber einen Bericht, fertig fuer das Artefakt.
+
+    `werte` sind die Einstellungen dessen, der die Staffel leitet. Ohne sie
+    gilt die Spielordnung.
 
     `abgeschaltet` kommt aus der Regeluebersicht. Eine abgeschaltete Regel
     laeuft trotzdem -- nur ihr Befund wird nicht gemeldet. Das ist billiger
@@ -344,7 +469,7 @@ def befunde_aus(report: MatchReport, abgeschaltet: Collection[str] = ()) -> list
     Schalter zu kennen.
     """
     aus = set(abgeschaltet)
-    return [als_befund(v) for v in pruefe(report) if v.rule not in aus]
+    return [als_befund(v) for v in pruefe(report, werte) if v.rule not in aus]
 
 
 def ohne_aufstellung() -> list[dict[str, object]]:
@@ -393,23 +518,35 @@ def nicht_gelesen(grund: str) -> list[dict[str, object]]:
 #: weder Datenbank noch Konfiguration, und genau deshalb steht sie hier.
 Regel = Callable[[MatchReport], list[Violation]]
 
+#: Was ein Staffelleiter eingestellt hat: Regel -> Parameter -> Wert. Kommt
+#: aus dem Artefakt und wird hier nicht geglaubt, sondern gelesen: siehe
+#: `_ganzzahl` und `_frist_uhrzeit`.
+Regelwerte = Mapping[str, Mapping[str, object]]
+
 
 #: Die Regeln dieser Datei, in der Reihenfolge, in der sie laufen.
 #: Ausdruecklich aufgezaehlt und nicht eingesammelt: eine Regel, die
 #: versehentlich mitlaeuft, ist ein Schreiben an einen Verein.
-def alle_regeln() -> list[Regel]:
+def alle_regeln(werte: Regelwerte | None = None) -> list[Regel]:
+    werte = werte or {}
     return [
         _check_incidents,
         _check_confirmation_comments,
         _check_order_manager,
-        _check_team_confirmations,
-        _check_release_timeliness,
+        partial(_check_team_confirmations, fristen=fristen_bestaetigung(werte)),
+        partial(_check_release_timeliness, fristen=fristen_freigabe(werte)),
         _check_documents,
         _check_player_eligibility,
     ]
 
 
-def pruefe(report: MatchReport) -> list[Violation]:
+def _name(regel: Regel) -> str:
+    """Wie die Regel im Quelltext heisst -- auch, wenn sie schon Werte traegt."""
+    funktion = regel.func if isinstance(regel, partial) else regel
+    return str(getattr(funktion, "__name__", funktion))
+
+
+def pruefe(report: MatchReport, werte: Regelwerte | None = None) -> list[Violation]:
     """Alle Regeln ueber einen Bericht.
 
     Eine Regel, die wirft, nimmt die anderen nicht mit: sie meldet sich als
@@ -417,7 +554,7 @@ def pruefe(report: MatchReport) -> list[Violation]:
     einem ungewoehnlichen stehenbleiben.
     """
     gefunden: list[Violation] = []
-    for regel in alle_regeln():
+    for regel in alle_regeln(werte):
         try:
             gefunden.extend(regel(report))
         except Exception as fehler:
@@ -425,8 +562,8 @@ def pruefe(report: MatchReport) -> list[Violation]:
                 Violation(
                     rule="rule_error",
                     severity=Severity.WARNING,
-                    message=f"Die Regel {regel.__name__} ist gescheitert: {fehler}",
-                    details={"regel": regel.__name__},
+                    message=f"Die Regel {_name(regel)} ist gescheitert: {fehler}",
+                    details={"regel": _name(regel)},
                 )
             )
     return gefunden
@@ -614,7 +751,103 @@ def canonical_team(report: MatchReport, home: bool) -> str:
     return "Heim" if home else "Gast"
 
 
-def _check_team_confirmations(report: MatchReport) -> list[Violation]:
+#: Beide Fristen stehen in § 59 (17) SpO SFV:
+#:
+#:   „Der Spielbericht Online ist unmittelbar nach dem Spiel vom Schiedsrichter
+#:    oder den SR-Assistenten vollständig auszufüllen. Die Eintragungen sind
+#:    mit den beiden Mannschaftsverantwortlichen abzugleichen und nach der
+#:    Schiedsrichterfreigabe durch diese unmittelbar vor Ort bis 18:00 Uhr
+#:    spätestens aber 60 Minuten nach Spielende die Kenntnisnahme zu
+#:    bestätigen."
+#:
+#: Die Zahlen standen lange unbelegt hier — die Annahme war richtig, aber
+#: niemand konnte sie nachschlagen. „spätestens aber 60 Minuten nach
+#: Spielende" ist dabei die spätere der beiden Fristen, nicht die frühere:
+#: ein Abendspiel, das um 18:40 endet, kann nicht um 18:00 bestätigt sein.
+
+#: § 59 (17) — Freigabe durch den Schiedsrichter am Spieltag.
+REFEREE_RELEASE_DEADLINE_HOUR = 18
+
+#: § 59 (17) — „spätestens aber 60 Minuten nach Spielende".
+RELEASE_GRACE_MINUTES = 60
+
+#: § 59 (17) — dieselben Fristen für die Bestätigung durch die Mannschaften.
+#: Es gilt die spätere von beiden.
+CONFIRMATION_DEADLINE_HOUR = 18
+CONFIRMATION_GRACE_MINUTES = 60
+
+
+@dataclass(frozen=True)
+class Fristen:
+    """Die Fristen einer Regel, wie sie fuer eine Staffel gelten.
+
+    Ohne Angaben die der Spielordnung. Was ein Staffelleiter davon aendert,
+    steht in seinem Regelsatz im Artefakt und kommt je Lauf herein.
+    """
+
+    stunde: int = CONFIRMATION_DEADLINE_HOUR
+    minute: int = 0
+    nach_spielende: int = CONFIRMATION_GRACE_MINUTES
+    nach_freigabe: int = CONFIRMATION_GRACE_MINUTES
+    #: Stunden, die auf die fertige Frist obendrauf kommen.
+    kulanz: int = 0
+
+    def am(self, tag: datetime) -> datetime:
+        return tag.replace(hour=self.stunde, minute=self.minute, second=0, microsecond=0)
+
+    def mit_kulanz(self, frist: datetime) -> datetime:
+        return frist + timedelta(hours=self.kulanz)
+
+
+def fristen_bestaetigung(werte: Regelwerte) -> Fristen:
+    """Die Frist der Mannschaften. Gilt fuer die fehlende wie fuer die spaete."""
+    return _fristen(
+        werte.get("confirmation_late", {}), CONFIRMATION_DEADLINE_HOUR, CONFIRMATION_GRACE_MINUTES
+    )
+
+
+def fristen_freigabe(werte: Regelwerte) -> Fristen:
+    """Die Frist des Schiedsrichters."""
+    return _fristen(
+        werte.get("release_late", {}), REFEREE_RELEASE_DEADLINE_HOUR, RELEASE_GRACE_MINUTES
+    )
+
+
+def _fristen(werte: Mapping[str, object], stunde: int, minuten: int) -> Fristen:
+    """Aus Einstellungen Fristen -- und aus unbrauchbaren die Vorgabe.
+
+    Das Artefakt prueft beim Speichern. Hier wird trotzdem nichts geglaubt:
+    ein Lauf ueber achtzig Berichte soll nicht an einem Feld scheitern.
+    """
+    uhr_stunde, uhr_minute = _frist_uhrzeit(werte.get("frist_uhrzeit"), (stunde, 0))
+    return Fristen(
+        stunde=uhr_stunde,
+        minute=uhr_minute,
+        nach_spielende=_ganzzahl(werte.get("nach_spielende"), minuten),
+        nach_freigabe=_ganzzahl(werte.get("nach_freigabe"), minuten),
+        kulanz=_ganzzahl(werte.get("kulanz"), 0),
+    )
+
+
+def _frist_uhrzeit(wert: object, vorgabe: tuple[int, int]) -> tuple[int, int]:
+    treffer = re.fullmatch(r"([01]?\d|2[0-3]):([0-5]\d)", wert) if isinstance(wert, str) else None
+    return (int(treffer.group(1)), int(treffer.group(2))) if treffer else vorgabe
+
+
+def _ganzzahl(wert: object, vorgabe: int) -> int:
+    # `True` ist in Python eine 1 -- als Kulanz waere das eine Stunde.
+    if isinstance(wert, bool) or not isinstance(wert, int) or wert < 0:
+        return vorgabe
+    return wert
+
+
+#: Ohne Einstellungen gilt die Spielordnung.
+SPIELORDNUNG = Fristen()
+
+
+def _check_team_confirmations(
+    report: MatchReport, fristen: Fristen = SPIELORDNUNG
+) -> list[Violation]:
     """Both teams must confirm the report — step 6.
 
     Home first, then the guest: without an appointed referee the home team's
@@ -634,11 +867,11 @@ def _check_team_confirmations(report: MatchReport) -> list[Violation]:
     )
 
     for team_name, conf, frist in (
-        (heim, heim_conf, _confirmation_deadline(report)),
+        (heim, heim_conf, _confirmation_deadline(report, fristen)),
         (
             gast,
             _find_confirmation(report, gast),
-            _confirmation_deadline(report, gast=True, heim_bestaetigt=heim_bestaetigt),
+            _confirmation_deadline(report, fristen, gast=True, heim_bestaetigt=heim_bestaetigt),
         ),
     ):
         if conf is None or not conf.confirmed:
@@ -728,32 +961,6 @@ def _find_confirmation(report: MatchReport, team_name: str) -> Confirmation | No
     return candidates[0] if team_name == home_name else candidates[-1]
 
 
-#: Beide Fristen stehen in § 59 (17) SpO SFV:
-#:
-#:   „Der Spielbericht Online ist unmittelbar nach dem Spiel vom Schiedsrichter
-#:    oder den SR-Assistenten vollständig auszufüllen. Die Eintragungen sind
-#:    mit den beiden Mannschaftsverantwortlichen abzugleichen und nach der
-#:    Schiedsrichterfreigabe durch diese unmittelbar vor Ort bis 18:00 Uhr
-#:    spätestens aber 60 Minuten nach Spielende die Kenntnisnahme zu
-#:    bestätigen."
-#:
-#: Die Zahlen standen lange unbelegt hier — die Annahme war richtig, aber
-#: niemand konnte sie nachschlagen. „spätestens aber 60 Minuten nach
-#: Spielende" ist dabei die spätere der beiden Fristen, nicht die frühere:
-#: ein Abendspiel, das um 18:40 endet, kann nicht um 18:00 bestätigt sein.
-
-#: § 59 (17) — Freigabe durch den Schiedsrichter am Spieltag.
-REFEREE_RELEASE_DEADLINE_HOUR = 18
-
-#: § 59 (17) — „spätestens aber 60 Minuten nach Spielende".
-RELEASE_GRACE_MINUTES = 60
-
-#: § 59 (17) — dieselben Fristen für die Bestätigung durch die Mannschaften.
-#: Es gilt die spätere von beiden.
-CONFIRMATION_DEADLINE_HOUR = 18
-CONFIRMATION_GRACE_MINUTES = 60
-
-
 def _verspaetung(delta: timedelta) -> str:
     """How late something was, in the unit that carries the information.
 
@@ -817,7 +1024,9 @@ def _match_end(report: MatchReport) -> datetime | None:
     return ende
 
 
-def referee_release_deadline(report: MatchReport) -> datetime | None:
+def referee_release_deadline(
+    report: MatchReport, fristen: Fristen = SPIELORDNUNG
+) -> datetime | None:
     """Deadline by which the referee should have released the report.
 
     18:00 on match day — but never before the match has actually ended. An
@@ -830,23 +1039,23 @@ def referee_release_deadline(report: MatchReport) -> datetime | None:
     match_date = _parse_date(report.meta.match_date)
     if not match_date:
         return None
-    regel = match_date.replace(
-        hour=REFEREE_RELEASE_DEADLINE_HOUR, minute=0, second=0, microsecond=0
-    )
+    frist = fristen.am(match_date)
     ende = _match_end(report)
-    if ende is None:
-        return regel
-    return max(regel, ende + timedelta(minutes=RELEASE_GRACE_MINUTES))
+    if ende is not None:
+        frist = max(frist, ende + timedelta(minutes=fristen.nach_spielende))
+    return fristen.mit_kulanz(frist)
 
 
-def _check_release_timeliness(report: MatchReport) -> list[Violation]:
+def _check_release_timeliness(
+    report: MatchReport, fristen: Fristen = SPIELORDNUNG
+) -> list[Violation]:
     """Report a match whose Spielbericht was released too late — step 8.
 
     Only fires when the release timestamp is actually known. A missing
     timestamp is reported by `confirmation_missing` instead of being guessed
     into a lateness finding.
     """
-    deadline = referee_release_deadline(report)
+    deadline = referee_release_deadline(report, fristen)
     if deadline is None:
         return []
     release = _parse_datetime(report.meta.referee_release_at)
@@ -873,7 +1082,7 @@ def _check_release_timeliness(report: MatchReport) -> list[Violation]:
     ]
 
 
-def _basis_frist(report: MatchReport) -> datetime | None:
+def _basis_frist(report: MatchReport, fristen: Fristen) -> datetime | None:
     """The earliest a confirmation can reasonably be expected.
 
     18:00 on match day, but never less than an hour after the final whistle.
@@ -884,15 +1093,16 @@ def _basis_frist(report: MatchReport) -> datetime | None:
     match_date = _parse_date(report.meta.match_date)
     if not match_date:
         return None
-    regel = match_date.replace(hour=CONFIRMATION_DEADLINE_HOUR, minute=0, second=0, microsecond=0)
+    frist = fristen.am(match_date)
     ende = _match_end(report)
     if ende is None:
-        return regel
-    return max(regel, ende + timedelta(minutes=CONFIRMATION_GRACE_MINUTES))
+        return frist
+    return max(frist, ende + timedelta(minutes=fristen.nach_spielende))
 
 
 def _confirmation_deadline(
     report: MatchReport,
+    fristen: Fristen = SPIELORDNUNG,
     *,
     gast: bool = False,
     heim_bestaetigt: datetime | None = None,
@@ -911,17 +1121,17 @@ def _confirmation_deadline(
     Measuring both teams against one deadline made every unrefereed evening
     match look late for the guest, who by the rule had not even started yet.
     """
-    basis = _basis_frist(report)
-    if basis is None:
+    frist = _basis_frist(report, fristen)
+    if frist is None:
         return None
 
-    release = _parse_datetime(report.meta.referee_release_at)
-    if release is not None:
-        return max(basis, release + timedelta(minutes=CONFIRMATION_GRACE_MINUTES))
-
-    if gast and heim_bestaetigt is not None:
-        return max(basis, heim_bestaetigt + timedelta(minutes=CONFIRMATION_GRACE_MINUTES))
-    return basis
+    # Ab wann diese Mannschaft bestaetigen konnte. Mit Schiedsrichter ab
+    # seiner Freigabe, ohne ihn der Gast ab der Bestaetigung der Heimmannschaft.
+    ab = _parse_datetime(report.meta.referee_release_at) or (heim_bestaetigt if gast else None)
+    if ab is not None:
+        frist = max(frist, ab + timedelta(minutes=fristen.nach_freigabe))
+    # Zuletzt, und nur einmal: die Kulanz gilt der fertigen Frist.
+    return fristen.mit_kulanz(frist)
 
 
 def _parse_date(value: str) -> datetime | None:

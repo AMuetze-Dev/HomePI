@@ -27,6 +27,7 @@ describe("Das Register der Oberflächen", () => {
       "Regeldateien",
       "Einstellungen",
       "DFBnet-Zugang",
+      "Leitfaden",
       "Einrichtung",
     ]);
   });

@@ -21,6 +21,9 @@ export interface Staffel {
   /** Das zustaendige Sportgericht, wortgleich mit der Auswahl in DFBnet. */
   sportgericht: string;
   aktiv: boolean;
+  /** Wer sie leitet. Leer: niemand, dann prüft der Prüflauf mit den Vorgaben. */
+  staffelleiter: string;
+  leite_ich: boolean;
 }
 
 export interface Befund {
@@ -53,6 +56,19 @@ export interface SpielZeile {
   faellig: boolean;
 }
 
+/** Was an einer Regel einstellbar ist -- gemeldet vom Prüfdienst. */
+export interface Parameter {
+  schluessel: string;
+  name: string;
+  art: "uhrzeit" | "minuten" | "stunden" | "zahl";
+  vorgabe: number | string;
+  kleinst: number | null;
+  groesst: number | null;
+  erklaerung: string;
+  /** Der eigene Wert. `null`: die Vorgabe gilt. */
+  wert: number | string | null;
+}
+
 export interface Regel {
   id: string;
   schluessel: string;
@@ -67,6 +83,9 @@ export interface Regel {
   /** Der mitgelieferte. Steht im Feld als Platzhalter, nicht als Inhalt. */
   vorgabe_sachverhalt: string;
   vorgabe_hinweis: string;
+  parameter: Parameter[];
+  /** Ob hier etwas anders ist als die Vorgabe -- Schalter oder Werte. */
+  angepasst: boolean;
 }
 
 // `faellig` faellt weg: der einzelne Bericht wird geoeffnet, weil jemand ihn
@@ -492,6 +511,17 @@ export function schalteRegel(id: string, aktiv: boolean): Promise<Regel> {
 }
 
 /**
+ * Die Werte einer Regel, als Ganzes: was fehlt oder leer ist, gilt mit der
+ * Vorgabe. `{}` setzt alle zurück.
+ */
+export function stelleRegelEin(
+  id: string,
+  werte: Record<string, string>,
+): Promise<Regel> {
+  return anfrage<Regel>(`/regeln/${id}`, mitKoerper("PATCH", { werte }));
+}
+
+/**
  * Die Sätze, die später im Schreiben stehen.
  *
  * Leer heisst: der mitgelieferte Satz gilt — und eine spätere Korrektur am
@@ -512,6 +542,19 @@ export function aendereStaffel(
   daten: Partial<Omit<Staffel, "id">>,
 ): Promise<Staffel> {
   return anfrage<Staffel>(`/staffeln/${id}`, mitKoerper("PATCH", daten));
+}
+
+export function uebernimmStaffel(id: string): Promise<Staffel> {
+  return anfrage<Staffel>(`/staffeln/${id}/leitung`, { method: "POST" });
+}
+
+export function gibStaffelAb(id: string): Promise<Staffel> {
+  return anfrage<Staffel>(`/staffeln/${id}/leitung`, { method: "DELETE" });
+}
+
+/** Alle Staffeln ohne Staffelleiter auf einmal. */
+export function uebernimmFreieStaffeln(): Promise<{ uebernommen: number }> {
+  return anfrage<{ uebernommen: number }>("/staffeln/leitung", { method: "POST" });
 }
 
 export function loescheStaffel(id: string): Promise<void> {

@@ -18,6 +18,8 @@ function staffel(rest: Partial<api.Staffel> = {}): api.Staffel {
     spieltage: 0,
     sportgericht: "",
     aktiv: true,
+    staffelleiter: "Aaron",
+    leite_ich: true,
     ...rest,
   };
 }
@@ -678,7 +680,14 @@ describe("Nur fällige", () => {
     mitDaten();
     zeige("regeln");
 
-    expect(await screen.findByText("Kein Regelkatalog")).toBeInTheDocument();
+    expect(await screen.findByText("Noch keine Regeln")).toBeInTheDocument();
+  });
+
+  it("führt zum Leitfaden", async () => {
+    mitDaten();
+    zeige("leitfaden");
+
+    expect(await screen.findByRole("heading", { name: "Leitfaden" })).toBeInTheDocument();
   });
 });
 

@@ -319,6 +319,83 @@ class Regel(Base, ZeitstempelMixin):
     aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
+class Regelparameter(Base, ZeitstempelMixin):
+    """Was eine Regel einstellbar macht -- die Frist am Spieltag, die Kulanz.
+
+    Gemeldet vom Pruefdienst mit dem Katalog, und mit ihm ersetzt. Eine eigene
+    Tabelle und keine Spalte an `Regel`: eine neue Spalte in einer bestehenden
+    Tabelle haelt das Gateway an, solange es keine Migrationen gibt.
+    """
+
+    __tablename__ = "staffelpilot_regelparameter"
+    __table_args__ = (UniqueConstraint("regel", "schluessel", name="uq_parameter_je_regel"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    regel: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    schluessel: Mapped[str] = mapped_column(String(60), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    art: Mapped[str] = mapped_column(String(20), nullable=False)
+    #: "18:00" oder eine Zahl -- deshalb JSON und nicht Text.
+    vorgabe: Mapped[int | str] = mapped_column(JSONB, nullable=False)
+    kleinst: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    groesst: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    erklaerung: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    #: In der Reihenfolge, in der die Regel sie meldet.
+    reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class Regelwahl(Base, ZeitstempelMixin):
+    """Der Regelsatz eines Staffelleiters: was er anders haben will als die Vorgabe.
+
+    **Nur Abweichungen.** `aktiv` ist `None`, solange er wie die Vorgabe
+    schaltet; `werte` enthaelt nur, was er geaendert hat. Sonst hielte das
+    erste Speichern den heutigen Stand fest.
+
+    Am Schluessel der Regel und nicht an ihrer Zeile: der Katalog wird als
+    Ganzes ersetzt, und eine Regel, die ein Lauf einmal nicht gemeldet hat,
+    nahme sonst die Einstellung mit.
+    """
+
+    __tablename__ = "staffelpilot_regelwahl"
+    __table_args__ = (UniqueConstraint("benutzer_id", "regel", name="uq_regelwahl_je_konto"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    benutzer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("benutzer.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    regel: Mapped[str] = mapped_column(String(120), nullable=False)
+    aktiv: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    werte: Mapped[dict[str, int | str]] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class Staffelleitung(Base, ZeitstempelMixin):
+    """Wer eine Staffel leitet -- und damit, welcher Regelsatz an ihr prueft.
+
+    Eine eigene Tabelle statt einer Spalte an `Staffel`, aus demselben Grund
+    wie bei `Regelparameter`. Keine Zeile heisst: niemand leitet sie, und der
+    Prueflauf nimmt die Vorgaben.
+    """
+
+    __tablename__ = "staffelpilot_staffelleitung"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    staffel_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("staffelpilot_staffeln.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    benutzer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("benutzer.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+
 class Regeldatei(Base, ZeitstempelMixin):
     """Eine Regeldatei des Staffelleiters -- der Quelltext, nicht das Ergebnis.
 

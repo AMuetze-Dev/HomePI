@@ -18,6 +18,7 @@ import {
 } from "../../ui";
 import {
   entscheide,
+  gibStaffelAb,
   hakeAb,
   ladeEinrichtung,
   ladeSpiel,
@@ -30,6 +31,7 @@ import {
   legeStaffelAn,
   loescheStaffel,
   loeseHaken,
+  uebernimmStaffel,
   type Befund,
   type Einrichtungsstand,
   type Schwere,
@@ -42,6 +44,7 @@ import { alsDatum } from "./datum";
 import { Einrichtung } from "./Einrichtung";
 import { EinstellungenTafel } from "./EinstellungenTafel";
 import { ErgebnisseTafel } from "./ErgebnisseTafel";
+import { LeitfadenTafel } from "./LeitfadenTafel";
 import { PrueflaufTafel } from "./PrueflaufTafel";
 import { StaffelnTafel } from "./StaffelnTafel";
 import { UebersichtTafel } from "./UebersichtTafel";
@@ -213,6 +216,7 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
   if (unterseite === "einrichten") {
     return (
       <Einrichtung
+        onLeitfaden={() => gehe("leitfaden")}
         onFertig={() => {
           setEinrichtung((vorher) =>
             vorher === null ? vorher : { ...vorher, erledigt: true, schritt: "fertig" },
@@ -249,6 +253,8 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
           onAnlegen={(daten) => mitFehlerbehandlung(() => legeStaffelAn(daten))}
           onAendern={(id, daten) => mitFehlerbehandlung(() => aendereStaffel(id, daten))}
           onLoeschen={(id) => mitFehlerbehandlung(() => loescheStaffel(id))}
+          onUebernehmen={(id) => mitFehlerbehandlung(() => uebernimmStaffel(id))}
+          onAbgeben={(id) => mitFehlerbehandlung(() => gibStaffelAb(id))}
         />
       </>
     );
@@ -272,7 +278,16 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
   }
 
   if (unterseite === "regeln") {
-    return <RegelnTafel />;
+    return (
+      <RegelnTafel
+        staffeln={staffeln}
+        onStaffelnGeaendert={() => void laden(staffelFilter, nurFaellig)}
+      />
+    );
+  }
+
+  if (unterseite === "leitfaden") {
+    return <LeitfadenTafel onWechsel={gehe} />;
   }
 
   if (unterseite === "vorgaenge") {

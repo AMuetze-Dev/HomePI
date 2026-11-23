@@ -1,0 +1,137 @@
+/* Nur Tokens. Sobald hier ein fester Wert steht, beginnt das
+   Erscheinungsbild auseinanderzulaufen (docs/08-design.md). */
+
+.geltung {
+  margin: 0;
+  max-width: var(--breite-text);
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-gedaempft);
+}
+
+.freie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-2) var(--raum-4);
+}
+
+.liste {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Kopf und Schalter nebeneinander und nicht ineinander: ein Schalter in einem
+   Knopf ist fuer die Tastatur nicht erreichbar. */
+.zeile {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+}
+
+.kopf {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  gap: var(--raum-3);
+  min-width: 0;
+  /* 44 px Trefferflaeche: die Zeile ist dicht, das Ziel darf es nicht sein. */
+  min-height: 2.75rem;
+  padding: var(--raum-3) var(--raum-2);
+  border: 0;
+  border-radius: var(--rundung-md);
+  font: inherit;
+  font-size: var(--text-md);
+  text-align: left;
+  color: var(--farbe-text);
+  background: none;
+  cursor: pointer;
+  transition: background var(--dauer-schnell) var(--verlauf);
+}
+
+.kopf:hover {
+  background: linear-gradient(to right, var(--farbe-akzent-spur), transparent 70%);
+}
+
+.kopf:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: -2px;
+}
+
+/* Aus tritt zurueck, verschwindet aber nicht. */
+.aus {
+  color: var(--farbe-text-leise);
+}
+
+.pfeil {
+  flex: 0 0 auto;
+  color: var(--farbe-text-leise);
+  transition: transform var(--dauer-schnell) var(--verlauf);
+}
+
+.kopf[aria-expanded="true"] .pfeil {
+  transform: rotate(90deg);
+}
+
+.namen {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--raum-1);
+  min-width: 0;
+}
+
+.namenzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-1) var(--raum-2);
+}
+
+.satz {
+  font-size: var(--text-sm);
+  line-height: var(--zeile-weit);
+  color: var(--farbe-text-gedaempft);
+}
+
+.ausklappung {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  /* Unter den Namen geruckt, nicht unter den Pfeil. */
+  padding: var(--raum-1) var(--raum-2) var(--raum-5) var(--raum-6);
+}
+
+.werte {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+.felder {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--raum-4) var(--raum-5);
+  align-items: start;
+}
+
+.knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+}
+
+.etiketten {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2);
+}
+
+@media (width < 34rem) {
+  .ausklappung {
+    padding-left: var(--raum-2);
+  }
+}

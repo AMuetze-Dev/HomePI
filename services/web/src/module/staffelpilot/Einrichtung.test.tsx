@@ -70,6 +70,8 @@ describe("Die Einrichtung", () => {
     render(<Einrichtung onFertig={vi.fn()} />);
 
     const leiste = await screen.findByRole("list", { name: /Schritte der Einrichtung/ });
+    // Ohne Ziel kein Knopf: er täte nichts.
+    expect(screen.queryByRole("button", { name: "Leitfaden lesen" })).toBeNull();
     expect(leiste).toBeInTheDocument();
   });
 
@@ -210,5 +212,18 @@ describe("Die Einrichtung", () => {
     // Coverage - war das in zwei von fünf Durchgängen rot. Mit dem Namen im
     // Aufruf wartet findByRole, bis die richtige Überschrift da ist.
     expect(await screen.findByRole("heading", { name: /Fertig/ })).toBeInTheDocument();
+  });
+});
+
+describe("Der Weg zum Leitfaden", () => {
+  it("steht gleich am Anfang", async () => {
+    // Wer noch nicht weiß, was das Programm tut, soll es nachlesen können,
+    // bevor er ein Passwort eintippt.
+    const lesen = vi.fn();
+    render(<Einrichtung onFertig={vi.fn()} onLeitfaden={lesen} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Leitfaden lesen" }));
+
+    expect(lesen).toHaveBeenCalled();
   });
 });

@@ -160,7 +160,14 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
       {werte.staffeln_aktiv === 0 && (
         <Leerzustand
           titel="Keine aktive Staffel"
-          aktion={<Knopf onClick={() => onWechsel("staffeln")}>Staffeln verwalten</Knopf>}
+          aktion={
+            <span className={stil.knoepfe}>
+              <Knopf onClick={() => onWechsel("staffeln")}>Staffeln verwalten</Knopf>
+              <Knopf auspraegung="leise" onClick={() => onWechsel("leitfaden")}>
+                Leitfaden lesen
+              </Knopf>
+            </span>
+          }
         >
           Ohne Staffel kommen keine Spielberichte herein. Leg die erste an — Name und
           Spielklasse genau so, wie sie in DFBnet heißen.

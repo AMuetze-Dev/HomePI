@@ -14,10 +14,12 @@ from dataclasses import asdict
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request, Response, status
-from homepi_core.auth import Rolle, erfordert
+from homepi_core.auth import AktuellerBenutzer, Rolle, erfordert
+from homepi_core.auth import speicher as auth_speicher
+from homepi_core.auth.dienst import darf
 from homepi_core.deps import DbSitzung
 
-from . import mahnung, speicher, sportrichtermail, texte
+from . import dienst, mahnung, speicher, sportrichtermail, texte
 from .dienst import (
     BefundSicht,
     Einstellungen,
@@ -44,7 +46,9 @@ from .modelle import (
     Mannschaft,
     Regel,
     Regeldatei,
+    Regelparameter,
     Regeltext,
+    Regelwahl,
     Spielbericht,
     Staffel,
     Vorgang,
@@ -67,9 +71,11 @@ from .schemas import (
     ImportAuftrag,
     ImportErgebnis,
     KarteAusgabe,
+    LeitungUebernommen,
     MailEntwurf,
     MannschaftAusgabe,
     MannschaftenSetzen,
+    ParameterAusgabe,
     Pause,
     Posten,
     RegelAendern,
@@ -79,6 +85,7 @@ from .schemas import (
     RegeldateiInhalt,
     RegeldateiSetzen,
     RegelkatalogSetzen,
+    RegelsatzAusgabe,
     SpielAusgabe,
     SpielZeile,
     StaffelAendern,
@@ -249,26 +256,93 @@ async def ergebnisse(
 # ── Staffeln ──────────────────────────────────────────────────────────────
 
 
+NUTZER = [erfordert("staffelpilot", Rolle.NUTZER)]
+
+
+def _staffel(
+    s: Staffel, leitungen: dict[uuid.UUID, tuple[uuid.UUID, str]], ich: uuid.UUID
+) -> StaffelAusgabe:
+    konto, name = leitungen.get(s.id, (None, ""))
+    return StaffelAusgabe.model_validate(s).model_copy(
+        update={"staffelleiter": name, "leite_ich": konto == ich}
+    )
+
+
 @router.get("/staffeln", summary="Alle Staffeln")
-async def staffeln(sitzung: DbSitzung) -> list[StaffelAusgabe]:
-    return [StaffelAusgabe.model_validate(s) for s in await speicher.staffeln(sitzung)]
+async def staffeln(sitzung: DbSitzung, benutzer: AktuellerBenutzer) -> list[StaffelAusgabe]:
+    leitungen = await speicher.leitungen(sitzung)
+    return [_staffel(s, leitungen, benutzer.id) for s in await speicher.staffeln(sitzung)]
 
 
 @router.post("/staffeln", status_code=status.HTTP_201_CREATED, summary="Staffel anlegen")
-async def staffel_anlegen(daten: StaffelAnlegen, sitzung: DbSitzung) -> StaffelAusgabe:
-    return StaffelAusgabe.model_validate(await speicher.staffel_anlegen(sitzung, daten))
+async def staffel_anlegen(
+    daten: StaffelAnlegen, sitzung: DbSitzung, benutzer: AktuellerBenutzer
+) -> StaffelAusgabe:
+    """Wer sie anlegt, leitet sie -- und sein Regelsatz prueft sie."""
+    neue = await speicher.staffel_anlegen(sitzung, daten)
+    await speicher.leitung_setzen(sitzung, neue.id, benutzer.id)
+    return _staffel(neue, await speicher.leitungen(sitzung), benutzer.id)
+
+
+@router.post(
+    "/staffeln/leitung",
+    summary="Alle Staffeln ohne Staffelleiter übernehmen",
+    dependencies=NUTZER,
+)
+async def freie_uebernehmen(sitzung: DbSitzung, benutzer: AktuellerBenutzer) -> LeitungUebernommen:
+    """Was vor den Staffelleitern angelegt oder aus DFBnet geholt wurde, hat
+    keinen. Das uebernimmt man mit einem Knopf und nicht Zeile fuer Zeile."""
+    return LeitungUebernommen(uebernommen=await speicher.freie_uebernehmen(sitzung, benutzer.id))
+
+
+@router.post(
+    "/staffeln/{staffel_id}/leitung",
+    summary="Eine Staffel übernehmen",
+    dependencies=NUTZER,
+)
+async def leitung_uebernehmen(
+    staffel_id: uuid.UUID, sitzung: DbSitzung, benutzer: AktuellerBenutzer
+) -> StaffelAusgabe:
+    staffel = await speicher.staffel(sitzung, staffel_id)
+    konto, name = (await speicher.leitungen(sitzung)).get(staffel_id, (None, ""))
+    dienst.uebernahme_pruefen(
+        leiter=str(konto) if konto else None, ich=str(benutzer.id), leiter_name=name
+    )
+    await speicher.leitung_setzen(sitzung, staffel_id, benutzer.id)
+    return _staffel(staffel, await speicher.leitungen(sitzung), benutzer.id)
+
+
+@router.delete(
+    "/staffeln/{staffel_id}/leitung",
+    summary="Eine Staffel abgeben",
+    dependencies=NUTZER,
+)
+async def leitung_abgeben(
+    staffel_id: uuid.UUID, sitzung: DbSitzung, benutzer: AktuellerBenutzer
+) -> StaffelAusgabe:
+    """Abgegeben prueft sie mit den Vorgaben, bis jemand sie uebernimmt."""
+    staffel = await speicher.staffel(sitzung, staffel_id)
+    konto, _ = (await speicher.leitungen(sitzung)).get(staffel_id, (None, ""))
+    dienst.abgabe_pruefen(
+        leiter=str(konto) if konto else None,
+        ich=str(benutzer.id),
+        verwalter=darf(auth_speicher.rechte_von(benutzer), "staffelpilot", Rolle.VERWALTER),
+    )
+    await speicher.leitung_loeschen(sitzung, staffel_id)
+    return _staffel(staffel, await speicher.leitungen(sitzung), benutzer.id)
 
 
 @router.patch("/staffeln/{staffel_id}", summary="Staffel ändern")
 async def staffel_aendern(
-    staffel_id: uuid.UUID, daten: StaffelAendern, sitzung: DbSitzung
+    staffel_id: uuid.UUID, daten: StaffelAendern, sitzung: DbSitzung, benutzer: AktuellerBenutzer
 ) -> StaffelAusgabe:
     """Nur die mitgeschickten Felder. Ausgelassene bleiben stehen.
 
     Ein Dialog, der offen stand, während woanders geschrieben wurde, schreibt
     sonst einen alten Wert zurück.
     """
-    return StaffelAusgabe.model_validate(await speicher.staffel_aendern(sitzung, staffel_id, daten))
+    geaendert = await speicher.staffel_aendern(sitzung, staffel_id, daten)
+    return _staffel(geaendert, await speicher.leitungen(sitzung), benutzer.id)
 
 
 @router.delete(
@@ -761,23 +835,72 @@ async def vorgang_anlegen(
 # ── Regelkatalog ──────────────────────────────────────────────────────────
 
 
-def _regel(r: Regel, eigener: Regeltext | None = None) -> RegelAusgabe:
-    """Der Katalogeintrag, und dazu, was ohne eigene Saetze gilt.
+def _sichten(parameter: list[Regelparameter]) -> list[dienst.ParameterSicht]:
+    return [
+        dienst.ParameterSicht(
+            schluessel=p.schluessel,
+            name=p.name,
+            art=p.art,
+            vorgabe=p.vorgabe,
+            kleinst=p.kleinst,
+            groesst=p.groesst,
+        )
+        for p in parameter
+    ]
 
-    Die Vorgabe wird **mitgeschickt und nicht eingesetzt**: die Oberflaeche
-    zeigt sie als Platzhalter, und das leere Feld bleibt leer. Wuerde sie
-    hineingeschrieben, haette der erste Klick auf Speichern den heutigen
-    Wortlaut eingefroren -- samt Paragraf, samt spaeterer Korrektur.
+
+def _regel(
+    r: Regel,
+    eigener: Regeltext | None = None,
+    parameter: list[Regelparameter] | None = None,
+    wahl: Regelwahl | None = None,
+) -> RegelAusgabe:
+    """Der Katalogeintrag, wie er fuer diesen Staffelleiter gilt.
+
+    Die Vorgabe wird **mitgeschickt und nicht eingesetzt** -- bei den Saetzen
+    wie bei den Parametern: die Oberflaeche zeigt sie als Platzhalter, und das
+    leere Feld bleibt leer. Wuerde sie hineingeschrieben, haette der erste
+    Klick auf Speichern den heutigen Stand eingefroren.
     """
     vorgabe = texte.vorlage_fuer(r.schluessel)
+    parameter = parameter or []
+    eigen_aktiv = wahl.aktiv if wahl else None
+    eigene = dienst.gueltige_werte(_sichten(parameter), wahl.werte if wahl else {})
     return RegelAusgabe.model_validate(r).model_copy(
         update={
+            "aktiv": dienst.wirksam_aktiv(r.aktiv, eigen_aktiv),
             "sachverhalt": eigener.sachverhalt if eigener else "",
             "hinweis": eigener.hinweis if eigener else "",
             "vorgabe_sachverhalt": vorgabe.sachverhalt,
             "vorgabe_hinweis": vorgabe.hinweis,
+            "parameter": [
+                ParameterAusgabe.model_validate(
+                    {
+                        "schluessel": p.schluessel,
+                        "name": p.name,
+                        "art": p.art,
+                        "vorgabe": p.vorgabe,
+                        "kleinst": p.kleinst,
+                        "groesst": p.groesst,
+                        "erklaerung": p.erklaerung,
+                        "wert": eigene.get(p.schluessel),
+                    }
+                )
+                for p in parameter
+            ],
+            "angepasst": dienst.ist_angepasst(eigen_aktiv, eigene, _sichten(parameter)),
         }
     )
+
+
+async def _katalog_fuer(sitzung: DbSitzung, benutzer_id: uuid.UUID) -> list[RegelAusgabe]:
+    eigene = await speicher.regeltexte(sitzung)
+    parameter = await speicher.regelparameter(sitzung)
+    wahl = await speicher.regelwahlen(sitzung, benutzer_id)
+    return [
+        _regel(r, eigene.get(r.schluessel), parameter.get(r.schluessel), wahl.get(r.schluessel))
+        for r in await speicher.regeln(sitzung)
+    ]
 
 
 # ── Regeldateien ──────────────────────────────────────────────────────────
@@ -892,10 +1015,34 @@ async def regeldatei_loeschen(datei_id: uuid.UUID, sitzung: DbSitzung) -> Respon
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/regeln", summary="Was geprüft wird")
-async def regeln(sitzung: DbSitzung) -> list[RegelAusgabe]:
-    eigene = await speicher.regeltexte(sitzung)
-    return [_regel(r, eigene.get(r.schluessel)) for r in await speicher.regeln(sitzung)]
+@router.get("/regeln", summary="Was geprüft wird -- im eigenen Regelsatz")
+async def regeln(sitzung: DbSitzung, benutzer: AktuellerBenutzer) -> list[RegelAusgabe]:
+    return await _katalog_fuer(sitzung, benutzer.id)
+
+
+@router.get(
+    "/regelsatz",
+    summary="Der Regelsatz, mit dem eine Staffel geprüft wird",
+    # Der Pruefdienst meldet sich als Verwalter an. Sonst liest hier niemand
+    # mit, was ein anderer Staffelleiter fuer sich eingestellt hat.
+    dependencies=[erfordert("staffelpilot", Rolle.VERWALTER)],
+)
+async def regelsatz(staffel_id: uuid.UUID, sitzung: DbSitzung) -> RegelsatzAusgabe:
+    """Fuer den Prueflauf: der Satz dessen, der die Staffel leitet.
+
+    Leitet sie niemand, gelten die Vorgaben. Die Werte stehen vollstaendig da;
+    der Pruefdienst soll nicht wissen muessen, was hier Vorgabe ist.
+    """
+    await speicher.staffel(sitzung, staffel_id)
+    konto, name = (await speicher.leitungen(sitzung)).get(staffel_id, (None, ""))
+    wahl = await speicher.regelwahlen(sitzung, konto) if konto else {}
+    parameter = await speicher.regelparameter(sitzung)
+    aus, werte = dienst.regelsatz_aus(
+        [(r.schluessel, r.aktiv) for r in await speicher.regeln(sitzung)],
+        {k: _sichten(v) for k, v in parameter.items()},
+        {k: (w.aktiv, w.werte) for k, w in wahl.items()},
+    )
+    return RegelsatzAusgabe(staffelleiter=name, aus=aus, werte=werte)
 
 
 @router.put(
@@ -919,7 +1066,9 @@ async def staffeln_aus_dfbnet(daten: StaffelnAusDfbnet, sitzung: DbSitzung) -> S
 
 
 @router.put("/regeln", summary="Den Regelkatalog einspielen")
-async def regelkatalog_setzen(daten: RegelkatalogSetzen, sitzung: DbSitzung) -> list[RegelAusgabe]:
+async def regelkatalog_setzen(
+    daten: RegelkatalogSetzen, sitzung: DbSitzung, benutzer: AktuellerBenutzer
+) -> list[RegelAusgabe]:
     """Der Prüfdienst meldet, was es gibt.
 
     Was er nicht mehr meldet, verschwindet -- ein Schalter für eine Regel, die
@@ -927,14 +1076,17 @@ async def regelkatalog_setzen(daten: RegelkatalogSetzen, sitzung: DbSitzung) -> 
     übrigen bleiben stehen: `aktiv` gehört dem Staffelleiter, nicht dem
     Katalog.
     """
-    katalog = await speicher.regelkatalog_setzen(sitzung, daten.regeln)
-    eigene = await speicher.regeltexte(sitzung)
-    return [_regel(r, eigene.get(r.schluessel)) for r in katalog]
+    await speicher.regelkatalog_setzen(sitzung, daten.regeln)
+    return await _katalog_fuer(sitzung, benutzer.id)
 
 
-@router.patch("/regeln/{regel_id}", summary="Eine Regel umschalten oder umformulieren")
+@router.patch(
+    "/regeln/{regel_id}",
+    summary="Eine Regel umschalten, einstellen oder umformulieren",
+    dependencies=NUTZER,
+)
 async def regel_aendern(
-    regel_id: uuid.UUID, daten: RegelAendern, sitzung: DbSitzung
+    regel_id: uuid.UUID, daten: RegelAendern, sitzung: DbSitzung, benutzer: AktuellerBenutzer
 ) -> RegelAusgabe:
     """Was an einer Regel dem Staffelleiter gehört: der Schalter und die Sätze.
 
@@ -945,8 +1097,17 @@ async def regel_aendern(
     Die Sätze dagegen wirken hier: sie stehen im nächsten Schreiben, das aus
     einem Befund dieser Regel entsteht. **Schon abgeschickte Schreiben ändern
     sich nicht** -- ihr Text liegt am Vorgang und nicht an dieser Zeile.
+
+    Schalter und Werte gelten **nur fuer den, der sie setzt** -- und damit fuer
+    die Staffeln, die er leitet.
     """
-    return _regel(*await speicher.regel_aendern(sitzung, regel_id, daten))
+    regel, text = await speicher.regel_aendern(sitzung, regel_id, daten)
+    parameter = (await speicher.regelparameter(sitzung)).get(regel.schluessel, [])
+    werte = None
+    if daten.werte is not None:
+        werte = dienst.eigene_werte(_sichten(parameter), daten.werte)
+    wahl = await speicher.regelwahl_setzen(sitzung, benutzer.id, regel, daten.aktiv, werte)
+    return _regel(regel, text, parameter, wahl)
 
 
 # ── Aufträge: Prüflauf und Initialisierung ────────────────────────────────
