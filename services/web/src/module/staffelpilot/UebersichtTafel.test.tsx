@@ -140,6 +140,7 @@ describe("Die Übersicht", () => {
       befunde: 1,
       meldung: "",
       protokoll: [],
+      vor_dir: 0,
       gestartet_am: "2026-09-19T10:00:00Z",
       beendet_am: null,
       angelegt: "2026-09-19T10:00:00Z",

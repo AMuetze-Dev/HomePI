@@ -20,7 +20,8 @@ Oberfläche          Artefakt                      Prüfdienst
 ────────────────────────────────────────────────────────────────────
 "Prüflauf"  ──────► POST /auftraege
                     (angefordert)   ◄──────────── GET /auftraege/offen
-                    POST /zugang/abholen ◄──────── holt die Zugangsdaten
+                                                   nennt, wer angefordert hat
+                    POST /zugang/abholen ◄──────── holt dessen Zugangsdaten
                                                    meldet sich bei DFBnet an
                     …/fortschritt   ◄──────────── Schritt, Zahlen, Protokoll
                     POST /import    ◄──────────── die gelesenen Spiele
@@ -31,6 +32,30 @@ Prüflauf-Tafel ◄─── GET /auftraege/offen
 Er meldet sich am Gateway an wie jeder andere Benutzer — kein eigener
 Schlüssel, kein Sonderweg. So steht in jedem Zugriffsprotokoll, wer gearbeitet
 hat, und ein Konto, das abhandenkommt, lässt sich sperren wie jedes andere.
+
+### Für wen er arbeitet
+
+Jeder Staffelleiter hat seine eigenen Staffeln, Einstellungen und seinen eigenen
+DFBnet-Zugang, und kein Konto sieht die eines anderen. Der Dienst muss für alle
+da sein; **welches Konto er ist**, sagt dem Artefakt die Umgebung des Gateways:
+
+```
+STAFFELPILOT_DIENSTKONTO=pruefdienst     # derselbe Name wie PRUEFDIENST_BENUTZER
+```
+
+Ohne diese Zeile ist er ein Verwalter wie jeder andere, sieht keinen Auftrag und
+tut nichts.
+
+Als er selbst sieht er nur nach, ob es etwas zu tun gibt. Alles andere geht über
+`Gateway.fuer(konto)`: jeder Aufruf nennt dann, für wen, und liefert nur, was dem
+gehört. Ein Auftrag läuft mit dem Zugang dessen, der ihn angefordert hat; eine
+Übertragung mit dem dessen, dem die Staffel gehört, und nur, wenn er sie
+freigegeben hat.
+
+Übertragungen arbeitet er **Konto für Konto** ab und nicht in der Reihenfolge des
+Vormerkens — sonst meldete er sich nach jeder Zeile um. Scheitert eine Anmeldung,
+wird sie nicht wiederholt: nach ein paar falschen Passwörtern sperrt DFBnet das
+Konto. Die Zeilen scheitern dann mit diesem Grund.
 
 ## Einrichten
 
@@ -281,9 +306,10 @@ Genau deshalb steht er in einer Datei, die sich ändern lässt.
 
 ### Wessen Regelsatz gilt
 
-Je Staffel holt der Lauf `GET /staffelpilot/regelsatz`: was aus ist und welche
-Werte gelten, bei dem, der sie leitet. Das Protokoll nennt ihn. Kommt keine
-Antwort, wird mit den Vorgaben geprüft, und auch das steht im Protokoll.
+Einmal je Lauf holt er `GET /staffelpilot/regelsatz`: was aus ist und welche
+Werte gelten, bei dem, der den Lauf angefordert hat. Das Protokoll nennt ihn.
+Kommt keine Antwort, wird mit den Vorgaben geprüft, und auch das steht im
+Protokoll.
 
 Einstellbar sind heute die Fristen nach § 59 (17): `Fristen` in `regeln.py`,
 gemeldet mit dem Katalog (`_parameter_zu`). Vorgabe und geprüfte Zahl stehen an

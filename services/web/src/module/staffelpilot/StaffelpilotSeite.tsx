@@ -18,7 +18,6 @@ import {
 } from "../../ui";
 import {
   entscheide,
-  gibStaffelAb,
   hakeAb,
   ladeEinrichtung,
   ladeSpiel,
@@ -31,7 +30,6 @@ import {
   legeStaffelAn,
   loescheStaffel,
   loeseHaken,
-  uebernimmStaffel,
   type Befund,
   type Einrichtungsstand,
   type Schwere,
@@ -253,8 +251,6 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
           onAnlegen={(daten) => mitFehlerbehandlung(() => legeStaffelAn(daten))}
           onAendern={(id, daten) => mitFehlerbehandlung(() => aendereStaffel(id, daten))}
           onLoeschen={(id) => mitFehlerbehandlung(() => loescheStaffel(id))}
-          onUebernehmen={(id) => mitFehlerbehandlung(() => uebernimmStaffel(id))}
-          onAbgeben={(id) => mitFehlerbehandlung(() => gibStaffelAb(id))}
         />
       </>
     );
@@ -278,12 +274,7 @@ export function StaffelpilotSeite({ unterseite = "uebersicht" }: ModulProps) {
   }
 
   if (unterseite === "regeln") {
-    return (
-      <RegelnTafel
-        staffeln={staffeln}
-        onStaffelnGeaendert={() => void laden(staffelFilter, nurFaellig)}
-      />
-    );
+    return <RegelnTafel />;
   }
 
   if (unterseite === "leitfaden") {

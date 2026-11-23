@@ -18,8 +18,6 @@ function staffel(rest: Partial<api.Staffel> = {}): api.Staffel {
     spieltage: 0,
     sportgericht: "",
     aktiv: true,
-    staffelleiter: "Aaron",
-    leite_ich: true,
     ...rest,
   };
 }

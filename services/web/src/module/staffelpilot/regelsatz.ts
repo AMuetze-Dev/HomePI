@@ -175,9 +175,3 @@ export function fristsatz(parameter: readonly Parameter[], eingaben: Eingaben): 
   if (kulanz && kulanz !== "0") satz += `, dazu ${kulanz} Std. Kulanz`;
   return `${satz}.`;
 }
-
-/** „A", „A und B", „A, B und C". */
-export function aufzaehlung(namen: readonly string[]): string {
-  if (namen.length <= 1) return namen.join("");
-  return `${namen.slice(0, -1).join(", ")} und ${namen[namen.length - 1]}`;
-}

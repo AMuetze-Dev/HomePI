@@ -27,6 +27,33 @@ async def staffel_anlegen(client: AsyncClient, **abweichend: Any) -> str:
     return str(antwort.json()["id"])
 
 
+def dfbnet_zeile(**abweichend: Any) -> dict[str, Any]:
+    """Eine Staffel, wie DFBnet sie unter "Eigene Staffeln" fuehrt."""
+    return {
+        "kennung": "633203",
+        "name": STAFFEL["name"],
+        "spielklasse": STAFFEL["spielklasse"],
+        "altersklasse": STAFFEL["altersklasse"],
+        "saison": STAFFEL["saison"],
+        **abweichend,
+    }
+
+
+async def konto_von(client: AsyncClient) -> str:
+    return str((await client.get("/auth/ich")).json()["id"])
+
+
+async def aus_dfbnet(dienst: AsyncClient, fuer: AsyncClient, *zeilen: dict[str, Any]) -> Any:
+    """Was der Pruefdienst nach "Meine Staffeln aus DFBnet holen" schickt."""
+    antwort = await dienst.put(
+        "/staffelpilot/staffeln/aus-dfbnet",
+        params={"konto": await konto_von(fuer)},
+        json={"staffeln": list(zeilen) or [dfbnet_zeile()]},
+    )
+    assert antwort.status_code == 200, antwort.text
+    return antwort.json()
+
+
 def spiel(dfbnet_id: str = "M-1", **abweichend: Any) -> dict[str, Any]:
     return {
         "dfbnet_id": dfbnet_id,

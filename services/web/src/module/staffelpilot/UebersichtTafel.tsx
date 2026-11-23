@@ -25,6 +25,7 @@ import {
   ladeZusammenfassung,
 } from "./api";
 import { alsDatum } from "./datum";
+import { wartesatz } from "./ergebnis";
 import stil from "./StaffelpilotSeite.module.css";
 import { meldung } from "../../api/client";
 
@@ -135,7 +136,7 @@ export function UebersichtTafel({ onWechsel }: { onWechsel: (reiter: string) => 
             </Etikett>
           </div>
           <p className={stil.vorgangHinweis}>
-            {auftrag.fortschritt} % · {auftrag.schritt || "Wartet auf den Prüfdienst"}
+            {auftrag.fortschritt} % · {auftrag.schritt || wartesatz(auftrag.vor_dir)}
           </p>
           <div className={stil.knoepfe}>
             <Knopf

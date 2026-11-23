@@ -14,3 +14,15 @@ export function ergebnisSatz(z: AuftragZeile): string {
   if (z.gepruefte === 0) return "Keine Spielberichte im Prüfzeitraum";
   return `${z.gepruefte} geprüft, ${z.befunde} Befunde`;
 }
+
+/**
+ * Was dasteht, solange ein Auftrag wartet.
+ *
+ * Der Prüfdienst arbeitet die Aufträge aller Konten nacheinander ab. Ohne die
+ * Zahl sähe Warten aus wie ein Dienst, der nicht läuft.
+ */
+export function wartesatz(vorDir: number): string {
+  if (vorDir === 1) return "Wartet, vor dir ist noch ein Auftrag";
+  if (vorDir > 1) return `Wartet, vor dir sind noch ${vorDir} Aufträge`;
+  return "Wartet auf den Prüfdienst";
+}

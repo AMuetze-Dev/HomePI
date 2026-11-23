@@ -9,13 +9,6 @@
   color: var(--farbe-text-gedaempft);
 }
 
-.freie {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--raum-2) var(--raum-4);
-}
-
 .liste {
   display: flex;
   flex-direction: column;

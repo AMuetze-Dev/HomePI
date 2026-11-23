@@ -14,6 +14,7 @@ from collections.abc import Iterable, Mapping
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from uuid import UUID
 
 from cryptography.fernet import Fernet, InvalidToken
 from homepi_core import ServiceError
@@ -307,7 +308,7 @@ class WertUnbrauchbar(ServiceError):
 
 @dataclass(frozen=True, slots=True)
 class Einstellungen:
-    """Was fuer die ganze Installation gilt.
+    """Was ein Staffelleiter fuer sich eingestellt hat.
 
     Als eigener Typ und nicht als dict: so steht jede Voreinstellung genau
     einmal da, und ein Tippfehler im Schluessel faellt beim Uebersetzen auf
@@ -872,11 +873,12 @@ _AUFTRAGSWEGE: dict[str, tuple[str, ...]] = {
 
 
 def darf_angefordert_werden(offene: int) -> None:
-    """Einer nach dem anderen.
+    """Je Konto einer nach dem anderen.
 
-    Es gibt genau eine DFBnet-Sitzung. Zwei Laeufe gleichzeitig hiessen zwei
-    Browser an derselben Anmeldung, und der zweite wirft den ersten hinaus -
-    mitten in einem halb gelesenen Spielbericht.
+    Zwei Laeufe gleichzeitig hiessen zwei Browser an derselben Anmeldung, und
+    der zweite wirft den ersten hinaus - mitten in einem halb gelesenen
+    Spielbericht. Die Auftraege verschiedener Konten stehen einander nicht im
+    Weg; der Pruefdienst arbeitet sie der Reihe nach ab.
     """
     if offene:
         raise SchonUnterwegs("Es ist bereits ein Auftrag unterwegs. Erst abwarten oder abbrechen.")
@@ -1126,11 +1128,6 @@ class ParameterUngueltig(ServiceError):
     title = "Wert nicht zulässig"
 
 
-class StaffelGeleitet(ServiceError):
-    status = 409
-    title = "Staffel hat schon einen Staffelleiter"
-
-
 _UHRZEIT = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 
 
@@ -1273,20 +1270,90 @@ def ist_angepasst(
     return eigen_aktiv is not None or bool(gueltige_werte(parameter, eigene))
 
 
-def uebernahme_pruefen(*, leiter: str | None, ich: str, leiter_name: str = "") -> None:
-    """Eine Staffel uebernehmen: nur eine freie, oder die eigene."""
-    if leiter is not None and leiter != ich:
-        raise StaffelGeleitet(
-            f"Diese Staffel leitet {leiter_name or 'jemand anderes'}. "
-            "Erst wenn sie abgegeben ist, lässt sie sich übernehmen."
-        )
+# ── Wer was sieht ─────────────────────────────────────────────────────────
+#
+# Eine Staffel gehoert dem, der sie anlegt, und mit ihr alles, was daran haengt.
+# Die Rolle aendert daran nichts: ein Verwalter betreibt das Artefakt, er
+# liest nicht die Berichte der anderen.
+#
+# Die eine Ausnahme ist der Pruefdienst. Er ist kein Mensch, muss fuer alle
+# arbeiten -- und wird deshalb **benannt** und nicht an der Rolle erkannt.
 
 
-def abgabe_pruefen(*, leiter: str | None, ich: str, verwalter: bool) -> None:
-    """Eine Staffel abgeben: der Staffelleiter selbst, oder ein Verwalter.
+class KontoFremd(ServiceError):
+    status = 403
+    title = "Nicht erlaubt"
 
-    Der Verwalter, weil sonst die Staffel eines Staffelleiters, der aufhoert,
-    fuer immer bei ihm bliebe.
+
+class KontoFehlt(ServiceError):
+    status = 422
+    title = "Konto fehlt"
+
+
+class NurPruefdienst(ServiceError):
+    status = 403
+    title = "Nicht erlaubt"
+
+
+#: Welches Konto der Pruefdienst ist. Steht beim Gateway in der Umgebung, also
+#: dort, wo auch der Schluessel fuer die Zugangsdaten steht. Nicht gesetzt
+#: heisst: niemand.
+DIENSTKONTO_VARIABLE = "STAFFELPILOT_DIENSTKONTO"
+
+
+def ist_dienstkonto(name: str, *, verwalter: bool, dienstkonto: str) -> bool:
+    """Der Name **und** das Recht.
+
+    Der Name allein reichte nicht: wer dem Konto das Recht entzieht, soll ihm
+    damit auch den Blick auf alles nehmen.
     """
-    if leiter is not None and leiter != ich and not verwalter:
-        raise StaffelGeleitet("Abgeben kann eine Staffel nur, wer sie leitet.")
+    gesucht = dienstkonto.strip().casefold()
+    return bool(gesucht) and verwalter and name.casefold() == gesucht
+
+
+@dataclass(frozen=True, slots=True)
+class Blick:
+    """Mit wessen Augen diese Anfrage sieht.
+
+    `konto=None` heisst *alles*, und das gibt es nur beim Pruefdienst.
+    """
+
+    konto: UUID | None
+    dienst: bool = False
+
+
+def blick_fuer(*, ich: UUID, ist_dienst: bool, konto: UUID | None) -> Blick:
+    """Ein Mensch sieht sich; der Pruefdienst alles oder genau ein Konto."""
+    if ist_dienst:
+        return Blick(konto=konto, dienst=True)
+    if konto is not None and konto != ich:
+        raise KontoFremd("Für ein anderes Konto arbeitet nur der Prüfdienst.")
+    return Blick(konto=ich)
+
+
+def konto_von(blick: Blick) -> UUID:
+    """Einstellungen, Sätze und Zugang gehören jemandem -- also braucht es ihn."""
+    if blick.konto is None:
+        raise KontoFehlt("Es fehlt, für welches Konto: ?konto=<Kennung>")
+    return blick.konto
+
+
+def name_frei(name: str, vorhandene: Iterable[str]) -> None:
+    """Zwei eigene Staffeln desselben Namens hält niemand auseinander."""
+    if name in set(vorhandene):
+        raise StaffelVergeben(f"Eine Staffel namens '{name}' gibt es bereits")
+
+
+def kennung_aus_referenz(referenz: str) -> UUID:
+    """Worauf sich eine Übertragung bezieht. Was keine Kennung ist, gibt es nicht."""
+    try:
+        return UUID(referenz)
+    except ValueError as fehler:
+        raise UebertragungUnbekannt(f"Dazu gibt es nichts: {referenz!r}") from fehler
+
+
+def freigegebene(roh: Mapping[UUID, Mapping[str, str]]) -> set[UUID]:
+    """Wessen Übertragungen hinaus dürfen -- je Konto, und ab Werk keine."""
+    return {
+        konto for konto, werte in roh.items() if not einstellungen_aus(werte).uebertragung_pausiert
+    }

@@ -104,6 +104,9 @@ class FalschesGateway:
             }
         }
         self.zugang_geholt = 0
+        # Fuer wen gerade gearbeitet wird. Leer: fuer niemand Bestimmten.
+        self.konto = ""
+        self.zugaenge: list[str] = []
         self.uebernommen_staffeln: list[list[dict[str, Any]]] = []
         # Wie nach der Uebergabe: das Artefakt fuehrt die mitgelieferten
         # Regeln, und der Dienst schreibt sie sich in seinen Ordner.
@@ -120,13 +123,22 @@ class FalschesGateway:
         # eines. Leer heisst: DFBnet hat keines gezeigt.
         self.aktenzeichen: list[str] = []
         self._warteschlange = [
-            {"id": f"u{i + 1}", "aktion": "prueferfreigabe", "spiel_id": "sp1", "referenz": "sp1"}
+            {
+                "id": f"u{i + 1}",
+                "aktion": "prueferfreigabe",
+                "spiel_id": "sp1",
+                "referenz": "sp1",
+                "konto": "k1",
+            }
             for i in range(offen)
         ]
 
     # Was der Prueflauf davon braucht:
+    def fuer(self, konto: str) -> FuerKonto:
+        return FuerKonto(self, konto)
+
     def offener_auftrag(self) -> dict[str, Any] | None:
-        return self._auftrag
+        return {"konto": "k1", **self._auftrag} if self._auftrag else None
 
     def staffeln(self) -> list[dict[str, Any]]:
         return self._staffeln
@@ -136,7 +148,8 @@ class FalschesGateway:
 
     def zugang(self) -> tuple[str, str]:
         self.zugang_geholt += 1
-        return "dfbnet-benutzer", "dfbnet-passwort"
+        self.zugaenge.append(self.konto)
+        return f"dfbnet-{self.konto}", "dfbnet-passwort"
 
     def fortschritt(self, auftrag_id: str, **felder: Any) -> None:
         self.fortschritte.append({"id": auftrag_id, **felder})
@@ -162,9 +175,9 @@ class FalschesGateway:
         self.katalog = regeln
         return [{**r, "aktiv": r["schluessel"] not in self.abgeschaltet} for r in regeln]
 
-    def regelsatz(self, staffel_id: str) -> dict[str, Any]:
+    def regelsatz(self) -> dict[str, Any]:
         return self.regelsaetze.get(
-            staffel_id, {"staffelleiter": "", "aus": sorted(self.abgeschaltet), "werte": {}}
+            self.konto, {"staffelleiter": "", "aus": sorted(self.abgeschaltet), "werte": {}}
         )
 
     def spiel(self, spiel_id: str) -> dict[str, Any]:
@@ -212,9 +225,11 @@ class FalschesGateway:
         }
 
     def uebertragung_uebernehmen(self) -> dict[str, Any] | None:
-        if not self._warteschlange:
+        meine = [z for z in self._warteschlange if self.konto in ("", z["konto"])]
+        if not meine:
             return None
-        naechste = self._warteschlange.pop(0)
+        naechste = meine[0]
+        self._warteschlange.remove(naechste)
         self.uebernommen.append(str(naechste["id"]))
         return naechste
 
@@ -232,6 +247,29 @@ class FalschesGateway:
     @property
     def schritte(self) -> str:
         return " | ".join(str(f.get("schritt", "")) for f in self.fortschritte)
+
+
+class FuerKonto:
+    """Dasselbe Gateway, aber fuer ein Konto -- wie `Gateway.fuer`.
+
+    Setzt fuer die Dauer eines Aufrufs, fuer wen gearbeitet wird. Wer am Konto
+    vorbei ruft, ruft `FalschesGateway` selbst und steht dann mit leerem Konto
+    da -- genau das soll ein Test sehen koennen.
+    """
+
+    def __init__(self, gateway: FalschesGateway, konto: str) -> None:
+        self._gateway = gateway
+        self._konto = konto
+
+    def __getattr__(self, name: str) -> Any:
+        def ruf(*args: Any, **kwargs: Any) -> Any:
+            vorher, self._gateway.konto = self._gateway.konto, self._konto
+            try:
+                return getattr(self._gateway, name)(*args, **kwargs)
+            finally:
+                self._gateway.konto = vorher
+
+        return ruf
 
 
 def mitgelieferte_regeldateien() -> list[dict[str, Any]]:
@@ -352,8 +390,8 @@ class TestRegelkatalog:
         assert gateway.importe
 
 
-class TestRegelsatzJeStaffel:
-    """Welcher Regelsatz gilt, hängt an der Staffel -- an dem, der sie leitet."""
+class TestRegelsatz:
+    """Geprüft wird mit dem Satz dessen, der den Lauf angefordert hat."""
 
     @staticmethod
     def _bericht(kennung: str) -> MatchReport:
@@ -373,38 +411,38 @@ class TestRegelsatzJeStaffel:
     def _lauf(
         self, regelsaetze: dict[str, dict[str, Any]], klasse: type[FalschesGateway] | None = None
     ) -> FalschesGateway:
-        zweite = {**STAFFEL, "id": "s2", "name": "Stadtliga D"}
-        gateway = (klasse or FalschesGateway)(
-            {"id": "a1", "art": "pruflauf", "staffel_id": None}, staffeln=[STAFFEL, zweite]
-        )
+        gateway = (klasse or FalschesGateway)({"id": "a1", "art": "pruflauf", "staffel_id": None})
         gateway.regelsaetze = regelsaetze
         leser = DemoLeser(
-            {"Stadtliga C": [zeile("M-1")], "Stadtliga D": [zeile("M-2")]},
-            berichte_je_spiel={"M-1": self._bericht("M-1"), "M-2": self._bericht("M-2")},
+            {"Stadtliga C": [zeile("M-1")]}, berichte_je_spiel={"M-1": self._bericht("M-1")}
         )
         lauf(gateway, leser).runde()
         return gateway
 
     @staticmethod
-    def _befunde(gateway: FalschesGateway) -> dict[str, set[str]]:
+    def _befunde(gateway: FalschesGateway) -> set[str]:
         return {
-            staffel_id: {str(b["regel"]) for s in spiele for b in s["befunde"]}
-            for staffel_id, spiele in gateway.importe
+            str(b["regel"]) for _, spiele in gateway.importe for s in spiele for b in s["befunde"]
         }
 
-    def test_jede_staffel_bekommt_ihren_schalter(self) -> None:
+    def test_der_schalter_des_anforderers_gilt(self) -> None:
         gateway = self._lauf(
-            {"s1": {"staffelleiter": "Erika", "aus": ["release_late"], "werte": {}}}
+            {"k1": {"staffelleiter": "Erika", "aus": ["release_late"], "werte": {}}}
         )
 
-        befunde = self._befunde(gateway)
-        assert "release_late" not in befunde["s1"]
-        assert "release_late" in befunde["s2"]
+        assert "release_late" not in self._befunde(gateway)
 
-    def test_und_ihre_werte(self) -> None:
+    def test_der_eines_anderen_nicht(self) -> None:
+        gateway = self._lauf(
+            {"k2": {"staffelleiter": "Erika", "aus": ["release_late"], "werte": {}}}
+        )
+
+        assert "release_late" in self._befunde(gateway)
+
+    def test_und_seine_werte(self) -> None:
         gateway = self._lauf(
             {
-                "s1": {
+                "k1": {
                     "staffelleiter": "Erika",
                     "aus": [],
                     "werte": {"release_late": {"kulanz": 6}},
@@ -412,37 +450,34 @@ class TestRegelsatzJeStaffel:
             }
         )
 
-        befunde = self._befunde(gateway)
-        assert "release_late" not in befunde["s1"]
-        assert "release_late" in befunde["s2"]
+        assert "release_late" not in self._befunde(gateway)
 
     def test_das_protokoll_nennt_wessen_satz_galt(self) -> None:
         gateway = self._lauf(
-            {"s1": {"staffelleiter": "Erika", "aus": ["release_late"], "werte": {}}}
+            {"k1": {"staffelleiter": "Erika", "aus": ["release_late"], "werte": {}}}
         )
 
         zeilen = [str(f.get("zeile", "")) for f in gateway.fortschritte]
-        assert "Stadtliga C: Regelsatz von Erika, 1 Regel(n) abgeschaltet" in zeilen
-        assert "Stadtliga D: ohne Staffelleiter, es gelten die Vorgaben" in zeilen
+        assert "Regelsatz von Erika, 1 Regel(n) abgeschaltet" in zeilen
 
     def test_ohne_regelsatz_wird_mit_den_vorgaben_geprueft(self) -> None:
         """Und zwar laut: wer eine Kulanz eingestellt hat und trotzdem eine
         Verspätung sieht, soll im Protokoll lesen können, warum."""
 
         class Stumm(FalschesGateway):
-            def regelsatz(self, staffel_id: str) -> dict[str, Any]:
+            def regelsatz(self) -> dict[str, Any]:
                 raise GatewayFehler("Artefakt weg")
 
         gateway = self._lauf({}, Stumm)
 
         assert gateway.abschluesse[0][1] == "fertig"
-        assert "release_late" in self._befunde(gateway)["s1"]
+        assert "release_late" in self._befunde(gateway)
         zeilen = [str(f.get("zeile", "")) for f in gateway.fortschritte]
         assert any("Regelsatz liess sich nicht lesen" in z for z in zeilen)
 
     def test_dann_gelten_auch_die_schalter_der_vorgabe(self) -> None:
         class Stumm(FalschesGateway):
-            def regelsatz(self, staffel_id: str) -> dict[str, Any]:
+            def regelsatz(self) -> dict[str, Any]:
                 raise GatewayFehler("Artefakt weg")
 
             def regelkatalog_setzen(self, regeln: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -451,7 +486,62 @@ class TestRegelsatzJeStaffel:
 
         gateway = self._lauf({}, Stumm)
 
-        assert "release_late" not in self._befunde(gateway)["s1"]
+        assert "release_late" not in self._befunde(gateway)
+
+
+class TestFuerWen:
+    """Jeder Auftrag wird mit den Augen und dem Zugang dessen abgearbeitet, der
+    ihn angefordert hat."""
+
+    def test_mit_seinem_zugang(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "anmeldeprobe", "konto": "k7"})
+        leser = DemoLeser()
+
+        lauf(gateway, leser).runde()
+
+        assert gateway.zugaenge == ["k7"]
+        assert leser.angemeldet_als == "dfbnet-k7"
+
+    @pytest.mark.parametrize("art", ["pruflauf", "initialisierung", "staffeln"])
+    def test_kein_aufruf_geht_am_konto_vorbei(self, art: str) -> None:
+        """Mit leerem Konto sähe der Dienst die Staffeln aller."""
+        gesehen: list[tuple[str, str]] = []
+
+        class Merkt(FalschesGateway):
+            def __getattribute__(self, name: str) -> Any:
+                wert = super().__getattribute__(name)
+                if callable(wert) and not name.startswith("_"):
+                    gesehen.append((name, super().__getattribute__("konto")))
+                return wert
+
+        gateway = Merkt({"id": "a1", "art": art, "konto": "k7"})
+        leser = DemoLeser({"Stadtliga C": [zeile()]})
+        leser._eigene_staffeln = [{"name": "Stadtliga C"}]
+
+        lauf(gateway, leser).runde()
+
+        vorbei = {name for name, konto in gesehen if konto != "k7"}
+        # Nur nachsehen darf er als er selbst.
+        assert vorbei <= {"fuer", "offener_auftrag", "uebertragung"}
+
+    def test_danach_ist_er_wieder_fuer_alle_da(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "anmeldeprobe", "konto": "k7"})
+        dienst_lauf = lauf(gateway, DemoLeser())
+
+        dienst_lauf.runde()
+        dienst_lauf.runde()
+
+        assert gateway.zugaenge == ["k7", "k7"]
+        assert gateway.konto == ""
+
+    def test_ohne_anforderer_wird_nicht_gearbeitet(self) -> None:
+        gateway = FalschesGateway({"id": "a1", "art": "pruflauf", "konto": None})
+
+        lauf(gateway).runde()
+
+        assert gateway.zugang_geholt == 0
+        assert gateway.abschluesse[0][1] == "gescheitert"
+        assert "wer ihn angefordert hat" in gateway.abschluesse[0][2]
 
 
 class TestAnmeldeprobe:
@@ -674,7 +764,7 @@ class TestPrueflauf:
 
         assert lauf(gateway, leser).runde() is True
 
-        assert leser.angemeldet_als == "dfbnet-benutzer"
+        assert leser.angemeldet_als == "dfbnet-k1"
         assert gateway.importe == [
             (
                 "s1",
@@ -786,7 +876,7 @@ class TestPrueflauf:
 
         assert "Melde mich bei DFBnet an" in gateway.schritte
         assert "Lese Stadtliga C" in gateway.schritte
-        assert "Angemeldet als dfbnet-benutzer" in gateway.protokoll
+        assert "Angemeldet als dfbnet-k1" in gateway.protokoll
 
     def test_das_passwort_steht_in_keiner_meldung(self) -> None:
         """Was im Protokoll steht, liest irgendwann jemand vor."""
@@ -927,6 +1017,62 @@ class TestUebertragung:
 
         assert leser.freigegeben == ["M-1"]
         assert gateway.gemeldet[0][1] == "fertig"
+
+    def test_davor_meldet_er_sich_mit_dem_richtigen_zugang_an(self) -> None:
+        gateway = FalschesGateway(pausiert=False, offen=2)
+        leser = DemoLeser({"Stadtliga C": [zeile("M-1")]})
+
+        lauf(gateway, leser, darf_schreiben=True).runde()
+
+        # Einmal fuer beide Zeilen, und danach ist der Browser zu.
+        assert gateway.zugaenge == ["k1"]
+        assert leser.angemeldet_als == "dfbnet-k1"
+        assert leser.geschlossen
+
+    def test_je_konto_einmal_und_nicht_je_zeile(self) -> None:
+        gateway = FalschesGateway(pausiert=False, offen=4)
+        for z, konto in zip(gateway._warteschlange, ["k1", "k2", "k1", "k2"], strict=True):
+            z["konto"] = konto
+        leser = DemoLeser({"Stadtliga C": [zeile("M-1")]})
+
+        lauf(gateway, leser, darf_schreiben=True).runde()
+
+        assert gateway.zugaenge == ["k1", "k2"]
+        assert gateway.uebernommen == ["u1", "u3", "u2", "u4"]
+        assert [m[1] for m in gateway.gemeldet] == ["fertig"] * 4
+
+    def test_scheitert_die_anmeldung_wird_sie_nicht_wiederholt(self) -> None:
+        """Nach ein paar falschen Passwörtern sperrt DFBnet das Konto."""
+        versuche: list[str] = []
+
+        class Verweigert(DemoLeser):
+            def anmelden(self, benutzer: str, passwort: str) -> None:
+                versuche.append(benutzer)
+                if benutzer == "dfbnet-k1":
+                    raise RuntimeError("Passwort falsch\nCall log: fill('geheim')")
+
+        gateway = FalschesGateway(pausiert=False, offen=3)
+        gateway._warteschlange[2]["konto"] = "k2"
+
+        lauf(gateway, Verweigert({"Stadtliga C": [zeile("M-1")]}), darf_schreiben=True).runde()
+
+        assert versuche == ["dfbnet-k1", "dfbnet-k2"]
+        assert [m[1] for m in gateway.gemeldet] == ["fehler", "fehler", "fertig"]
+        assert "Passwort falsch" in gateway.gemeldet[0][2]
+        # Playwright schreibt mit, was es eingetippt hat.
+        assert "geheim" not in gateway.gemeldet[0][2]
+
+    def test_ein_fehler_haelt_die_anderen_nicht_auf(self) -> None:
+        class Stolpert(DemoLeser):
+            def spiele(self, *_: Any) -> list[Spielzeile]:
+                raise dienst.StaffelNichtGefunden("Die Staffel gibt es in DFBnet nicht")
+
+        gateway = FalschesGateway(pausiert=False, offen=2)
+
+        lauf(gateway, Stolpert(), darf_schreiben=True).runde()
+
+        assert [m[1] for m in gateway.gemeldet] == ["fehler", "fehler"]
+        assert "gibt es in DFBnet nicht" in gateway.gemeldet[0][2]
 
     def test_ohne_den_bericht_in_der_trefferliste_passiert_nichts(self) -> None:
         """Der Bericht wird über den Verweis in der Liste geöffnet. Steht er

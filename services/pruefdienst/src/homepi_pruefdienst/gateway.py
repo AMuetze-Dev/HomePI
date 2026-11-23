@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from typing import Any
 
@@ -36,7 +37,9 @@ class Gateway:
     """Der Prüfdienst meldet sich wie jeder andere Benutzer an.
 
     Kein eigener Schlüssel, kein Sonderweg: er bekommt ein Konto mit der Rolle
-    `verwalter` für `staffelpilot` und ein Sitzungscookie wie ein Mensch. So
+    `verwalter` für `staffelpilot` und ein Sitzungscookie wie ein Mensch. Dass
+    es das Konto des Dienstes ist, weiß das Artefakt aus seiner Umgebung
+    (`STAFFELPILOT_DIENSTKONTO`); nur dieses eine sieht alle Staffelleiter. So
     steht in jedem Zugriffsprotokoll, wer gearbeitet hat, und ein Konto, das
     abhandenkommt, lässt sich sperren wie jedes andere.
     """
@@ -45,6 +48,20 @@ class Gateway:
         self._benutzer = benutzer
         self._passwort = passwort
         self._client = httpx.Client(base_url=basis.rstrip("/"), timeout=zeit_s)
+        self._konto = ""
+
+    def fuer(self, konto: str) -> Gateway:
+        """Dasselbe Gateway, aber mit den Augen eines Staffelleiters.
+
+        Jeder Aufruf nennt dann sein Konto: der Dienst sieht nur dessen
+        Staffeln, liest dessen Einstellungen und holt dessen Zugang. Er
+        **koennte** alles sehen -- im Lauf eines Einzelnen soll er es nicht.
+
+        Verbindung und Sitzung sind dieselben.
+        """
+        anderes = copy.copy(self)
+        anderes._konto = konto
+        return anderes
 
     def __enter__(self) -> Gateway:
         return self
@@ -75,6 +92,8 @@ class Gateway:
         Behandlung — mehr wäre eine Schleife, die einen echten Fehler
         verschluckt.
         """
+        if self._konto:
+            kwargs["params"] = {**kwargs.get("params", {}), "konto": self._konto}
         antwort = self._client.request(methode, pfad, **kwargs)
         if antwort.status_code == 401:
             self.anmelden()
@@ -203,15 +222,10 @@ class Gateway:
             "PUT", "/staffelpilot/regeln", json={"regeln": regeln}
         )
 
-    def regelsatz(self, staffel_id: str) -> dict[str, Any]:
-        """Womit diese Staffel geprueft wird: was aus ist, welche Werte gelten.
-
-        Es ist der Satz dessen, der sie leitet. Leitet sie niemand, kommen die
-        Vorgaben zurueck.
-        """
-        return self._json(  # type: ignore[no-any-return]
-            "GET", "/staffelpilot/regelsatz", params={"staffel_id": staffel_id}
-        )
+    def regelsatz(self) -> dict[str, Any]:
+        """Der Regelsatz dessen, fuer den geprueft wird: was aus ist, welche
+        Werte gelten."""
+        return self._json("GET", "/staffelpilot/regelsatz")  # type: ignore[no-any-return]
 
     def einstellungen(self) -> dict[str, Any]:
         return self._json("GET", "/staffelpilot/einstellungen")  # type: ignore[no-any-return]

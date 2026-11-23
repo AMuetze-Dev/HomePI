@@ -7,12 +7,15 @@ setzen ihn selbst und stellen ihn hinterher zurück.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from cryptography.fernet import Fernet
 from httpx import AsyncClient
 
 from homepi_staffelpilot.dienst import SCHLUESSEL_VARIABLE
+
+from .hilfen import konto_von
 
 pytestmark = pytest.mark.integration
 
@@ -29,6 +32,12 @@ def mit_schluessel(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
 @pytest.fixture
 def ohne_schluessel(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(SCHLUESSEL_VARIABLE, raising=False)
+
+
+async def abholen(pruefdienst: AsyncClient, fuer: AsyncClient) -> Any:
+    return await pruefdienst.post(
+        "/staffelpilot/zugang/abholen", params={"konto": await konto_von(fuer)}
+    )
 
 
 class TestOhneSchluessel:
@@ -82,36 +91,36 @@ class TestMitSchluessel:
         """Ein Datenbankabzug allein soll wertlos sein."""
         from sqlalchemy import select
 
-        from homepi_staffelpilot.modelle import Zugang
+        from homepi_staffelpilot.modelle import Kontozugang
 
         await client.put("/staffelpilot/zugang", json=ZUGANG)
 
         # Über denselben Weg lesen, den ein Abzug nähme: roh.
         app = client._transport.app  # type: ignore[attr-defined]
         async with app.state.homepi.db.session() as sitzung:
-            zeile = (await sitzung.execute(select(Zugang))).scalar_one()
+            zeile = (await sitzung.execute(select(Kontozugang))).scalar_one()
 
         assert "geheim-und-lang-genug" not in zeile.geheimnis
         assert zeile.benutzer == "staffelleiter42"
 
     async def test_der_pruefdienst_holt_es_ab(
-        self, client: AsyncClient, mit_schluessel: str
+        self, client: AsyncClient, pruefdienst: AsyncClient, mit_schluessel: str
     ) -> None:
         await client.put("/staffelpilot/zugang", json=ZUGANG)
 
-        antwort = await client.post("/staffelpilot/zugang/abholen")
+        antwort = await abholen(pruefdienst, client)
 
         assert antwort.json() == ZUGANG
 
     async def test_zweimal_hinterlegen_ersetzt(
-        self, client: AsyncClient, mit_schluessel: str
+        self, client: AsyncClient, pruefdienst: AsyncClient, mit_schluessel: str
     ) -> None:
         await client.put("/staffelpilot/zugang", json=ZUGANG)
         await client.put(
             "/staffelpilot/zugang", json={"benutzer": "anderer", "passwort": "neues-passwort-hier"}
         )
 
-        antwort = await client.post("/staffelpilot/zugang/abholen")
+        antwort = await abholen(pruefdienst, client)
 
         assert antwort.json()["benutzer"] == "anderer"
         assert antwort.json()["passwort"] == "neues-passwort-hier"
@@ -130,9 +139,9 @@ class TestMitSchluessel:
         assert (await client.delete("/staffelpilot/zugang")).status_code == 204
 
     async def test_abholen_ohne_zugang_gibt_404(
-        self, client: AsyncClient, mit_schluessel: str
+        self, client: AsyncClient, pruefdienst: AsyncClient, mit_schluessel: str
     ) -> None:
-        assert (await client.post("/staffelpilot/zugang/abholen")).status_code == 404
+        assert (await abholen(pruefdienst, client)).status_code == 404
 
     async def test_ein_leeres_passwort_wird_abgelehnt(
         self, client: AsyncClient, mit_schluessel: str
@@ -144,7 +153,7 @@ class TestMitSchluessel:
 
 class TestSchluesselGetauscht:
     async def test_die_meldung_zeigt_auf_den_schluessel(
-        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+        self, client: AsyncClient, pruefdienst: AsyncClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Ein vertauschter Schluessel darf nicht wie ein falsches Passwort
         aussehen - sonst sucht jemand stundenlang bei DFBnet nach einem
@@ -153,7 +162,7 @@ class TestSchluesselGetauscht:
         await client.put("/staffelpilot/zugang", json=ZUGANG)
 
         monkeypatch.setenv(SCHLUESSEL_VARIABLE, Fernet.generate_key().decode())
-        antwort = await client.post("/staffelpilot/zugang/abholen")
+        antwort = await abholen(pruefdienst, client)
 
         assert antwort.status_code == 503
         assert SCHLUESSEL_VARIABLE in antwort.text
@@ -170,26 +179,9 @@ class TestSchluesselGetauscht:
         assert "Fernet" in antwort.text
 
 
-class TestNurVerwalter:
-    def test_schreiben_und_abholen_haengen_an_der_rolle(self) -> None:
-        """Ein Leser sieht Spielberichte. Er meldet sich nicht fuer die ganze
-        Installation bei DFBnet an -- und holt ihr Passwort schon gar nicht ab.
-
-        Geprueft wird an der Route und nicht an der Konstanten: eine Liste, die
-        niemand einhaengt, ist keine Pruefung.
-        """
-        from homepi_staffelpilot.router import router
-
-        geschuetzt = {
-            (r.path, methode)
-            for r in router.routes
-            for methode in getattr(r, "methods", set())
-            if getattr(r, "dependencies", None)
-        }
-
-        assert ("/zugang", "PUT") in geschuetzt
-        assert ("/zugang", "DELETE") in geschuetzt
-        assert ("/zugang/abholen", "POST") in geschuetzt
+class TestWerDarf:
+    """Hinterlegen darf jeder Nutzer seinen eigenen; abholen nur der Pruefdienst.
+    Beides steht in `test_router_trennung.py`."""
 
     async def test_der_stand_ist_fuer_jeden_leser_sichtbar(
         self, client: AsyncClient, ohne_schluessel: None

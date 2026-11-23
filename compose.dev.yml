@@ -116,6 +116,10 @@ services:
       # Produktion gehoert er in ein Secret. Fehlt er, weigert sich das
       # Artefakt, ein Passwort abzulegen - und sagt das.
       STAFFELPILOT_SCHLUESSEL: ${STAFFELPILOT_SCHLUESSEL:-1WuoSsS9q2oVVI5snLycfEnX63URJyb38kZJNo6vQ04=}
+      # Welches Konto der Pruefdienst ist. Nur dieses eine sieht die Staffeln
+      # aller Staffelleiter; leer heisst: keines. Derselbe Name wie oben beim
+      # Pruefdienst.
+      STAFFELPILOT_DIENSTKONTO: ${PRUEFDIENST_BENUTZER:-pruefdienst}
       # Leer = alle Artefakte. Zum Arbeiten an einem einzelnen:
       #   make dev N=tischtennis
       HOMEPI_MODULE: ${HOMEPI_MODULE:-}

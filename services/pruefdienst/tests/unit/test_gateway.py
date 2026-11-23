@@ -187,3 +187,38 @@ def test_der_client_wird_geschlossen() -> None:
         assert offen is dienst
 
     assert dienst._client.is_closed
+
+
+class TestFuerEinKonto:
+    def test_jeder_aufruf_nennt_es(self) -> None:
+        dienst, gesehen = gateway(httpx.Response(200, json=[]))
+
+        dienst.fuer("k7").staffeln()
+
+        assert gesehen[0].url.params["konto"] == "k7"
+
+    def test_neben_den_eigenen_angaben(self) -> None:
+        dienst, gesehen = gateway(httpx.Response(200, json=[]))
+
+        dienst.fuer("k7").karten("P-1")
+
+        assert dict(gesehen[0].url.params) == {"pass_nr": "P-1", "konto": "k7"}
+
+    def test_das_gateway_selbst_bleibt_wie_es_war(self) -> None:
+        dienst, gesehen = gateway(httpx.Response(200, json=[]))
+
+        dienst.fuer("k7")
+        dienst.staffeln()
+
+        assert "konto" not in gesehen[0].url.params
+
+    def test_auch_der_regelsatz_und_der_zugang(self) -> None:
+        dienst, gesehen = gateway(
+            httpx.Response(200, json={"benutzer": "b", "passwort": "p", "aus": []})
+        )
+        fuer = dienst.fuer("k7")
+
+        fuer.regelsatz()
+        fuer.zugang()
+
+        assert [g.url.params["konto"] for g in gesehen] == ["k7", "k7"]

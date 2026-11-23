@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/client";
 import { RegelnTafel } from "./RegelnTafel";
 import * as api from "./api";
-import { minuten, regel, staffel, stunden, uhrzeit } from "./regelsatz.hilfen";
+import { minuten, regel, stunden, uhrzeit } from "./regelsatz.hilfen";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -257,110 +257,13 @@ describe("Werte einer Regel", () => {
   });
 });
 
-describe("Für welche Staffeln der Regelsatz gilt", () => {
-  it("nennt die eigenen", async () => {
+describe("Für wen der Regelsatz gilt", () => {
+  it("sagt, dass es der eigene ist und ab wann er gilt", async () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
-    render(
-      <RegelnTafel
-        staffeln={[
-          staffel(),
-          staffel({ id: "s2", name: "Stadtliga D" }),
-          staffel({
-            id: "s3",
-            name: "Fremde",
-            staffelleiter: "Erika",
-            leite_ich: false,
-          }),
-        ]}
-      />,
-    );
+    render(<RegelnTafel />);
 
-    expect(
-      await screen.findByText(/prüft Stadtliga C und Stadtliga D\./),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/Fremde/)).toBeNull();
-  });
-
-  it("sagt, wenn er noch für nichts gilt", async () => {
-    // Sonst schaltet jemand und wundert sich, dass nichts passiert.
-    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
-    render(
-      <RegelnTafel staffeln={[staffel({ staffelleiter: "Erika", leite_ich: false })]} />,
-    );
-
-    expect(await screen.findByText(/Du leitest noch keine Staffel/)).toBeInTheDocument();
-  });
-
-  it("bietet an, freie Staffeln zu übernehmen", async () => {
-    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
-    const uebernehmen = vi
-      .spyOn(api, "uebernimmFreieStaffeln")
-      .mockResolvedValue({ uebernommen: 1 });
-    const neuLaden = vi.fn();
-    render(
-      <RegelnTafel
-        staffeln={[staffel({ name: "Freie", staffelleiter: "", leite_ich: false })]}
-        onStaffelnGeaendert={neuLaden}
-      />,
-    );
-
-    expect(await screen.findByText(/Freie/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Übernehmen" }));
-
-    await waitFor(() => expect(uebernehmen).toHaveBeenCalled());
-    expect(neuLaden).toHaveBeenCalled();
-  });
-
-  it("sagt, dass der Knopf alle nimmt, wenn es mehrere sind", async () => {
-    // Wer mit "Übernehmen" eine meint und alle bekommt, prüft ab dann die
-    // Staffeln anderer mit seinem Regelsatz.
-    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
-    const frei = { staffelleiter: "", leite_ich: false };
-    render(<RegelnTafel staffeln={[staffel(frei), staffel({ ...frei, id: "s2" })]} />);
-
-    expect(
-      await screen.findByRole("button", { name: "Alle 2 übernehmen" }),
-    ).toBeInTheDocument();
-  });
-
-  it("sagt, wenn das Übernehmen scheitert", async () => {
-    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
-    vi.spyOn(api, "uebernimmFreieStaffeln").mockRejectedValue(
-      new ApiError("Für 'staffelpilot' fehlt die Rolle 'nutzer'", 403),
-    );
-    const neuLaden = vi.fn();
-    render(
-      <RegelnTafel
-        staffeln={[staffel({ staffelleiter: "", leite_ich: false })]}
-        onStaffelnGeaendert={neuLaden}
-      />,
-    );
-
-    await userEvent.click(await screen.findByRole("button", { name: "Übernehmen" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("fehlt die Rolle");
-    expect(neuLaden).not.toHaveBeenCalled();
-  });
-
-  it("lässt stillgelegte Staffeln aus", async () => {
-    vi.spyOn(api, "ladeRegeln").mockResolvedValue([regel()]);
-    render(
-      <RegelnTafel
-        staffeln={[
-          staffel(),
-          staffel({
-            id: "s2",
-            name: "Vorjahr",
-            aktiv: false,
-            staffelleiter: "",
-            leite_ich: false,
-          }),
-        ]}
-      />,
-    );
-
-    await screen.findByText(/prüft Stadtliga C\./);
-    expect(screen.queryByText(/Vorjahr/)).toBeNull();
+    expect(await screen.findByText(/für alle deine Staffeln/)).toBeInTheDocument();
+    expect(screen.getByText(/ab dem nächsten Prüflauf/)).toBeInTheDocument();
   });
 });
 
@@ -448,14 +351,12 @@ describe("Die Sätze fürs Schreiben", () => {
     expect(screen.getByRole("button", { name: "Speichern" })).toBeDisabled();
   });
 
-  it("sagt, dass sie für alle Staffelleiter gelten", async () => {
-    // Schalter und Werte gehören jedem selbst, die Sätze nicht. Das steht da,
-    // bevor jemand einen überschreibt.
+  it("sagt, dass sie nur für einen selbst gelten", async () => {
     vi.spyOn(api, "ladeRegeln").mockResolvedValue([mitSatz()]);
     render(<RegelnTafel />);
     await aufklappen(/Feldverweis auf Dauer/);
 
-    expect(screen.getByText(/für alle Staffelleiter/)).toBeInTheDocument();
+    expect(screen.getByText(/nur für deine Schreiben/)).toBeInTheDocument();
   });
 });
 

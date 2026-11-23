@@ -42,6 +42,7 @@ function auftrag(rest: Partial<api.Auftrag> = {}): api.Auftrag {
     beendet_am: null,
     angelegt: "2026-10-24T08:00:00Z",
     protokoll: [],
+    vor_dir: 0,
     ...rest,
   };
 }

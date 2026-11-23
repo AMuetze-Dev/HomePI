@@ -149,27 +149,3 @@ class TestAngepasst:
 
     def test_ein_wert_ohne_parameter_zaehlt_nicht(self) -> None:
         assert dienst.ist_angepasst(None, {"weg": 1}, [KULANZ]) is False
-
-
-class TestStaffelleitung:
-    def test_eine_freie_staffel_laesst_sich_uebernehmen(self) -> None:
-        dienst.uebernahme_pruefen(leiter=None, ich="a")
-
-    def test_die_eigene_noch_einmal_ist_kein_fehler(self) -> None:
-        dienst.uebernahme_pruefen(leiter="a", ich="a")
-
-    def test_eine_fremde_nicht(self) -> None:
-        with pytest.raises(dienst.StaffelGeleitet, match="Erika"):
-            dienst.uebernahme_pruefen(leiter="b", ich="a", leiter_name="Erika")
-
-    def test_abgeben_darf_der_leiter(self) -> None:
-        dienst.abgabe_pruefen(leiter="a", ich="a", verwalter=False)
-
-    def test_abgeben_darf_der_verwalter(self) -> None:
-        """Sonst bliebe die Staffel eines Staffelleiters, der aufhoert, fuer
-        immer bei ihm."""
-        dienst.abgabe_pruefen(leiter="b", ich="a", verwalter=True)
-
-    def test_sonst_niemand(self) -> None:
-        with pytest.raises(dienst.StaffelGeleitet, match="nur, wer sie leitet"):
-            dienst.abgabe_pruefen(leiter="b", ich="a", verwalter=False)

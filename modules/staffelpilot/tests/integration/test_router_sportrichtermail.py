@@ -55,6 +55,7 @@ async def _vorgemerkt_und_erledigt(
 ) -> dict:
     """Vormerken, die Zeile übernehmen und sie abschließen -- wie der Dienst."""
     await client.post(f"/staffelpilot/vorgaenge/{vorgang_id}/fallanlage")
+    await client.post("/staffelpilot/uebertragungen/pause", json={"pausiert": False})
     offen = await client.post("/staffelpilot/uebertragungen/naechste")
     assert offen.status_code == 200, offen.text
     zeile = offen.json()

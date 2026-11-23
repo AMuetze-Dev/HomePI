@@ -42,10 +42,8 @@ Menschen, in seinem Mailprogramm.
 | `GET/POST /staffeln`, `PATCH/DELETE /staffeln/{id}` | Staffeln verwalten |
 | `GET/PUT /staffeln/{id}/mannschaften` | Mannschaften und ihr Aufbau |
 | `GET/PUT /regeln`, `PATCH /regeln/{id}` | Regelkatalog, und darin der eigene Regelsatz |
-| `POST/DELETE /staffeln/{id}/leitung` | eine Staffel übernehmen oder abgeben |
-| `POST /staffeln/leitung` | alle Staffeln ohne Staffelleiter übernehmen |
-| `GET/PUT /einstellungen` | Staffelleiter, Verband, Zeitraeume, Pause |
-| `GET/PUT/DELETE /zugang` | DFBnet-Zugangsdaten (verschluesselt) |
+| `GET/PUT /einstellungen` | die eigenen: Staffelleiter, Verband, Zeitraeume, Pause |
+| `GET/PUT/DELETE /zugang` | die eigenen DFBnet-Zugangsdaten (verschluesselt) |
 | `POST /import` | geprueftte Berichte einspielen |
 
 ### Was der Prüfdienst treibt
@@ -53,7 +51,7 @@ Menschen, in seinem Mailprogramm.
 | Endpunkt | |
 |---|---|
 | `GET/POST /auftraege` | Prueflauf oder Initialisierung anfordern |
-| `GET /auftraege/offen` | der eine, der laeuft -- oder `null` |
+| `GET /auftraege/offen` | der eigene, der laeuft -- oder `null`. Beim Pruefdienst der aelteste von allen |
 | `GET /auftraege/{id}` | einer mit seinem Protokoll |
 | `POST /auftraege/{id}/fortschritt` | vom Pruefdienst |
 | `POST /auftraege/{id}/abschluss` | vom Pruefdienst, oder Abbruch |
@@ -61,8 +59,8 @@ Menschen, in seinem Mailprogramm.
 | `POST /uebertragungen/pause` | der eine Schalter |
 | `POST /uebertragungen/wiederholen` | Gescheitertes zurueck in die Schlange |
 | `POST /uebertragungen/{id}/abschluss` | vom Pruefdienst |
-| `POST /zugang/abholen` | Zugangsdaten fuer den Pruefdienst |
-| `GET /regelsatz?staffel_id=` | womit diese Staffel geprueft wird (nur Verwalter) |
+| `POST /zugang/abholen?konto=` | Zugangsdaten, nur fuer den Pruefdienst |
+| `GET /regelsatz` | der eigene Regelsatz, aufgeloest |
 
 ## Die Entscheidungen, die hier stecken
 
@@ -98,8 +96,9 @@ sich mit jedem Tag; ein geschriebener Wert waere am Morgen darauf falsch.
 minutenlang einen Browser und laeuft im Pruefdienst; hier steht nur, wer ihn
 angefordert hat, wie weit er ist und was herauskam. Das Gateway darf neu
 starten, ohne dass jemand vor einer Anzeige sitzt, die nie wieder
-weiterzaehlt. Es gibt genau **einen** offenen Auftrag, weil es genau eine
-DFBnet-Sitzung gibt.
+weiterzaehlt. Es gibt je Konto genau **einen** offenen Auftrag, weil es je Konto
+genau eine DFBnet-Sitzung gibt. Der Pruefdienst arbeitet sie nacheinander ab,
+der aelteste zuerst; wer wartet, sieht, wie viele vor ihm sind.
 
 **Eine Entscheidung laesst sich zuruecknehmen -- solange nichts hinaus ist.**
 Der Haken faellt dabei mit: abgehakt heisst, zu jedem Befund liegt eine
@@ -189,7 +188,7 @@ Ein erneuter Import ersetzt die Karten desselben Spiels. Wuerden sie sich
 anhaeufen, zaehlte Paragraf 58 nach dem dritten Prueflauf die dreifache Zahl.
 
 **Gezaehlt wird hier nicht.** `GET /karten?pass_nr=...` gibt heraus, was das
-Artefakt weiss; die Schwellen stehen in den Regeldateien des Staffelleiters
+Artefakt weiss (aus den eigenen Staffeln); die Schwellen stehen in den Regeldateien des Staffelleiters
 (`30_karten.py`), und der Zaehler selbst im Pruefdienst (`auskunft.py`).
 
 ### Erfundene Spiele
@@ -422,9 +421,8 @@ der Quelltext-Blau in `tokens.css` als eigener Wert: als Rand reicht
 ### Der Regelsatz
 
 Jeder Staffelleiter hat seinen eigenen: welche Regeln an sind, und mit welchen
-Werten sie pruefen. Welcher an einem Spiel gilt, haengt an der **Staffel** - an
-dem, der sie leitet (`staffelpilot_staffelleitung`). Leitet sie niemand, gelten
-die Vorgaben; die Oberflaeche sagt das und bietet das Uebernehmen an.
+Werten sie pruefen. Er gilt fuer alle seine Staffeln -- und da eine Staffel
+genau einem Konto gehoert, gibt es nie die Frage, wessen gilt.
 
 **Gespeichert wird nur, was abweicht** (`staffelpilot_regelwahl`). Ein Schalter
 wie die Vorgabe ist keine Zeile, ein Wert gleich der Vorgabe auch nicht. Sonst
@@ -447,11 +445,63 @@ Paragraf 59 (17). Ein weiterer Parameter braucht hier **keine** Aenderung.
 naheliegender gewesen, hielte das Gateway aber an (siehe "Wenn das Schema sich
 geaendert hat"). Neue Tabellen kommen von allein.
 
-Was noch **gemeinsam** ist: die Saetze fuers Schreiben, die Einstellungen, der
-DFBnet-Zugang - und jedes Konto sieht alle Staffeln. Das zu trennen ist der
-naechste Schritt, sobald ein zweiter Staffelleiter wirklich anfaengt. Ein
-Verwalter liest ueber `GET /regelsatz` den Satz anderer; die Oberflaeche zeigt
-ihn nirgends, aber der Pruefdienst meldet sich nun einmal als Verwalter an.
+### Wem was gehoert
+
+**Staffeln sind wie Einstellungen.** Jeder legt seine eigenen an oder holt sie
+mit seinem Zugang aus DFBnet, und niemand sonst sieht sie. StaffelPilot
+verwaltet nicht, wer welche Staffel leitet, und es ist ihm egal, wie viele
+jemand hat: der Vorsitzende hat eben alle.
+
+Fuehren zwei dieselbe Staffel -- ein Jugendausschuss arbeitet in Zweierteams --,
+hat jeder **seine**: eigene Berichte, eigene Entscheidungen, eigener Regelsatz.
+Nichts davon ist gemeinsam, denn jeder kann es anders eingestellt haben. Der
+Abgleich mit DFBnet vergleicht deshalb nur mit den eigenen, auch bei gleicher
+Kennung.
+
+| | |
+|---|---|
+| Staffel, und daran Spiele, Befunde, Vorgaenge, Karten, Mannschaften, Uebertragungen | `staffelpilot_staffelkonten` |
+| Einstellungen, samt Uebertragungspause | `staffelpilot_kontoeinstellungen` |
+| Regelsatz | `staffelpilot_regelwahl` |
+| Saetze fuers Schreiben | `staffelpilot_kontotexte` |
+| DFBnet-Zugang | `staffelpilot_kontozugang` |
+| Auftrag | `staffelpilot_auftraggeber` |
+
+Gemeinsam bleiben der Regelkatalog und die Regeldateien. Sie sind Programm und
+kein Inhalt; aendern darf sie nur ein Verwalter.
+
+**Fremdes ist 404, nicht 403.** Dass es etwas gibt, ist auch schon eine
+Auskunft. Aus demselben Grund zaehlt jeder seine Aktenzeichen selbst: eine Luecke
+verriete, wie viele Schreiben andere verschicken.
+
+**Die Rolle aendert daran nichts.** `nutzer` genuegt fuer alles Eigene, auch fuer
+den Zugang und die Fallanlage. Ein Verwalter betreibt das Artefakt (Katalog,
+Regeldateien) und sieht trotzdem nur seine Staffeln.
+
+**Jede Route hat einen Blick** (`router._blick`, `dienst.Blick`): mit wessen Augen
+sie liest. Im Speicher ist das Konto eine Pflichtangabe ohne Vorgabewert; eine
+Funktion, die es vergisst, scheitert am Typpruefer. Dass keine Route den Blick
+auslaesst, haelt `test_jede_route_weiss_fuer_wen_sie_antwortet` fest.
+
+**Die eine Ausnahme ist der Pruefdienst.** Er muss fuer alle arbeiten, ist kein
+Mensch und deshalb **benannt**: `STAFFELPILOT_DIENSTKONTO` in der Umgebung des
+Gateways traegt seinen Kontonamen, dazu braucht das Konto die Rolle `verwalter`.
+Nicht gesetzt heisst: niemand, und dann laeuft kein Auftrag. Nur dieses Konto holt
+Passwoerter ab; vorher konnte das jeder Verwalter.
+
+Im Lauf nennt er mit `?konto=`, fuer wen er arbeitet, und sieht dann nur, was
+diesem Konto gehoert. Einem Menschen antwortet `?konto=` mit einem fremden Konto
+403.
+
+Wird ein Konto geloescht, gehen Zugang, Einstellungen, Saetze und Regelsatz mit.
+Seine Staffeln bleiben unsichtbar in der Datenbank liegen -- die Zuordnung steht
+in einer eigenen Tabelle und nicht als Spalte an der Staffel. Wer sie los sein
+will, loescht sie vorher in der Oberflaeche.
+
+**Was vor der Trennung da war, sieht zunaechst niemand.** Es gehoert keinem Konto.
+`scripts/migrationen/2026-11-23-staffelpilot-je-konto.sql` legt es auf eines und
+loest zwei Eindeutigkeiten (Staffelname, Aktenzeichen), die je Installation
+galten. Beim Ausrollen einmal von Hand.
 
 ### Wer ueber wem spielt
 
@@ -519,7 +569,8 @@ als gar keine.
 fuehrt. Das ersetzt das Abschreiben von Hand -- und genau daran war die
 Pruefung gescheitert: eine Spielklasse "Stadtliga C", die DFBnet nicht kennt,
 und ein Name, der nicht in der Meisterschaftsliste steht. Ein Konto sieht
-ohnehin nur seine eigenen Staffeln; abzuschreiben war nie noetig.
+ohnehin nur seine eigenen Staffeln; abzuschreiben war nie noetig. Sie gehoeren
+danach dem, der sie angefordert hat.
 
 Abgeglichen wird **zuerst ueber die Kennung**, dann ueber Name und
 Spielklasse -- beide normalisiert und beide gegen beide (`dienst.gefaltet`).
@@ -570,7 +621,7 @@ nicht hineingeschrieben -- sonst hielte der erste Klick auf Speichern den
 heutigen Wortlaut fest, samt Paragraf, und eine spaetere Korrektur kaeme nie
 an.
 
-Die eigenen Saetze stehen in `staffelpilot_regeltexte` und nicht an der Regel:
+Die eigenen Saetze stehen in `staffelpilot_kontotexte` und nicht an der Regel:
 der Katalog wird als Ganzes eingespielt, und was der Prueflauf einmal nicht
 meldet, verschwindet. Eine eigene Regeldatei mit einem Tippfehler genuegt --
 und mit der Regel waeren die Saetze weg, an denen jemand eine Viertelstunde

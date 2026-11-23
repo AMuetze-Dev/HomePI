@@ -82,6 +82,9 @@ export function EinstellungenTafel() {
     <Tafel titel="Einstellungen">
       <Karte>
         <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
+          <p className={stil.vorgangHinweis}>
+            Deine Einstellungen. Sie gelten für deine Staffeln und deine Schreiben.
+          </p>
           <Feld
             beschriftung="Staffelleiter"
             hinweis="Steht unter jedem Schreiben."

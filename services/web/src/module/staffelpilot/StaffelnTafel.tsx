@@ -29,18 +29,19 @@ export function StaffelnTafel({
   onAnlegen,
   onAendern,
   onLoeschen,
-  onUebernehmen,
-  onAbgeben,
 }: {
   staffeln: Staffel[];
   onAnlegen: (daten: NeueStaffel) => Promise<boolean>;
   onAendern: (id: string, daten: Partial<Omit<Staffel, "id">>) => Promise<boolean>;
   onLoeschen: (id: string) => Promise<boolean>;
-  onUebernehmen: (id: string) => Promise<boolean>;
-  onAbgeben: (id: string) => Promise<boolean>;
 }) {
   return (
     <Tafel titel="Staffeln">
+      <p className={stil.vorgangHinweis}>
+        Deine Staffeln. Andere Konten sehen sie nicht, auch wenn sie in DFBnet dieselbe
+        führen.
+      </p>
+
       {staffeln.length === 0 ? (
         <Leerzustand titel="Noch keine Staffel angelegt">
           Eine Staffel ist der Ort, an dem Spielberichte ankommen. Leg die erste an — Name
@@ -55,8 +56,6 @@ export function StaffelnTafel({
                 staffel={s}
                 onAendern={(daten) => onAendern(s.id, daten)}
                 onLoeschen={() => onLoeschen(s.id)}
-                onUebernehmen={() => onUebernehmen(s.id)}
-                onAbgeben={() => onAbgeben(s.id)}
               />
             </li>
           ))}
@@ -83,14 +82,10 @@ function StaffelKarte({
   staffel,
   onAendern,
   onLoeschen,
-  onUebernehmen,
-  onAbgeben,
 }: {
   staffel: Staffel;
   onAendern: (daten: Partial<Omit<Staffel, "id">>) => Promise<boolean>;
   onLoeschen: () => Promise<boolean>;
-  onUebernehmen: () => Promise<boolean>;
-  onAbgeben: () => Promise<boolean>;
 }) {
   const [offen, setOffen] = useState(false);
   const [name, setName] = useState(staffel.name);
@@ -116,20 +111,11 @@ function StaffelKarte({
           <Etikett ton={staffel.aktiv ? "gut" : "neutral"}>
             {staffel.aktiv ? "aktiv" : "stillgelegt"}
           </Etikett>
-          <Etikett ton={staffel.staffelleiter ? "neutral" : "warnung"}>
-            {leitungWort(staffel)}
-          </Etikett>
         </span>
       </button>
 
       {offen && (
         <div className={stil.detail}>
-          <Leitung
-            staffel={staffel}
-            onUebernehmen={onUebernehmen}
-            onAbgeben={onAbgeben}
-          />
-
           <form
             className={stil.formular}
             onSubmit={(e) => {
@@ -222,66 +208,6 @@ function StaffelKarte({
         </div>
       )}
     </Karte>
-  );
-}
-
-function leitungWort(staffel: Staffel): string {
-  if (staffel.leite_ich) return "von dir geleitet";
-  return staffel.staffelleiter || "ohne Staffelleiter";
-}
-
-/**
- * Wer die Staffel leitet — und damit, nach wessen Regeln sie geprüft wird.
- *
- * Der Satz steht dabei, weil „abgeben“ allein nicht sagt, dass sich damit
- * ändert, was im nächsten Prüflauf gemeldet wird.
- */
-function Leitung({
-  staffel,
-  onUebernehmen,
-  onAbgeben,
-}: {
-  staffel: Staffel;
-  onUebernehmen: () => Promise<boolean>;
-  onAbgeben: () => Promise<boolean>;
-}) {
-  if (staffel.leite_ich) {
-    return (
-      <div className={stil.stapel}>
-        <p className={stil.vorgangHinweis}>
-          Du leitest diese Staffel, sie wird mit deinem Regelsatz geprüft. Abgegeben wird
-          sie mit den Vorgaben geprüft, bis jemand sie übernimmt.
-        </p>
-        <div className={stil.knoepfe}>
-          <Knopf groesse="sm" auspraegung="leise" onClick={() => void onAbgeben()}>
-            Staffel abgeben
-          </Knopf>
-        </div>
-      </div>
-    );
-  }
-
-  if (staffel.staffelleiter) {
-    return (
-      <p className={stil.vorgangHinweis}>
-        {staffel.staffelleiter} leitet diese Staffel, sie wird mit dem Regelsatz dieses
-        Kontos geprüft.
-      </p>
-    );
-  }
-
-  return (
-    <div className={stil.stapel}>
-      <p className={stil.vorgangHinweis}>
-        Niemand leitet diese Staffel, sie wird mit den Vorgaben geprüft. Übernimmst du
-        sie, gilt dein Regelsatz.
-      </p>
-      <div className={stil.knoepfe}>
-        <Knopf groesse="sm" onClick={() => void onUebernehmen()}>
-          Staffel übernehmen
-        </Knopf>
-      </div>
-    </div>
   );
 }
 

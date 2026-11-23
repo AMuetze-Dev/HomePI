@@ -25,7 +25,10 @@ class Staffel(Base, ZeitstempelMixin):
     __tablename__ = "staffelpilot_staffeln"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    # Nicht eindeutig: jeder hat seine eigenen Staffeln, und zwei duerfen
+    # gleich heissen. Dass jemand denselben Namen nicht zweimal vergibt, prueft
+    # `speicher.staffel_anlegen`.
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
     altersklasse: Mapped[str] = mapped_column(String(20), nullable=False)
     # Die Spielklasse, wie sie in DFBnet heisst -- "1.Kreisklasse". Sie ist
     # nicht eindeutig: dieselbe Klasse gibt es fuer Herren und fuer Ue35.
@@ -197,11 +200,8 @@ class Befund(Base, ZeitstempelMixin):
 class Einstellung(Base, ZeitstempelMixin):
     """Was fuer die ganze Installation gilt, als Schluessel und Wert.
 
-    Eine Zeile je Schluessel und keine Tabelle mit festen Spalten: eine
-    Einstellung dazuzunehmen soll keine Wanderung der Datenbank kosten.
-    Gelesen wird sie ueber `dienst.einstellungen_aus`, das aus den rohen
-    Zeichenketten geprueft Werte macht -- die Pruefung steht damit an einer
-    Stelle und nicht bei jedem Aufrufer.
+    Nur noch Vermerke des Programms (``_vorlagen_uebernommen``). Was ein
+    Staffelleiter einstellt, steht in :class:`Kontoeinstellung`.
     """
 
     __tablename__ = "staffelpilot_einstellungen"
@@ -209,6 +209,32 @@ class Einstellung(Base, ZeitstempelMixin):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     schluessel: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
     wert: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+
+
+class Kontoeinstellung(Base, ZeitstempelMixin):
+    """Was ein Staffelleiter fuer sich einstellt: Name, Verband, Zeitraeume.
+
+    Eine Zeile je Schluessel und keine Tabelle mit festen Spalten: eine
+    Einstellung dazuzunehmen soll keine Wanderung der Datenbank kosten.
+    Gelesen wird sie ueber `dienst.einstellungen_aus`, das aus den rohen
+    Zeichenketten geprueft Werte macht -- die Pruefung steht damit an einer
+    Stelle und nicht bei jedem Aufrufer.
+
+    `wert` ist `Text`: ein Folgesatz darf 2000 Zeichen haben.
+    """
+
+    __tablename__ = "staffelpilot_kontoeinstellungen"
+    __table_args__ = (UniqueConstraint("benutzer_id", "schluessel", name="uq_kontoeinstellung"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    benutzer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("benutzer.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    schluessel: Mapped[str] = mapped_column(String(60), nullable=False)
+    wert: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
 
 class Mannschaft(Base, ZeitstempelMixin):
@@ -263,8 +289,9 @@ class Vorgang(Base, ZeitstempelMixin):
         index=True,
     )
     art: Mapped[str] = mapped_column(String(20), nullable=False)
-    #: Fortlaufend je Saison, vergeben beim Anlegen. Steht auf jedem Schreiben.
-    aktenzeichen: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
+    #: Fortlaufend je Saison und Konto, vergeben beim Anlegen. Steht auf jedem
+    #: Schreiben. Nicht eindeutig: jeder Staffelleiter zaehlt fuer sich.
+    aktenzeichen: Mapped[str] = mapped_column(String(40), nullable=False)
     #: Die Nummer, die **DFBnet** dem Sportgerichtsfall gibt -- eine andere
     #: Sache als das eigene Aktenzeichen oben.
     #:
@@ -303,7 +330,7 @@ class Regel(Base, ZeitstempelMixin):
     gehoert -- `aktiv`. Ein erneutes Einspielen des Katalogs laesst sie
     stehen, sonst waere jedes Abschalten bis zum naechsten Start haltbar.
 
-    Die Saetze fuer das Schreiben stehen in `Regeltext` und nicht hier: sie
+    Die Saetze fuer das Schreiben stehen in `Kontotext` und nicht hier: sie
     duerfen nicht mit einer Regel verschwinden.
     """
 
@@ -371,15 +398,19 @@ class Regelwahl(Base, ZeitstempelMixin):
     werte: Mapped[dict[str, int | str]] = mapped_column(JSONB, nullable=False, default=dict)
 
 
-class Staffelleitung(Base, ZeitstempelMixin):
-    """Wer eine Staffel leitet -- und damit, welcher Regelsatz an ihr prueft.
+class Staffelkonto(Base, ZeitstempelMixin):
+    """Wem eine Staffel gehoert.
 
-    Eine eigene Tabelle statt einer Spalte an `Staffel`, aus demselben Grund
-    wie bei `Regelparameter`. Keine Zeile heisst: niemand leitet sie, und der
-    Prueflauf nimmt die Vorgaben.
+    Wie eine Einstellung: jeder legt seine eigenen an, und niemand sonst sieht
+    sie. Fuehren zwei dieselbe Staffel in DFBnet, hat jeder seine -- mit
+    eigenen Berichten, eigenem Regelsatz und eigenen Entscheidungen. Wer wie
+    viele hat, ist StaffelPilot egal.
+
+    Eine eigene Tabelle statt einer Spalte an `Staffel`, weil es keine
+    Migrationen gibt.
     """
 
-    __tablename__ = "staffelpilot_staffelleitung"
+    __tablename__ = "staffelpilot_staffelkonten"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     staffel_id: Mapped[uuid.UUID] = mapped_column(
@@ -427,8 +458,8 @@ class Regeldatei(Base, ZeitstempelMixin):
     aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
-class Regeltext(Base, ZeitstempelMixin):
-    """Die Saetze, die aus einem Befund ein Schreiben machen.
+class Kontotext(Base, ZeitstempelMixin):
+    """Die Saetze, mit denen ein Staffelleiter aus einem Befund ein Schreiben macht.
 
     **Eine eigene Tabelle und keine Spalten an `Regel`.** Der Katalog wird als
     Ganzes eingespielt: was der Prueflauf nicht meldet, verschwindet. Ein Lauf
@@ -443,11 +474,18 @@ class Regeltext(Base, ZeitstempelMixin):
     nie an.
     """
 
-    __tablename__ = "staffelpilot_regeltexte"
+    __tablename__ = "staffelpilot_kontotexte"
+    __table_args__ = (UniqueConstraint("benutzer_id", "schluessel", name="uq_kontotext"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    benutzer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("benutzer.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     #: Die technische Kennung der Regel, wie sie am Befund steht.
-    schluessel: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    schluessel: Mapped[str] = mapped_column(String(120), nullable=False)
     sachverhalt: Mapped[str] = mapped_column(Text, nullable=False, default="")
     hinweis: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
@@ -498,6 +536,31 @@ class Auftrag(Base, ZeitstempelMixin):
     protokoll: Mapped[list[dict[str, str]]] = mapped_column(JSONB, nullable=False, default=list)
     gestartet_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     beendet_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class Auftraggeber(Base, ZeitstempelMixin):
+    """Wer einen Auftrag angefordert hat.
+
+    Er sieht ihn, und mit seinem DFBnet-Zugang, seinen Einstellungen und
+    seinem Regelsatz wird er abgearbeitet. Eine eigene Tabelle statt einer
+    Spalte, weil es keine Migrationen gibt.
+    """
+
+    __tablename__ = "staffelpilot_auftraggeber"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    auftrag_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("staffelpilot_auftraege.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    benutzer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("benutzer.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
 
 class Ansicht(Base, ZeitstempelMixin):
@@ -573,8 +636,8 @@ class Uebertragung(Base, ZeitstempelMixin):
     erledigt_am: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
 
-class Zugang(Base, ZeitstempelMixin):
-    """Die Anmeldedaten fuer DFBnet.
+class Kontozugang(Base, ZeitstempelMixin):
+    """Die DFBnet-Anmeldedaten eines Staffelleiters.
 
     Der Benutzername steht im Klartext -- er steht ohnehin in jedem Protokoll
     des Pruefdienstes. Das Passwort liegt **verschluesselt**, mit einem
@@ -588,11 +651,15 @@ class Zugang(Base, ZeitstempelMixin):
     Sicherung kommt.
     """
 
-    __tablename__ = "staffelpilot_zugang"
+    __tablename__ = "staffelpilot_kontozugang"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    #: Es gibt genau einen DFBnet-Zugang je Installation.
-    dienst: Mapped[str] = mapped_column(String(30), nullable=False, unique=True, default="dfbnet")
+    benutzer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("benutzer.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
     benutzer: Mapped[str] = mapped_column(String(120), nullable=False)
     #: Der Fernet-Token. Nie im Klartext, nie in einer Antwort.
     geheimnis: Mapped[str] = mapped_column(Text, nullable=False)
