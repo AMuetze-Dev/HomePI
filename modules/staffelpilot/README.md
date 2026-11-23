@@ -94,6 +94,33 @@ nicht mehr gemeldet hat. Wer ihn verwirft, ist mit dem naechsten Lauf auch den
 Befund los. Solange der Befund steht, braucht er wie jeder andere eine
 Entscheidung, bevor der Bericht abgehakt werden kann.
 
+**Bleibt nach einem Lauf ein Befund offen, faellt der Haken** - und mit ihm
+`abgehakt_am`. Abgehakt heisst, zu jedem Befund liegt eine Entscheidung vor; ein
+Lauf, den niemand angesehen hat, aendert daran nichts. Bis zum 23.11.2026 blieb
+der Haken stehen, und der neue Befund verschwand hinter einem erledigten Spiel.
+Ein Lauf ohne offenen Befund laesst Haken und Zeitpunkt, wie sie sind: was schon
+entschieden war, muss niemand noch einmal abhaken.
+
+Die Prueferfreigabe zu dem Spiel haengt an derselben Zusage. Sie sagt dem
+Verein, der Bericht sei geprueft, und der Pruefdienst laesst einen freigegebenen
+Bericht danach aus - der offene Befund kaeme mit keinem Lauf mehr nach. Was mit
+ihr geschieht, richtet sich nach ihrem Zustand:
+
+| Zustand | |
+|---|---|
+| `offen` | wird zurueckgezogen. Das erneute Abhaken merkt sie wieder vor |
+| `fehler` | ebenso - "alle wiederholen" schickte sie sonst doch noch hinaus |
+| `laeuft` | bleibt. Der Pruefdienst ist in DFBnet schon dabei, und ohne die Zeile koennte er nicht melden, was herauskam |
+| `fertig` | bleibt, und ein erneutes Abhaken merkt keine zweite vor. Hat jemand die Freigabe in DFBnet zurueckgenommen, erteilt er sie dort auch wieder |
+
+Zurueckgezogen heisst geloescht und nicht angehalten: eine Zeile, die wartet,
+ohne dass jemand sieht worauf, waere eine offene Arbeit, die niemand erledigen
+kann. Das gilt auch, wenn der Haken vorher schon von Hand entfernt war. Die
+Fallanlage bleibt; sie gehoert zu ihrem Vorgang.
+
+Eine Luecke bleibt: scheitert eine laufende Freigabe, nachdem der Haken gefallen
+ist, steht sie auf `fehler` und laesst sich von Hand wiederholen.
+
 **Der Weg eines Befundes kommt von aussen.** Ob aus einem Feldverweis ein
 Sportgerichtsfall wird, steht in der Spielordnung, und die kennt dieses
 Artefakt nicht. Der Prueflauf sagt es beim Einspielen (`weg`); hier entsteht

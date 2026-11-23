@@ -994,6 +994,12 @@ _UEBERTRAGUNGSWEGE: dict[str, tuple[str, ...]] = {
     "fertig": (),
 }
 
+#: Was sich noch zurueckziehen laesst, wenn ein Lauf an dem Spiel einen offenen
+#: Befund hinterlaesst. Eine gescheiterte gehoert dazu: "alle wiederholen"
+#: schickte sie sonst doch noch hinaus. Eine laufende nicht -- der Pruefdienst
+#: ist in DFBnet schon dabei und muss melden koennen, was herauskam.
+ZURUECKZIEHBAR: tuple[str, ...] = ("offen", "fehler")
+
 
 def uebertragung_weiter(alt: str, neu: str) -> str:
     if neu not in _UEBERTRAGUNGSWEGE.get(alt, ()):
