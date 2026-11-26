@@ -1,0 +1,495 @@
+/* Nur Tokens aus src/styles/tokens.css - kein fester Farbwert. Siehe
+   docs/08-design.md. Mobil zuerst: Alles steht untereinander, nebeneinander
+   erst ab genug Breite. */
+
+.stapel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+  min-width: 0;
+}
+
+.leise {
+  color: var(--farbe-text-leise);
+  font-size: var(--text-sm);
+}
+
+.zurueck {
+  align-self: flex-start;
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.zurueck:hover {
+  color: var(--farbe-akzent-schrift);
+}
+
+.verweis {
+  color: var(--farbe-akzent-schrift);
+  font-size: var(--text-sm);
+}
+
+.abschnittstitel {
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-halbfett);
+}
+
+/* ── Listen ─────────────────────────────────────────────────────────────── */
+
+.liste {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.zeile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--raum-1);
+  padding: var(--raum-3) var(--raum-4);
+  border-bottom: 1px solid var(--farbe-rand);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--dauer-schnell) var(--verlauf);
+}
+
+.liste li:last-child .zeile {
+  border-bottom: none;
+}
+
+.zeile:hover {
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+.zeilentitel {
+  font-weight: var(--gewicht-mittel);
+}
+
+.rechts {
+  color: var(--farbe-text-gedaempft);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (width >= 48rem) {
+  .zeile {
+    grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.5fr) auto;
+    align-items: baseline;
+    gap: var(--raum-4);
+  }
+}
+
+/* ── Formulare ──────────────────────────────────────────────────────────── */
+
+.formular {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--raum-4);
+}
+
+@media (width >= 40rem) {
+  .formular {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  .formular > div {
+    flex: 1 1 10rem;
+  }
+}
+
+.beschriftung {
+  font-size: var(--text-sm);
+  font-weight: var(--gewicht-mittel);
+  color: var(--farbe-text-gedaempft);
+}
+
+.auswahlgruppe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  min-width: 0;
+}
+
+.auswahl,
+.zahlfeld,
+.textfeld {
+  background: var(--farbe-flaeche);
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-md);
+  color: var(--farbe-text);
+  font: inherit;
+  font-size: var(--text-md);
+}
+
+.auswahl,
+.zahlfeld {
+  height: 2.25rem;
+  padding-inline: var(--raum-3);
+}
+
+.zahlfeld {
+  width: 6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.textfeld {
+  width: 100%;
+  padding: var(--raum-2) var(--raum-3);
+  resize: vertical;
+  line-height: var(--zeile-normal);
+}
+
+.auswahl:focus-visible,
+.zahlfeld:focus-visible,
+.textfeld:focus-visible {
+  outline: none;
+  border-color: var(--farbe-fokus);
+  box-shadow: 0 0 0 3px var(--farbe-auswahl);
+}
+
+.zahlfeld:disabled {
+  background: var(--farbe-flaeche-gedaempft);
+  color: var(--farbe-text-leise);
+}
+
+.zeilenformular {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--raum-3);
+}
+
+.zahlzeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+}
+
+.knopfreihe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-2);
+}
+
+/* Sieht aus wie <Knopf auspraegung="sekundaer">, ist aber ein Label um ein
+   Dateifeld: Nur so öffnet ein Antippen die Dateiauswahl ohne Skript. */
+.dateiknopf {
+  display: inline-flex;
+  align-items: center;
+  height: 2.25rem;
+  padding-inline: var(--raum-4);
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche-erhoben);
+  color: var(--farbe-text);
+  font-size: var(--text-md);
+  font-weight: var(--gewicht-mittel);
+  cursor: pointer;
+}
+
+.dateiknopf:hover {
+  border-color: var(--farbe-text-leise);
+}
+
+.dateiknopf:focus-within {
+  border-color: var(--farbe-fokus);
+  box-shadow: 0 0 0 3px var(--farbe-auswahl);
+}
+
+@media (pointer: coarse) {
+  .dateiknopf {
+    min-height: 2.75rem;
+  }
+}
+
+/* ── Prüfling ───────────────────────────────────────────────────────────── */
+
+/* Die Fehlermeldung bleibt sichtbar, auch wenn man weit unten im Raster
+   eine Punktzahl gesetzt hat. */
+.klebend {
+  position: sticky;
+  top: calc(var(--hoehe-kopf) + var(--raum-2));
+  z-index: var(--ebene-klebend);
+  /* Der Hinweis selbst ist nur getönt - ohne Grund darunter schiene das
+     Raster durch, über das er beim Scrollen gleitet. */
+  background: var(--farbe-grund);
+  border-radius: var(--rundung-md);
+}
+
+.arbeitsflaeche {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--raum-6);
+  align-items: start;
+}
+
+@media (width >= 72rem) {
+  .arbeitsflaeche {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  }
+
+  /* Das Dokument bleibt stehen, während man rechts durch das Raster geht. */
+  .dokumentspalte {
+    position: sticky;
+    top: calc(var(--hoehe-kopf) + var(--raum-4));
+  }
+}
+
+.stammdaten {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--raum-4);
+}
+
+@media (width >= 40rem) {
+  .stammdaten {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.schalterliste {
+  list-style: none;
+  padding: 0;
+  margin: var(--raum-4) 0 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--raum-2) var(--raum-6);
+}
+
+@media (width >= 40rem) {
+  .schalterliste {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.schalterzeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3);
+  font-size: var(--text-md);
+}
+
+.summe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--raum-2) var(--raum-4);
+}
+
+.summenzahl {
+  font-weight: var(--gewicht-halbfett);
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  color: var(--farbe-akzent-schrift);
+  font-weight: var(--gewicht-halbfett);
+  font-variant-numeric: tabular-nums;
+}
+
+.sektion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+}
+
+.sektionskopf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--raum-3);
+}
+
+.sektionstitel {
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.sektionssumme {
+  flex: none;
+  color: var(--farbe-text-gedaempft);
+  font-variant-numeric: tabular-nums;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  padding-top: var(--raum-3);
+  border-top: 1px solid var(--farbe-rand);
+}
+
+.gruppe {
+  font-weight: var(--gewicht-mittel);
+  font-style: italic;
+}
+
+.kriterium {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+@media (width >= 34rem) {
+  .kriterium {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--raum-4);
+  }
+}
+
+.eingerueckt {
+  padding-left: var(--raum-4);
+}
+
+.kriteriumtext {
+  min-width: 0;
+}
+
+.hinweistext {
+  display: block;
+  color: var(--farbe-text-leise);
+  font-size: var(--text-xs);
+  line-height: var(--zeile-normal);
+  white-space: pre-line;
+}
+
+/* Die Punktknöpfe brechen um, statt die Zeile zu verbreitern: Das Kriterium
+   "Darstellung Funktion" hat neun davon, und bei 375 px passen keine neun
+   Fingerbreiten nebeneinander. */
+.punkte {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-1);
+  flex: none;
+  max-width: 100%;
+}
+
+.punkt {
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding-inline: var(--raum-2);
+  border: 1px solid var(--farbe-rand-stark);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  font: inherit;
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background-color var(--dauer-schnell) var(--verlauf),
+    border-color var(--dauer-schnell) var(--verlauf);
+}
+
+.punkt:hover {
+  border-color: var(--farbe-text-leise);
+}
+
+.punkt[aria-pressed="true"] {
+  background: var(--farbe-akzent-fuellung);
+  border-color: var(--farbe-akzent);
+  color: var(--farbe-akzent-schrift);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.punkt:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--farbe-auswahl);
+}
+
+@media (pointer: coarse) {
+  .punkt {
+    min-width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+/* ── Zeitmessung ────────────────────────────────────────────────────────── */
+
+.uhren {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--raum-3);
+}
+
+.uhr {
+  font-family: var(--schrift-mono);
+  font-size: var(--text-2xl);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--gewicht-halbfett);
+}
+
+.ueber {
+  color: var(--signal-fehler);
+}
+
+/* ── Gesamtergebnis ─────────────────────────────────────────────────────── */
+
+.ergebnisliste {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  margin: 0;
+}
+
+.ergebniszeile {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--raum-3);
+}
+
+.ergebniszeile dd {
+  margin: 0;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Dokument ───────────────────────────────────────────────────────────── */
+
+.dokumentkopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--raum-3);
+  margin-bottom: var(--raum-3);
+}
+
+.dokumentkopf > label {
+  flex: 1 1 12rem;
+}
+
+.pdf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  margin-bottom: var(--raum-3);
+}
+
+.pdfleiste {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-2);
+}
+
+.pdfflaeche {
+  overflow: auto;
+  max-height: 80vh;
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+.pdfflaeche canvas {
+  display: block;
+}
