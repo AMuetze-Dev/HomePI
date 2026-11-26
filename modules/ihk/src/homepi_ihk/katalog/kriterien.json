@@ -1,0 +1,664 @@
+{
+  "source": "TEMPLATE.xlsm",
+  "print_area": "A1:L80",
+  "doku": {
+    "total_row": 66,
+    "max": 100,
+    "sections": [
+      {
+        "id": "doku.1",
+        "no": "1",
+        "row": 14,
+        "label": "Form",
+        "max": 5,
+        "children": [
+          {
+            "id": "doku.1.1",
+            "row": 15,
+            "label": "Deckblatt",
+            "max": 1,
+            "kind": "points",
+            "hint": "Verlangt Angaben des Projektthemas, Name und Vorname des Auszubildenden, Ausbildungsberuf, Ausbildungsbetrieb und Praktikumsbetrieb, Projektzeitraum;\nMängel sind fehlende Angaben"
+          },
+          {
+            "id": "doku.1.2",
+            "row": 16,
+            "label": "Verzeichnisse",
+            "max": 2,
+            "kind": "points",
+            "hint": "Inhalts-, Anlagen und Abbildungsverzeichnis (nicht zwingend Extrablatt)\nMängel: fehlende Nummerierung, Text und Seitenangaben, Nummerierungsfehler"
+          },
+          {
+            "id": "doku.1.3",
+            "row": 17,
+            "label": "Quellen-/Literaturnachweis",
+            "max": 2,
+            "kind": "points",
+            "hint": "Mängel: fehlende Nachweise"
+          }
+        ]
+      },
+      {
+        "id": "doku.2",
+        "no": "2",
+        "row": 18,
+        "label": "Gesamteindruck",
+        "max": 8,
+        "children": [
+          {
+            "id": "doku.2.1",
+            "row": 19,
+            "label": "Darstellung",
+            "max": 3,
+            "kind": "points",
+            "hint": "verlangt wird Blocksatz, einheitliches/ durchgängiges Layout, Objektunterschriften"
+          },
+          {
+            "id": "doku.2.2",
+            "row": 20,
+            "label": "Ausdruck",
+            "max": 2,
+            "kind": "points",
+            "hint": "verlangt wird klare, sachliche Sprache; Berichtsform ist akzeptiert;\nMängel: Wort-Wiederholungen, inhaltl. Bezugsfehler (fehlerhafte semant. Zusammenhänge)"
+          },
+          {
+            "id": "doku.2.3",
+            "row": 21,
+            "label": "Rechtschreibung",
+            "max": 3,
+            "kind": "points",
+            "hint": "Verlangt wird \"Neue deutsche Rechtschreibung\", korrekte Zeichensetzung\nMängel: Fehler in Orthographie, Grammatik, Zeichensetzung"
+          }
+        ]
+      },
+      {
+        "id": "doku.3",
+        "no": "3",
+        "row": 22,
+        "label": "Projektdefinition",
+        "max": 10,
+        "children": [
+          {
+            "id": "doku.3.1",
+            "row": 23,
+            "label": "Darstellung des erwünschten Nutzens",
+            "max": 1,
+            "kind": "points",
+            "hint": "Abfrage und Wiedergabe; eigene Bewertung hier nicht erforderlich"
+          },
+          {
+            "id": "doku.3.2",
+            "row": 24,
+            "label": "IST-Analyse",
+            "max": 4,
+            "kind": "points",
+            "hint": "Rahmenbedingungen\n- technisch\n- organisatorisch (Personen, Betreuer, Abteilungen, rechtlich (z.B. BDSG))"
+          },
+          {
+            "id": "doku.3.3",
+            "row": 25,
+            "label": "SOLL-Analyse",
+            "max": 5,
+            "kind": "points",
+            "hint": "- Definition Kernfunktionen(Anwendungsfälle)\n- geplante Veränderungen/Erweiterung\n- Darstellungsform (methodisch passend, z.B. Diagramme)\n- Mängel: fehlende Abgrenzung, wenn sie erforderlich wäre; unpassende Darstellungsform"
+          }
+        ]
+      },
+      {
+        "id": "doku.4",
+        "no": "4",
+        "row": 26,
+        "label": "Konzept / Planung",
+        "max": 35,
+        "children": [
+          {
+            "id": "doku.4.1",
+            "row": 27,
+            "label": "technische Planung",
+            "max": 10,
+            "kind": "group",
+            "children": [
+              {
+                "id": "doku.4.1.1",
+                "row": 28,
+                "label": "Datenbetrachtung",
+                "max": 4,
+                "kind": "points",
+                "hint": "\"Datenbetrachtung\" (welche Daten werden verarbeitet/Datenstruktur/Formate, Datenquellen, Umfang)"
+              },
+              {
+                "id": "doku.4.1.2",
+                "row": 29,
+                "label": "Anwendungsfälle",
+                "max": 4,
+                "kind": "points",
+                "hint": "Anwendungsfälle, inkl. Verfeinerung (Definition, Diagramm, Ereignisse, Funktionen)"
+              },
+              {
+                "id": "doku.4.1.3",
+                "row": 30,
+                "label": "konkrete Datenflüsse",
+                "max": 2,
+                "kind": "points"
+              }
+            ]
+          },
+          {
+            "id": "doku.4.2",
+            "row": 31,
+            "label": "organisatorische Planung",
+            "max": 10,
+            "kind": "group",
+            "children": [
+              {
+                "id": "doku.4.2.1",
+                "row": 32,
+                "label": "Entwicklungsmodell",
+                "max": 2,
+                "kind": "points",
+                "hint": "Benennung und Begründung"
+              },
+              {
+                "id": "doku.4.2.2",
+                "row": 33,
+                "label": "Einsatz von Ressourcen",
+                "max": 3,
+                "kind": "points",
+                "hint": "Benennung Personen, SW, HW"
+              },
+              {
+                "id": "doku.4.2.3",
+                "row": 34,
+                "label": "Schutzbedarfsermittlung",
+                "max": 4,
+                "kind": "points",
+                "hint": "- Datenschutz (Klärung, ob im Projekt notwendig, z.B. Personenbezug)\n- Datensicherheit (z.B. Integrität)"
+              },
+              {
+                "id": "doku.4.2.4",
+                "row": 35,
+                "label": "Maßnahmen zur QM",
+                "max": 1,
+                "kind": "points",
+                "hint": "Versionierung, Tests u.ä."
+              }
+            ]
+          },
+          {
+            "id": "doku.4.3",
+            "row": 36,
+            "label": "Idee zur Umsetzung",
+            "max": 15,
+            "kind": "group",
+            "children": [
+              {
+                "id": "doku.4.3.1",
+                "row": 37,
+                "label": "Lösungsansatz / -varianten",
+                "max": 6,
+                "kind": "points",
+                "hint": "einen zu lösenden (Teil-)aspekt sowie Lösungsansatz aufzeigen, begründen\n- Lösungsvarianten darstellen (Alternativbetrachtung)\n- Methodik"
+              },
+              {
+                "id": "doku.4.3.2",
+                "row": 38,
+                "label": "Kostenplanung / -schätzung",
+                "max": 3,
+                "kind": "points",
+                "hint": "mind. Kosten erzeugende Ressourcen müssen benannt werden, auch personelle Ressource, darauf folgt Kostenschätzung\n- sollte im Ergebnis verglichen werden\n- Amortisationsbetrachtung ist nicht erforderlich"
+              },
+              {
+                "id": "doku.4.3.3",
+                "row": 39,
+                "label": "Prozessschritte / Projektplan",
+                "max": 6,
+                "kind": "points",
+                "hint": "- Arbeitspakete benennen, inkl. Abhängigkeiten zu Ressourcen, Zeiträume/Dauer, Einordnung/zeitl. Abfolge, Werkzeuge/graf. Darstellung (z.B. GANT))\n- Berücksichtigung der zeitlichen Planung für Kundendokumentation"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "doku.5",
+        "no": "5",
+        "row": 40,
+        "label": "Umsetzung",
+        "max": 20,
+        "children": [
+          {
+            "id": "doku.5.1",
+            "row": 41,
+            "label": "Erläuterung Prozessschritte",
+            "max": 6,
+            "kind": "group",
+            "children": [
+              {
+                "id": "doku.5.1.1",
+                "row": 42,
+                "label": "Vollständigkeit",
+                "max": 2,
+                "kind": "points"
+              },
+              {
+                "id": "doku.5.1.2",
+                "row": 43,
+                "label": "Logik nachvollziehbar",
+                "max": 2,
+                "kind": "points"
+              },
+              {
+                "id": "doku.5.1.3",
+                "row": 44,
+                "label": "zielführender Einsatz Werkzeuge",
+                "max": 2,
+                "kind": "points"
+              }
+            ]
+          },
+          {
+            "id": "doku.5.2",
+            "row": 45,
+            "label": "Darstellung Funktion / Algorithmus",
+            "max": 8,
+            "kind": "points",
+            "hint": "Umsetzung der Entwürfe unter Darstellung einer wesentlichen Funktion/eines Algorithmus\n(z.B. Codierung mit aussagekräftiger Inline-Dokumentation, auch als UML zulässig)"
+          },
+          {
+            "id": "doku.5.3",
+            "row": 46,
+            "label": "Qualitätssicherung",
+            "max": 4,
+            "kind": "group",
+            "children": [
+              {
+                "id": "doku.5.3.1",
+                "row": 47,
+                "label": "Versionierung, Teststrategie",
+                "max": 2,
+                "kind": "points"
+              },
+              {
+                "id": "doku.5.3.2",
+                "row": 48,
+                "label": "Testergebnisse",
+                "max": 2,
+                "kind": "points"
+              }
+            ]
+          },
+          {
+            "id": "doku.5.4",
+            "row": 49,
+            "label": "Umsetzung Schutzbedarf",
+            "max": 2,
+            "kind": "points",
+            "hint": "Umsetzung der Maßnahmen zum Schutzbedarf entsprechend Konzept"
+          },
+          {
+            "id": "doku.5.5",
+            "row": 50,
+            "label": "Mängel",
+            "max": -2,
+            "kind": "malus"
+          }
+        ]
+      },
+      {
+        "id": "doku.6",
+        "no": "6",
+        "row": 51,
+        "label": "Projektabschluss",
+        "max": 10,
+        "children": [
+          {
+            "id": "doku.6.1",
+            "row": 52,
+            "label": "Ergebnisdarstellung",
+            "max": 3,
+            "kind": "points",
+            "hint": "Leistungsdaten des erstellten Ergebnisses, Benennung des erreichten Ist-Zustandes"
+          },
+          {
+            "id": "doku.6.2",
+            "row": 53,
+            "label": "Vergleich zum Soll-Zustand",
+            "max": 3,
+            "kind": "points",
+            "hint": "Gegenüberstellung, Bewertung\n- Referenzierung/Querverweise (auf Tests, Aspekte aus der Arbeit, ..."
+          },
+          {
+            "id": "doku.6.3",
+            "row": 54,
+            "label": "Abweichungen",
+            "max": 3,
+            "kind": "points",
+            "hint": "Abweichungen zum Projektplan\numfasst auch Abweichungen, Techn./Orga./Kostenplan; Diskussion ist nicht gefordert"
+          },
+          {
+            "id": "doku.6.4",
+            "row": 55,
+            "label": "Übergabe",
+            "max": 1,
+            "kind": "points",
+            "hint": "Benennung an wen, wie und wann, die Nennung ist hinreichend"
+          }
+        ]
+      },
+      {
+        "id": "doku.7",
+        "no": "7",
+        "row": 56,
+        "label": "Kundendokumentation",
+        "max": 12,
+        "children": [
+          {
+            "id": "doku.7.1",
+            "row": 57,
+            "label": "Deckblatt",
+            "max": 2,
+            "kind": "group",
+            "children": [
+              {
+                "id": "doku.7.1.1",
+                "row": 58,
+                "label": "Titel, Name, Datum/Version",
+                "max": 1,
+                "kind": "points"
+              },
+              {
+                "id": "doku.7.1.2",
+                "row": 59,
+                "label": "Zielgruppe",
+                "max": 1,
+                "kind": "points"
+              }
+            ]
+          },
+          {
+            "id": "doku.7.2",
+            "row": 60,
+            "label": "Inhalt",
+            "max": 10,
+            "kind": "group",
+            "children": [
+              {
+                "id": "doku.7.2.1",
+                "row": 61,
+                "label": "zielgruppengerechte Darstellung",
+                "max": 1,
+                "kind": "points"
+              },
+              {
+                "id": "doku.7.2.2",
+                "row": 62,
+                "label": "technische Voraussetzungen",
+                "max": 2,
+                "kind": "points",
+                "hint": "HW, SW…"
+              },
+              {
+                "id": "doku.7.2.3",
+                "row": 63,
+                "label": "Installationsquelle",
+                "max": 1,
+                "kind": "points",
+                "hint": "Installationsquelle/Quelltextbereitstellung"
+              },
+              {
+                "id": "doku.7.2.4",
+                "row": 64,
+                "label": "Installationsanleitung",
+                "max": 2,
+                "kind": "points",
+                "hint": "Installationsanleitung, Konfiguration / Vorbereitung Entwicklungsumgebung"
+              },
+              {
+                "id": "doku.7.2.5",
+                "row": 65,
+                "label": "Darstellung relevanter Prozesse",
+                "max": 4,
+                "kind": "points",
+                "hint": "Darstellung der zielgruppenrelevanten Prozesse\n- Systemadmin: z.B. Anlegen eines Nutzers, Backup/Restore, Datenspeicherung\n- Entwickler: z.B. Datenmodell, Schnittstellen, \"semantische\" Beschreibung von Funktionen\n- Endanwender: z.B. Handhabung, Erfassung von Daten, Screenshots"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "praesentation": {
+    "total_row": 118,
+    "max": 100,
+    "sections": [
+      {
+        "id": "praesi.1",
+        "no": "1",
+        "row": 90,
+        "label": "Aufbau und inhaltlich Struktur",
+        "max": 10,
+        "suggestion": "round(max * mean(children))",
+        "children": [
+          {
+            "id": "praesi.1.1",
+            "row": 91,
+            "label": "Projektziel",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.1.2",
+            "row": 92,
+            "label": "Projektumfeld",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.1.3",
+            "row": 93,
+            "label": "sachliche Gliederung",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.1.4",
+            "row": 94,
+            "label": "zeitliche Gliederung",
+            "kind": "scale"
+          }
+        ]
+      },
+      {
+        "id": "praesi.2",
+        "no": "2",
+        "row": 95,
+        "label": "Kommunikative Kompetenz",
+        "max": 20,
+        "suggestion": "round(max * mean(children))",
+        "children": [
+          {
+            "id": "praesi.2.1",
+            "row": 96,
+            "label": "klar und verständlich",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.2.2",
+            "row": 97,
+            "label": "positive Körpersprache",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.2.3",
+            "row": 98,
+            "label": "Verliert Ziel nicht aus den Augen",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.2.4",
+            "row": 99,
+            "label": "Strukturiert Präsentation",
+            "kind": "scale"
+          }
+        ]
+      },
+      {
+        "id": "praesi.3",
+        "no": "3",
+        "row": 100,
+        "label": "Fachliche Kompetenz",
+        "max": 15,
+        "suggestion": "round(max * mean(children))",
+        "children": [
+          {
+            "id": "praesi.3.1",
+            "row": 101,
+            "label": "fachlicher Hintergrund überzeugend",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.3.2",
+            "row": 102,
+            "label": "sachgerechte Alternativen / Lösungen",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.3.3",
+            "row": 103,
+            "label": "Konsequenzen der Lösung",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.3.4",
+            "row": 104,
+            "label": "Fachbegriffe",
+            "kind": "scale"
+          }
+        ]
+      },
+      {
+        "id": "praesi.4",
+        "no": "4",
+        "row": 105,
+        "label": "Präsentationstechnik",
+        "max": 10,
+        "suggestion": "round(max * mean(children))",
+        "children": [
+          {
+            "id": "praesi.4.1",
+            "row": 106,
+            "label": "Umgang mit Medien",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.4.2",
+            "row": 107,
+            "label": "Lesbarkeit",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.4.3",
+            "row": 108,
+            "label": "Layout",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.4.4",
+            "row": 109,
+            "label": "keine unnötigen Animationen",
+            "kind": "scale"
+          }
+        ]
+      },
+      {
+        "id": "praesi.5",
+        "no": "5",
+        "row": 114,
+        "label": "Fachgespräch",
+        "max": 45,
+        "suggestion": "round(max * mean(children))",
+        "children": [
+          {
+            "id": "praesi.5.1",
+            "row": 115,
+            "label": "Analysiert Situation",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.5.2",
+            "row": 116,
+            "label": "Argumentiert fachlich richtig",
+            "kind": "scale"
+          },
+          {
+            "id": "praesi.5.3",
+            "row": 117,
+            "label": "Argumentiert sicher",
+            "kind": "scale"
+          }
+        ]
+      }
+    ]
+  },
+  "timing": {
+    "praesentation": {
+      "start": "C87",
+      "duration": "C88",
+      "end": "C89",
+      "limit_min": 15
+    },
+    "fachgespraech": {
+      "start": "C111",
+      "duration": "C112",
+      "end": "C113",
+      "limit_min": 30
+    }
+  },
+  "gesamt": {
+    "teil1": {
+      "label": "Einrichten IT-gestützter Arbeitsplatz",
+      "weight": 20
+    },
+    "teil2": {
+      "divisor": 80,
+      "bereiche": [
+        {
+          "id": "planen_softwareprodukt",
+          "label": "Planen Softwareprodukt",
+          "weight": 10,
+          "mep_allowed": true
+        },
+        {
+          "id": "algorithmen",
+          "label": "Entwicklung Algorithmen",
+          "weight": 10,
+          "mep_allowed": true
+        },
+        {
+          "id": "wiso",
+          "label": "WiSo",
+          "weight": 10,
+          "mep_allowed": true
+        }
+      ],
+      "projekt": {
+        "label": "Planung und Umsetzen Softwareprojekt",
+        "weight": 50,
+        "parts": [
+          {
+            "id": "dokumentation",
+            "weight": 50
+          },
+          {
+            "id": "praesentation",
+            "weight": 50
+          }
+        ],
+        "divisor": 100
+      }
+    },
+    "gesamt": {
+      "divisor": 100
+    },
+    "mep": {
+      "formula": "round((2 * schriftlich + muendlich) / 3)"
+    }
+  }
+}

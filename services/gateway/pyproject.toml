@@ -5,6 +5,7 @@ description = "HomePI-Gateway: laedt die Artefakt-Module und stellt sie unter ei
 requires-python = ">=3.12"
 dependencies = [
     "homepi-core",
+    "homepi-ihk",
     "homepi-kinderzimmer",
     # Die Artefakte. Jedes meldet sich ueber einen Entry Point an und wird
     # beim Start automatisch eingehaengt - hier steht nur, dass es mitkommt.
@@ -22,6 +23,7 @@ stack = "apps"
 
 [tool.uv.sources]
 homepi-core = { path = "../../packages/homepi-core", editable = true }
+homepi-ihk = { path = "../../modules/ihk", editable = true }
 homepi-kinderzimmer = { path = "../../modules/kinderzimmer", editable = true }
 homepi-haushaltsbuch = { path = "../../modules/haushaltsbuch", editable = true }
 homepi-tischtennis = { path = "../../modules/tischtennis", editable = true }

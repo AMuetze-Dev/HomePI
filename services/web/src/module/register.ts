@@ -4,6 +4,7 @@ import { VerwaltungSeite } from "./verwaltung/VerwaltungSeite";
 import { HaushaltsbuchSeite } from "./haushaltsbuch/HaushaltsbuchSeite";
 import { TischtennisSeite } from "./tischtennis/TischtennisSeite";
 import { KinderzimmerSeite } from "./kinderzimmer/KinderzimmerSeite";
+import { IhkSeite } from "./ihk/IhkSeite";
 
 /**
  * Eigene Oberflächen der Artefakte.
@@ -23,6 +24,15 @@ import { KinderzimmerSeite } from "./kinderzimmer/KinderzimmerSeite";
  * Artefakte zueinander verhalten, statt verteilt auf drei Dateien.
  */
 export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
+  {
+    id: "ihk",
+    Komponente: IhkSeite,
+    // Am Prüfling stehen Dokument und Bewertungsraster nebeneinander - das
+    // braucht jeden Millimeter. Jede Ebene baut ihren Kopf selbst: Daneben
+    // stehen Datum, Punkte und Note, die nur sie kennt.
+    breite: "voll",
+    eigenerTitel: true,
+  },
   {
     id: "kinderzimmer",
     Komponente: KinderzimmerSeite,
