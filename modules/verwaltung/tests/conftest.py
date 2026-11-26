@@ -11,10 +11,6 @@ from httpx import ASGITransport, AsyncClient
 
 from homepi_verwaltung import modul as artefakt
 
-#: Nur eine Datenbank, die erkennbar zum Testen da ist - diese Tests
-#: rufen drop_all auf.
-DATENBANK = datenbank_fuer_tests()
-
 #: Nur fuer Tests. Die Konten legt die Fixture unten an.
 PASSWORT = "korrekt-pferd-batterie-heftklammer"
 
@@ -27,8 +23,14 @@ async def app_und_kontext():
     nachgebaute Sitzung wuerde man vor allem den Nachbau testen. Deshalb sind
     diese Tests als Integration markiert.
     """
+    # Erst hier lesen, nicht als Konstante oben in der Datei: pytest laedt
+    # diese conftest, bevor das Plugin in pytest_configure die eigene
+    # Datenbank dieses Laufs anlegt. Eine Konstante zeigte deshalb noch auf
+    # die gemeinsame Vorlage "test". Und nur eine Datenbank, die erkennbar
+    # zum Testen da ist - diese Tests werfen Tabellen weg.
+    datenbank = datenbank_fuer_tests()
     settings = ServiceSettings(
-        service_name="verwaltung-test", service_version="0.0.1", database_url=DATENBANK
+        service_name="verwaltung-test", service_version="0.0.1", database_url=datenbank
     )
     app = create_service(settings, module=register_aus([artefakt]), anmeldung=True)
     kontext = app.state.homepi

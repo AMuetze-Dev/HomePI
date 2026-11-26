@@ -11,12 +11,6 @@ from httpx import ASGITransport, AsyncClient
 
 from homepi_kinderzimmer import modul as artefakt
 
-# Die Integrationstests laufen gegen "test", nicht gegen "app": sie legen
-# Tabellen an und loeschen sie wieder.
-#: Nur eine Datenbank, die erkennbar zum Testen da ist - diese Tests
-#: rufen drop_all auf.
-DATENBANK = datenbank_fuer_tests()
-
 #: Nur fuer Tests. Das Konto wird in der Fixture unten angelegt.
 PASSWORT = "korrekt-pferd-batterie-heftklammer"
 
@@ -33,8 +27,14 @@ async def client() -> AsyncIterator[AsyncClient]:
     denselben Weg wie ein echter Aufruf und nicht an der Pruefung vorbei.
     Ist das Artefakt oeffentlich, kann der Anmeldeteil hier weg.
     """
+    # Erst hier lesen, nicht als Konstante oben in der Datei: pytest laedt
+    # diese conftest, bevor das Plugin in pytest_configure die eigene
+    # Datenbank dieses Laufs anlegt. Eine Konstante zeigte deshalb noch auf
+    # die gemeinsame Vorlage "test". Und nur eine Datenbank, die erkennbar
+    # zum Testen da ist - diese Tests werfen Tabellen weg.
+    datenbank = datenbank_fuer_tests()
     settings = ServiceSettings(
-        service_name="kinderzimmer-test", service_version="0.0.1", database_url=DATENBANK
+        service_name="kinderzimmer-test", service_version="0.0.1", database_url=datenbank
     )
     app = create_service(settings, module=register_aus([artefakt]), anmeldung=True)
     kontext = app.state.homepi

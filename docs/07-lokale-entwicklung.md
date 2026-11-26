@@ -152,7 +152,8 @@ Deshalb entscheidet nicht mehr die Umgebung allein:
 ```python
 from homepi_core.testing.datenbank import datenbank_fuer_tests
 
-DATENBANK = datenbank_fuer_tests()
+# in der Fixture, nicht oben in der conftest - siehe 12-testen.md, "Fallen"
+datenbank = datenbank_fuer_tests()
 ```
 
 Sie nimmt `HOMEPI_TEST_DATABASE_URL`, sonst `DATABASE_URL`, sonst die
