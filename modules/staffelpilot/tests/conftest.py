@@ -14,10 +14,6 @@ from sqlalchemy import text
 from homepi_staffelpilot import modul as artefakt
 from homepi_staffelpilot.dienst import DIENSTKONTO_VARIABLE
 
-#: Nur eine Datenbank, die erkennbar zum Testen da ist - diese Tests
-#: werfen das ganze Schema weg.
-DATENBANK = datenbank_fuer_tests()
-
 #: Nur hier, nur fuer Tests. Angelegt wird das Konto in der Fixture unten.
 PASSWORT = "korrekt-pferd-batterie-heftklammer"
 
@@ -35,8 +31,14 @@ async def umgebung(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Any]:
     Deshalb sind die Tests damit als Integration markiert.
     """
     monkeypatch.setenv(DIENSTKONTO_VARIABLE, DIENSTKONTO)
+    # Erst hier lesen, nicht als Konstante oben in der Datei: pytest laedt
+    # diese conftest, bevor das Plugin in pytest_configure die eigene
+    # Datenbank dieses Laufs anlegt. Eine Konstante zeigte deshalb noch auf
+    # die gemeinsame Vorlage "test". Und nur eine Datenbank, die erkennbar
+    # zum Testen da ist - diese Tests werfen Tabellen weg.
+    datenbank = datenbank_fuer_tests()
     settings = ServiceSettings(
-        service_name="staffelpilot-test", service_version="0.0.1", database_url=DATENBANK
+        service_name="staffelpilot-test", service_version="0.0.1", database_url=datenbank
     )
     app = create_service(settings, module=register_aus([artefakt]), anmeldung=True)
     kontext = app.state.homepi

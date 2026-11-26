@@ -60,9 +60,11 @@ def pytest_unconfigure(config: pytest.Config) -> None:
 def _datenbank_vorbereiten(config: pytest.Config) -> None:
     """Legt fuer diesen Lauf eine eigene Datenbank an und stellt sie ein.
 
-    Hier und nicht in einer Fixture: die Integrationstests halten die URL als
+    Hier und nicht in einer Fixture: manche Testdateien halten die URL als
     Modulkonstante, und die steht schon beim Einlesen der Testdatei fest -
-    lange bevor die erste Fixture laeuft.
+    lange bevor die erste Fixture laeuft. Das genuegt aber nur fuer
+    Testdateien. Eine ``tests/conftest.py`` laedt pytest noch *vor* diesem
+    Hook; dort muss die URL deshalb in der Fixture gelesen werden.
     """
     global _lauf
     import os

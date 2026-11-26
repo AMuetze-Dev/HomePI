@@ -60,7 +60,10 @@ Verlust aller Konten. Deshalb entscheidet nicht die Umgebung allein:
 ```python
 from homepi_core.testing.datenbank import datenbank_fuer_tests
 
-DATENBANK = datenbank_fuer_tests()
+@pytest.fixture
+async def client():
+    datenbank = datenbank_fuer_tests()   # in der Fixture, nicht oben in der Datei
+    ...
 ```
 
 Sie nimmt `HOMEPI_TEST_DATABASE_URL`, sonst `DATABASE_URL`, sonst die
@@ -215,9 +218,17 @@ den Header dran.
 `scope="function"` verdrahtet; ohne das liefe der Commit hinter dem Statuscode
 her. Nie selbst committen, und die Sitzung nicht selbst aufbauen.
 
-**Die URL der Testdatenbank ist eine Modulkonstante.** Sie steht schon beim
-Einlesen der Testdatei fest, lange vor der ersten Fixture — deshalb legt das
-Plugin die Datenbank in `pytest_configure` an und nicht in einer Fixture.
+**Die URL der Testdatenbank wird erst in der Fixture gelesen.** pytest lädt
+`tests/conftest.py`, _bevor_ das Plugin in `pytest_configure` die eigene
+Datenbank des Laufs anlegt und die Umgebung darauf umstellt. Eine Konstante
+`DATENBANK = datenbank_fuer_tests()` oben in der conftest zeigt deshalb noch
+auf die Vorlage `test` — der Kopf des Laufs meldet `messwerte_test`, die Tests
+schreiben trotzdem in die gemeinsame Datenbank. Aufgefallen ist das erst, als
+dort Tabellen eines anderen Artefakts lagen und `drop_all` mit „cannot drop
+table benutzer because other objects depend on it“ scheiterte. Also
+`datenbank_fuer_tests()` in der Fixture aufrufen oder die Fixture
+`testdatenbank` anfordern. In Testdateien selbst ist eine Konstante
+unschädlich: die liest pytest erst nach `pytest_configure` ein.
 
 **Reihenfolge beim Ersetzen.** `mitAnmeldung` setzt eigene Vorgaben für
 `holeIch`; ein vorher gesetzter Spy wird davon überschrieben. Nach dem
