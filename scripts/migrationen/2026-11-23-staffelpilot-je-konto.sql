@@ -1,8 +1,10 @@
 -- Staffelpilot: was bisher allen gehoerte, gehoert einem Konto
 --
 -- Fuehrt von fd658fb (Regelsatz je Staffelleiter) auf die Trennung der
--- Staffelleiter. Noch auf keiner Anlage gelaufen -- wer es einspielt, traegt
--- Datum und Anlage hier ein.
+-- Staffelleiter.
+--
+-- Eingespielt: 26.11.2026 auf dem Pi (homelab), mit develop 065d62c, nach
+-- `homepi schema anlegen`. Ergebnis: alles ging an das Konto "aaron".
 --
 -- Vorgeschichte: Staffeln, Einstellungen, Saetze, DFBnet-Zugang und Auftraege
 -- hatten bisher keinen Besitzer. Seit der Trennung sieht jeder nur, was seinem
