@@ -145,6 +145,16 @@ dem Pi läuft** — ein Push dorthin baut die arm64-Images als `:develop`;
 Pipeline arm64-Images,
 `homepi deploy -s <name>` rollt aus. Nie direkt auf `main` committen.
 
+Prüfen und ausrollen, je ein Befehl (PowerShell, im Repo):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\vorschau.ps1    # lokaler develop auf http://localhost:5373
+powershell -ExecutionPolicy Bypass -File scripts\ausrollen.ps1   # develop pushen, Images abwarten, Pi aktualisieren
+```
+
+`ausrollen.ps1` zeigt vorher jeden Commit, der mitginge - auch ungepushte
+Merges anderer Arbeiten - und nennt neue Migrationen, statt sie einzuspielen.
+
 ---
 
 ## Bevor du etwas für fertig hältst
