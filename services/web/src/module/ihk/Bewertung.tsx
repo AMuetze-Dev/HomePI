@@ -4,6 +4,7 @@ import { Etikett, Karte, Knopf } from "../../ui";
 import * as api from "./api";
 import stil from "./IhkSeite.module.css";
 import type { Aendern } from "./PrueflingTafel";
+import { FragenListe } from "./Fachgespraech";
 import { Zeitmessung } from "./Zeitmessung";
 import { useZitat } from "./Zitat";
 import { note, punkte } from "./zeit";
@@ -411,6 +412,13 @@ export function PraesiFormular({ katalog, pruefling: p, aendern }: Props) {
             offen={klappen.offen(sektion.id)}
             onUmschalten={() => klappen.umschalten(sektion.id)}
           >
+            {sektion.fragen && (
+              <FragenListe
+                fragen={b.fg_fragen}
+                skala={katalog.skala}
+                onAendern={(neu) => setze({ fg_fragen: neu })}
+              />
+            )}
             {sektion.kinder.map((k) => (
               <div key={k.id} className={stil.kriterium}>
                 <div className={stil.kriteriumtext}>{k.label}</div>
@@ -450,19 +458,6 @@ export function PraesiFormular({ katalog, pruefling: p, aendern }: Props) {
           </SektionKarte>
         );
       })}
-      <Karte>
-        <section aria-labelledby="fragen" className={stil.sektion}>
-          <h3 id="fragen" className={stil.sektionstitel}>
-            Fragen fürs Fachgespräch
-          </h3>
-          <Bemerkung
-            wert={b.fragen}
-            zeilen={6}
-            beschriftung="Eine Frage je Zeile"
-            onSpeichern={(text) => setze({ fragen: text })}
-          />
-        </section>
-      </Karte>
       <Karte>
         <section aria-labelledby="notizen" className={stil.sektion}>
           <h3 id="notizen" className={stil.sektionstitel}>

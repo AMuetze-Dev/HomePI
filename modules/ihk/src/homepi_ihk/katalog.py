@@ -5,6 +5,10 @@ stammen aus ``TEMPLATE.xlsm`` und wurden im ExamManager V2 mit
 ``tools/extract_template.py`` erzeugt. Wer den Katalog ändern will, ändert die
 Vorlage und erzeugt neu - sonst rechnet HomePI anders als der Bogen der IHK.
 
+Eine Abweichung ist gewollt: Das Fachgespräch (``praesi.5``) hat keine festen
+Kriterien, sondern bewertet die gestellten Fragen (``"questions": true``). Der
+Vorschlag ist wie sonst ``round(max * Mittelwert)`` - nur über die Fragen.
+
 Gelesen wird einmal beim Import. Das ist konstante Paketlage, kein I/O im
 Sinne der Schichtung: Der Rechenkern bleibt ohne Datenbank testbar.
 """
@@ -36,6 +40,8 @@ class Sektion:
     label: str
     max: int
     kinder: tuple[Knoten, ...]
+    #: Bewertet wird je gestellter Frage statt je festem Kriterium.
+    fragen: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +107,7 @@ def _sektion(roh: dict[str, Any]) -> Sektion:
         label=roh["label"],
         max=roh["max"],
         kinder=tuple(_knoten(k) for k in roh["children"]),
+        fragen=bool(roh.get("questions", False)),
     )
 
 

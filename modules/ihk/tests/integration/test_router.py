@@ -491,3 +491,115 @@ async def test_uebersicht_zeigt_fortschritt_und_ergebnis(client: AsyncClient) ->
     assert kurz["doku_grenzfall"] is False
     assert kurz["gesamt_punkte"] is None
     assert kurz["gesamt_note"] is None
+
+
+# ── Fachgespräch ─────────────────────────────────────────────────────────────
+
+
+async def test_fragen_im_fachgespraech_bewerten(client: AsyncClient) -> None:
+    p = await _pruefling(client)
+    url = f"/ihk/prueflinge/{p['id']}/bewertung"
+
+    antwort = await client.patch(
+        url, json={"fg_fragen": [{"text": "Was ist ein Index?"}, {"text": "Warum REST?"}]}
+    )
+    assert antwort.status_code == 200, antwort.text
+    fragen = antwort.json()["bewertung"]["fg_fragen"]
+    assert [f["text"] for f in fragen] == ["Was ist ein Index?", "Warum REST?"]
+    assert all(f["id"] and f["wert"] is None for f in fragen)
+
+    fragen[0]["wert"] = 1
+    fragen[1]["wert"] = 0.5
+    antwort = await client.patch(url, json={"fg_fragen": fragen})
+    fg = next(
+        s
+        for s in antwort.json()["auswertung"]["praesentation"]["sektionen"]
+        if s["id"] == "praesi.5"
+    )
+    assert fg["vorschlag"] == 34  # 45 * 0,75 = 33,75
+    assert [f["id"] for f in antwort.json()["bewertung"]["fg_fragen"]] == [f["id"] for f in fragen]
+
+
+async def test_frage_mit_falscher_stufe(client: AsyncClient) -> None:
+    p = await _pruefling(client)
+    antwort = await client.patch(
+        f"/ihk/prueflinge/{p['id']}/bewertung",
+        json={"fg_fragen": [{"text": "Warum?", "wert": 0.6}]},
+    )
+    assert antwort.status_code == 422
+    assert "100, 75, 50, 25 oder 0" in antwort.json()["detail"]
+
+
+async def test_katalog_kennzeichnet_das_fachgespraech(client: AsyncClient) -> None:
+    katalog = (await client.get("/ihk/katalog")).json()
+    fg = next(s for s in katalog["praesentation"] if s["id"] == "praesi.5")
+    assert fg["fragen"] is True
+    assert fg["kinder"] == []
+
+
+# ── Fragensammlung ───────────────────────────────────────────────────────────
+
+
+async def _frage(client: AsyncClient, text: str, thema: str = "") -> dict[str, Any]:
+    antwort = await client.post("/ihk/fragen", json={"text": text, "thema": thema})
+    assert antwort.status_code == 201, antwort.text
+    ergebnis: dict[str, Any] = antwort.json()
+    return ergebnis
+
+
+async def test_sammlung_anlegen_aendern_entfernen(client: AsyncClient) -> None:
+    assert (await client.get("/ihk/fragen")).json() == []
+    frage = await _frage(client, "  Was ist ACID?  ", " Datenbanken ")
+    assert (frage["text"], frage["thema"]) == ("Was ist ACID?", "Datenbanken")
+    await _frage(client, "Was ist ein Subnetz?", "Netzwerk")
+    await _frage(client, "Was ist eine Fremdschlüsselbeziehung?", "Datenbanken")
+
+    liste = (await client.get("/ihk/fragen")).json()
+    # nach Thema, dann Text
+    assert [f["text"] for f in liste] == [
+        "Was ist ACID?",
+        "Was ist eine Fremdschlüsselbeziehung?",
+        "Was ist ein Subnetz?",
+    ]
+
+    antwort = await client.patch(f"/ihk/fragen/{frage['id']}", json={"thema": "DB"})
+    assert antwort.json()["thema"] == "DB"
+    assert antwort.json()["text"] == "Was ist ACID?"
+
+    assert (await client.delete(f"/ihk/fragen/{frage['id']}")).status_code == 204
+    assert len((await client.get("/ihk/fragen")).json()) == 2
+    assert (await client.delete(f"/ihk/fragen/{frage['id']}")).status_code == 404
+
+
+async def test_leere_frage_wird_abgelehnt(client: AsyncClient) -> None:
+    antwort = await client.post("/ihk/fragen", json={"text": "   ", "thema": ""})
+    assert antwort.status_code == 422
+
+
+async def test_stapel_nimmt_viele_auf_und_ueberspringt_doppelte(client: AsyncClient) -> None:
+    await _frage(client, "Was ist ACID?", "Datenbanken")
+    antwort = await client.post(
+        "/ihk/fragen/stapel",
+        json={"thema": "Datenbanken", "texte": "was ist acid?\nWas ist ein Index?\n\nWas ist 3NF?"},
+    )
+    assert antwort.status_code == 201, antwort.text
+    assert antwort.json() == {"angelegt": 2, "doppelt": 1}
+    assert len((await client.get("/ihk/fragen")).json()) == 3
+
+
+async def test_frage_ziehen(client: AsyncClient) -> None:
+    a = await _frage(client, "Was ist ACID?", "Datenbanken")
+    b = await _frage(client, "Was ist ein Index?", "Datenbanken")
+    await _frage(client, "Was ist ein Subnetz?", "Netzwerk")
+
+    gezogen = await client.get(
+        "/ihk/fragen/zufall", params={"thema": "Datenbanken", "ohne": [a["id"]]}
+    )
+    assert gezogen.status_code == 200, gezogen.text
+    assert gezogen.json()["id"] == b["id"]
+
+    leer = await client.get(
+        "/ihk/fragen/zufall", params={"thema": "Datenbanken", "ohne": [a["id"], b["id"]]}
+    )
+    assert leer.status_code == 404
+    assert "Datenbanken" in leer.json()["detail"]

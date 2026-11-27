@@ -8,6 +8,8 @@ eine Zahl ab, rechnet HomePI anders als die Vorlage ``TEMPLATE.xlsm``.
 from __future__ import annotations
 
 import json
+import random
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -17,6 +19,7 @@ import pytest
 from homepi_ihk import dienst
 from homepi_ihk.dienst import (
     Bewertung,
+    FgFrage,
     Mep,
     Teilnoten,
     Zeiten,
@@ -288,7 +291,10 @@ def test_leere_bemerkung_entfernt_den_eintrag() -> None:
 
 def test_bewertung_ueberlebt_den_weg_durch_json() -> None:
     b = aendere_bewertung(
-        Bewertung(), doku={"doku.1.1": 1}, praesi_skala={"praesi.1.1": 0.5}, fragen="Warum?"
+        Bewertung(),
+        doku={"doku.1.1": 1},
+        praesi_skala={"praesi.1.1": 0.5},
+        fg_fragen=[FgFrage("", "Warum?", 0.75, "q1")],
     )
     assert Bewertung.aus_dict(json.loads(json.dumps(b.als_dict()))) == b
     assert Bewertung.aus_dict({}) == Bewertung()
@@ -433,3 +439,145 @@ def test_fortschritt_zaehlt_bewertete_kriterien_und_sektionen() -> None:
     f = dienst.fortschritt(b)
     assert (f.doku_bewertet, f.doku_kriterien) == (2, 38)
     assert (f.praesi_bewertet, f.praesi_sektionen) == (1, 5)
+
+
+# ── Fachgespräch: gestellte Fragen statt fester Kriterien ────────────────────
+
+FG = "praesi.5"
+
+
+def _fg(ergebnis: dienst.TeilErgebnis) -> dienst.SektionErgebnis:
+    return next(s for s in ergebnis.sektionen if s.id == FG)
+
+
+def test_fachgespraech_hat_keine_festen_kriterien_sondern_fragen() -> None:
+    sektion = next(s for s in KATALOG.praesentation if s.id == FG)
+    assert sektion.fragen is True
+    assert sektion.kinder == ()
+    assert all(not b.id.startswith(FG + ".") for b in KATALOG.praesi_blaetter)
+
+
+def test_vorschlag_im_fachgespraech_aus_dem_mittel_der_fragen() -> None:
+    # 45 * (1 + 0,5 + 0,75) / 3 = 33,75 -> 34; unbewertete Fragen zählen nicht
+    ergebnis = berechne_praesentation({}, {}, [1, 0.5, 0.75, None])
+    assert _fg(ergebnis).vorschlag == 34
+    assert _fg(ergebnis).vollstaendig is False
+
+
+def test_fachgespraech_vollstaendig_wenn_jede_frage_und_die_punkte_da_sind() -> None:
+    assert _fg(berechne_praesentation({}, {FG: 30}, [1, 0.5])).vollstaendig is True
+    assert _fg(berechne_praesentation({}, {FG: 30}, [])).vollstaendig is False
+    assert _fg(berechne_praesentation({}, {}, [])).vorschlag is None
+
+
+def test_fragen_bekommen_eine_kennung_und_werden_ganz_ersetzt() -> None:
+    nummern = iter(["a", "b"])
+    b = aendere_bewertung(
+        Bewertung(),
+        fg_fragen=[FgFrage("", "  Was ist ein Index?  ", None, "q7"), FgFrage("", "Und REST?")],
+        neue_id=lambda: next(nummern),
+    )
+    assert b.fg_fragen == (
+        FgFrage("a", "Was ist ein Index?", None, "q7"),
+        FgFrage("b", "Und REST?", None, None),
+    )
+    b = aendere_bewertung(b, fg_fragen=[FgFrage("b", "Und REST?", 0.5)])
+    assert b.fg_fragen == (FgFrage("b", "Und REST?", 0.5, None),)
+    assert aendere_bewertung(b, notizen="x").fg_fragen == b.fg_fragen
+
+
+def test_frage_nur_mit_text_und_einer_stufe_der_skala() -> None:
+    with pytest.raises(dienst.FrageUngueltig):
+        aendere_bewertung(Bewertung(), fg_fragen=[FgFrage("", "   ")])
+    with pytest.raises(dienst.FrageUngueltig):
+        aendere_bewertung(Bewertung(), fg_fragen=[FgFrage("", "x" * 501)])
+    with pytest.raises(dienst.PunkteUnzulaessig):
+        aendere_bewertung(Bewertung(), fg_fragen=[FgFrage("", "Warum?", 0.6)])
+    with pytest.raises(dienst.FrageUngueltig):
+        aendere_bewertung(Bewertung(), fg_fragen=[FgFrage("", "F")] * 41)
+
+
+def test_fachgespraech_kriterien_sind_nicht_mehr_bewertbar() -> None:
+    with pytest.raises(dienst.KriteriumUnbekannt):
+        aendere_bewertung(Bewertung(), praesi_skala={"praesi.5.1": 1})
+
+
+def test_alte_bewertung_wird_beim_lesen_umgestellt() -> None:
+    alt = {
+        "praesi_skala": {"praesi.1.1": 1, "praesi.5.1": 0.5},
+        "praesi_punkte": {"praesi.5": 30},
+        "fragen": "Was ist ein Index?\n\n  Warum REST?  ",
+    }
+    b = Bewertung.aus_dict(alt)
+    assert b.praesi_skala == {"praesi.1.1": 1}
+    assert b.praesi_punkte == {"praesi.5": 30}
+    assert [(f.text, f.wert) for f in b.fg_fragen] == [
+        ("Was ist ein Index?", None),
+        ("Warum REST?", None),
+    ]
+    assert len({f.id for f in b.fg_fragen}) == 2
+
+
+def test_fortschritt_mit_fragen() -> None:
+    b = aendere_bewertung(Bewertung(), praesi_punkte={FG: 30})
+    assert dienst.fortschritt(b).praesi_bewertet == 1
+
+
+# ── Fragensammlung ───────────────────────────────────────────────────────────
+
+
+def test_frage_der_sammlung_wird_bereinigt() -> None:
+    assert dienst.pruefe_frage("  Was ist ACID?  ", "  Datenbanken ") == (
+        "Was ist ACID?",
+        "Datenbanken",
+    )
+    with pytest.raises(dienst.FrageUngueltig):
+        dienst.pruefe_frage("  ", "")
+    with pytest.raises(dienst.FrageUngueltig):
+        dienst.pruefe_frage("Was?", "x" * 61)
+
+
+def test_stapel_eine_frage_je_zeile_ohne_doppelte() -> None:
+    neu, doppelt = dienst.neue_fragen(
+        ["Was ist ACID?"],
+        "was ist  acid?\n\nWas ist REST?\n  Was ist REST?\nWarum Docker?\n",
+    )
+    assert neu == ["Was ist REST?", "Warum Docker?"]
+    assert doppelt == 2
+
+
+def test_stapel_lehnt_ueberlange_zeilen_ab() -> None:
+    with pytest.raises(dienst.FrageUngueltig):
+        dienst.neue_fragen([], "x" * 501)
+
+
+@dataclass
+class _F:
+    id: str
+    thema: str
+
+
+SAMMLUNG = [_F("1", "Datenbanken"), _F("2", "Datenbanken"), _F("3", "Netzwerk")]
+
+
+def test_ziehen_nach_thema_und_ohne_schon_gestellte() -> None:
+    for saat in range(20):
+        gezogen = dienst.ziehe_frage(
+            SAMMLUNG, thema="Datenbanken", ohne={"1"}, zufall=random.Random(saat)
+        )
+        assert gezogen.id == "2"
+
+
+def test_ziehen_ohne_thema_aus_allen() -> None:
+    gezogen = {
+        dienst.ziehe_frage(SAMMLUNG, thema=None, ohne=set(), zufall=random.Random(s)).id
+        for s in range(50)
+    }
+    assert gezogen == {"1", "2", "3"}
+
+
+def test_nichts_mehr_zu_ziehen() -> None:
+    with pytest.raises(dienst.KeineFrageUebrig, match="Netzwerk"):
+        dienst.ziehe_frage(SAMMLUNG, thema="Netzwerk", ohne={"3"}, zufall=random.Random(0))
+    with pytest.raises(dienst.KeineFrageUebrig, match="noch keine"):
+        dienst.ziehe_frage([], thema=None, ohne=set(), zufall=random.Random(0))

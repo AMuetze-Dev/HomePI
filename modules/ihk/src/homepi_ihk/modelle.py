@@ -13,7 +13,7 @@ from datetime import date, datetime
 from typing import Any
 
 from homepi_core import Base, ZeitstempelMixin
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, LargeBinary, String
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, deferred, mapped_column
 
@@ -75,3 +75,14 @@ class Dokument(Base, ZeitstempelMixin):
     # deferred: Die Liste der Dokumente braucht die Bytes nicht. Ohne das
     # laedt jede Prueflingsansicht alle PDFs komplett aus der Datenbank.
     daten: Mapped[bytes] = deferred(mapped_column(LargeBinary, nullable=False))
+
+
+class Frage(Base, ZeitstempelMixin):
+    """Die Fragensammlung fürs Fachgespräch - geteilt von allen, die das
+    Artefakt benutzen dürfen, nicht an einen Prüfungstag gebunden."""
+
+    __tablename__ = "ihk_fragen"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    thema: Mapped[str] = mapped_column(String(60), nullable=False, default="", index=True)
