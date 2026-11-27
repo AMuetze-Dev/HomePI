@@ -52,8 +52,9 @@ async def test_tag_anlegen_und_in_der_uebersicht(client: AsyncClient) -> None:
     assert neu["ort"] == "Bonn"
     uebersicht = (await client.get("/ihk/")).json()
     # Der jüngste Tag zuerst
-    assert [t["datum"] for t in uebersicht] == ["2026-06-18", "2026-06-17"]
-    assert uebersicht[0]["anzahl_prueflinge"] == 0
+    assert [t["tag"]["datum"] for t in uebersicht] == ["2026-06-18", "2026-06-17"]
+    assert uebersicht[0]["tag"]["anzahl_prueflinge"] == 0
+    assert uebersicht[0]["prueflinge"] == []
 
 
 async def test_tag_mit_ungueltigem_datum(client: AsyncClient) -> None:
@@ -101,7 +102,35 @@ async def test_pruefling_anlegen_numeriert_der_reihe_nach(client: AsyncClient) -
         (2, "Zweiter, B"),
     ]
     assert detail["prueflinge"][0]["doku_punkte"] is None
-    assert (await client.get("/ihk/")).json()[0]["anzahl_prueflinge"] == 2
+    assert detail["prueflinge"][0]["dokumente"] == 0
+
+    # Die Übersicht bringt jeden Tag samt seinen Prüflingen in einem Abruf
+    uebersicht = (await client.get("/ihk/")).json()
+    assert uebersicht[0]["tag"]["anzahl_prueflinge"] == 2
+    assert [p["name"] for p in uebersicht[0]["prueflinge"]] == ["Erster, A", "Zweiter, B"]
+
+
+async def test_uebersicht_trennt_die_prueflinge_nach_tagen(client: AsyncClient) -> None:
+    frueh = await _tag(client, datum="2026-06-17")
+    spaet = await _tag(client, datum="2026-06-18")
+    await client.post(f"/ihk/tage/{frueh['id']}/prueflinge", json={"name": "Früh, F"})
+    await client.post(f"/ihk/tage/{spaet['id']}/prueflinge", json={"name": "Spät, S"})
+
+    uebersicht = (await client.get("/ihk/")).json()
+
+    assert [[p["name"] for p in t["prueflinge"]] for t in uebersicht] == [["Spät, S"], ["Früh, F"]]
+
+
+async def test_kurzansicht_zaehlt_die_dokumente(client: AsyncClient) -> None:
+    p = await _pruefling(client)
+    await client.post(
+        f"/ihk/prueflinge/{p['id']}/dokumente",
+        params={"art": "projekt", "dateiname": "a.pdf"},
+        content=PDF,
+    )
+
+    detail = (await client.get(f"/ihk/tage/{p['tag']['id']}")).json()
+    assert detail["prueflinge"][0]["dokumente"] == 1
 
 
 async def test_pruefling_ohne_namen(client: AsyncClient) -> None:

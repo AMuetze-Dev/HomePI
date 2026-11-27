@@ -144,6 +144,7 @@ export function kurz(rest: Partial<PrueflingKurz> = {}): PrueflingKurz {
     doku_note: null,
     praesi_punkte: null,
     praesi_note: null,
+    dokumente: 0,
     ...rest,
   };
 }

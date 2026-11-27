@@ -60,6 +60,18 @@ async def prueflinge_von(sitzung: AsyncSession, tag_id: uuid.UUID) -> list[Pruef
     return list(ergebnis.scalars())
 
 
+async def alle_prueflinge(sitzung: AsyncSession) -> list[Pruefling]:
+    ergebnis = await sitzung.execute(select(Pruefling).order_by(Pruefling.reihenfolge))
+    return list(ergebnis.scalars())
+
+
+async def dokumente_je_pruefling(sitzung: AsyncSession) -> dict[uuid.UUID, int]:
+    ergebnis = await sitzung.execute(
+        select(Dokument.pruefling_id, func.count()).group_by(Dokument.pruefling_id)
+    )
+    return {pruefling_id: int(n) for pruefling_id, n in ergebnis.all()}
+
+
 async def anzahl_prueflinge(sitzung: AsyncSession, tag_id: uuid.UUID) -> int:
     ergebnis = await sitzung.execute(
         select(func.count()).select_from(Pruefling).where(Pruefling.tag_id == tag_id)

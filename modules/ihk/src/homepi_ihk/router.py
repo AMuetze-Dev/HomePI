@@ -117,7 +117,7 @@ async def _detail(sitzung: AsyncSession, p: Pruefling) -> PrueflingDetail:
     )
 
 
-def _kurz(p: Pruefling) -> PrueflingKurz:
+def _kurz(p: Pruefling, dokumente: int) -> PrueflingKurz:
     bewertung = Bewertung.aus_dict(p.bewertung)
     doku = dienst.berechne_doku(bewertung.doku)
     praesi = dienst.berechne_praesentation(bewertung.praesi_skala, bewertung.praesi_punkte)
@@ -132,6 +132,7 @@ def _kurz(p: Pruefling) -> PrueflingKurz:
         doku_note=doku.note,
         praesi_punkte=praesi.gesamt,
         praesi_note=praesi.note,
+        dokumente=dokumente,
     )
 
 
@@ -175,8 +176,20 @@ def _pdf(daten: bytes, dateiname: str, art: str) -> Response:
 
 
 @router.get("/", summary="Prüfungstage")
-async def uebersicht(sitzung: DbSitzung) -> list[TagAusgabe]:
-    return [_tag(t, n) for t, n in await speicher.tage_mit_anzahl(sitzung)]
+async def uebersicht(sitzung: DbSitzung) -> list[TagDetail]:
+    # Ein Abruf für die ganze Übersicht: Jeder Tag lässt sich dort aufklappen,
+    # ohne dass dabei nachgeladen wird.
+    je_tag: dict[uuid.UUID, list[Pruefling]] = {}
+    for p in await speicher.alle_prueflinge(sitzung):
+        je_tag.setdefault(p.tag_id, []).append(p)
+    dokumente = await speicher.dokumente_je_pruefling(sitzung)
+    return [
+        TagDetail(
+            tag=_tag(t, n),
+            prueflinge=[_kurz(p, dokumente.get(p.id, 0)) for p in je_tag.get(t.id, [])],
+        )
+        for t, n in await speicher.tage_mit_anzahl(sitzung)
+    ]
 
 
 @router.get("/katalog", summary="Kriterienkatalog und Notenschlüssel")
@@ -208,7 +221,11 @@ async def tag_anlegen(daten: TagAnlegen, sitzung: DbSitzung) -> TagAusgabe:
 async def tag_lesen(tag_id: uuid.UUID, sitzung: DbSitzung) -> TagDetail:
     tag = await speicher.tag(sitzung, tag_id)
     prueflinge = await speicher.prueflinge_von(sitzung, tag_id)
-    return TagDetail(tag=_tag(tag, len(prueflinge)), prueflinge=[_kurz(p) for p in prueflinge])
+    dokumente = await speicher.dokumente_je_pruefling(sitzung)
+    return TagDetail(
+        tag=_tag(tag, len(prueflinge)),
+        prueflinge=[_kurz(p, dokumente.get(p.id, 0)) for p in prueflinge],
+    )
 
 
 @router.patch("/tage/{tag_id}", summary="Prüfungstag ändern")

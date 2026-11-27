@@ -67,6 +67,9 @@ class PrueflingKurz(BaseModel):
     doku_note: float | None
     praesi_punkte: int | None
     praesi_note: float | None
+    #: Wie viele PDFs hinterlegt sind. Ob die Doku vorliegt, muss niemand
+    #: von Hand abhaken - es steht hier.
+    dokumente: int
 
 
 class TagDetail(BaseModel):

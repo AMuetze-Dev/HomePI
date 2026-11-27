@@ -80,6 +80,111 @@
   }
 }
 
+/* ── Übersicht ──────────────────────────────────────────────────────────── */
+
+.werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--raum-3);
+}
+
+.werkzeuge > div {
+  flex: 1 1 14rem;
+}
+
+.tagkopf {
+  display: flex;
+  align-items: stretch;
+}
+
+.aufklapper {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--raum-1) var(--raum-3);
+  align-items: baseline;
+  padding: var(--raum-3) var(--raum-4);
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dauer-schnell) var(--verlauf);
+}
+
+.aufklapper:hover {
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+.aufklapper:focus-visible,
+.bearbeiten:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--farbe-fokus);
+}
+
+.aufklapper > :nth-child(n + 3) {
+  grid-column: 2;
+}
+
+@media (width >= 48rem) {
+  .aufklapper {
+    grid-template-columns: auto minmax(8rem, auto) minmax(0, 1fr) auto;
+  }
+
+  .aufklapper > :nth-child(n + 3) {
+    grid-column: auto;
+  }
+}
+
+.pfeil {
+  color: var(--farbe-text-leise);
+}
+
+.bearbeiten {
+  display: flex;
+  align-items: center;
+  padding-inline: var(--raum-4);
+  border-left: 1px solid var(--farbe-rand);
+  color: var(--farbe-akzent-schrift);
+  font-size: var(--text-sm);
+  font-weight: var(--gewicht-mittel);
+  text-decoration: none;
+}
+
+.bearbeiten:hover {
+  background: var(--farbe-flaeche-gedaempft);
+}
+
+/* Die aufgeklappte Liste setzt sich mit einer Linie vom Kopf ab. */
+.tagkopf + div {
+  border-top: 1px solid var(--farbe-rand);
+}
+
+.innen {
+  padding: var(--raum-3) var(--raum-4);
+}
+
+.mitaktion {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+  padding-right: var(--raum-3);
+  border-bottom: 1px solid var(--farbe-rand);
+}
+
+.mitaktion:last-child {
+  border-bottom: none;
+}
+
+.mitaktion > a {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+
 /* ── Formulare ──────────────────────────────────────────────────────────── */
 
 .formular {
@@ -415,20 +520,43 @@
 
 /* ── Zeitmessung ────────────────────────────────────────────────────────── */
 
+.zeitleiste {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--raum-3) var(--raum-6);
+}
+
 .uhren {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--raum-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-2) var(--raum-6);
+}
+
+.uhrzeile {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+  color: var(--farbe-text-gedaempft);
 }
 
 .uhr {
+  color: var(--farbe-text);
   font-family: var(--schrift-mono);
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-variant-numeric: tabular-nums;
   font-weight: var(--gewicht-halbfett);
 }
 
-.ueber {
+.grenze {
+  color: var(--farbe-text-leise);
+  font-family: var(--schrift-mono);
+  font-size: var(--text-sm);
+}
+
+.ueber,
+.ueber .uhr {
   color: var(--signal-fehler);
 }
 
@@ -490,6 +618,16 @@
   background: var(--farbe-flaeche-gedaempft);
 }
 
-.pdfflaeche canvas {
+.pdfflaeche {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+/* Bis sie gezeichnet ist, hält eine Seite ihren Platz frei - als Fläche in
+   der Höhe, die sie haben wird. */
+.pdfseite {
   display: block;
+  max-width: none;
+  background: var(--farbe-flaeche);
 }

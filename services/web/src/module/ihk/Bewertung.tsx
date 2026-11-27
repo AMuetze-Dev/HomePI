@@ -225,13 +225,11 @@ export function DokuFormular({ katalog, pruefling: p, aendern }: Props) {
   );
 }
 
-const SKALA_WORT: Record<string, string> = {
-  "1": "voll",
-  "0.75": "¾",
-  "0.5": "½",
-  "0.25": "¼",
-  "0": "nein",
-};
+/** Prozent statt Brüchen: "75 %" liest man im Vorbeigehen, "¾" muss man
+ *  erst übersetzen - und das während der Prüfling spricht. */
+function prozent(stufe: number): string {
+  return `${Math.round(stufe * 100)} %`;
+}
 
 function SektionsPunkte({
   sektion,
@@ -322,7 +320,7 @@ export function PraesiFormular({ katalog, pruefling: p, aendern }: Props) {
                             setze({ praesi_skala: { [k.id]: gewaehlt ? null : stufe } })
                           }
                         >
-                          {SKALA_WORT[String(stufe)] ?? stufe}
+                          {prozent(stufe)}
                         </button>
                       );
                     })}

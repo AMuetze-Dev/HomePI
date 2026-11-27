@@ -88,6 +88,8 @@ export interface PrueflingKurz {
   doku_note: number | null;
   praesi_punkte: number | null;
   praesi_note: number | null;
+  /** Zahl der hinterlegten PDFs - daran erkennt man, ob die Doku da ist. */
+  dokumente: number;
 }
 
 export interface TagDetail {
@@ -218,8 +220,9 @@ export function ladeKatalog(signal?: AbortSignal): Promise<Katalog> {
   return anfrage<Katalog>("/katalog", {}, signal);
 }
 
-export function ladeTage(signal?: AbortSignal): Promise<Tag[]> {
-  return anfrage<Tag[]>("/", {}, signal);
+/** Alle Tage samt ihren Prüflingen - die Übersicht klappt sie auf, ohne nachzuladen. */
+export function ladeTage(signal?: AbortSignal): Promise<TagDetail[]> {
+  return anfrage<TagDetail[]>("/", {}, signal);
 }
 
 export function legeTagAn(daten: NeuerTag): Promise<Tag> {
