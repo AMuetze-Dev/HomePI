@@ -108,7 +108,7 @@ export function FragenTafel() {
         <>
           <input
             type="search"
-            className={stil.eingabezeile}
+            className={`${stil.eingabezeile} ${stil.suchfeld}`}
             aria-label="Fragen durchsuchen"
             placeholder="Fragen durchsuchen …"
             value={suche}

@@ -900,6 +900,12 @@
   font-size: var(--text-md);
 }
 
+/* Allein in einer Spalte darf das Feld nicht in die Höhe wachsen. */
+.suchfeld {
+  flex: none;
+  width: 100%;
+}
+
 .eingabezeile:focus-visible {
   outline: none;
   border-color: var(--farbe-fokus);
