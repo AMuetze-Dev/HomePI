@@ -116,6 +116,45 @@ describe("Prüfungstage", () => {
     expect(await screen.findByRole("link", { name: /Alt, Anton/ })).toBeInTheDocument();
   });
 
+  it("zeigt den Fortschritt, solange bewertet wird, danach Punkte und Note", async () => {
+    vi.spyOn(api, "ladeTage").mockResolvedValue([
+      {
+        tag: tag(),
+        prueflinge: [
+          kurz({ name: "Halb, Fertig", doku_bewertet: 12, praesi_bewertet: 2 }),
+          kurz({
+            id: "p3",
+            name: "Ganz, Fertig",
+            doku_punkte: 81,
+            doku_note: 2.4,
+            doku_bewertet: 38,
+            praesi_punkte: 66,
+            praesi_note: 3.5,
+            praesi_bewertet: 5,
+            praesi_grenzfall: true,
+            gesamt_punkte: 77,
+            gesamt_note: 2.7,
+          }),
+        ],
+      },
+    ]);
+    zeige();
+
+    const halb = await screen.findByRole("link", { name: /Halb, Fertig/ });
+    const dokuBalken = within(halb).getByRole("progressbar", { name: "Doku" });
+    expect(dokuBalken).toHaveAttribute("aria-valuenow", "12");
+    expect(dokuBalken).toHaveAttribute("aria-valuemax", "38");
+    expect(
+      within(halb).getByRole("progressbar", { name: "Präsentation" }),
+    ).toHaveAttribute("aria-valuenow", "2");
+
+    const ganz = screen.getByRole("link", { name: /Ganz, Fertig/ });
+    expect(within(ganz).queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(ganz).toHaveTextContent("Doku 81 P · 2,4");
+    expect(ganz).toHaveTextContent("Gesamt 77 P · 2,7");
+    expect(within(ganz).getByText("Grenzfall")).toBeInTheDocument();
+  });
+
   it("erkennt die hinterlegte Doku, ohne dass jemand abhakt", async () => {
     vi.spyOn(api, "ladeTage").mockResolvedValue([
       {
@@ -323,6 +362,35 @@ describe("Prüfling", () => {
     expect(screen.getByText("1 / 2 P")).toBeInTheDocument();
   });
 
+  it("klappt eine Sektion ein und alle wieder auf", async () => {
+    vi.spyOn(api, "ladePruefling").mockResolvedValue(pruefling());
+    zeige("?pruefling=p1");
+
+    const kopf = await screen.findByRole("button", { name: /1\. Form/ });
+    expect(kopf).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(kopf);
+    expect(kopf).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("group", { name: /Umfang/ })).not.toBeInTheDocument();
+    // Die Summe bleibt im Kopf sichtbar
+    expect(within(kopf).getByText("– / 2 P")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Alle einklappen" }));
+    expect(screen.queryByRole("group", { name: /Mängel/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Alle aufklappen" }));
+    expect(screen.getByRole("group", { name: /Umfang/ })).toBeInTheDocument();
+  });
+
+  it("sagt, dass gespeichert wurde", async () => {
+    vi.spyOn(api, "ladePruefling").mockResolvedValue(pruefling());
+    vi.spyOn(api, "aendereBewertung").mockResolvedValue(pruefling());
+    zeige("?pruefling=p1");
+
+    const gruppe = await screen.findByRole("group", { name: /Umfang/ });
+    await userEvent.click(within(gruppe).getByRole("button", { name: "1" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/Gespeichert/);
+  });
+
   it("nimmt einen gesetzten Punkt beim zweiten Antippen zurück", async () => {
     const p = pruefling();
     p.bewertung.doku = { "doku.1.1": 1 };
@@ -433,6 +501,11 @@ describe("Prüfling", () => {
     await userEvent.click(screen.getByRole("button", { name: "Präsentation starten" }));
 
     expect(api.schalteZeit).toHaveBeenCalledWith("p1", "praesentation_starten");
+    // Der Balken liegt in der Uhrenzeile und nimmt keinen eigenen Platz.
+    expect(screen.getByRole("progressbar", { name: "Prüfungszeit" })).toHaveAttribute(
+      "aria-valuemax",
+      "30",
+    );
     // Symbole statt Wörter - benannt bleiben die Uhren trotzdem.
     expect(screen.getByRole("timer", { name: "Präsentation" })).toHaveTextContent(
       "00:00",

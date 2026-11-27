@@ -34,10 +34,13 @@ from .schemas import (
     KatalogAusgabe,
     KnotenAusgabe,
     NotenbandAusgabe,
+    NotenstufeAusgabe,
     PrueflingAendern,
     PrueflingAnlegen,
     PrueflingDetail,
     PrueflingKurz,
+    RechnerAusgabe,
+    RechnerEingabe,
     SektionAusgabe,
     Status,
     TagAendern,
@@ -121,6 +124,9 @@ def _kurz(p: Pruefling, dokumente: int) -> PrueflingKurz:
     bewertung = Bewertung.aus_dict(p.bewertung)
     doku = dienst.berechne_doku(bewertung.doku)
     praesi = dienst.berechne_praesentation(bewertung.praesi_skala, bewertung.praesi_punkte)
+    stand = dienst.fortschritt(bewertung)
+    ohne, mit = dienst.berechne_gesamt(_teilnoten(p.teilnoten), doku.gesamt, praesi.gesamt)
+    gesamt = mit or ohne
     return PrueflingKurz(
         id=p.id,
         reihenfolge=p.reihenfolge,
@@ -133,6 +139,15 @@ def _kurz(p: Pruefling, dokumente: int) -> PrueflingKurz:
         praesi_punkte=praesi.gesamt,
         praesi_note=praesi.note,
         dokumente=dokumente,
+        doku_bewertet=stand.doku_bewertet,
+        doku_kriterien=stand.doku_kriterien,
+        praesi_bewertet=stand.praesi_bewertet,
+        praesi_sektionen=stand.praesi_sektionen,
+        doku_grenzfall=doku.grenzfall,
+        praesi_grenzfall=praesi.grenzfall,
+        gesamt_punkte=gesamt.gesamt,
+        gesamt_note=gesamt.note,
+        gesamt_grenzfall=gesamt.grenzfall,
     )
 
 
@@ -190,6 +205,37 @@ async def uebersicht(sitzung: DbSitzung) -> list[TagDetail]:
         )
         for t, n in await speicher.tage_mit_anzahl(sitzung)
     ]
+
+
+def _stufe(punkte: int | None) -> NotenstufeAusgabe | None:
+    if punkte is None:
+        return None
+    return NotenstufeAusgabe.model_validate(dienst.notenstufe(punkte))
+
+
+@router.get("/notenstufe", summary="Note zu einer Punktzahl, mit Abstand zur nächsten")
+async def notenstufe(punkte: int) -> NotenstufeAusgabe:
+    return NotenstufeAusgabe.model_validate(dienst.notenstufe(punkte))
+
+
+@router.post("/rechner", summary="Notenrechner - rechnet, ohne etwas zu speichern")
+async def rechner(daten: RechnerEingabe) -> RechnerAusgabe:
+    teilnoten = Teilnoten(
+        teil1=daten.teil1,
+        planen_softwareprodukt=daten.planen_softwareprodukt,
+        algorithmen=daten.algorithmen,
+        wiso=daten.wiso,
+        mep=Mep(bereich=daten.mep.bereich, punkte=daten.mep.punkte) if daten.mep else None,
+    )
+    ohne, mit = dienst.berechne_gesamt(teilnoten, daten.doku, daten.praesentation)
+    return RechnerAusgabe(
+        ohne_mep=GesamtErgebnisAusgabe.model_validate(ohne),
+        mit_mep=GesamtErgebnisAusgabe.model_validate(mit) if mit else None,
+        stufe_ohne_mep=_stufe(ohne.gesamt),
+        stufe_mit_mep=_stufe(mit.gesamt) if mit else None,
+        stufe_doku=_stufe(daten.doku),
+        stufe_praesentation=_stufe(daten.praesentation),
+    )
 
 
 @router.get("/katalog", summary="Kriterienkatalog und Notenschlüssel")

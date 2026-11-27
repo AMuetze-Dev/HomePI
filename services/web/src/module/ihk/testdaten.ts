@@ -145,6 +145,15 @@ export function kurz(rest: Partial<PrueflingKurz> = {}): PrueflingKurz {
     praesi_punkte: null,
     praesi_note: null,
     dokumente: 0,
+    doku_bewertet: 0,
+    doku_kriterien: 38,
+    praesi_bewertet: 0,
+    praesi_sektionen: 5,
+    doku_grenzfall: false,
+    praesi_grenzfall: false,
+    gesamt_punkte: null,
+    gesamt_note: null,
+    gesamt_grenzfall: false,
     ...rest,
   };
 }

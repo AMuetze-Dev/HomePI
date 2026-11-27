@@ -70,6 +70,18 @@ class PrueflingKurz(BaseModel):
     #: Wie viele PDFs hinterlegt sind. Ob die Doku vorliegt, muss niemand
     #: von Hand abhaken - es steht hier.
     dokumente: int
+    #: Fortschritt für die Übersicht: bewertete Kriterien bzw. Sektionen.
+    doku_bewertet: int
+    doku_kriterien: int
+    praesi_bewertet: int
+    praesi_sektionen: int
+    doku_grenzfall: bool
+    praesi_grenzfall: bool
+    #: Gesamtergebnis, sobald alle Teile da sind - mit Ergänzungsprüfung,
+    #: wenn eine eingetragen ist.
+    gesamt_punkte: int | None
+    gesamt_note: float | None
+    gesamt_grenzfall: bool
 
 
 class TagDetail(BaseModel):
@@ -151,6 +163,34 @@ class TeilnotenEingabe(BaseModel):
     wiso: Punkte | None = None
     #: Mündliche Ergänzungsprüfung in genau einem Bereich von Teil 2.
     mep: MepEingabe | None = None
+
+
+class RechnerEingabe(TeilnotenEingabe):
+    """Was der Notenrechner bekommt - nichts davon wird gespeichert."""
+
+    doku: Punkte | None = None
+    praesentation: Punkte | None = None
+
+
+class NotenstufeAusgabe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    punkte: int
+    note: float
+    ganze_note: int
+    grenzfall: bool
+    bessere_note: int | None
+    fehlen: int | None
+    puffer: int
+
+
+class RechnerAusgabe(BaseModel):
+    ohne_mep: GesamtErgebnisAusgabe
+    mit_mep: GesamtErgebnisAusgabe | None
+    stufe_ohne_mep: NotenstufeAusgabe | None
+    stufe_mit_mep: NotenstufeAusgabe | None
+    stufe_doku: NotenstufeAusgabe | None
+    stufe_praesentation: NotenstufeAusgabe | None
 
 
 class ZeitAktion(BaseModel):
@@ -303,4 +343,5 @@ class KatalogAusgabe(BaseModel):
 
 
 PrueflingKurz.model_rebuild()
+RechnerAusgabe.model_rebuild()
 TagDetail.model_rebuild()

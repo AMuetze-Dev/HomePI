@@ -392,3 +392,44 @@ def test_korrekturbogen_spiegelt_die_vorlage() -> None:
     assert len(bogen.notenschluessel) == 6
     # Notizen gehören nie auf den Bogen
     assert all("geheim" not in (z.bemerkung or "") for z in bogen.zeilen)
+
+
+# ── Notenrechner ─────────────────────────────────────────────────────────────
+
+
+def test_notenstufe_nennt_note_und_was_zur_naechsten_fehlt() -> None:
+    s = dienst.notenstufe(81)
+    assert (s.punkte, s.note, s.ganze_note) == (81, 2.4, 2)
+    # 92 ist die Untergrenze der 1
+    assert (s.bessere_note, s.fehlen) == (1, 11)
+    # 81 ist die Untergrenze der 2: ein Punkt weniger, und es ist eine 3
+    assert s.puffer == 0
+
+
+def test_notenstufe_erkennt_den_grenzfall() -> None:
+    assert dienst.notenstufe(91).grenzfall is True
+    assert dienst.notenstufe(91).fehlen == 1
+    assert dienst.notenstufe(90).grenzfall is False
+
+
+def test_notenstufe_an_den_enden() -> None:
+    oben = dienst.notenstufe(100)
+    assert (oben.ganze_note, oben.bessere_note, oben.fehlen) == (1, None, None)
+    unten = dienst.notenstufe(0)
+    assert (unten.ganze_note, unten.bessere_note, unten.fehlen) == (6, 5, 30)
+
+
+def test_notenstufe_nur_von_0_bis_100() -> None:
+    with pytest.raises(dienst.PunkteUnzulaessig):
+        dienst.notenstufe(101)
+    with pytest.raises(dienst.PunkteUnzulaessig):
+        dienst.notenstufe(-1)
+
+
+def test_fortschritt_zaehlt_bewertete_kriterien_und_sektionen() -> None:
+    b = aendere_bewertung(
+        Bewertung(), doku={"doku.1.1": 1, "doku.1.2": 1}, praesi_punkte={"praesi.1": 8}
+    )
+    f = dienst.fortschritt(b)
+    assert (f.doku_bewertet, f.doku_kriterien) == (2, 38)
+    assert (f.praesi_bewertet, f.praesi_sektionen) == (1, 5)

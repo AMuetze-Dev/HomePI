@@ -419,3 +419,75 @@ async def test_katalog(client: AsyncClient) -> None:
         "wiso",
     ]
     assert len(katalog["notenbaender"]) == 6
+
+
+# ── Notenrechner und Fortschritt ─────────────────────────────────────────────
+
+
+async def test_notenstufe(client: AsyncClient) -> None:
+    stufe = (await client.get("/ihk/notenstufe", params={"punkte": 91})).json()
+    assert stufe == {
+        "punkte": 91,
+        "note": 1.5,
+        "ganze_note": 2,
+        "grenzfall": True,
+        "bessere_note": 1,
+        "fehlen": 1,
+        "puffer": 10,
+    }
+    antwort = await client.get("/ihk/notenstufe", params={"punkte": 101})
+    assert antwort.status_code == 422
+
+
+async def test_rechner_rechnet_ohne_pruefling(client: AsyncClient) -> None:
+    antwort = await client.post(
+        "/ihk/rechner",
+        json={
+            "teil1": 80,
+            "planen_softwareprodukt": 70,
+            "algorithmen": 60,
+            "wiso": 90,
+            "mep": {"bereich": "wiso", "punkte": 40},
+            "doku": 65,
+            "praesentation": 89,
+        },
+    )
+
+    assert antwort.status_code == 200, antwort.text
+    ergebnis = antwort.json()
+    assert ergebnis["ohne_mep"]["gesamt"] == 77
+    assert ergebnis["mit_mep"]["gesamt"] == 75
+    assert ergebnis["stufe_ohne_mep"]["ganze_note"] == 3
+    assert ergebnis["stufe_doku"]["punkte"] == 65
+    assert ergebnis["stufe_praesentation"]["punkte"] == 89
+    # Nichts davon landet in der Datenbank
+    assert (await client.get("/ihk/")).json() == []
+
+
+async def test_rechner_mit_luecken(client: AsyncClient) -> None:
+    ergebnis = (await client.post("/ihk/rechner", json={"doku": 50})).json()
+    assert ergebnis["ohne_mep"]["gesamt"] is None
+    assert ergebnis["stufe_ohne_mep"] is None
+    assert ergebnis["stufe_doku"]["ganze_note"] == 4
+    assert ergebnis["mit_mep"] is None
+
+
+async def test_rechner_lehnt_mehr_als_100_ab(client: AsyncClient) -> None:
+    antwort = await client.post("/ihk/rechner", json={"doku": 120})
+    assert antwort.status_code == 422
+
+
+async def test_uebersicht_zeigt_fortschritt_und_ergebnis(client: AsyncClient) -> None:
+    p = await _pruefling(client)
+    await client.patch(
+        f"/ihk/prueflinge/{p['id']}/bewertung",
+        json={"doku": {"doku.1.1": 1}, "praesi_punkte": {"praesi.1": 8}},
+    )
+
+    kurz = (await client.get("/ihk/")).json()[0]["prueflinge"][0]
+
+    assert (kurz["doku_bewertet"], kurz["doku_kriterien"]) == (1, 38)
+    assert (kurz["praesi_bewertet"], kurz["praesi_sektionen"]) == (1, 5)
+    assert kurz["doku_grenzfall"] is False
+    assert kurz["gesamt_punkte"] is None
+    assert kurz["gesamt_note"] is None

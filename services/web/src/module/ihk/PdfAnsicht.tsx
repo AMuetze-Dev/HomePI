@@ -4,6 +4,7 @@ import { Hinweis, Knopf, Platzhalter } from "../../ui";
 import * as api from "./api";
 import stil from "./IhkSeite.module.css";
 import { meldung } from "./zeit";
+import { useZitat } from "./Zitat";
 
 type PdfJs = typeof import("pdfjs-dist");
 type Dokument = Awaited<ReturnType<PdfJs["getDocument"]>["promise"]>;
@@ -225,13 +226,33 @@ function PdfSeite({
     };
   }, [sichtbar, pdf, nummer, massstab]);
 
+  const zitat = useZitat();
+
   return (
-    <canvas
-      ref={leinwand}
-      role="img"
-      aria-label={`${name}, Seite ${nummer} von ${von}`}
-      className={stil.pdfseite}
-      style={sichtbar ? undefined : { height: `${hoehe}px`, width: "100%" }}
-    />
+    <div className={stil.pdfseitenrahmen}>
+      <canvas
+        ref={leinwand}
+        role="img"
+        aria-label={`${name}, Seite ${nummer} von ${von}`}
+        className={stil.pdfseite}
+        style={sichtbar ? undefined : { height: `${hoehe}px`, width: "100%" }}
+      />
+      {zitat && (
+        <button
+          type="button"
+          className={stil.seitenmarke}
+          disabled={!zitat.hatZiel}
+          aria-label={`Seite ${nummer} in die Bemerkung übernehmen`}
+          title={
+            zitat.hatZiel
+              ? `„S. ${nummer}:“ in die zuletzt benutzte Bemerkung`
+              : "Erst in ein Bemerkungsfeld tippen"
+          }
+          onClick={() => zitat.zitiere(nummer)}
+        >
+          S. {nummer}
+        </button>
+      )}
+    </div>
   );
 }
