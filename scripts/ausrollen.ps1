@@ -2,6 +2,7 @@
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\ausrollen.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts\ausrollen.ps1 -OhnePush   # nur der Pi
+#   powershell -ExecutionPolicy Bypass -File scripts\ausrollen.ps1 -Ja         # ohne Rueckfrage
 #
 # Ablauf:
 #   1. zeigen, was mit dem Push auf den Pi ginge - auch Commits anderer
@@ -17,6 +18,9 @@
 
 param(
     [switch]$OhnePush,
+    # Ohne Rueckfrage - fuer einen Aufruf, bei dem niemand tippen kann. Die
+    # Liste der Commits steht trotzdem davor.
+    [switch]$Ja,
     [string]$Ziel = "homelab",
     [int]$WarteMinuten = 30
 )
@@ -49,8 +53,10 @@ if (-not $OhnePush) {
             $migrationen | ForEach-Object { Write-Host "      $_" }
         }
         Write-Host ""
-        $antwort = Read-Host "Pushen und ausrollen? (j/n)"
-        if ($antwort -ne "j") { Write-Host "Nichts getan."; exit 0 }
+        if (-not $Ja) {
+            $antwort = Read-Host "Pushen und ausrollen? (j/n)"
+            if ($antwort -ne "j") { Write-Host "Nichts getan."; exit 0 }
+        }
 
         git push origin develop
         Pruefe "git push"
