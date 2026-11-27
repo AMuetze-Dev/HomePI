@@ -3,6 +3,7 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\vorschau.ps1            # develop
 #   powershell -ExecutionPolicy Bypass -File scripts\vorschau.ps1 -Zweig feature/ihk
 #   powershell -ExecutionPolicy Bypass -File scripts\vorschau.ps1 -Stopp
+#   powershell -ExecutionPolicy Bypass -File scripts\vorschau.ps1 -Dev    # auf 5173, mit deinen Daten
 #
 # Warum nicht einfach "make dev": Der Hauptordner steht oft auf einem anderen
 # Zweig, und darin liegen ungesicherte Aenderungen anderer Arbeiten. Die
@@ -16,12 +17,18 @@
 # Die Entwicklungsumgebung auf 5173 bleibt davon unberuehrt. Die Datenbank der
 # Vorschau ueberlebt ein erneutes Starten; weggeworfen wird sie nie von hier.
 #
+# Mit -Dev laeuft derselbe Stand stattdessen als DIE Entwicklungsumgebung
+# (5173/18000/15432) - mit ihrer Datenbank, also mit deinem Konto und deinen
+# Daten. Neue Tabellen legt das Gateway beim Start an. Zurueck zum Code des
+# Hauptordners: dort "make dev" bzw. die Zeile, die das Skript am Ende nennt.
+#
 # Bewusst ohne Umlaute: Windows PowerShell 5.1 liest Skripte ohne BOM als
 # ANSI, und aus einem "ae" wird dann nichts Falsches.
 
 param(
     [string]$Zweig = "develop",
-    [switch]$Stopp
+    [switch]$Stopp,
+    [switch]$Dev
 )
 
 # Nicht "Stop": Windows PowerShell 5.1 hielte jede Zeile, die git oder docker
@@ -33,10 +40,19 @@ $repo = (git -C $PSScriptRoot rev-parse --path-format=absolute --git-common-dir)
 $repo = Split-Path $repo -Parent
 $ordner = Join-Path (Split-Path $repo -Parent) "HomePI-vorschau"
 
-$env:DEV_PROJEKT = "homepi-vorschau"
-$env:DEV_WEB_PORT = "5373"
-$env:DEV_API_PORT = "18200"
-$env:DEV_DB_PORT = "15632"
+if ($Dev) {
+    # Dieselben Namen wie "make dev": dasselbe Compose-Projekt, also auch
+    # dasselbe Datenbank-Band. Nur der Code kommt aus dem Vorschau-Ordner.
+    $env:DEV_PROJEKT = "homepi-dev"
+    $env:DEV_WEB_PORT = "5173"
+    $env:DEV_API_PORT = "18000"
+    $env:DEV_DB_PORT = "15432"
+} else {
+    $env:DEV_PROJEKT = "homepi-vorschau"
+    $env:DEV_WEB_PORT = "5373"
+    $env:DEV_API_PORT = "18200"
+    $env:DEV_DB_PORT = "15632"
+}
 $env:HOMEPI_MODULE = ""
 
 function Pruefe([string]$schritt) {
@@ -75,6 +91,20 @@ Write-Host "    $stand"
 # -V:      node_modules liegen in einem anonymen Band. Ohne Erneuern fehlt
 #          eine neue npm-Abhaengigkeit, obwohl sie im Abbild ist.
 Write-Host "==> Baue und starte die Vorschau (dauert beim ersten Mal einige Minuten)"
+if ($Dev) {
+    # Alle Dienste, auch der Pruefdienst: Er gehoert zu diesem Projekt und
+    # liefe sonst mit dem Code des Hauptordners gegen das neue Gateway.
+    docker compose -f (Join-Path $ordner "compose.dev.yml") up -d --build -V --wait
+    Pruefe "docker compose up"
+    Write-Host ""
+    Write-Host "Entwicklungsumgebung laeuft mit $stand"
+    Write-Host "    http://localhost:5173  - mit deinem Konto anmelden."
+    Write-Host "    Ein neues Artefakt erscheint erst, wenn du dir in der Verwaltung ein Recht darauf gibst."
+    Write-Host ""
+    Write-Host "Zurueck zum Code des Hauptordners:"
+    Write-Host "    docker compose -f `"$(Join-Path $repo 'compose.dev.yml')`" up -d --build -V"
+    exit 0
+}
 docker compose -f (Join-Path $ordner "compose.dev.yml") up -d --build -V --wait postgres gateway web
 Pruefe "docker compose up"
 
