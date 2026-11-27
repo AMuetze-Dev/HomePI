@@ -47,12 +47,92 @@ describe("Prüfungstage", () => {
     expect(await screen.findByText(/Noch kein Prüfungstag/)).toBeInTheDocument();
   });
 
-  it("listet die Tage mit Zahl der Prüflinge", async () => {
-    vi.spyOn(api, "ladeTage").mockResolvedValue([tag({ anzahl_prueflinge: 3 })]);
+  it("zeigt jeden Tag mit seinen Prüflingen, den jüngsten aufgeklappt", async () => {
+    vi.spyOn(api, "ladeTage").mockResolvedValue([
+      {
+        tag: tag({ id: "t2", datum: "2026-06-19", anzahl_prueflinge: 1 }),
+        prueflinge: [
+          kurz({ id: "p2", name: "Neu, Nina", doku_punkte: 81, doku_note: 2.4 }),
+        ],
+      },
+      { tag: tag({ anzahl_prueflinge: 1 }), prueflinge: [kurz({ name: "Alt, Anton" })] },
+    ]);
     zeige();
-    const verweis = await screen.findByRole("link", { name: /18\.06\.2026/ });
-    expect(verweis).toHaveAttribute("href", "/modul/ihk?tag=t1");
-    expect(verweis).toHaveTextContent("3 Prüflinge");
+
+    const verweis = await screen.findByRole("link", { name: /Neu, Nina/ });
+    expect(verweis).toHaveAttribute("href", "/modul/ihk?pruefling=p2");
+    expect(verweis).toHaveTextContent("81 P");
+    expect(verweis).toHaveTextContent("2,4");
+    expect(screen.queryByRole("link", { name: /Alt, Anton/ })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /18\.06\.2026/ }));
+    expect(screen.getByRole("link", { name: /Alt, Anton/ })).toHaveAttribute(
+      "href",
+      "/modul/ihk?pruefling=p1",
+    );
+    expect(screen.getAllByRole("link", { name: /Bearbeiten/ })[1]).toHaveAttribute(
+      "href",
+      "/modul/ihk?tag=t1",
+    );
+  });
+
+  it("klappt alle Tage auf einmal auf", async () => {
+    vi.spyOn(api, "ladeTage").mockResolvedValue([
+      {
+        tag: tag({ id: "t2", datum: "2026-06-19" }),
+        prueflinge: [kurz({ id: "p2", name: "Neu, Nina" })],
+      },
+      { tag: tag(), prueflinge: [kurz({ name: "Alt, Anton" })] },
+    ]);
+    zeige();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Alle aufklappen" }));
+    expect(screen.getByRole("link", { name: /Alt, Anton/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Neu, Nina/ })).toBeInTheDocument();
+  });
+
+  it("findet einen Prüfling über alle Tage", async () => {
+    vi.spyOn(api, "ladeTage").mockResolvedValue([
+      {
+        tag: tag({ id: "t2", datum: "2026-06-19" }),
+        prueflinge: [kurz({ id: "p2", name: "Neu, Nina" })],
+      },
+      { tag: tag(), prueflinge: [kurz({ name: "Alt, Anton" })] },
+    ]);
+    zeige();
+
+    await userEvent.type(await screen.findByLabelText("Prüfling suchen"), "anton");
+
+    expect(screen.getByRole("link", { name: /Alt, Anton/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Neu, Nina/ })).not.toBeInTheDocument();
+  });
+
+  it("öffnet beim Zurückkommen den Tag des Prüflings", async () => {
+    vi.spyOn(api, "ladeTage").mockResolvedValue([
+      { tag: tag({ id: "t2", datum: "2026-06-19" }), prueflinge: [] },
+      { tag: tag(), prueflinge: [kurz({ name: "Alt, Anton" })] },
+    ]);
+    zeige("?offen=t1");
+    expect(await screen.findByRole("link", { name: /Alt, Anton/ })).toBeInTheDocument();
+  });
+
+  it("erkennt die hinterlegte Doku, ohne dass jemand abhakt", async () => {
+    vi.spyOn(api, "ladeTage").mockResolvedValue([
+      {
+        tag: tag(),
+        prueflinge: [
+          kurz({ name: "Mit, Doku", dokumente: 1 }),
+          kurz({ id: "p3", name: "Ohne, Doku" }),
+        ],
+      },
+    ]);
+    zeige();
+    expect(await screen.findByRole("link", { name: /Mit, Doku/ })).toHaveTextContent(
+      "Doku hinterlegt",
+    );
+    expect(screen.getByRole("link", { name: /Ohne, Doku/ })).toHaveTextContent(
+      "keine Doku",
+    );
   });
 
   it("legt einen Tag an und leert das Formular", async () => {
@@ -147,6 +227,36 @@ describe("Prüfungstag", () => {
     expect(await screen.findByText(/Noch kein Prüfungstag/)).toBeInTheDocument();
   });
 
+  it("ändert Datum, Ort und Korrektor", async () => {
+    vi.spyOn(api, "ladeTag").mockResolvedValue({ tag: tag(), prueflinge: [] });
+    vi.spyOn(api, "aendereTag").mockResolvedValue(tag({ ort: "Bonn" }));
+    zeige("?tag=t1");
+
+    const ort = await screen.findByLabelText("Ort");
+    await userEvent.clear(ort);
+    await userEvent.type(ort, "Bonn");
+    await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    expect(api.aendereTag).toHaveBeenCalledWith("t1", {
+      datum: "2026-06-18",
+      ort: "Bonn",
+      korrektor: "K. Orrektor",
+    });
+  });
+
+  it("entfernt einen Prüfling nach Rückfrage", async () => {
+    vi.spyOn(api, "ladeTag").mockResolvedValue({ tag: tag(), prueflinge: [kurz()] });
+    vi.spyOn(api, "entfernePruefling").mockResolvedValue(undefined);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    zeige("?tag=t1");
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Muster, Max entfernen" }),
+    );
+
+    expect(api.entfernePruefling).toHaveBeenCalledWith("p1");
+  });
+
   it("meldet einen unbekannten Tag wörtlich", async () => {
     vi.spyOn(api, "ladeTag").mockRejectedValue(
       new ApiError("Es gibt keinen Prüfungstag", 404),
@@ -174,6 +284,24 @@ describe("Prüfling", () => {
     );
     expect(screen.getByRole("heading", { name: /1\. Form/ })).toBeInTheDocument();
     expect(screen.getByText(/4 von 4 Kriterien offen/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Prüfungstage/ })).toHaveAttribute(
+      "href",
+      "/modul/ihk?offen=t1",
+    );
+  });
+
+  it("erkennt die Doku am hinterlegten PDF und fragt nicht nach Hochgeladen", async () => {
+    vi.spyOn(api, "ladePruefling").mockResolvedValue(pruefling());
+    zeige("?pruefling=p1");
+
+    expect(await screen.findByText("Keine Doku hinterlegt")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", { name: /runtergeladen/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", { name: "Hochgeladen" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Kontrolliert" })).toBeInTheDocument();
   });
 
   it("setzt Punkte über das Backend und zeigt die neue Summe", async () => {
@@ -276,7 +404,7 @@ describe("Prüfling", () => {
 
     await userEvent.click(await screen.findByRole("radio", { name: "Präsentation" }));
     const ziel = screen.getByRole("group", { name: /Projektziel/ });
-    await userEvent.click(within(ziel).getByRole("button", { name: "¾" }));
+    await userEvent.click(within(ziel).getByRole("button", { name: "75 %" }));
     expect(api.aendereBewertung).toHaveBeenCalledWith("p1", {
       praesi_skala: { "praesi.1.1": 0.75 },
     });
@@ -305,6 +433,12 @@ describe("Prüfling", () => {
     await userEvent.click(screen.getByRole("button", { name: "Präsentation starten" }));
 
     expect(api.schalteZeit).toHaveBeenCalledWith("p1", "praesentation_starten");
+    // Symbole statt Wörter - benannt bleiben die Uhren trotzdem.
+    expect(screen.getByRole("timer", { name: "Präsentation" })).toHaveTextContent(
+      "00:00",
+    );
+    expect(screen.getByRole("timer", { name: "Fachgespräch" })).toBeInTheDocument();
+    expect(screen.getByRole("timer", { name: "Gesamt" })).toBeInTheDocument();
     expect(
       await screen.findByRole("button", { name: "Fachgespräch starten" }),
     ).toBeVisible();

@@ -49,17 +49,22 @@ afterEach(() => {
 });
 
 describe("PDF-Ansicht", () => {
-  it("lädt das Dokument und blättert", async () => {
+  it("zeigt alle Seiten untereinander zum Durchscrollen", async () => {
     vi.spyOn(api, "ladeDokumentDaten").mockResolvedValue(new ArrayBuffer(8));
     render(<PdfAnsicht pruefling={pruefling()} dokument={DOKUMENT} />);
 
     expect(screen.getByRole("status")).toBeInTheDocument();
-    expect(await screen.findByText("Seite 1 / 3")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Vorige Seite" })).toBeDisabled();
-
-    await userEvent.click(screen.getByRole("button", { name: "Nächste Seite" }));
-    expect(screen.getByText("Seite 2 / 3")).toBeInTheDocument();
-    expect(getPage).toHaveBeenLastCalledWith(2);
+    expect(await screen.findByText("3 Seiten")).toBeInTheDocument();
+    for (const nummer of [1, 2, 3]) {
+      expect(
+        await screen.findByRole("img", { name: `Projekt.pdf, Seite ${nummer} von 3` }),
+      ).toBeInTheDocument();
+    }
+    // Kein Blättern mehr: gescrollt wird in der Fläche selbst.
+    expect(
+      screen.queryByRole("button", { name: "Nächste Seite" }),
+    ).not.toBeInTheDocument();
+    expect(getPage).toHaveBeenCalledWith(3);
 
     await userEvent.click(screen.getByRole("button", { name: "Vergrößern" }));
     await userEvent.click(screen.getByRole("button", { name: "Verkleinern" }));

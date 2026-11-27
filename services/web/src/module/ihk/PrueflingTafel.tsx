@@ -42,10 +42,8 @@ function dokumentAnfangsSichtbar(): boolean {
 }
 
 const STATUS: { schluessel: keyof api.Status; wort: string }[] = [
-  { schluessel: "runtergeladen", wort: "Doku runtergeladen" },
   { schluessel: "kontrolliert", wort: "Kontrolliert" },
   { schluessel: "abgestimmt", wort: "Abgestimmt" },
-  { schluessel: "hochgeladen", wort: "Hochgeladen" },
 ];
 
 /** Was eine Ansicht braucht, um etwas am Prüfling zu ändern. */
@@ -136,8 +134,8 @@ export function PrueflingTafel({ prueflingId }: { prueflingId: string }) {
         </>
       }
     >
-      <Link to={`?tag=${encodeURIComponent(p.tag.id)}`} className={stil.zurueck}>
-        ← Prüfungstag {datum(p.tag.datum)}
+      <Link to={`?offen=${encodeURIComponent(p.tag.id)}`} className={stil.zurueck}>
+        ← Prüfungstage · {datum(p.tag.datum)}
       </Link>
 
       <div className={mitDokument ? stil.arbeitsflaeche : undefined}>
@@ -239,11 +237,20 @@ function Stammdaten({
         </label>
       </div>
       <ul className={stil.schalterliste}>
+        {/* Ob die Doku vorliegt, steht am hinterlegten PDF - von Hand abhaken
+            hiesse, dieselbe Frage zweimal zu beantworten. "Hochgeladen" gibt
+            es nicht mehr: Der Bogen geht zurzeit wieder auf Papier. */}
+        <li className={stil.schalterzeile}>
+          <span>Dokumentation</span>
+          <Etikett ton={p.dokumente.length > 0 ? "gut" : "neutral"}>
+            {p.dokumente.length > 0 ? "Doku hinterlegt" : "Keine Doku hinterlegt"}
+          </Etikett>
+        </li>
         {STATUS.map(({ schluessel, wort }) => (
           <li key={schluessel} className={stil.schalterzeile}>
             <span>{wort}</span>
             <Schalter
-              beschriftung={wort === "Doku runtergeladen" ? "Doku runtergeladen" : wort}
+              beschriftung={wort}
               an={p.status[schluessel]}
               beiWechsel={(an) =>
                 void aendern(() =>

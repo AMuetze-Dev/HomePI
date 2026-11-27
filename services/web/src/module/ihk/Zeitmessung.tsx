@@ -4,15 +4,30 @@ import { Hinweis, Karte, Knopf } from "../../ui";
 import * as api from "./api";
 import stil from "./IhkSeite.module.css";
 import type { Aendern } from "./PrueflingTafel";
+import { Sinnbild } from "./Symbole";
 import { uhr, zeitstand } from "./zeit";
 
-const AKTION_WORT: Record<
+/** Was der eine Knopf gerade tut: Symbol für die Handlung, Symbol für das,
+ *  was danach läuft. Der Satz dazu steht im Tooltip und für Screenreader. */
+const AKTION: Record<
   NonNullable<ReturnType<typeof zeitstand>["naechste"]>,
-  string
+  {
+    wort: string;
+    symbol: "start" | "weiter" | "stopp";
+    ziel: "praesentation" | "gespraech" | "gesamt";
+  }
 > = {
-  praesentation_starten: "Präsentation starten",
-  fachgespraech_starten: "Fachgespräch starten",
-  beenden: "Prüfung beenden",
+  praesentation_starten: {
+    wort: "Präsentation starten",
+    symbol: "start",
+    ziel: "praesentation",
+  },
+  fachgespraech_starten: {
+    wort: "Fachgespräch starten",
+    symbol: "weiter",
+    ziel: "gespraech",
+  },
+  beenden: { wort: "Prüfung beenden", symbol: "stopp", ziel: "gesamt" },
 };
 
 /** Tickt nur, solange eine Messung läuft - sonst gibt es nichts zu zählen. */
@@ -105,51 +120,57 @@ export function Zeitmessung({
   const schalte = (aktion: api.Zeitaktion) =>
     void aendern(() => api.schalteZeit(p.id, aktion));
 
+  const knopf = s.naechste ? AKTION[s.naechste] : null;
+
   return (
     <Karte>
       <section aria-labelledby="zeitmessung" className={stil.sektion}>
-        <h3 id="zeitmessung" className={stil.sektionstitel}>
+        <h3 id="zeitmessung" className="nur-vorlesen">
           Zeitmessung
         </h3>
-        <div className={stil.uhren} aria-live="off">
-          <div>
-            <p className={stil.beschriftung}>Präsentation</p>
-            <p className={s.praesiUeber ? `${stil.uhr} ${stil.ueber}` : stil.uhr}>
-              {uhr(s.praesiMs)}
-            </p>
-            <p className={stil.leise}>Ziel {katalog.praesi_grenze_min}:00</p>
+        <div className={stil.zeitleiste}>
+          <div className={stil.uhren}>
+            <Uhr
+              name="Präsentation"
+              symbol="praesentation"
+              ms={s.praesiMs}
+              grenze={`${katalog.praesi_grenze_min}:00`}
+              ueber={s.praesiUeber}
+            />
+            <Uhr name="Fachgespräch" symbol="gespraech" ms={s.fgMs} />
+            <Uhr
+              name="Gesamt"
+              symbol="gesamt"
+              ms={s.gesamtMs}
+              grenze={`${katalog.gesamt_grenze_min}:00`}
+              ueber={s.gesamtUeber}
+            />
           </div>
-          <div>
-            <p className={stil.beschriftung}>Fachgespräch</p>
-            <p className={stil.uhr}>{uhr(s.fgMs)}</p>
-            <p className={stil.leise}>
-              {p.zeiten.fg_start ? `Rest ${uhr(s.restMs)}` : " "}
-            </p>
+          <div className={stil.knopfreihe}>
+            {knopf && s.naechste && (
+              <Knopf
+                auspraegung="primaer"
+                aria-label={knopf.wort}
+                title={knopf.wort}
+                onClick={() => schalte(s.naechste!)}
+              >
+                <Sinnbild name={knopf.symbol} gefuellt />
+                <Sinnbild name={knopf.ziel} />
+              </Knopf>
+            )}
+            {p.zeiten.praesi_start && (
+              <Knopf
+                auspraegung="leise"
+                aria-label="Zeitmessung zurücksetzen"
+                title="Zeitmessung zurücksetzen"
+                onClick={() =>
+                  window.confirm("Zeitmessung zurücksetzen?") && schalte("zuruecksetzen")
+                }
+              >
+                <Sinnbild name="zurueck" />
+              </Knopf>
+            )}
           </div>
-          <div>
-            <p className={stil.beschriftung}>Gesamt</p>
-            <p className={s.gesamtUeber ? `${stil.uhr} ${stil.ueber}` : stil.uhr}>
-              {uhr(s.gesamtMs)}
-            </p>
-            <p className={stil.leise}>Grenze {katalog.gesamt_grenze_min}:00</p>
-          </div>
-        </div>
-        <div className={stil.knopfreihe}>
-          {s.naechste && (
-            <Knopf auspraegung="primaer" onClick={() => schalte(s.naechste!)}>
-              {AKTION_WORT[s.naechste]}
-            </Knopf>
-          )}
-          {p.zeiten.praesi_start && (
-            <Knopf
-              auspraegung="leise"
-              onClick={() =>
-                window.confirm("Zeitmessung zurücksetzen?") && schalte("zuruecksetzen")
-              }
-            >
-              Zurücksetzen
-            </Knopf>
-          )}
         </div>
         {s.gesamtUeber && (
           <Hinweis ton="fehler">
@@ -158,10 +179,38 @@ export function Zeitmessung({
         )}
         {s.praesiUeber && !s.gesamtUeber && (
           <Hinweis ton="warnung">
-            Die Präsentation überschreitet {katalog.praesi_grenze_min} Minuten.
+            Präsentation über {katalog.praesi_grenze_min} Minuten.
           </Hinweis>
         )}
       </section>
     </Karte>
+  );
+}
+
+/** Eine Uhr: Symbol, Zeit, Grenze. Den Namen hört der Screenreader. */
+function Uhr({
+  name,
+  symbol,
+  ms,
+  grenze,
+  ueber = false,
+}: {
+  name: string;
+  symbol: "praesentation" | "gespraech" | "gesamt";
+  ms: number;
+  grenze?: string;
+  ueber?: boolean;
+}) {
+  return (
+    <div
+      role="timer"
+      aria-label={name}
+      title={name}
+      className={ueber ? `${stil.uhrzeile} ${stil.ueber}` : stil.uhrzeile}
+    >
+      <Sinnbild name={symbol} />
+      <span className={stil.uhr}>{uhr(ms)}</span>
+      {grenze && <span className={stil.grenze}>/{grenze}</span>}
+    </div>
   );
 }
