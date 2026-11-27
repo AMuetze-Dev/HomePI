@@ -62,10 +62,15 @@ export function ModulSeite() {
 
     return (
       <Inhaltsbreite breite="normal">
-        <Seitenkopf titel="Unbekanntes Artefakt" />
+        <Seitenkopf titel="Nicht verfügbar" />
+        {/* Was von beidem zutrifft, weiß die Oberfläche nicht: Ein Artefakt
+            ohne Recht steht gar nicht im Manifest. Der häufigere Fall ist
+            das fehlende Recht - ein geteilter Link -, also steht er vorn,
+            mit dem Weg, wie man es bekommt. */}
         <Leerzustand titel={`Kein Modul mit der Kennung „${id}“`}>
-          Das Gateway kennt dieses Artefakt nicht. Vermutlich wurde es umbenannt oder ist
-          noch nicht ausgerollt.
+          Entweder ist es nicht für dich freigeschaltet - dann kann es dir freischalten,
+          wer die Verwaltung bedienen darf. Oder es gibt hier kein Artefakt unter diesem
+          Namen.
         </Leerzustand>
       </Inhaltsbreite>
     );

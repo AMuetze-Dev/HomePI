@@ -19,17 +19,41 @@
 }
 
 .zeichenknopf {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--raum-2);
   /* 44 px Trefferflaeche um ein 20 px grosses Zeichen - das Zeichen ist
-     klein, das Ziel ist es nicht. */
-  width: 2.75rem;
+     klein, das Ziel ist es nicht. Mit dem Wort daneben waechst sie mit. */
+  min-width: 2.75rem;
   height: 2.75rem;
+  padding-inline: var(--raum-3);
   margin-left: calc(var(--raum-3) * -1);
   border: 0;
   border-radius: var(--rundung-md);
   background: none;
   color: inherit;
+}
+
+.menuewort {
+  display: none;
+  font-size: var(--text-xs);
+  letter-spacing: var(--laufweite-marke);
+  text-transform: uppercase;
+  color: var(--farbe-text-gedaempft);
+  transition: color var(--dauer-schnell) var(--verlauf);
+}
+
+.zeichenknopf:hover .menuewort,
+.zeichenknopf[aria-expanded="true"] .menuewort {
+  color: var(--farbe-text);
+}
+
+/* Ab Tablet-Breite steht das Wort da; darunter reicht die Zeile nicht. */
+@media (width >= 48rem) {
+  .menuewort {
+    display: inline;
+  }
 }
 
 .zeichenknopf:focus-visible {

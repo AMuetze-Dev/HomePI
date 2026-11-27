@@ -173,6 +173,7 @@ function Personen({ daten, aktion }: Props) {
               type="submit"
               auspraegung="primaer"
               disabled={name.trim() === "" || laeuft}
+              grund={name.trim() === "" ? "Erst einen Namen eintragen" : undefined}
             >
               {laeuft
                 ? "Wird gespeichert …"
@@ -303,6 +304,7 @@ function Konten({ daten, aktion }: Props) {
               type="submit"
               auspraegung="primaer"
               disabled={name.trim() === "" || laeuft}
+              grund={name.trim() === "" ? "Erst einen Namen eintragen" : undefined}
             >
               {laeuft
                 ? "Wird gespeichert …"
@@ -419,6 +421,7 @@ function Kategorien({ daten, aktion }: Props) {
               type="submit"
               auspraegung="primaer"
               disabled={name.trim() === "" || laeuft}
+              grund={name.trim() === "" ? "Erst einen Namen eintragen" : undefined}
             >
               {laeuft
                 ? "Wird gespeichert …"

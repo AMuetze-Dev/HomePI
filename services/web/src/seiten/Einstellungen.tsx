@@ -1,10 +1,16 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { aenderePasswort, type Benutzer, type Rolle } from "../api/anmeldung";
+import {
+  aenderePasswort,
+  type Benutzer,
+  type Darstellungswahl,
+  type Rolle,
+} from "../api/anmeldung";
 import { useAnmeldung } from "../anmeldung/kontext";
 import { SystemStatus } from "./SystemStatus";
 import { GRUENDE } from "../huelle/darstellung";
+import { merkeImKonto } from "../huelle/kontoDarstellung";
 import { useBewegung } from "../huelle/useBewegung";
 import { useGrund } from "../huelle/useGrund";
 import { useThema, type Thema } from "../huelle/useThema";
@@ -54,6 +60,14 @@ export function Einstellungen() {
   // kaputtes Konto.
   const ohneKonto = zustand === "abgemeldet";
 
+  // Angemeldet gilt die Wahl für das Konto, also auf jedem Gerät. Der
+  // Browser merkt sie sich trotzdem - die Hooks schreiben sie ohnehin dort
+  // hinein, und aus ihm steht die Seite beim nächsten Laden sofort richtig.
+  function merke(aenderung: Partial<Darstellungswahl>) {
+    if (zustand !== "angemeldet") return;
+    merkeImKonto({ thema, grund, bewegung_reduziert: reduziert, ...aenderung });
+  }
+
   return (
     <div className={stil.seite}>
       <h1 className={stil.titel}>Einstellungen</h1>
@@ -67,7 +81,7 @@ export function Einstellungen() {
         </p>
       ) : (
         <p className={stil.unterzeile}>
-          Gilt für dieses Konto, nicht für die Installation.
+          Gilt für dein Konto, auf jedem Gerät – nicht für die Installation.
         </p>
       )}
 
@@ -77,7 +91,10 @@ export function Einstellungen() {
             beschriftung="Farbschema"
             optionen={THEMEN}
             wert={thema}
-            beiWahl={setzeThema}
+            beiWahl={(wert) => {
+              setzeThema(wert);
+              merke({ thema: wert });
+            }}
           />
         </Zeile>
 
@@ -89,7 +106,10 @@ export function Einstellungen() {
             beschriftung="Grundfarbe"
             optionen={GRUENDE}
             wert={grund}
-            beiWahl={setzeGrund}
+            beiWahl={(wert) => {
+              setzeGrund(wert);
+              merke({ grund: wert });
+            }}
           />
         </Zeile>
 
@@ -100,7 +120,10 @@ export function Einstellungen() {
           <Schalter
             beschriftung="Bewegung reduzieren"
             an={reduziert}
-            beiWechsel={setzeReduziert}
+            beiWechsel={(wert) => {
+              setzeReduziert(wert);
+              merke({ bewegung_reduziert: wert });
+            }}
           />
         </Zeile>
       </Abschnitt>

@@ -12,7 +12,7 @@ from . import cookies, speicher
 from .deps import Sitzungsbenutzer
 from .dienst import AnmeldungFehlgeschlagen, ZuVieleVersuche, pruefe_passwort, wartezeit
 from .modelle import Benutzer
-from .schemas import Anmeldung, BenutzerAusgabe, PasswortAendern
+from .schemas import Anmeldung, BenutzerAusgabe, Darstellung, PasswortAendern
 
 router = APIRouter(tags=["anmeldung"])
 
@@ -112,3 +112,26 @@ async def passwort_aendern(
     # ausgewiesen. Ihn hier hinauszuwerfen hiesse, ihn nach einem erzwungenen
     # Erstwechsel auf die Anmeldeseite zu schicken.
     await speicher.melde_andere_ab(sitzung, benutzer.id, request.cookies.get(cookies.NAME))
+
+
+@router.get("/darstellung", summary="Darstellung dieses Kontos")
+async def darstellung(benutzer: Sitzungsbenutzer, sitzung: DbSitzung) -> Darstellung | None:
+    """``null``, solange das Konto keine gewaehlt hat.
+
+    Nicht die Voreinstellung: Dann uebernimmt die Oberflaeche die Wahl, die
+    im Browser schon steht, statt sie beim ersten Anmelden auf "System"
+    zurueckzusetzen.
+
+    ``Sitzungsbenutzer`` und nicht ``AktuellerBenutzer``: Wer mit dem
+    Startpasswort ankommt, sitzt vor genau dieser Oberflaeche.
+    """
+    werte = await speicher.darstellung_von(sitzung, benutzer.id)
+    return Darstellung.model_validate(werte) if werte is not None else None
+
+
+@router.put("/darstellung", summary="Darstellung dieses Kontos setzen")
+async def darstellung_setzen(
+    daten: Darstellung, benutzer: Sitzungsbenutzer, sitzung: DbSitzung
+) -> Darstellung:
+    await speicher.setze_darstellung(sitzung, benutzer.id, daten.model_dump())
+    return daten

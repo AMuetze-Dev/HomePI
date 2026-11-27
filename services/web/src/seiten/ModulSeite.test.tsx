@@ -140,6 +140,20 @@ describe("Modulseite", () => {
     // Artefakt. Ein zweiter Weg an derselben Stelle wäre einer zu viel.
   });
 
+  it("schickt angemeldet ohne Recht nicht auf die falsche Spur", async () => {
+    // Ein Artefakt ohne Recht steht nicht im Manifest - von einem
+    // umbenannten ist es hier nicht zu unterscheiden. "Vermutlich
+    // umbenannt" schickte jemanden, dem nur das Recht fehlt, auf die Suche
+    // nach einem Fehler, den es nicht gibt.
+    vi.spyOn(client, "fetchModule").mockResolvedValue([ohneOberflaeche]);
+
+    zeige("staffelpilot");
+
+    expect(await screen.findByText(/nicht für dich freigeschaltet/)).toBeInTheDocument();
+    expect(screen.getByText(/Verwaltung/)).toBeInTheDocument();
+    expect(screen.queryByText(/umbenannt/)).not.toBeInTheDocument();
+  });
+
   it("bietet abgemeldet die Anmeldung an, statt 'gibt es nicht' zu behaupten", async () => {
     // Ein Artefakt ohne Recht steht gar nicht erst im Manifest - von hier aus
     // ist es von einem nicht vorhandenen nicht zu unterscheiden.

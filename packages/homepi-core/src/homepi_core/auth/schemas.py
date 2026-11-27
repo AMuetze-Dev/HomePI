@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -48,3 +49,16 @@ class Einrichtung(BaseModel):
     name: str = Field(min_length=1, max_length=32)
     passwort: str = Field(min_length=1, max_length=200)
     anzeigename: str | None = Field(default=None, max_length=100)
+
+
+class Darstellung(BaseModel):
+    """Wie die Oberflaeche fuer dieses Konto aussieht.
+
+    Die Grundfarbe ist bewusst nur ein Muster und keine Liste: Welche es gibt,
+    weiss die Oberflaeche. Eine unbekannte faellt dort auf die Voreinstellung
+    zurueck - eine neue soll nicht erst das Gateway anfassen muessen.
+    """
+
+    thema: Literal["system", "hell", "dunkel"] = "system"
+    grund: str = Field(default="nocturne", pattern=r"^[a-z]{1,20}$")
+    bewegung_reduziert: bool = False

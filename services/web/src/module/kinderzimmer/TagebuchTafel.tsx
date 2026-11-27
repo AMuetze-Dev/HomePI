@@ -171,6 +171,7 @@ function Eintragsformular({
             type="submit"
             auspraegung="primaer"
             disabled={laeuft || text.trim() === ""}
+            grund={text.trim() === "" ? "Erst etwas schreiben" : undefined}
           >
             {laeuft ? "Wird gespeichert …" : "Notiz speichern"}
           </Knopf>

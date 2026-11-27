@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import { useAnmeldung } from "../anmeldung/kontext";
 import stil from "./Huelle.module.css";
 import { Kopfleiste } from "./Kopfleiste";
+import { useKontoDarstellung } from "./kontoDarstellung";
 import { Navigation } from "./Navigation";
 
 interface Props {
@@ -41,6 +42,8 @@ export function Huelle({ children, schlicht = false }: Props) {
   const [navOffen, setNavOffen] = useState(false);
   const { pathname } = useLocation();
   const { zustand: anmeldung } = useAnmeldung();
+  // Einmal je Anmeldung: die Darstellung des Kontos auf dieses Gerät holen.
+  useKontoDarstellung();
 
   // Abgemeldet gibt es nichts zu navigieren: Das Manifest ist leer, und ein
   // Zeichen, das eine leere Fläche aufzieht, ist ein Versprechen, das die

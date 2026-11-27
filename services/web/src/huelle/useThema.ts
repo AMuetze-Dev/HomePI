@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { THEMA_SCHLUESSEL as SCHLUESSEL } from "./darstellung";
+import { DARSTELLUNG_GEAENDERT, THEMA_SCHLUESSEL as SCHLUESSEL } from "./darstellung";
 
 export type Thema = "system" | "hell" | "dunkel";
 
@@ -33,6 +33,14 @@ function systemIstDunkel(): boolean {
 export function useThema() {
   const [thema, setzeThemaIntern] = useState<Thema>(gespeichertesThema);
   const [systemDunkel, setzeSystemDunkel] = useState(systemIstDunkel);
+
+  // Kommt die Wahl aus dem Konto, steht sie schon im Speicher - hier nur
+  // nachziehen, damit eine offene Einstellungsseite den neuen Stand zeigt.
+  useEffect(() => {
+    const nachziehen = () => setzeThemaIntern(gespeichertesThema());
+    window.addEventListener(DARSTELLUNG_GEAENDERT, nachziehen);
+    return () => window.removeEventListener(DARSTELLUNG_GEAENDERT, nachziehen);
+  }, []);
 
   // Auf Systemwechsel reagieren, solange kein eigenes Thema gewählt ist -
   // sonst bliebe der Umschalter nach einem Wechsel falsch beschriftet.

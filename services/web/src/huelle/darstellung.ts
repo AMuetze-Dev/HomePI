@@ -16,6 +16,9 @@ export const THEMA_SCHLUESSEL = "homepi.thema";
 export const BEWEGUNG_SCHLUESSEL = "homepi.bewegung";
 export const GRUND_SCHLUESSEL = "homepi.grund";
 
+/** Gefeuert, wenn die Darstellung von außen gesetzt wurde - etwa aus dem Konto. */
+export const DARSTELLUNG_GEAENDERT = "homepi:darstellung";
+
 /**
  * Die wählbaren Grundfarben.
  *

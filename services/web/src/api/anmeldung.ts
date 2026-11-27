@@ -77,3 +77,19 @@ export async function holeIch(signal?: AbortSignal): Promise<Benutzer | null> {
   }
   return (await antwort.json()) as Benutzer;
 }
+
+/** Wie die Oberfläche für ein Konto aussieht - auf jedem Gerät dieselbe. */
+export interface Darstellungswahl {
+  thema: "system" | "hell" | "dunkel";
+  grund: string;
+  bewegung_reduziert: boolean;
+}
+
+/** `null`, solange das Konto keine gewählt hat. */
+export function holeDarstellung(signal?: AbortSignal): Promise<Darstellungswahl | null> {
+  return AUTH.anfrage<Darstellungswahl | null>("/darstellung", {}, signal);
+}
+
+export function speichereDarstellung(wahl: Darstellungswahl): Promise<Darstellungswahl> {
+  return AUTH.sende<Darstellungswahl>("PUT", "/darstellung", wahl);
+}

@@ -11,7 +11,11 @@ interface Aussehen {
   children: ReactNode;
 }
 
-type Props = Aussehen & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">;
+type Props = Aussehen &
+  Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
+    /** Warum der Knopf gesperrt ist - erscheint beim Darüberfahren, nur solange er es ist. */
+    grund?: string | undefined;
+  };
 
 type VerweisProps = Aussehen &
   Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "children"> & { href: string };
@@ -40,12 +44,36 @@ export function Knopf({
   type = "button",
   className,
   children,
+  grund,
   ...rest
 }: Props) {
+  if (grund === undefined) {
+    return (
+      <button type={type} className={klassen(auspraegung, groesse, className)} {...rest}>
+        {children}
+      </button>
+    );
+  }
+
+  // Mit Grund steht eine Hülle um den Knopf, und zwar immer, nicht nur im
+  // gesperrten Zustand: Sonst sprünge das Layout, sobald er frei wird. Den
+  // title trägt die Hülle, weil ein gesperrter <button> keine
+  // Mausereignisse bekommt und mancher Browser seinen title deshalb nicht
+  // zeigt. Die Lage im Layout (className) gehört der Hülle, der Knopf füllt
+  // sie aus.
   return (
-    <button type={type} className={klassen(auspraegung, groesse, className)} {...rest}>
-      {children}
-    </button>
+    <span
+      className={[stil.huelle, className].filter(Boolean).join(" ")}
+      title={rest.disabled ? grund : undefined}
+    >
+      <button
+        type={type}
+        className={klassen(auspraegung, groesse, stil.fuellend)}
+        {...rest}
+      >
+        {children}
+      </button>
+    </span>
   );
 }
 

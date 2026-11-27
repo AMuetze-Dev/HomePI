@@ -887,3 +887,18 @@
     transition: none;
   }
 }
+
+/* Am Finger ist ein 20 px hoher Verweis kaum zu treffen. Die Trefferfläche
+   wächst deshalb unsichtbar über die ganze Zeile des Platzes hinaus - das
+   Raster selbst behält seine Höhe, nichts verschiebt sich. */
+@media (pointer: coarse) {
+  .rasterverweis {
+    position: relative;
+  }
+
+  .rasterverweis::before {
+    content: "";
+    position: absolute;
+    inset: calc(-1 * var(--raum-3)) calc(-1 * var(--raum-2));
+  }
+}

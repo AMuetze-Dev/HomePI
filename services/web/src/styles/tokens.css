@@ -84,8 +84,13 @@
 
   /* --------------------------------------------------------------- Schrift */
   --farbe-text: light-dark(var(--ton-900), #e9e9ed);
-  --farbe-text-gedaempft: light-dark(var(--ton-700), #9095a8);
-  --farbe-text-leise: light-dark(var(--ton-600), #74798f);
+  /* Beide auf WCAG AA (4,5:1) gegen jede Fläche und jede Grundfarbe -
+   * nachgerechnet in kontrast.test.ts. „Leise" trägt die kleinste Schrift
+   * und lag vorher knapp darunter (3,9:1). Hebt man nur sie an, rückt sie
+   * an „gedämpft" heran; deshalb geht „gedämpft" eine Stufe mit, damit die
+   * drei Stufen Text, gedämpft, leise unterscheidbar bleiben. */
+  --farbe-text-gedaempft: light-dark(#4a4e5c, #abafc0);
+  --farbe-text-leise: light-dark(#626676, #8d92a5);
 
   /* ---------------------------------------------------------------- Akzent
    * Er tritt als Linie, Punkt und Rand auf, nie als Fläche. Auf hellem

@@ -54,11 +54,14 @@ describe("Einstellungen ohne Anmeldung", () => {
   });
 
   it("schaltet auch ohne Konto in den Dunkelmodus", async () => {
+    const speichern = vi.spyOn(anmeldungApi, "speichereDarstellung");
     zeige(null);
 
     await userEvent.click(await screen.findByRole("radio", { name: "Dunkel" }));
 
     expect(document.documentElement).toHaveAttribute("data-thema", "dunkel");
+    // Ohne Konto gibt es nichts, wohin es gespeichert werden könnte.
+    expect(speichern).not.toHaveBeenCalled();
   });
 
   it("zeigt kein leeres Konto und keine Rechte, sondern den Weg zur Anmeldung", async () => {
@@ -86,6 +89,40 @@ describe("Einstellungen", () => {
     zeige();
 
     expect(await screen.findByText(/nicht für die Installation/)).toBeInTheDocument();
+  });
+
+  it("sagt, dass die Darstellung auf jedem Gerät gilt", async () => {
+    zeige();
+
+    expect(await screen.findByText(/auf jedem Gerät/)).toBeInTheDocument();
+  });
+
+  it("merkt sich die Darstellung im Konto", async () => {
+    const speichern = vi.spyOn(anmeldungApi, "speichereDarstellung").mockResolvedValue({
+      thema: "dunkel",
+      grund: "nocturne",
+      bewegung_reduziert: false,
+    });
+    zeige();
+
+    await userEvent.click(await screen.findByRole("radio", { name: "Dunkel" }));
+
+    expect(speichern).toHaveBeenCalledWith({
+      thema: "dunkel",
+      grund: "nocturne",
+      bewegung_reduziert: false,
+    });
+  });
+
+  it("schaltet weiter, auch wenn das Konto gerade nicht erreichbar ist", async () => {
+    // Der Browser hat die Wahl ohnehin - ein Gateway, das gerade hakt, ist
+    // kein Grund, die Seite hell zu lassen.
+    vi.spyOn(anmeldungApi, "speichereDarstellung").mockRejectedValue(new Error("weg"));
+    zeige();
+
+    await userEvent.click(await screen.findByRole("radio", { name: "Dunkel" }));
+
+    expect(document.documentElement).toHaveAttribute("data-thema", "dunkel");
   });
 
   it("schaltet das Farbschema und merkt es sich", async () => {

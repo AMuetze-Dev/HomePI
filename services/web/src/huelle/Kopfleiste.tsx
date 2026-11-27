@@ -43,9 +43,17 @@ export function Kopfleiste({ navigierbar, navOffen, beiNavigation }: Props) {
           className={stil.zeichenknopf}
           aria-label="Navigation öffnen"
           aria-expanded={navOffen}
+          // Das Wort neben dem Zeichen: Vier Felder allein fand niemand, der
+          // es nicht schon wusste. Am Telefon fällt es weg - dort ist die
+          // Zeile zu schmal, und ein Zeichen oben links antippen ist dort
+          // gelernt. Den Hinweis auf Esc gibt es beim Darüberfahren.
+          title="Menü öffnen (Esc)"
           onClick={beiNavigation}
         >
           <Marke aktiv={navOffen} />
+          <span className={stil.menuewort} aria-hidden="true">
+            Menü
+          </span>
         </button>
       ) : (
         <Link to="/" className={stil.zeichenknopf} aria-label="Zur Übersicht">

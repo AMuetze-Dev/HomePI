@@ -119,4 +119,15 @@ describe("Kopfleiste", () => {
       await screen.findByRole("button", { name: "Navigation öffnen" }),
     ).toHaveAttribute("aria-expanded", "false");
   });
+
+  it("sagt am Zeichen, dass dahinter das Menü liegt und Esc es öffnet", async () => {
+    // Vier Felder ohne Wort fand niemand, der es nicht schon wusste - und
+    // dass Esc dasselbe tut, stand nur in der Fußzeile der Startseite.
+    zeige("/");
+
+    const knopf = await screen.findByRole("button", { name: "Navigation öffnen" });
+
+    expect(within(knopf).getByText("Menü")).toBeInTheDocument();
+    expect(knopf).toHaveAttribute("title", "Menü öffnen (Esc)");
+  });
 });

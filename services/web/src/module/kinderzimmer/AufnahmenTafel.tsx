@@ -155,6 +155,13 @@ function Ausklappung({
               type="submit"
               groesse="sm"
               disabled={!geaendert || titel.trim() === ""}
+              grund={
+                titel.trim() === ""
+                  ? "Der Titel fehlt"
+                  : !geaendert
+                    ? "Noch nichts geändert"
+                    : undefined
+              }
             >
               Speichern
             </Knopf>
@@ -346,6 +353,13 @@ function NeueAufnahme({
             type="submit"
             auspraegung="primaer"
             disabled={!wav || titel.trim() === "" || laeuft}
+            grund={
+              !wav
+                ? "Erst eine Aufnahme wählen"
+                : titel.trim() === ""
+                  ? "Erst einen Titel eintragen"
+                  : undefined
+            }
           >
             {laeuft ? "Wird hochgeladen …" : "Aufnahme speichern"}
           </Knopf>

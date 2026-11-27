@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { BEWEGUNG_SCHLUESSEL as SCHLUESSEL } from "./darstellung";
+import { BEWEGUNG_SCHLUESSEL as SCHLUESSEL, DARSTELLUNG_GEAENDERT } from "./darstellung";
 
 function gespeichert(): boolean {
   try {
@@ -26,6 +26,14 @@ function gespeichert(): boolean {
  */
 export function useBewegung() {
   const [reduziert, setzeReduziert] = useState(gespeichert);
+
+  // Kommt die Wahl aus dem Konto, steht sie schon im Speicher - hier nur
+  // nachziehen, damit eine offene Einstellungsseite den neuen Stand zeigt.
+  useEffect(() => {
+    const nachziehen = () => setzeReduziert(gespeichert());
+    window.addEventListener(DARSTELLUNG_GEAENDERT, nachziehen);
+    return () => window.removeEventListener(DARSTELLUNG_GEAENDERT, nachziehen);
+  }, []);
 
   useEffect(() => {
     const wurzel = document.documentElement;

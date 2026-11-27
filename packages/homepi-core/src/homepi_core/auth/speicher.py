@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import dienst, passwoerter
-from .modelle import Benutzer, Einrichtung, Recht, Sitzung
+from .modelle import Benutzer, Darstellung, Einrichtung, Recht, Sitzung
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import CursorResult
@@ -233,3 +233,21 @@ async def melde_andere_ab(
     if eigenes_token:
         bedingung = and_(bedingung, Sitzung.token_hash != passwoerter.hashe_token(eigenes_token))
     await sitzung.execute(delete(Sitzung).where(bedingung))
+
+
+async def darstellung_von(
+    sitzung: AsyncSession, benutzer_id: uuid.UUID
+) -> dict[str, object] | None:
+    """Die gespeicherte Darstellung - oder ``None``, wenn das Konto nie eine gewaehlt hat."""
+    zeile = await sitzung.get(Darstellung, benutzer_id)
+    return dict(zeile.werte) if zeile is not None else None
+
+
+async def setze_darstellung(
+    sitzung: AsyncSession, benutzer_id: uuid.UUID, werte: dict[str, object]
+) -> None:
+    zeile = await sitzung.get(Darstellung, benutzer_id)
+    if zeile is None:
+        sitzung.add(Darstellung(benutzer_id=benutzer_id, werte=werte))
+    else:
+        zeile.werte = werte

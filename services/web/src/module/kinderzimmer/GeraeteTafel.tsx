@@ -115,6 +115,7 @@ export function GeraeteTafel({
                 type="submit"
                 auspraegung="primaer"
                 disabled={laeuft || name.trim() === ""}
+                grund={name.trim() === "" ? "Erst einen Namen eintragen" : undefined}
               >
                 {laeuft ? "Wird angelegt …" : "Gerät anlegen"}
               </Knopf>

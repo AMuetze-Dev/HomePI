@@ -236,6 +236,11 @@ export function EinstellungenTafel({
             type="submit"
             auspraegung="primaer"
             disabled={laeuft || (turnier === null && name.trim() === "")}
+            grund={
+              turnier === null && name.trim() === ""
+                ? "Erst einen Namen für das Turnier eintragen"
+                : undefined
+            }
           >
             {turnier === null ? "Turnier anlegen" : "Einstellungen speichern"}
           </Knopf>

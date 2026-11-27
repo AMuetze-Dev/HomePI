@@ -166,6 +166,7 @@ function Teilnehmerliste({
             type="submit"
             auspraegung="primaer"
             disabled={name.trim() === "" || laeuft}
+            grund={name.trim() === "" ? "Erst einen Namen eintragen" : undefined}
             className={stil.absenden}
           >
             Eintragen
@@ -379,6 +380,11 @@ function GespeicherteListen({
               type="submit"
               auspraegung="primaer"
               disabled={listenname.trim() === "" || sichert}
+              grund={
+                listenname.trim() === ""
+                  ? "Erst einen Namen für die Liste eintragen"
+                  : undefined
+              }
             >
               {gleichnamig ? "Überschreiben" : "Speichern"}
             </Knopf>

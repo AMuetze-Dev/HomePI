@@ -97,6 +97,13 @@ export function Anmeldeformular({
             auspraegung="primaer"
             className={stil.knopf}
             disabled={laeuft || name.trim() === "" || passwort === ""}
+            grund={
+              name.trim() === ""
+                ? "Erst den Benutzernamen eintragen"
+                : passwort === ""
+                  ? "Erst das Passwort eintragen"
+                  : undefined
+            }
           >
             {laeuft ? "Einen Moment …" : "Anmelden"}
           </Knopf>

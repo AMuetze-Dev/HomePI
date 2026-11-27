@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { GRUND_SCHLUESSEL, istGrund, type Grund } from "./darstellung";
+import {
+  DARSTELLUNG_GEAENDERT,
+  GRUND_SCHLUESSEL,
+  istGrund,
+  type Grund,
+} from "./darstellung";
 
 function gespeichert(): Grund {
   try {
@@ -25,6 +30,14 @@ function gespeichert(): Grund {
  */
 export function useGrund() {
   const [grund, setzeGrundIntern] = useState<Grund>(gespeichert);
+
+  // Kommt die Wahl aus dem Konto, steht sie schon im Speicher - hier nur
+  // nachziehen, damit eine offene Einstellungsseite den neuen Stand zeigt.
+  useEffect(() => {
+    const nachziehen = () => setzeGrundIntern(gespeichert());
+    window.addEventListener(DARSTELLUNG_GEAENDERT, nachziehen);
+    return () => window.removeEventListener(DARSTELLUNG_GEAENDERT, nachziehen);
+  }, []);
 
   useEffect(() => {
     const wurzel = document.documentElement;

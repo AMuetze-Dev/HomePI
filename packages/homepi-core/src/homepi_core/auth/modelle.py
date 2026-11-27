@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -86,3 +86,20 @@ class Einrichtung(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     angelegt: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class Darstellung(Base):
+    """Farbschema, Grundfarbe und Bewegung eines Kontos.
+
+    Eine eigene Tabelle und keine Spalte an ``benutzer``: So legt
+    ``homepi schema anlegen`` sie auf einer laufenden Installation einfach an,
+    ohne dass eine vorhandene Tabelle geaendert werden muss. Und wer nie etwas
+    einstellt, hat schlicht keine Zeile.
+    """
+
+    __tablename__ = "benutzer_darstellung"
+
+    benutzer_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("benutzer.id", ondelete="CASCADE"), primary_key=True
+    )
+    werte: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)

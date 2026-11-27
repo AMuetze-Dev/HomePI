@@ -67,3 +67,12 @@
   font-size: var(--text-sm);
   color: var(--farbe-text-leise);
 }
+
+/* Am Finger 44 px wie die Knöpfe (siehe Knopf.module.css): Sonst steht ein
+   36 px hohes Feld neben einem 44 px hohen Knopf, und die Zeile wackelt.
+   Am Ende der Datei, damit es die Höhe oben überstimmt. */
+@media (pointer: coarse) {
+  .eingabe {
+    height: 2.75rem;
+  }
+}

@@ -97,3 +97,14 @@
   background: var(--farbe-flaeche-gedaempft);
   color: var(--farbe-text);
 }
+
+/* Um einen Knopf mit Grund (siehe Knopf.tsx). Die Hülle nimmt den Platz
+   im Layout ein, der Knopf füllt sie aus - so steht er gesperrt wie frei
+   an derselben Stelle und in derselben Breite. */
+.huelle {
+  display: inline-flex;
+}
+
+.fuellend {
+  flex: 1 1 auto;
+}

@@ -518,3 +518,80 @@ class TestVerwalterSchutz:
         async with kontext.db.session() as sitzung:
             assert await auth_speicher.zaehle_verwalter(sitzung) == 1
             assert not await auth_speicher.einrichtung_noetig(sitzung)
+
+
+# --- Darstellung je Konto ----------------------------------------------------
+
+
+class TestDarstellung:
+    """Farbschema, Grundfarbe und Bewegung gehoeren dem Konto: Wer sich auf
+    dem Handy anmeldet, sieht dieselbe Seite wie am Rechner."""
+
+    async def test_ohne_anmeldung_gibt_es_keine(self, client: AsyncClient) -> None:
+        assert (await client.get("/auth/darstellung")).status_code == 401
+
+    async def test_ein_neues_konto_hat_noch_keine(self, client: AsyncClient, benutzer) -> None:
+        # null und nicht die Voreinstellung: Die Oberflaeche soll dann die
+        # Wahl aus dem Browser ins Konto uebernehmen, statt sie mit
+        # "System" zu ueberschreiben.
+        await _anmelden(client)
+
+        antwort = await client.get("/auth/darstellung")
+
+        assert antwort.status_code == 200
+        assert antwort.json() is None
+
+    async def test_merkt_sie_sich_ueber_die_sitzung_hinaus(
+        self, client: AsyncClient, benutzer
+    ) -> None:
+        await _anmelden(client)
+        wahl = {"thema": "dunkel", "grund": "moos", "bewegung_reduziert": True}
+
+        assert (await client.put("/auth/darstellung", json=wahl)).status_code == 200
+        client.cookies.clear()
+        await _anmelden(client)
+
+        assert (await client.get("/auth/darstellung")).json() == wahl
+
+    async def test_ueberschreibt_die_alte(self, client: AsyncClient, benutzer) -> None:
+        await _anmelden(client)
+        await client.put(
+            "/auth/darstellung",
+            json={"thema": "dunkel", "grund": "moos", "bewegung_reduziert": True},
+        )
+
+        await client.put(
+            "/auth/darstellung",
+            json={"thema": "hell", "grund": "nocturne", "bewegung_reduziert": False},
+        )
+
+        assert (await client.get("/auth/darstellung")).json()["thema"] == "hell"
+
+    async def test_nimmt_kein_unbekanntes_thema(self, client: AsyncClient, benutzer) -> None:
+        await _anmelden(client)
+
+        antwort = await client.put(
+            "/auth/darstellung",
+            json={"thema": "lila", "grund": "nocturne", "bewegung_reduziert": False},
+        )
+
+        assert antwort.status_code == 422
+
+    async def test_geht_auch_vor_dem_passwortwechsel(
+        self, client: AsyncClient, app_und_kontext
+    ) -> None:
+        # Wer mit dem Startpasswort ankommt, sitzt vor genau dieser Seite -
+        # und soll sie dabei schon dunkel stellen koennen.
+        _, kontext = app_und_kontext
+        async with kontext.db.session() as sitzung:
+            neu = await auth_speicher.lege_benutzer_an(sitzung, "neu", PASSWORT, "Neu")
+            neu.passwort_wechseln = True
+            await sitzung.commit()
+        await _anmelden(client, name="neu")
+
+        antwort = await client.put(
+            "/auth/darstellung",
+            json={"thema": "dunkel", "grund": "nocturne", "bewegung_reduziert": False},
+        )
+
+        assert antwort.status_code == 200
