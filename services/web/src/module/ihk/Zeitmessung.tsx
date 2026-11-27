@@ -121,69 +121,105 @@ export function Zeitmessung({
     void aendern(() => api.schalteZeit(p.id, aktion));
 
   const knopf = s.naechste ? AKTION[s.naechste] : null;
+  const grenzeMs = katalog.gesamt_grenze_min * 60_000;
+  const anteil = Math.min(1, s.gesamtMs / grenzeMs);
+  const ton = s.gesamtUeber
+    ? stil.balkenFehler
+    : s.praesiUeber || (s.laeuft && s.restMs < 5 * 60_000)
+      ? stil.balkenWarnung
+      : "";
 
   return (
-    <Karte>
-      <section aria-labelledby="zeitmessung" className={stil.sektion}>
-        <h3 id="zeitmessung" className="nur-vorlesen">
-          Zeitmessung
-        </h3>
-        <div className={stil.zeitleiste}>
-          <div className={stil.uhren}>
-            <Uhr
-              name="Präsentation"
-              symbol="praesentation"
-              ms={s.praesiMs}
-              grenze={`${katalog.praesi_grenze_min}:00`}
-              ueber={s.praesiUeber}
+    // Klebt oben, solange gemessen wird: Die Uhr bleibt im Blick, während man
+    // durch das Raster scrollt - ohne eigene Prüfungsansicht.
+    <div className={s.laeuft ? stil.uhrklebend : undefined}>
+      <Karte>
+        <section
+          aria-labelledby="zeitmessung"
+          className={`${stil.sektion} ${stil.zeitkarte}`}
+        >
+          <h3 id="zeitmessung" className="nur-vorlesen">
+            Zeitmessung
+          </h3>
+          <div className={stil.zeitleiste}>
+            <div className={stil.uhren}>
+              <Uhr
+                name="Präsentation"
+                symbol="praesentation"
+                ms={s.praesiMs}
+                grenze={`${katalog.praesi_grenze_min}:00`}
+                ueber={s.praesiUeber}
+              />
+              <Uhr name="Fachgespräch" symbol="gespraech" ms={s.fgMs} />
+              <Uhr
+                name="Gesamt"
+                symbol="gesamt"
+                ms={s.gesamtMs}
+                grenze={`${katalog.gesamt_grenze_min}:00`}
+                ueber={s.gesamtUeber}
+              />
+            </div>
+            <div className={stil.knopfreihe}>
+              {knopf && s.naechste && (
+                <Knopf
+                  auspraegung="primaer"
+                  aria-label={knopf.wort}
+                  title={knopf.wort}
+                  onClick={() => schalte(s.naechste!)}
+                >
+                  <Sinnbild name={knopf.symbol} gefuellt />
+                  <Sinnbild name={knopf.ziel} />
+                </Knopf>
+              )}
+              {p.zeiten.praesi_start && (
+                <Knopf
+                  auspraegung="leise"
+                  aria-label="Zeitmessung zurücksetzen"
+                  title="Zeitmessung zurücksetzen"
+                  onClick={() =>
+                    window.confirm("Zeitmessung zurücksetzen?") &&
+                    schalte("zuruecksetzen")
+                  }
+                >
+                  <Sinnbild name="zurueck" />
+                </Knopf>
+              )}
+            </div>
+          </div>
+          {s.gesamtUeber && (
+            <Hinweis ton="fehler">
+              {katalog.gesamt_grenze_min} Minuten überschritten.
+            </Hinweis>
+          )}
+          {s.praesiUeber && !s.gesamtUeber && (
+            <Hinweis ton="warnung">
+              Präsentation über {katalog.praesi_grenze_min} Minuten.
+            </Hinweis>
+          )}
+          {/* Am Unterrand der Karte, im Polster: kostet keine Zeile. Die
+            Kerbe markiert das Ende der Präsentation. */}
+          <div
+            role="progressbar"
+            aria-label="Prüfungszeit"
+            aria-valuemin={0}
+            aria-valuemax={katalog.gesamt_grenze_min}
+            aria-valuenow={Math.floor(s.gesamtMs / 60_000)}
+            className={stil.zeitbalken}
+          >
+            <span
+              className={`${stil.zeitfuellung} ${ton}`}
+              style={{ width: `${anteil * 100}%` }}
             />
-            <Uhr name="Fachgespräch" symbol="gespraech" ms={s.fgMs} />
-            <Uhr
-              name="Gesamt"
-              symbol="gesamt"
-              ms={s.gesamtMs}
-              grenze={`${katalog.gesamt_grenze_min}:00`}
-              ueber={s.gesamtUeber}
+            <span
+              className={stil.zeitkerbe}
+              style={{
+                left: `${(katalog.praesi_grenze_min / katalog.gesamt_grenze_min) * 100}%`,
+              }}
             />
           </div>
-          <div className={stil.knopfreihe}>
-            {knopf && s.naechste && (
-              <Knopf
-                auspraegung="primaer"
-                aria-label={knopf.wort}
-                title={knopf.wort}
-                onClick={() => schalte(s.naechste!)}
-              >
-                <Sinnbild name={knopf.symbol} gefuellt />
-                <Sinnbild name={knopf.ziel} />
-              </Knopf>
-            )}
-            {p.zeiten.praesi_start && (
-              <Knopf
-                auspraegung="leise"
-                aria-label="Zeitmessung zurücksetzen"
-                title="Zeitmessung zurücksetzen"
-                onClick={() =>
-                  window.confirm("Zeitmessung zurücksetzen?") && schalte("zuruecksetzen")
-                }
-              >
-                <Sinnbild name="zurueck" />
-              </Knopf>
-            )}
-          </div>
-        </div>
-        {s.gesamtUeber && (
-          <Hinweis ton="fehler">
-            {katalog.gesamt_grenze_min} Minuten überschritten.
-          </Hinweis>
-        )}
-        {s.praesiUeber && !s.gesamtUeber && (
-          <Hinweis ton="warnung">
-            Präsentation über {katalog.praesi_grenze_min} Minuten.
-          </Hinweis>
-        )}
-      </section>
-    </Karte>
+        </section>
+      </Karte>
+    </div>
   );
 }
 

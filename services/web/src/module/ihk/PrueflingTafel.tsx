@@ -16,6 +16,7 @@ import * as api from "./api";
 import { DokuFormular, PraesiFormular } from "./Bewertung";
 import { Dokumente } from "./Dokumente";
 import { GesamtFormular } from "./Gesamt";
+import { ZitatBereich } from "./Zitat";
 import { Lade } from "./IhkSeite";
 import stil from "./IhkSeite.module.css";
 import { datum, meldung, note, punkte } from "./zeit";
@@ -56,6 +57,9 @@ export function PrueflingTafel({ prueflingId }: { prueflingId: string }) {
   // Getrennt vom Ladefehler: eine abgelehnte Punktzahl darf das Raster nicht
   // gegen eine Fehlerseite austauschen.
   const [fehler, setFehler] = useState("");
+  // Sichtbar, dass gespeichert wurde: Ohne Speichern-Knopf ist das sonst
+  // nur ein Versprechen.
+  const [gespeichert, setGespeichert] = useState<"laeuft" | Date | null>(null);
   const [reiter, setReiter] = useState<Reiter>("doku");
   const [mitDokument, setMitDokument] = useState(dokumentAnfangsSichtbar);
 
@@ -84,11 +88,14 @@ export function PrueflingTafel({ prueflingId }: { prueflingId: string }) {
 
   const aendern: Aendern = useCallback(async (aktion) => {
     setFehler("");
+    setGespeichert("laeuft");
     try {
       setPruefling(await aktion());
+      setGespeichert(new Date());
       return true;
     } catch (e) {
       setFehler(meldung(e));
+      setGespeichert(null);
       return false;
     }
   }, []);
@@ -138,43 +145,54 @@ export function PrueflingTafel({ prueflingId }: { prueflingId: string }) {
         ← Prüfungstage · {datum(p.tag.datum)}
       </Link>
 
-      <div className={mitDokument ? stil.arbeitsflaeche : undefined}>
-        {mitDokument && (
-          <div className={stil.dokumentspalte}>
-            <Dokumente pruefling={p} onGeaendert={() => laden()} onFehler={setFehler} />
-          </div>
-        )}
-
-        <div className={stil.stapel}>
-          {/* In der Spalte des Rasters, nicht darüber: Klebend über die
-              ganze Breite deckte sie sonst das Dokument zu. */}
-          {fehler && (
-            <div className={stil.klebend}>
-              <Hinweis ton="fehler" dringend>
-                {fehler}
-              </Hinweis>
+      <ZitatBereich>
+        <div className={mitDokument ? stil.arbeitsflaeche : undefined}>
+          {mitDokument && (
+            <div className={stil.dokumentspalte}>
+              <Dokumente pruefling={p} onGeaendert={() => laden()} onFehler={setFehler} />
             </div>
           )}
-          <Stammdaten pruefling={p} aendern={aendern} katalog={katalog} />
 
-          <Segmentwahl
-            beschriftung="Bewertungsteil"
-            optionen={REITER}
-            wert={reiter}
-            beiWahl={setReiter}
-          />
+          <div className={stil.stapel}>
+            {/* In der Spalte des Rasters, nicht darüber: Klebend über die
+              ganze Breite deckte sie sonst das Dokument zu. */}
+            {fehler && (
+              <div className={stil.klebend}>
+                <Hinweis ton="fehler" dringend>
+                  {fehler}
+                </Hinweis>
+              </div>
+            )}
+            <Stammdaten pruefling={p} aendern={aendern} katalog={katalog} />
 
-          {reiter === "doku" && (
-            <DokuFormular katalog={katalog} pruefling={p} aendern={aendern} />
-          )}
-          {reiter === "praesi" && (
-            <PraesiFormular katalog={katalog} pruefling={p} aendern={aendern} />
-          )}
-          {reiter === "gesamt" && (
-            <GesamtFormular katalog={katalog} pruefling={p} aendern={aendern} />
-          )}
+            <div className={stil.reiterzeile}>
+              <Segmentwahl
+                beschriftung="Bewertungsteil"
+                optionen={REITER}
+                wert={reiter}
+                beiWahl={setReiter}
+              />
+              <span role="status" className={stil.gespeichert}>
+                {gespeichert === "laeuft"
+                  ? "Speichert …"
+                  : gespeichert
+                    ? `Gespeichert ✓ ${gespeichert.toLocaleTimeString("de-DE")}`
+                    : ""}
+              </span>
+            </div>
+
+            {reiter === "doku" && (
+              <DokuFormular katalog={katalog} pruefling={p} aendern={aendern} />
+            )}
+            {reiter === "praesi" && (
+              <PraesiFormular katalog={katalog} pruefling={p} aendern={aendern} />
+            )}
+            {reiter === "gesamt" && (
+              <GesamtFormular katalog={katalog} pruefling={p} aendern={aendern} />
+            )}
+          </div>
         </div>
-      </div>
+      </ZitatBereich>
     </Tafel>
   );
 }

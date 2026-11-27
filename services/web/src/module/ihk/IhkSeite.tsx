@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-import { Feld, Hinweis, Karte, Knopf, Leerzustand, Platzhalter, Tafel } from "../../ui";
+import {
+  Etikett,
+  Feld,
+  Hinweis,
+  Karte,
+  Knopf,
+  Leerzustand,
+  Platzhalter,
+  Tafel,
+} from "../../ui";
 import * as api from "./api";
 import stil from "./IhkSeite.module.css";
 import { PrueflingTafel } from "./PrueflingTafel";
-import { datum, meldung, note, punkte } from "./zeit";
+import { RechnerTafel } from "./Rechner";
+import { datum, meldung, note } from "./zeit";
 
 /**
  * Prüfungstage (mit allen Prüflingen) → Prüfling; ein Tag wird auf eigener
@@ -20,6 +30,7 @@ export function IhkSeite() {
   const prueflingId = suche.get("pruefling");
   const tagId = suche.get("tag");
 
+  if (suche.has("rechner")) return <RechnerTafel />;
   if (prueflingId) return <PrueflingTafel key={prueflingId} prueflingId={prueflingId} />;
   if (tagId) return <TagTafel key={tagId} tagId={tagId} />;
   return <TageTafel />;
@@ -124,6 +135,11 @@ function TageTafel() {
     <Tafel
       titel="Prüfungstage"
       beiwort={`${tage.length} ${tage.length === 1 ? "Tag" : "Tage"} · ${anzahl} ${anzahl === 1 ? "Prüfling" : "Prüflinge"}`}
+      aktionen={
+        <Link to="?rechner" className={stil.verweis}>
+          Notenrechner
+        </Link>
+      }
     >
       {fehler && (
         <Hinweis ton="fehler" dringend>
@@ -260,11 +276,78 @@ function PrueflingZeile({ pruefling: p }: { pruefling: api.PrueflingKurz }) {
         {p.reihenfolge}. {p.name}
       </span>
       <span className={stil.leise}>{zustandText(p)}</span>
-      <span className={stil.rechts}>
-        Doku {punkte(p.doku_punkte)} P ({note(p.doku_note)}) · Präs.{" "}
-        {punkte(p.praesi_punkte)} P ({note(p.praesi_note)})
+      <span className={stil.stand}>
+        <Teilstand
+          wort="Doku"
+          punkte={p.doku_punkte}
+          note={p.doku_note}
+          bewertet={p.doku_bewertet}
+          von={p.doku_kriterien}
+        />
+        <Teilstand
+          wort="Präsentation"
+          kurz="Präs."
+          punkte={p.praesi_punkte}
+          note={p.praesi_note}
+          bewertet={p.praesi_bewertet}
+          von={p.praesi_sektionen}
+        />
+        {p.gesamt_punkte !== null && (
+          <span className={stil.teilstand}>
+            Gesamt {p.gesamt_punkte} P · {note(p.gesamt_note)}
+          </span>
+        )}
+        {(p.doku_grenzfall || p.praesi_grenzfall || p.gesamt_grenzfall) && (
+          <Etikett ton="warnung">Grenzfall</Etikett>
+        )}
       </span>
     </Link>
+  );
+}
+
+/**
+ * Ein Teil der Bewertung in einer Zeile: fertig bewertet als Punkte und Note,
+ * sonst als Balken - wie weit, sieht man im Vorbeigehen.
+ */
+function Teilstand({
+  wort,
+  kurz = wort,
+  punkte: wert,
+  note: n,
+  bewertet,
+  von,
+}: {
+  wort: string;
+  kurz?: string;
+  punkte: number | null;
+  note: number | null;
+  bewertet: number;
+  von: number;
+}) {
+  if (wert !== null) {
+    return (
+      <span className={stil.teilstand}>
+        {kurz} {wert} P · {note(n)}
+      </span>
+    );
+  }
+  return (
+    <span className={stil.teilstand}>
+      {kurz}
+      <span
+        role="progressbar"
+        aria-label={wort}
+        aria-valuenow={bewertet}
+        aria-valuemin={0}
+        aria-valuemax={von}
+        className={stil.balken}
+      >
+        <span className={stil.fuellung} style={{ width: `${(bewertet / von) * 100}%` }} />
+      </span>
+      <span className={stil.zahl}>
+        {bewertet}/{von}
+      </span>
+    </span>
   );
 }
 

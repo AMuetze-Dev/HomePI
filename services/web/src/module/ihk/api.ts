@@ -90,6 +90,16 @@ export interface PrueflingKurz {
   praesi_note: number | null;
   /** Zahl der hinterlegten PDFs - daran erkennt man, ob die Doku da ist. */
   dokumente: number;
+  doku_bewertet: number;
+  doku_kriterien: number;
+  praesi_bewertet: number;
+  praesi_sektionen: number;
+  doku_grenzfall: boolean;
+  praesi_grenzfall: boolean;
+  /** Sobald alle Teile da sind - mit Ergänzungsprüfung, wenn eingetragen. */
+  gesamt_punkte: number | null;
+  gesamt_note: number | null;
+  gesamt_grenzfall: boolean;
 }
 
 export interface TagDetail {
@@ -212,6 +222,57 @@ export interface Stammdaten {
   ident?: string;
   korrekturart?: Korrekturart;
   status?: Partial<Status>;
+}
+
+// ── Notenrechner ─────────────────────────────────────────────────────────────
+
+export interface Notenstufe {
+  punkte: number;
+  note: number;
+  ganze_note: number;
+  grenzfall: boolean;
+  /** Die nächstbessere ganze Note - null bei der 1. */
+  bessere_note: number | null;
+  fehlen: number | null;
+  /** Punkte über der Untergrenze dieser Note. */
+  puffer: number;
+}
+
+export interface RechnerEingabe extends Teilnoten {
+  doku: number | null;
+  praesentation: number | null;
+}
+
+export interface RechnerErgebnis {
+  ohne_mep: GesamtErgebnis;
+  mit_mep: GesamtErgebnis | null;
+  stufe_ohne_mep: Notenstufe | null;
+  stufe_mit_mep: Notenstufe | null;
+  stufe_doku: Notenstufe | null;
+  stufe_praesentation: Notenstufe | null;
+}
+
+export function ladeNotenstufe(
+  punkte: number,
+  signal?: AbortSignal,
+): Promise<Notenstufe> {
+  return anfrage<Notenstufe>(`/notenstufe?punkte=${punkte}`, {}, signal);
+}
+
+/** Rechnet, ohne etwas zu speichern. */
+export function rechne(
+  daten: RechnerEingabe,
+  signal?: AbortSignal,
+): Promise<RechnerErgebnis> {
+  return anfrage<RechnerErgebnis>(
+    "/rechner",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(daten),
+    },
+    signal,
+  );
 }
 
 const id = encodeURIComponent;

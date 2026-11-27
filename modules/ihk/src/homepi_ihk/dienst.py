@@ -110,6 +110,41 @@ def notenbaender() -> list[Notenband]:
     return baender
 
 
+@dataclass(frozen=True, slots=True)
+class Notenstufe:
+    """Wo eine Punktzahl steht - und wie weit es nach oben und unten ist."""
+
+    punkte: int
+    note: float
+    ganze_note: int
+    grenzfall: bool
+    #: die nächstbessere ganze Note, None bei der 1
+    bessere_note: int | None
+    #: Punkte bis dorthin
+    fehlen: int | None
+    #: Punkte über der Untergrenze dieser Note; 0 heißt: ein Punkt weniger,
+    #: und es ist die nächstschlechtere
+    puffer: int
+
+
+def notenstufe(punkte: int) -> Notenstufe:
+    if not 0 <= punkte <= 100:
+        raise PunkteUnzulaessig(f"Punkte gehen von 0 bis 100, nicht {punkte}")
+    baender = notenbaender()
+    index = next(i for i, b in enumerate(baender) if b.bis <= punkte <= b.von)
+    band = baender[index]
+    besser = baender[index - 1] if index > 0 else None
+    return Notenstufe(
+        punkte=punkte,
+        note=NOTEN.tabelle[punkte],
+        ganze_note=band.note,
+        grenzfall=ist_grenzfall(punkte),
+        bessere_note=besser.note if besser else None,
+        fehlen=besser.bis - punkte if besser else None,
+        puffer=punkte - band.bis,
+    )
+
+
 # ── Blöcke ───────────────────────────────────────────────────────────────────
 
 
@@ -486,6 +521,27 @@ def aendere_bewertung(
         ),
         notizen=bewertung.notizen if notizen is None else notizen,
         fragen=bewertung.fragen if fragen is None else fragen,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Fortschritt:
+    """Wie weit ein Prüfling bewertet ist - für die Übersicht."""
+
+    doku_bewertet: int
+    doku_kriterien: int
+    praesi_bewertet: int
+    praesi_sektionen: int
+
+
+def fortschritt(bewertung: Bewertung) -> Fortschritt:
+    doku = berechne_doku(bewertung.doku)
+    praesi = berechne_praesentation(bewertung.praesi_skala, bewertung.praesi_punkte)
+    return Fortschritt(
+        doku_bewertet=len(DOKU_BLAETTER) - len(doku.fehlend),
+        doku_kriterien=len(DOKU_BLAETTER),
+        praesi_bewertet=len(PRAESI_SEKTIONEN) - len(praesi.fehlend),
+        praesi_sektionen=len(PRAESI_SEKTIONEN),
     )
 
 
