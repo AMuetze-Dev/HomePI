@@ -1,4 +1,4 @@
-import type { Zeitaktion, Zeiten } from "./api";
+import type { Frage, Zeitaktion, Zeiten } from "./api";
 
 /**
  * Anzeige der Zeitmessung. Entschieden wird im Backend - welcher Schritt
@@ -79,4 +79,11 @@ export function meldung(fehler: unknown): string {
 export function datum(iso: string): string {
   const [jahr, monat, tag] = iso.split("-");
   return `${tag}.${monat}.${jahr}`;
+}
+
+/** Was es im Thema überhaupt gibt - leere Themen zählen nicht als Thema. */
+export function themenAus(fragen: Frage[]): string[] {
+  return [...new Set(fragen.map((f) => f.thema).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, "de"),
+  );
 }

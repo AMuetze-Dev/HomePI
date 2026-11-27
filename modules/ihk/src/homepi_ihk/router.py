@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import random
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Any
@@ -19,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import dienst, speicher
 from .bogen import pdf_aus
-from .dienst import Bewertung, Mep, Teilnoten, Zeiten
+from .dienst import Bewertung, FgFrage, Mep, Teilnoten, Zeiten
 from .katalog import KATALOG, NOTEN, Knoten, Sektion
 from .modelle import Pruefling, Pruefungstag
 from .schemas import (
@@ -30,6 +31,10 @@ from .schemas import (
     BlockAusgabe,
     DokumentArt,
     DokumentAusgabe,
+    FrageAendern,
+    FrageAnlegen,
+    FrageAusgabe,
+    FragenStapel,
     GesamtErgebnisAusgabe,
     KatalogAusgabe,
     KnotenAusgabe,
@@ -42,6 +47,7 @@ from .schemas import (
     RechnerAusgabe,
     RechnerEingabe,
     SektionAusgabe,
+    StapelErgebnis,
     Status,
     TagAendern,
     TagAnlegen,
@@ -86,7 +92,7 @@ def _tag(tag: Pruefungstag, anzahl: int = 0) -> TagAusgabe:
 
 def _auswertung(bewertung: Bewertung, teilnoten: Teilnoten) -> Auswertung:
     doku = dienst.berechne_doku(bewertung.doku)
-    praesi = dienst.berechne_praesentation(bewertung.praesi_skala, bewertung.praesi_punkte)
+    praesi = dienst.praesentation_von(bewertung)
     ohne, mit = dienst.berechne_gesamt(teilnoten, doku.gesamt, praesi.gesamt)
     return Auswertung(
         doku=TeilErgebnisAusgabe.model_validate(doku),
@@ -123,7 +129,7 @@ async def _detail(sitzung: AsyncSession, p: Pruefling) -> PrueflingDetail:
 def _kurz(p: Pruefling, dokumente: int) -> PrueflingKurz:
     bewertung = Bewertung.aus_dict(p.bewertung)
     doku = dienst.berechne_doku(bewertung.doku)
-    praesi = dienst.berechne_praesentation(bewertung.praesi_skala, bewertung.praesi_punkte)
+    praesi = dienst.praesentation_von(bewertung)
     stand = dienst.fortschritt(bewertung)
     ohne, mit = dienst.berechne_gesamt(_teilnoten(p.teilnoten), doku.gesamt, praesi.gesamt)
     gesamt = mit or ohne
@@ -170,6 +176,7 @@ def _sektion(s: Sektion) -> SektionAusgabe:
         max=s.max,
         kinder=[_knoten(k) for k in s.kinder],
         bloecke=[BlockAusgabe(id=b.id, knoten=[k.id for k in b.knoten]) for b in dienst.bloecke(s)],
+        fragen=s.fragen,
     )
 
 
@@ -253,6 +260,69 @@ async def katalog() -> KatalogAusgabe:
         praesi_grenze_min=KATALOG.praesi_grenze_min,
         gesamt_grenze_min=KATALOG.gesamt_grenze_min,
     )
+
+
+# ── Fragensammlung ───────────────────────────────────────────────────────────
+
+
+@router.get("/fragen", summary="Fragensammlung fürs Fachgespräch")
+async def fragen_lesen(sitzung: DbSitzung) -> list[FrageAusgabe]:
+    return [FrageAusgabe.model_validate(f) for f in await speicher.fragen(sitzung)]
+
+
+@router.post("/fragen", status_code=status.HTTP_201_CREATED, summary="Frage aufnehmen")
+async def frage_anlegen(daten: FrageAnlegen, sitzung: DbSitzung) -> FrageAusgabe:
+    text, thema = dienst.pruefe_frage(daten.text, daten.thema)
+    (neu,) = await speicher.fragen_anlegen(sitzung, [text], thema)
+    return FrageAusgabe.model_validate(neu)
+
+
+@router.post(
+    "/fragen/stapel",
+    status_code=status.HTTP_201_CREATED,
+    summary="Viele Fragen aufnehmen, eine je Zeile",
+)
+async def fragen_stapel(daten: FragenStapel, sitzung: DbSitzung) -> StapelErgebnis:
+    _, thema = dienst.pruefe_frage("-", daten.thema)
+    vorhanden = [f.text for f in await speicher.fragen(sitzung)]
+    texte, doppelt = dienst.neue_fragen(vorhanden, daten.texte)
+    await speicher.fragen_anlegen(sitzung, texte, thema)
+    return StapelErgebnis(angelegt=len(texte), doppelt=doppelt)
+
+
+@router.get("/fragen/zufall", summary="Zufällige Frage ziehen")
+async def frage_ziehen(
+    sitzung: DbSitzung,
+    thema: Annotated[str | None, Query(max_length=200)] = None,
+    ohne: Annotated[list[str] | None, Query(max_length=200)] = None,
+) -> FrageAusgabe:
+    gezogen = dienst.ziehe_frage(
+        await speicher.fragen(sitzung),
+        thema=thema or None,
+        ohne=set(ohne or []),
+        zufall=random.SystemRandom(),
+    )
+    return FrageAusgabe.model_validate(gezogen)
+
+
+@router.patch("/fragen/{frage_id}", summary="Frage ändern")
+async def frage_aendern(
+    frage_id: uuid.UUID, daten: FrageAendern, sitzung: DbSitzung
+) -> FrageAusgabe:
+    f = await speicher.frage(sitzung, frage_id)
+    f.text, f.thema = dienst.pruefe_frage(
+        f.text if daten.text is None else daten.text,
+        f.thema if daten.thema is None else daten.thema,
+    )
+    await speicher.speichern(sitzung, f)
+    return FrageAusgabe.model_validate(f)
+
+
+@router.delete(
+    "/fragen/{frage_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Frage entfernen"
+)
+async def frage_entfernen(frage_id: uuid.UUID, sitzung: DbSitzung) -> None:
+    await speicher.frage_loeschen(sitzung, frage_id)
 
 
 # ── Prüfungstage ─────────────────────────────────────────────────────────────
@@ -341,7 +411,13 @@ async def bewertung_aendern(
     pruefling_id: uuid.UUID, daten: BewertungAendern, sitzung: DbSitzung
 ) -> PrueflingDetail:
     p = await speicher.pruefling(sitzung, pruefling_id)
-    neu = dienst.aendere_bewertung(Bewertung.aus_dict(p.bewertung), **daten.model_dump())
+    felder = daten.model_dump(exclude={"fg_fragen"})
+    fragen = (
+        None
+        if daten.fg_fragen is None
+        else [FgFrage(f.id, f.text, f.wert, f.quelle) for f in daten.fg_fragen]
+    )
+    neu = dienst.aendere_bewertung(Bewertung.aus_dict(p.bewertung), **felder, fg_fragen=fragen)
     p.bewertung = neu.als_dict()
     await speicher.speichern(sitzung, p)
     return await _detail(sitzung, p)

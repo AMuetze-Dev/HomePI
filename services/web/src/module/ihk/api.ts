@@ -36,6 +36,8 @@ export interface Sektion {
   max: number;
   kinder: Knoten[];
   bloecke: Block[];
+  /** Bewertet je gestellter Frage statt je Kriterium - das Fachgespräch. */
+  fragen: boolean;
 }
 
 export type MepBereich = "planen_softwareprodukt" | "algorithmen" | "wiso";
@@ -115,9 +117,21 @@ export interface Bewertung {
   praesi_skala: Record<string, number>;
   praesi_punkte: Record<string, number>;
   praesi_bemerkungen: Record<string, string>;
+  fg_fragen: FgFrage[];
   notizen: string;
-  fragen: string;
 }
+
+/** Eine im Fachgespräch gestellte Frage, bewertet auf der Skala. */
+export interface FgFrage {
+  id: string;
+  text: string;
+  wert: number | null;
+  /** Die Frage der Sammlung, aus der sie stammt. */
+  quelle: string | null;
+}
+
+/** Ohne id ist die Frage neu - die Kennung vergibt das Backend. */
+export type FgFrageEingabe = Omit<FgFrage, "id"> & { id?: string };
 
 export interface BewertungAenderung {
   doku?: Record<string, number | null>;
@@ -125,8 +139,9 @@ export interface BewertungAenderung {
   praesi_skala?: Record<string, number | null>;
   praesi_punkte?: Record<string, number | null>;
   praesi_bemerkungen?: Record<string, string | null>;
+  /** Immer die ganze Liste in ihrer Reihenfolge. */
+  fg_fragen?: FgFrageEingabe[];
   notizen?: string;
-  fragen?: string;
 }
 
 export interface Teilnoten {
@@ -390,4 +405,47 @@ export async function ladeDokumentDaten(
   if (!antwort.ok)
     throw new ApiError("Das Dokument ließ sich nicht laden", antwort.status);
   return antwort.arrayBuffer();
+}
+
+// ── Fragensammlung ───────────────────────────────────────────────────────────
+
+export interface Frage {
+  id: string;
+  text: string;
+  thema: string;
+}
+
+export function ladeFragen(signal?: AbortSignal): Promise<Frage[]> {
+  return anfrage<Frage[]>("/fragen", {}, signal);
+}
+
+export function legeFrageAn(daten: Omit<Frage, "id">): Promise<Frage> {
+  return sende<Frage>("POST", "/fragen", daten);
+}
+
+/** Eine Frage je Zeile; was es schon gibt, wird übersprungen. */
+export function legeFragenAn(daten: {
+  thema: string;
+  texte: string;
+}): Promise<{ angelegt: number; doppelt: number }> {
+  return sende("POST", "/fragen/stapel", daten);
+}
+
+export function aendereFrage(
+  frageId: string,
+  daten: Partial<Omit<Frage, "id">>,
+): Promise<Frage> {
+  return sende<Frage>("PATCH", `/fragen/${id(frageId)}`, daten);
+}
+
+export function entferneFrage(frageId: string): Promise<void> {
+  return sende<void>("DELETE", `/fragen/${id(frageId)}`);
+}
+
+/** Zufällig aus dem Thema (leer: aus allen), ohne die genannten. */
+export function zieheFrage(thema: string, ohne: string[]): Promise<Frage> {
+  const suche = new URLSearchParams();
+  if (thema) suche.set("thema", thema);
+  ohne.forEach((o) => suche.append("ohne", o));
+  return anfrage<Frage>(`/fragen/zufall?${suche.toString()}`);
 }

@@ -13,6 +13,7 @@ import {
 } from "../../ui";
 import * as api from "./api";
 import stil from "./IhkSeite.module.css";
+import { FragenTafel } from "./Fragen";
 import { PrueflingTafel } from "./PrueflingTafel";
 import { RechnerTafel } from "./Rechner";
 import { datum, meldung, note } from "./zeit";
@@ -31,6 +32,7 @@ export function IhkSeite() {
   const tagId = suche.get("tag");
 
   if (suche.has("rechner")) return <RechnerTafel />;
+  if (suche.has("fragen")) return <FragenTafel />;
   if (prueflingId) return <PrueflingTafel key={prueflingId} prueflingId={prueflingId} />;
   if (tagId) return <TagTafel key={tagId} tagId={tagId} />;
   return <TageTafel />;
@@ -136,9 +138,14 @@ function TageTafel() {
       titel="Prüfungstage"
       beiwort={`${tage.length} ${tage.length === 1 ? "Tag" : "Tage"} · ${anzahl} ${anzahl === 1 ? "Prüfling" : "Prüflinge"}`}
       aktionen={
-        <Link to="?rechner" className={stil.verweis}>
-          Notenrechner
-        </Link>
+        <span className={stil.knopfreihe}>
+          <Link to="?fragen" className={stil.verweis}>
+            Fragensammlung
+          </Link>
+          <Link to="?rechner" className={stil.verweis}>
+            Notenrechner
+          </Link>
+        </span>
       }
     >
       {fehler && (

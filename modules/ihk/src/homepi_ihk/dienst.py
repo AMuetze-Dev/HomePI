@@ -20,11 +20,13 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping
+import uuid
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import PurePosixPath, PureWindowsPath
-from typing import Any, Literal
+from random import Random
+from typing import Any, Literal, Protocol
 
 from homepi_core import ServiceError
 
@@ -71,6 +73,21 @@ class KeinPdf(ServiceError):
 class DokumentZuGross(ServiceError):
     status = 413
     title = "Dokument zu groß"
+
+
+class FrageUngueltig(ServiceError):
+    status = 422
+    title = "Frage nicht zulässig"
+
+
+class FrageUnbekannt(ServiceError):
+    status = 404
+    title = "Frage unbekannt"
+
+
+class KeineFrageUebrig(ServiceError):
+    status = 404
+    title = "Keine Frage übrig"
 
 
 # ── Noten ────────────────────────────────────────────────────────────────────
@@ -246,13 +263,24 @@ def _teil(sektionen: list[SektionErgebnis], fehlend: list[str]) -> TeilErgebnis:
 
 
 def berechne_praesentation(
-    skala: Mapping[str, float | None], punkte: Mapping[str, int | None]
+    skala: Mapping[str, float | None],
+    punkte: Mapping[str, int | None],
+    fragen: Sequence[float | None] = (),
 ) -> TeilErgebnis:
-    """Vorschlag ``round(max * Mittelwert)``; zählen tut die gesetzte Punktzahl."""
+    """Vorschlag ``round(max * Mittelwert)``; zählen tut die gesetzte Punktzahl.
+
+    Im Fachgespräch ist es der Mittelwert über die bewerteten Fragen; eine
+    gestellte, noch unbewertete Frage zählt nicht mit, hält die Sektion aber
+    unvollständig."""
     fehlend: list[str] = []
     sektionen = []
     for sektion in KATALOG.praesentation:
-        bewertet = [w for b in blaetter(sektion) if (w := skala.get(b.id)) is not None]
+        if sektion.fragen:
+            bewertet = [w for w in fragen if w is not None]
+            alle = len(fragen) > 0 and len(bewertet) == len(fragen)
+        else:
+            bewertet = [w for b in blaetter(sektion) if (w := skala.get(b.id)) is not None]
+            alle = len(bewertet) == len(blaetter(sektion))
         vorschlag = runde(sektion.max * sum(bewertet) / len(bewertet)) if bewertet else None
         wert = punkte.get(sektion.id)
         if wert is None:
@@ -264,7 +292,7 @@ def berechne_praesentation(
                 label=sektion.label,
                 max=sektion.max,
                 wert=wert,
-                vollstaendig=len(bewertet) == len(blaetter(sektion)) and wert is not None,
+                vollstaendig=alle and wert is not None,
                 vorschlag=vorschlag,
             )
         )
@@ -392,6 +420,33 @@ def berechne_gesamt(
 # ── Bewertung ────────────────────────────────────────────────────────────────
 
 
+MAX_FRAGE = 500
+MAX_THEMA = 60
+MAX_FG_FRAGEN = 40
+
+
+@dataclass(frozen=True, slots=True)
+class FgFrage:
+    """Eine im Fachgespräch gestellte Frage. ``quelle`` ist die Frage der
+    Sammlung, aus der sie stammt - damit sie nicht zweimal gezogen wird."""
+
+    id: str
+    text: str
+    wert: float | None = None
+    quelle: str | None = None
+
+
+def _neue_id() -> str:
+    return uuid.uuid4().hex
+
+
+def _alte_fragen(text: str) -> tuple[FgFrage, ...]:
+    """Früher ein Freitext, eine Frage je Zeile. Die Kennung folgt der Zeile,
+    damit dieselbe Bewertung beim nächsten Lesen dieselben Kennungen hat."""
+    zeilen = [z.strip() for z in text.splitlines() if z.strip()]
+    return tuple(FgFrage(f"alt{i}", z[:MAX_FRAGE]) for i, z in enumerate(zeilen, 1))
+
+
 @dataclass(frozen=True, slots=True)
 class Bewertung:
     """Ein Datensatz je Prüfling. Fehlende Schlüssel heißen: noch nicht bewertet."""
@@ -401,9 +456,9 @@ class Bewertung:
     praesi_skala: dict[str, float] = field(default_factory=dict)
     praesi_punkte: dict[str, int] = field(default_factory=dict)
     praesi_bemerkungen: dict[str, str] = field(default_factory=dict)
+    fg_fragen: tuple[FgFrage, ...] = ()
     #: wird nie gedruckt
     notizen: str = ""
-    fragen: str = ""
 
     def als_dict(self) -> dict[str, Any]:
         return {
@@ -412,8 +467,11 @@ class Bewertung:
             "praesi_skala": dict(self.praesi_skala),
             "praesi_punkte": dict(self.praesi_punkte),
             "praesi_bemerkungen": dict(self.praesi_bemerkungen),
+            "fg_fragen": [
+                {"id": f.id, "text": f.text, "wert": f.wert, "quelle": f.quelle}
+                for f in self.fg_fragen
+            ],
             "notizen": self.notizen,
-            "fragen": self.fragen,
         }
 
     @classmethod
@@ -421,11 +479,27 @@ class Bewertung:
         return cls(
             doku={k: int(v) for k, v in roh.get("doku", {}).items()},
             doku_bemerkungen=dict(roh.get("doku_bemerkungen", {})),
-            praesi_skala={k: float(v) for k, v in roh.get("praesi_skala", {}).items()},
+            # Kriterien, die es nicht mehr gibt (das Fachgespräch hatte bis
+            # 11/2026 drei feste), fallen beim Lesen heraus.
+            praesi_skala={
+                k: float(v) for k, v in roh.get("praesi_skala", {}).items() if k in PRAESI_BLAETTER
+            },
             praesi_punkte={k: int(v) for k, v in roh.get("praesi_punkte", {}).items()},
             praesi_bemerkungen=dict(roh.get("praesi_bemerkungen", {})),
+            fg_fragen=(
+                tuple(
+                    FgFrage(
+                        str(f["id"]),
+                        str(f["text"]),
+                        None if f.get("wert") is None else float(f["wert"]),
+                        None if f.get("quelle") is None else str(f["quelle"]),
+                    )
+                    for f in roh["fg_fragen"]
+                )
+                if "fg_fragen" in roh
+                else _alte_fragen(str(roh.get("fragen", "")))
+            ),
             notizen=str(roh.get("notizen", "")),
-            fragen=str(roh.get("fragen", "")),
         )
 
 
@@ -467,6 +541,30 @@ def _pruefe_sektion(kennung: str, wert: int) -> None:
         )
 
 
+def _frage_text(text: str) -> str:
+    text = text.strip()
+    if not text:
+        raise FrageUngueltig("Eine Frage braucht einen Text")
+    if len(text) > MAX_FRAGE:
+        raise FrageUngueltig(f"Eine Frage hat höchstens {MAX_FRAGE} Zeichen, nicht {len(text)}")
+    return text
+
+
+def _fg_fragen(neu: Sequence[FgFrage], neue_id: Callable[[], str]) -> tuple[FgFrage, ...]:
+    if len(neu) > MAX_FG_FRAGEN:
+        raise FrageUngueltig(f"Höchstens {MAX_FG_FRAGEN} Fragen je Fachgespräch")
+    ergebnis = []
+    for frage in neu:
+        if frage.wert is not None and frage.wert not in NOTEN.skala:
+            raise PunkteUnzulaessig(
+                f"Eine Frage wird mit 100, 75, 50, 25 oder 0 % bewertet, nicht {frage.wert}"
+            )
+        ergebnis.append(
+            FgFrage(frage.id or neue_id(), _frage_text(frage.text), frage.wert, frage.quelle)
+        )
+    return tuple(ergebnis)
+
+
 def _pruefe_bemerkung(gueltig: frozenset[str] | Mapping[str, object], kennung: str) -> None:
     if kennung not in gueltig:
         raise KriteriumUnbekannt(f"Zu '{kennung}' gibt es kein Bemerkungsfeld")
@@ -506,11 +604,15 @@ def aendere_bewertung(
     praesi_skala: Mapping[str, float | None] | None = None,
     praesi_punkte: Mapping[str, int | None] | None = None,
     praesi_bemerkungen: Mapping[str, str | None] | None = None,
+    fg_fragen: Sequence[FgFrage] | None = None,
     notizen: str | None = None,
-    fragen: str | None = None,
+    neue_id: Callable[[], str] = _neue_id,
 ) -> Bewertung:
     """Teiländerung: Genannte Schlüssel werden gesetzt, ``None`` entfernt sie,
-    alles Ungenannte bleibt stehen. Jeder Wert wird gegen den Katalog geprüft."""
+    alles Ungenannte bleibt stehen. Jeder Wert wird gegen den Katalog geprüft.
+
+    Die Fragen des Fachgesprächs kommen als ganze Liste - sie sind eine
+    Reihenfolge, kein Wörterbuch. Eine Frage ohne Kennung ist neu."""
     return Bewertung(
         doku=_zahlen(bewertung.doku, doku, _pruefe_doku),
         doku_bemerkungen=_texte(bewertung.doku_bemerkungen, doku_bemerkungen, DOKU_BLOECKE),
@@ -519,8 +621,16 @@ def aendere_bewertung(
         praesi_bemerkungen=_texte(
             bewertung.praesi_bemerkungen, praesi_bemerkungen, PRAESI_SEKTIONEN
         ),
+        fg_fragen=bewertung.fg_fragen if fg_fragen is None else _fg_fragen(fg_fragen, neue_id),
         notizen=bewertung.notizen if notizen is None else notizen,
-        fragen=bewertung.fragen if fragen is None else fragen,
+    )
+
+
+def praesentation_von(bewertung: Bewertung) -> TeilErgebnis:
+    return berechne_praesentation(
+        bewertung.praesi_skala,
+        bewertung.praesi_punkte,
+        [f.wert for f in bewertung.fg_fragen],
     )
 
 
@@ -536,13 +646,67 @@ class Fortschritt:
 
 def fortschritt(bewertung: Bewertung) -> Fortschritt:
     doku = berechne_doku(bewertung.doku)
-    praesi = berechne_praesentation(bewertung.praesi_skala, bewertung.praesi_punkte)
+    praesi = praesentation_von(bewertung)
     return Fortschritt(
         doku_bewertet=len(DOKU_BLAETTER) - len(doku.fehlend),
         doku_kriterien=len(DOKU_BLAETTER),
         praesi_bewertet=len(PRAESI_SEKTIONEN) - len(praesi.fehlend),
         praesi_sektionen=len(PRAESI_SEKTIONEN),
     )
+
+
+# ── Fragensammlung ───────────────────────────────────────────────────────────
+
+
+def pruefe_frage(text: str, thema: str) -> tuple[str, str]:
+    thema = thema.strip()
+    if len(thema) > MAX_THEMA:
+        raise FrageUngueltig(f"Ein Thema hat höchstens {MAX_THEMA} Zeichen")
+    return _frage_text(text), thema
+
+
+def _schluessel(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
+def neue_fragen(vorhandene: Iterable[str], stapel: str) -> tuple[list[str], int]:
+    """Eine Frage je Zeile. Was es schon gibt - auch nur anders geschrieben
+    oder doppelt im Stapel -, wird übersprungen und gezählt."""
+    bekannt = {_schluessel(t) for t in vorhandene}
+    neu: list[str] = []
+    doppelt = 0
+    for zeile in stapel.splitlines():
+        if not zeile.strip():
+            continue
+        text = _frage_text(zeile)
+        if _schluessel(text) in bekannt:
+            doppelt += 1
+            continue
+        bekannt.add(_schluessel(text))
+        neu.append(text)
+    return neu, doppelt
+
+
+class _Ziehbar(Protocol):
+    @property
+    def id(self) -> Any: ...
+    @property
+    def thema(self) -> str: ...
+
+
+def ziehe_frage[F: _Ziehbar](
+    fragen: Sequence[F], *, thema: str | None, ohne: Collection[str], zufall: Random
+) -> F:
+    """Zufällig aus dem Thema (oder allen), ohne die schon gestellten."""
+    if not fragen:
+        raise KeineFrageUebrig("Die Sammlung hat noch keine Fragen")
+    kandidaten = [
+        f for f in fragen if (thema is None or f.thema == thema) and str(f.id) not in ohne
+    ]
+    if not kandidaten:
+        wo = f"zum Thema „{thema}“" if thema else "der Sammlung"
+        raise KeineFrageUebrig(f"Alle Fragen {wo} wurden schon gestellt")
+    return zufall.choice(kandidaten)
 
 
 # ── Zeitmessung ──────────────────────────────────────────────────────────────

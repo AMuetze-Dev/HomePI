@@ -121,6 +121,22 @@ class PrueflingAendern(BaseModel):
     _trim = field_validator("name", "ident", mode="before")(_trimmen)
 
 
+class FgFrageEingabe(BaseModel):
+    id: Annotated[str, Field(max_length=64)] = ""
+    text: Annotated[str, Field(max_length=500)]
+    wert: float | None = None
+    quelle: Annotated[str, Field(max_length=64)] | None = None
+
+
+class FgFrageAusgabe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    text: str
+    wert: float | None
+    quelle: str | None
+
+
 class BewertungAendern(BaseModel):
     """Teiländerung: Genannte Schlüssel werden gesetzt, ``null`` entfernt sie."""
 
@@ -129,8 +145,9 @@ class BewertungAendern(BaseModel):
     praesi_skala: dict[str, float | None] | None = None
     praesi_punkte: dict[str, int | None] | None = None
     praesi_bemerkungen: dict[str, Bemerkung | None] | None = None
+    #: Die ganze Liste in ihrer Reihenfolge; eine Frage ohne ``id`` ist neu.
+    fg_fragen: Annotated[list[FgFrageEingabe], Field(max_length=40)] | None = None
     notizen: Annotated[str, Field(max_length=20000)] | None = None
-    fragen: Annotated[str, Field(max_length=20000)] | None = None
 
 
 class BewertungAusgabe(BaseModel):
@@ -141,8 +158,8 @@ class BewertungAusgabe(BaseModel):
     praesi_skala: dict[str, float]
     praesi_punkte: dict[str, int]
     praesi_bemerkungen: dict[str, str]
+    fg_fragen: list[FgFrageAusgabe]
     notizen: str
-    fragen: str
 
 
 class MepEingabe(BaseModel):
@@ -314,6 +331,8 @@ class SektionAusgabe(BaseModel):
     max: int
     kinder: list[KnotenAusgabe]
     bloecke: list[BlockAusgabe]
+    #: Bewertet wird je gestellter Frage statt je Kriterium (Fachgespräch).
+    fragen: bool = False
 
 
 class NotenbandAusgabe(BaseModel):
@@ -340,6 +359,38 @@ class KatalogAusgabe(BaseModel):
     projekt_label: str
     praesi_grenze_min: int
     gesamt_grenze_min: int
+
+
+# ── Fragensammlung ───────────────────────────────────────────────────────────
+
+
+class FrageAnlegen(BaseModel):
+    text: Annotated[str, Field(max_length=2000)]
+    thema: Annotated[str, Field(max_length=200)] = ""
+
+
+class FrageAendern(BaseModel):
+    text: Annotated[str, Field(max_length=2000)] | None = None
+    thema: Annotated[str, Field(max_length=200)] | None = None
+
+
+class FragenStapel(BaseModel):
+    thema: Annotated[str, Field(max_length=200)] = ""
+    #: Eine Frage je Zeile.
+    texte: Annotated[str, Field(max_length=200_000)]
+
+
+class StapelErgebnis(BaseModel):
+    angelegt: int
+    doppelt: int
+
+
+class FrageAusgabe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    text: str
+    thema: str
 
 
 PrueflingKurz.model_rebuild()

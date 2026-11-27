@@ -573,27 +573,9 @@
         "row": 114,
         "label": "Fachgespräch",
         "max": 45,
-        "suggestion": "round(max * mean(children))",
-        "children": [
-          {
-            "id": "praesi.5.1",
-            "row": 115,
-            "label": "Analysiert Situation",
-            "kind": "scale"
-          },
-          {
-            "id": "praesi.5.2",
-            "row": 116,
-            "label": "Argumentiert fachlich richtig",
-            "kind": "scale"
-          },
-          {
-            "id": "praesi.5.3",
-            "row": 117,
-            "label": "Argumentiert sicher",
-            "kind": "scale"
-          }
-        ]
+        "suggestion": "round(max * mean(questions))",
+        "children": [],
+        "questions": true
       }
     ]
   },

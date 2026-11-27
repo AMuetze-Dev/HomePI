@@ -13,8 +13,8 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import undefer
 
-from .dienst import DokumentUnbekannt, PrueflingUnbekannt, TagUnbekannt
-from .modelle import Dokument, Pruefling, Pruefungstag
+from .dienst import DokumentUnbekannt, FrageUnbekannt, PrueflingUnbekannt, TagUnbekannt
+from .modelle import Dokument, Frage, Pruefling, Pruefungstag
 
 # ── Prüfungstage ─────────────────────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ async def pruefling(sitzung: AsyncSession, pruefling_id: uuid.UUID) -> Pruefling
     return gefunden
 
 
-async def speichern(sitzung: AsyncSession, eintrag: Pruefling | Pruefungstag) -> None:
+async def speichern(sitzung: AsyncSession, eintrag: Pruefling | Pruefungstag | Frage) -> None:
     await sitzung.flush()
     await sitzung.refresh(eintrag)
 
@@ -151,3 +151,32 @@ async def dokument_loeschen(
     )
     if getattr(ergebnis, "rowcount", 0) == 0:
         raise DokumentUnbekannt("Dieses Dokument gibt es zu diesem Prüfling nicht")
+
+
+# ── Fragensammlung ───────────────────────────────────────────────────────────
+
+
+async def fragen(sitzung: AsyncSession, thema: str | None = None) -> list[Frage]:
+    abfrage = select(Frage).order_by(Frage.thema, Frage.text)
+    if thema is not None:
+        abfrage = abfrage.where(Frage.thema == thema)
+    return list((await sitzung.scalars(abfrage)).all())
+
+
+async def frage(sitzung: AsyncSession, frage_id: uuid.UUID) -> Frage:
+    gefunden = await sitzung.get(Frage, frage_id)
+    if gefunden is None:
+        raise FrageUnbekannt(f"Es gibt keine Frage mit der Kennung {frage_id}")
+    return gefunden
+
+
+async def fragen_anlegen(sitzung: AsyncSession, texte: list[str], thema: str) -> list[Frage]:
+    neu = [Frage(text=t, thema=thema) for t in texte]
+    sitzung.add_all(neu)
+    await sitzung.flush()
+    return neu
+
+
+async def frage_loeschen(sitzung: AsyncSession, frage_id: uuid.UUID) -> None:
+    await sitzung.delete(await frage(sitzung, frage_id))
+    await sitzung.flush()
