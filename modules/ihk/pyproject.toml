@@ -1,7 +1,7 @@
 [project]
 name = "homepi-ihk"
 version = "0.1.0"
-description = "HomePI-Artefakt: Prüfung"
+description = "HomePI-Artefakt: IHK-Prüfung"
 requires-python = ">=3.12"
 dependencies = ["homepi-core", "fpdf2>=2.8"]
 

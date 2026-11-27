@@ -8,7 +8,7 @@ from homepi_core.auth import Rolle
 
 def test_modul_ist_korrekt_beschrieben(modul: Modul) -> None:
     assert modul.id == "ihk"
-    assert modul.titel == "Prüfung"
+    assert modul.titel == "IHK-Prüfung"
     assert modul.praefix == "/ihk"
     assert modul.version
 

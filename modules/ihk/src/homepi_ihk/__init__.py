@@ -1,4 +1,4 @@
-"""HomePI-Artefakt: Prüfung."""
+"""HomePI-Artefakt: IHK-Prüfung."""
 
 from homepi_core import Modul, Zugang
 
@@ -11,7 +11,7 @@ __version__ = "0.1.0"
 #: Startseite als Kachel anzuzeigen.
 modul = Modul(
     id="ihk",
-    titel="Prüfung",
+    titel="IHK-Prüfung",
     router=router,
     beschreibung="IHK-Abschlussprüfungen FIAE bewerten",
     icon="kachel",
