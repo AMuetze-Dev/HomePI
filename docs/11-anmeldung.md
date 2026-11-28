@@ -87,25 +87,39 @@ Verwaltung. Das Artefakt prüft dann Endpunkt für Endpunkt mit `erfordert(...)`
 Im Manifest erscheint es trotzdem nur bei Rechteinhabern; sonst wäre es über
 die Kachelliste wieder für alle sichtbar.
 
-### Das eine öffentliche Artefakt
+### Die öffentlichen Artefakte
 
-`OEFFENTLICH` ist genau einmal vergeben: **`tischtennis`**. Seine
-Dashboard-Ansicht soll jeder Kollege aufrufen können, ohne dass jemand zwanzig
-Konten anlegt — und zwar über die Kachel und nicht nur über einen
-weitergegebenen Link. Deshalb `OEFFENTLICH` und nicht `SELBST`: bei `SELBST`
-stünde das Artefakt nur bei Rechteinhabern im Manifest, und ein Besucher ohne
-Konto fände von der Startseite aus keinen Weg dorthin.
+`OEFFENTLICH` ist zweimal vergeben, und beide Male aus demselben Grund:
+Menschen ohne Konto sollen über die Kachel hineinfinden und nicht nur über
+einen weitergegebenen Link.
 
-Der Preis ist die fehlende Prüfung am Router. Das Artefakt trägt deshalb an
-**jedem** schreibenden Endpunkt sein eigenes `erfordert(...)`, und ein Test
-(`modules/tischtennis/tests/unit/test_anmeldung.py`) geht alle Routen durch und
-verlangt bei jeder nicht-GET-Route eine Abhängigkeit. Ohne diesen Test wäre
-der vergessene Endpunkt ein Formular, das jeder Besucher abschicken kann.
+| Artefakt      | ohne Konto                                                           |
+| ------------- | -------------------------------------------------------------------- |
+| `tischtennis` | die Dashboard-Ansicht, damit kein Turnierleiter zwanzig Konten anlegt |
+| `quiz`        | beitreten, antworten, buzzern, die Anzeigetafel                      |
 
-Dass es bei einem bleibt, hält ein Test im Gateway fest: die Artefaktliste
-eines Besuchers ohne Konto besteht namentlich aus `tischtennis` und sonst
-nichts. Ein zweites öffentliches Artefakt soll eine Entscheidung sein, die
-jemand dort bestätigt, und kein Nebeneffekt.
+Bei `SELBST` stünde ein Artefakt nur bei Rechteinhabern im Manifest, und ein
+Besucher ohne Konto fände von der Startseite aus keinen Weg dorthin.
+
+Der Preis ist die fehlende Prüfung am Router. Beide Artefakte tragen deshalb
+an jedem Endpunkt, der nicht für Besucher gedacht ist, ihr eigenes
+`erfordert(...)`, und je ein Test geht alle Routen durch:
+`modules/tischtennis/tests/unit/test_anmeldung.py` verlangt bei jeder
+nicht-GET-Route eine Abhängigkeit, `modules/quiz/tests/unit/test_anmeldung.py`
+kennt die offenen Endpunkte **namentlich** — beim Quiz schreiben auch
+Besucher, und die Kataloge darf trotz GET niemand ohne Konto lesen, denn dort
+stehen die Lösungen. Ohne diese Tests wäre der vergessene Endpunkt ein
+Formular, das jeder Besucher abschicken kann.
+
+Wie das Quiz Spieler ohne Konto auseinanderhält, steht in
+[`modules/quiz/README.md`](../modules/quiz/README.md): ein Token je Runde
+im `httponly`-Cookie, in der Datenbank nur als SHA-256, ein Name je Runde
+genau einmal.
+
+Dass es bei diesen beiden bleibt, hält ein Test im Gateway fest: die
+Artefaktliste eines Besuchers ohne Konto besteht namentlich aus `tischtennis`
+und `quiz` und sonst nichts. Ein weiteres öffentliches Artefakt soll eine
+Entscheidung sein, die jemand dort bestätigt, und kein Nebeneffekt.
 
 ### Warum die Prüfung am Router hängt und nicht am Endpunkt
 

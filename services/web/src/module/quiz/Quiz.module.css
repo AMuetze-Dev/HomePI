@@ -1,0 +1,606 @@
+/* Nur Tokens aus src/styles/tokens.css - kein fester Farbwert, keine feste
+   Pixelzahl außer dort, wo eine Mindestgröße eine Bedienentscheidung ist.
+   Siehe docs/08-design.md.
+
+   Eine Datei für alle Flächen dieses Artefakts: Mitspielen, Tafel, Leitung
+   und Kataloge teilen Listen, Zeilen und Nebensätze.
+
+   Zwei Haltungen, die hier den Ausschlag geben:
+
+   1. **Das Handy zuerst.** Mitgespielt wird stehend, mit einer Hand, im
+      Saal. Tippziele sind groß, nichts verlangt ein Ziehen oder Halten.
+   2. **Der Beamer liest aus fünf Metern.** Auf der Tafel ist die Frage das
+      Größte, die Rangliste das Zweitgrößte - und sonst steht dort nichts. */
+
+.laden,
+.formular,
+.spiel,
+.ergebnis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+.nebensache {
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.knopfzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-3);
+}
+
+.schalterzeile {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--raum-2);
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.feldreihe {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--raum-3);
+}
+
+.auswahl,
+.textfeld {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+  min-width: 0;
+}
+
+.auswahl select,
+.textfeld textarea,
+.optiontext,
+.punkteEingabe {
+  font: inherit;
+  font-size: var(--text-md);
+  color: var(--farbe-text);
+  background: var(--farbe-flaeche);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  padding: var(--raum-2) var(--raum-3);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.textfeld textarea {
+  resize: vertical;
+}
+
+.auswahl select:focus-visible,
+.textfeld textarea:focus-visible,
+.optiontext:focus-visible,
+.punkteEingabe:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 1px;
+}
+
+.verweis {
+  color: var(--farbe-akzent-schrift);
+  font-size: var(--text-sm);
+}
+
+.code {
+  font-family: var(--schrift-mono);
+  letter-spacing: var(--laufweite-weit);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.codefeld input {
+  font-family: var(--schrift-mono);
+  font-size: var(--text-2xl);
+  letter-spacing: var(--laufweite-weit);
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ Listen */
+
+.liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.listenzeile,
+.spielerzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-2) var(--raum-3);
+  padding: var(--raum-3) 0;
+  border-bottom: 1px solid var(--farbe-linie);
+  min-width: 0;
+}
+
+.listenzeile[aria-current="true"] {
+  background: var(--farbe-auswahl);
+  padding-inline: var(--raum-2);
+  border-radius: var(--rundung-sm);
+}
+
+.fragezeile {
+  display: block;
+}
+
+.zeilenknopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--raum-1) var(--raum-3);
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: var(--raum-1) 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 2.75rem;
+}
+
+.zeilenknopf:hover .zeilentext {
+  color: var(--farbe-akzent-schrift);
+}
+
+.zeilenknopf:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+  border-radius: var(--rundung-sm);
+}
+
+.zeilentext {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.spielername {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------- Mitspielen */
+
+.fragekopf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+.fragemeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--raum-2);
+  font-size: var(--text-sm);
+  color: var(--farbe-text-gedaempft);
+}
+
+.fragetext {
+  margin: 0;
+  font-size: var(--text-2xl);
+  line-height: var(--zeile-eng);
+  letter-spacing: var(--laufweite-eng);
+  overflow-wrap: anywhere;
+}
+
+.countdown {
+  margin-left: auto;
+  font-family: var(--schrift-mono);
+  font-size: var(--text-lg);
+  font-weight: var(--gewicht-halbfett);
+  color: var(--farbe-text);
+}
+
+.countdown[data-knapp="true"] {
+  color: var(--signal-fehler);
+}
+
+.bild {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  border-radius: var(--rundung-md);
+  margin-inline: auto;
+}
+
+.optionen {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  min-width: 0;
+}
+
+/* Groß genug für den Daumen: die ganze Zeile ist die Fläche, nicht nur das
+   Kästchen. */
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-3);
+  min-height: 3rem;
+  padding: var(--raum-2) var(--raum-3);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.option[data-gewaehlt="true"] {
+  border-color: var(--farbe-akzent);
+  background: var(--farbe-akzent-hell);
+}
+
+.option input {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  accent-color: var(--farbe-akzent);
+}
+
+.optionzeile {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-2);
+}
+
+.optiontext {
+  flex: 1;
+}
+
+.schaetzung {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+}
+
+.regler {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+.regler input {
+  width: 100%;
+  min-height: 2.75rem;
+  accent-color: var(--farbe-akzent);
+}
+
+.reglerGrenzen {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--farbe-text-leise);
+}
+
+.hotspot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+.hotspotFlaeche {
+  position: relative;
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: crosshair;
+}
+
+.hotspotFlaeche:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+.markierung {
+  position: absolute;
+  width: 1.5rem;
+  height: 1.5rem;
+  transform: translate(-50%, -50%);
+  border-radius: var(--rundung-voll);
+  border: 3px solid var(--farbe-akzent);
+  background: var(--farbe-akzent-spur);
+  pointer-events: none;
+}
+
+.zielkreis {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: var(--rundung-voll);
+  border: 3px solid var(--signal-gut);
+  background: var(--signal-gut-flaeche);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.sortierliste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+}
+
+.sortierzeile {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-3);
+  padding: var(--raum-2) var(--raum-3);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+  transition: border-color var(--dauer-schnell) var(--verlauf);
+}
+
+.sortierzeile[data-bewegt="true"] {
+  border-color: var(--farbe-akzent);
+}
+
+.sortiernummer {
+  font-family: var(--schrift-mono);
+  font-size: var(--text-sm);
+  color: var(--farbe-text-leise);
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+.sortiertext {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sortierknoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--raum-1);
+}
+
+.buzzerbereich {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--raum-4);
+  padding: var(--raum-4) 0;
+}
+
+/* Der eine Knopf, um den es geht: rund, groß, nicht zu verfehlen. */
+.buzzer {
+  width: min(16rem, 70vw);
+  aspect-ratio: 1;
+  border-radius: var(--rundung-voll);
+  border: 0;
+  background: var(--signal-fehler);
+  color: var(--farbe-aktion-schrift);
+  font: inherit;
+  font-size: var(--text-3xl);
+  font-weight: var(--gewicht-halbfett);
+  letter-spacing: var(--laufweite-eng);
+  box-shadow: var(--schatten-lg);
+  cursor: pointer;
+  transition:
+    transform var(--dauer-sofort) var(--verlauf),
+    opacity var(--dauer-schnell) var(--verlauf);
+}
+
+.buzzer:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.buzzer:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.buzzer:focus-visible {
+  outline: 4px solid var(--farbe-fokus);
+  outline-offset: 4px;
+}
+
+.buzzerstatus {
+  text-align: center;
+  font-size: var(--text-lg);
+}
+
+.loesung {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-1);
+  margin: 0;
+  font-size: var(--text-xl);
+  overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------- Rangliste */
+
+.rangliste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.platz {
+  display: flex;
+  align-items: baseline;
+  gap: var(--raum-3);
+  padding: var(--raum-2) 0;
+  border-bottom: 1px solid var(--farbe-linie);
+}
+
+.platz[aria-current="true"] {
+  font-weight: var(--gewicht-halbfett);
+  color: var(--farbe-akzent-schrift);
+}
+
+.rang {
+  min-width: 2rem;
+  font-family: var(--schrift-mono);
+  color: var(--farbe-text-leise);
+}
+
+.platzname {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.platzpunkte {
+  font-family: var(--schrift-mono);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.rangliste[data-gross="true"] .platz {
+  font-size: var(--text-xl);
+}
+
+/* ---------------------------------------------------------- Anzeigetafel */
+
+.anzeige {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
+  gap: var(--raum-8);
+  align-items: start;
+}
+
+.anzeigeHaupt .fragetext {
+  font-size: var(--text-4xl);
+}
+
+.anzeigeSeite {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-6);
+}
+
+.anzeigeOptionen {
+  margin: 0;
+  padding-left: var(--raum-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  font-size: var(--text-2xl);
+}
+
+.anzeigeOptionen li[data-richtig="true"] {
+  color: var(--signal-gut);
+  font-weight: var(--gewicht-halbfett);
+}
+
+.anzeigeOptionen li[data-richtig="false"] {
+  color: var(--farbe-text-leise);
+}
+
+.anzeigeStatus {
+  font-size: var(--text-xl);
+  color: var(--farbe-text-gedaempft);
+}
+
+/* ---------------------------------------------------------------- Leitung */
+
+.eroeffnen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--raum-3);
+}
+
+.eroeffnen > :first-child {
+  flex: 1 1 14rem;
+}
+
+.leitung {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  gap: var(--raum-6);
+  align-items: start;
+}
+
+.leitungHaupt,
+.leitungSeite {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-6);
+  min-width: 0;
+}
+
+.aktuell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+}
+
+.punkteform {
+  display: flex;
+  align-items: center;
+  gap: var(--raum-1);
+}
+
+.punkteLabel {
+  display: contents;
+}
+
+.punkteEingabe {
+  width: 4.5rem;
+  padding: var(--raum-1) var(--raum-2);
+}
+
+.punkteEingabe[data-offen="true"] {
+  border-color: var(--signal-warnung);
+}
+
+.bildverwaltung {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-3);
+  margin-top: var(--raum-4);
+  padding-top: var(--raum-4);
+  border-top: 1px solid var(--farbe-linie);
+}
+
+.vorschau {
+  max-width: 100%;
+  max-height: 12rem;
+  border-radius: var(--rundung-sm);
+  align-self: flex-start;
+}
+
+@media (max-width: 60rem) {
+  .anzeige,
+  .leitung {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buzzer,
+  .sortierzeile {
+    transition: none;
+  }
+}

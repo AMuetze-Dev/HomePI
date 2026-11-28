@@ -5,6 +5,7 @@ import { HaushaltsbuchSeite } from "./haushaltsbuch/HaushaltsbuchSeite";
 import { TischtennisSeite } from "./tischtennis/TischtennisSeite";
 import { KinderzimmerSeite } from "./kinderzimmer/KinderzimmerSeite";
 import { IhkSeite } from "./ihk/IhkSeite";
+import { QuizSeite } from "./quiz/QuizSeite";
 
 /**
  * Eigene Oberflächen der Artefakte.
@@ -24,6 +25,23 @@ import { IhkSeite } from "./ihk/IhkSeite";
  * Artefakte zueinander verhalten, statt verteilt auf drei Dateien.
  */
 export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
+  {
+    id: "quiz",
+    Komponente: QuizSeite,
+    breite: "normal",
+    // Jeder Bereich baut seinen Kopf selbst: daneben steht die Runde, der
+    // eigene Punktestand, die Zahl der Spieler.
+    unterseiten: [
+      // Zuerst, und das mit Absicht: diese Flaeche ist der Grund, warum das
+      // Artefakt oeffentlich ist. Wer die Kachel ohne Konto antippt, landet
+      // hier - mit dem Handy, also schmal.
+      { id: "spielen", wort: "Mitspielen", breite: "text", eigenerTitel: true },
+      // Fuer den Beamer: Frage gross links, QR-Code und Rangliste rechts.
+      { id: "tafel", wort: "Anzeigetafel", breite: "voll", eigenerTitel: true },
+      { id: "runden", wort: "Runden", breite: "weit", eigenerTitel: true },
+      { id: "kataloge", wort: "Kataloge", eigenerTitel: true },
+    ],
+  },
   {
     id: "ihk",
     Komponente: IhkSeite,

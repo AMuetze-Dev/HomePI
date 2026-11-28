@@ -1,0 +1,399 @@
+"""Datenbankzugriff. Hier faellt I/O an, hier stehen keine Entscheidungen.
+
+Kein einziges if, das eine Fachregel abbildet - solche gehoeren in dienst.py.
+Erlaubt sind nur Pruefungen, die die Datenbank selbst beantwortet: ob ein
+Datensatz existiert, ob ein Name in der Runde schon belegt ist.
+"""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import Sequence
+from typing import Any
+
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from . import dienst
+from .modelle import Antwort, Bild, Buzzer, Frage, Katalog, Korrektur, Runde, Spieler
+from .schemas import FrageEingabe, KatalogEingabe
+
+# ------------------------------------------------------------- Kataloge
+
+
+async def kataloge(sitzung: AsyncSession) -> list[tuple[Katalog, int]]:
+    anzahl = select(Frage.katalog_id, func.count().label("n")).group_by(Frage.katalog_id).subquery()
+    ergebnis = await sitzung.execute(
+        select(Katalog, func.coalesce(anzahl.c.n, 0))
+        .outerjoin(anzahl, anzahl.c.katalog_id == Katalog.id)
+        .order_by(Katalog.titel)
+    )
+    return [(katalog, int(n)) for katalog, n in ergebnis.all()]
+
+
+async def katalog(sitzung: AsyncSession, katalog_id: uuid.UUID) -> Katalog:
+    eintrag = await sitzung.get(Katalog, katalog_id)
+    if eintrag is None:
+        raise dienst.KatalogUnbekannt("Diesen Fragenkatalog gibt es nicht.")
+    return eintrag
+
+
+async def katalog_anlegen(sitzung: AsyncSession, eingabe: KatalogEingabe) -> Katalog:
+    eintrag = Katalog(**eingabe.model_dump())
+    sitzung.add(eintrag)
+    await sitzung.flush()
+    await sitzung.refresh(eintrag)
+    return eintrag
+
+
+async def katalog_aendern(sitzung: AsyncSession, eintrag: Katalog, eingabe: KatalogEingabe) -> None:
+    eintrag.titel = eingabe.titel
+    eintrag.beschreibung = eingabe.beschreibung
+    await sitzung.flush()
+    await sitzung.refresh(eintrag)
+
+
+async def katalog_loeschen(sitzung: AsyncSession, eintrag: Katalog) -> None:
+    await sitzung.delete(eintrag)
+    await sitzung.flush()
+
+
+async def laufende_runden_mit(sitzung: AsyncSession, katalog_id: uuid.UUID) -> int:
+    return int(
+        await sitzung.scalar(
+            select(func.count())
+            .select_from(Runde)
+            .where(Runde.katalog_id == katalog_id, Runde.status != "beendet")
+        )
+        or 0
+    )
+
+
+# ------------------------------------------------------------- Fragen
+
+
+async def fragen(sitzung: AsyncSession, katalog_id: uuid.UUID) -> list[Frage]:
+    ergebnis = await sitzung.execute(
+        select(Frage).where(Frage.katalog_id == katalog_id).order_by(Frage.position, Frage.angelegt)
+    )
+    return list(ergebnis.scalars())
+
+
+async def mit_bild(sitzung: AsyncSession, frage_ids: Sequence[uuid.UUID]) -> set[uuid.UUID]:
+    if not frage_ids:
+        return set()
+    ergebnis = await sitzung.execute(select(Bild.frage_id).where(Bild.frage_id.in_(frage_ids)))
+    return set(ergebnis.scalars())
+
+
+async def frage(sitzung: AsyncSession, frage_id: uuid.UUID) -> Frage:
+    eintrag = await sitzung.get(Frage, frage_id)
+    if eintrag is None:
+        raise dienst.FrageUnbekannt("Diese Frage gibt es nicht.")
+    return eintrag
+
+
+def _felder(eingabe: FrageEingabe) -> dict[str, Any]:
+    return {
+        "text": eingabe.text,
+        "kategorie": eingabe.kategorie,
+        "punkte": eingabe.punkte,
+        "zeitlimit": eingabe.zeitlimit,
+        "daten": eingabe.daten.model_dump(mode="json"),
+    }
+
+
+async def frage_anlegen(
+    sitzung: AsyncSession, katalog_id: uuid.UUID, eingabe: FrageEingabe
+) -> Frage:
+    letzte = await sitzung.scalar(
+        select(func.max(Frage.position)).where(Frage.katalog_id == katalog_id)
+    )
+    eintrag = Frage(katalog_id=katalog_id, position=(letzte or 0) + 1, **_felder(eingabe))
+    sitzung.add(eintrag)
+    await sitzung.flush()
+    await sitzung.refresh(eintrag)
+    return eintrag
+
+
+async def frage_aendern(sitzung: AsyncSession, eintrag: Frage, eingabe: FrageEingabe) -> None:
+    for feld, wert in _felder(eingabe).items():
+        setattr(eintrag, feld, wert)
+    await sitzung.flush()
+    await sitzung.refresh(eintrag)
+
+
+async def frage_loeschen(sitzung: AsyncSession, eintrag: Frage) -> None:
+    await sitzung.delete(eintrag)
+    await sitzung.flush()
+
+
+async def reihenfolge_setzen(sitzung: AsyncSession, ids: Sequence[uuid.UUID]) -> None:
+    for position, frage_id in enumerate(ids, start=1):
+        await sitzung.execute(update(Frage).where(Frage.id == frage_id).values(position=position))
+    await sitzung.flush()
+
+
+async def bild(sitzung: AsyncSession, frage_id: uuid.UUID) -> Bild | None:
+    return await sitzung.get(Bild, frage_id)
+
+
+async def bild_setzen(sitzung: AsyncSession, frage_id: uuid.UUID, mime: str, inhalt: bytes) -> None:
+    await sitzung.execute(
+        insert(Bild)
+        .values(frage_id=frage_id, mime=mime, inhalt=inhalt)
+        .on_conflict_do_update(
+            index_elements=[Bild.frage_id], set_={"mime": mime, "inhalt": inhalt}
+        )
+    )
+
+
+async def bild_loeschen(sitzung: AsyncSession, frage_id: uuid.UUID) -> None:
+    await sitzung.execute(delete(Bild).where(Bild.frage_id == frage_id))
+
+
+# ------------------------------------------------------------- Runden
+
+
+async def runden(sitzung: AsyncSession) -> list[tuple[Runde, str, int]]:
+    anzahl = select(Spieler.runde_id, func.count().label("n")).group_by(Spieler.runde_id).subquery()
+    ergebnis = await sitzung.execute(
+        select(Runde, Katalog.titel, func.coalesce(anzahl.c.n, 0))
+        .join(Katalog, Katalog.id == Runde.katalog_id)
+        .outerjoin(anzahl, anzahl.c.runde_id == Runde.id)
+        .order_by(Runde.angelegt.desc())
+    )
+    return [(runde, titel, int(n)) for runde, titel, n in ergebnis.all()]
+
+
+async def runde_anlegen(sitzung: AsyncSession, katalog_id: uuid.UUID) -> Runde:
+    # Ein Zusammenstoss bei 31^6 Codes ist selten, aber nicht unmoeglich. Die
+    # Datenbank entscheidet ueber die Eindeutigkeit; hier wird nur neu
+    # gewuerfelt. Ein Savepoint, damit ein Fehlschlag nicht die ganze
+    # Anfrage mitreisst.
+    for _ in range(5):
+        eintrag = Runde(code=dienst.neuer_rundencode(), katalog_id=katalog_id, erledigt=[])
+        try:
+            async with sitzung.begin_nested():
+                sitzung.add(eintrag)
+                await sitzung.flush()
+        except IntegrityError:
+            continue
+        await sitzung.refresh(eintrag)
+        return eintrag
+    raise RuntimeError("Kein freier Rundencode gefunden")  # pragma: no cover
+
+
+async def runde(sitzung: AsyncSession, runde_id: uuid.UUID) -> Runde:
+    eintrag = await sitzung.get(Runde, runde_id)
+    if eintrag is None:
+        raise dienst.RundeUnbekannt("Diese Runde gibt es nicht.")
+    return eintrag
+
+
+async def runde_mit_code(sitzung: AsyncSession, code: str) -> Runde:
+    eintrag = await sitzung.scalar(select(Runde).where(Runde.code == code))
+    if eintrag is None:
+        raise dienst.RundeUnbekannt("Zu diesem Code gibt es keine Runde.")
+    return eintrag
+
+
+async def runde_loeschen(sitzung: AsyncSession, eintrag: Runde) -> None:
+    await sitzung.delete(eintrag)
+    await sitzung.flush()
+
+
+async def anzahl_laufend(sitzung: AsyncSession) -> int:
+    return int(
+        await sitzung.scalar(
+            select(func.count()).select_from(Runde).where(Runde.status == "laeuft")
+        )
+        or 0
+    )
+
+
+async def speichern(sitzung: AsyncSession, eintrag: object) -> None:
+    sitzung.add(eintrag)
+    await sitzung.flush()
+
+
+# ------------------------------------------------------------- Spieler
+
+
+async def spieler_der_runde(sitzung: AsyncSession, runde_id: uuid.UUID) -> list[Spieler]:
+    ergebnis = await sitzung.execute(
+        select(Spieler).where(Spieler.runde_id == runde_id).order_by(Spieler.beigetreten)
+    )
+    return list(ergebnis.scalars())
+
+
+async def anzahl_spieler(sitzung: AsyncSession, runde_id: uuid.UUID) -> int:
+    return int(
+        await sitzung.scalar(
+            select(func.count()).select_from(Spieler).where(Spieler.runde_id == runde_id)
+        )
+        or 0
+    )
+
+
+async def spieler_anlegen(
+    sitzung: AsyncSession, runde_id: uuid.UUID, name: str, schluessel: str, token_hash: str
+) -> Spieler:
+    eintrag = Spieler(runde_id=runde_id, name=name, schluessel=schluessel, token_hash=token_hash)
+    try:
+        async with sitzung.begin_nested():
+            sitzung.add(eintrag)
+            await sitzung.flush()
+    except IntegrityError as fehler:
+        # Die Datenbank ist die einzige Stelle, die das zuverlaessig weiss -
+        # eine Vorabpruefung waere ein Rennen zwischen zwei Beitritten.
+        raise dienst.NameVergeben(
+            f"„{name}“ spielt in dieser Runde schon mit. Wähle einen anderen Namen."
+        ) from fehler
+    await sitzung.refresh(eintrag)
+    return eintrag
+
+
+async def spieler_mit_token(
+    sitzung: AsyncSession, runde_id: uuid.UUID, token_hash: str
+) -> Spieler | None:
+    return await sitzung.scalar(
+        select(Spieler).where(Spieler.runde_id == runde_id, Spieler.token_hash == token_hash)
+    )
+
+
+async def spieler_mit_name(
+    sitzung: AsyncSession, runde_id: uuid.UUID, schluessel: str
+) -> Spieler | None:
+    return await sitzung.scalar(
+        select(Spieler).where(Spieler.runde_id == runde_id, Spieler.schluessel == schluessel)
+    )
+
+
+async def spieler(sitzung: AsyncSession, runde_id: uuid.UUID, spieler_id: uuid.UUID) -> Spieler:
+    eintrag = await sitzung.get(Spieler, spieler_id)
+    if eintrag is None or eintrag.runde_id != runde_id:
+        raise dienst.SpielerUnbekannt("Diesen Spieler gibt es in der Runde nicht.")
+    return eintrag
+
+
+async def spieler_loeschen(sitzung: AsyncSession, eintrag: Spieler) -> None:
+    await sitzung.delete(eintrag)
+    await sitzung.flush()
+
+
+# ------------------------------------------------------------- Antworten
+
+
+async def antworten(
+    sitzung: AsyncSession, runde_id: uuid.UUID, frage_id: uuid.UUID
+) -> list[Antwort]:
+    ergebnis = await sitzung.execute(
+        select(Antwort).where(Antwort.runde_id == runde_id, Antwort.frage_id == frage_id)
+    )
+    return list(ergebnis.scalars())
+
+
+async def antwort_von(
+    sitzung: AsyncSession, spieler_id: uuid.UUID, frage_id: uuid.UUID
+) -> Antwort | None:
+    return await sitzung.scalar(
+        select(Antwort).where(Antwort.spieler_id == spieler_id, Antwort.frage_id == frage_id)
+    )
+
+
+async def antwort_speichern(
+    sitzung: AsyncSession,
+    runde_id: uuid.UUID,
+    frage_id: uuid.UUID,
+    spieler_id: uuid.UUID,
+    wert: dict[str, object],
+    eingeloggt: bool,
+) -> None:
+    await sitzung.execute(
+        insert(Antwort)
+        .values(
+            id=uuid.uuid4(),
+            runde_id=runde_id,
+            frage_id=frage_id,
+            spieler_id=spieler_id,
+            wert=wert,
+            eingeloggt=eingeloggt,
+        )
+        .on_conflict_do_update(
+            constraint="uq_quiz_antwort", set_={"wert": wert, "eingeloggt": eingeloggt}
+        )
+    )
+
+
+async def antwort(sitzung: AsyncSession, runde_id: uuid.UUID, antwort_id: uuid.UUID) -> Antwort:
+    eintrag = await sitzung.get(Antwort, antwort_id)
+    if eintrag is None or eintrag.runde_id != runde_id:
+        raise dienst.AntwortUnbekannt("Diese Antwort gibt es in der Runde nicht.")
+    return eintrag
+
+
+async def anzahl_antworten(sitzung: AsyncSession, runde_id: uuid.UUID, frage_id: uuid.UUID) -> int:
+    return int(
+        await sitzung.scalar(
+            select(func.count())
+            .select_from(Antwort)
+            .where(Antwort.runde_id == runde_id, Antwort.frage_id == frage_id)
+        )
+        or 0
+    )
+
+
+# ------------------------------------------------------------- Buzzer
+
+
+async def druecke(sitzung: AsyncSession, runde_id: uuid.UUID, frage_id: uuid.UUID) -> list[Buzzer]:
+    ergebnis = await sitzung.execute(
+        select(Buzzer)
+        .where(Buzzer.runde_id == runde_id, Buzzer.frage_id == frage_id)
+        .order_by(Buzzer.reihe)
+    )
+    return list(ergebnis.scalars())
+
+
+async def druecken(
+    sitzung: AsyncSession, runde_id: uuid.UUID, frage_id: uuid.UUID, spieler_id: uuid.UUID
+) -> None:
+    try:
+        async with sitzung.begin_nested():
+            sitzung.add(Buzzer(runde_id=runde_id, frage_id=frage_id, spieler_id=spieler_id))
+            await sitzung.flush()
+    except IntegrityError as fehler:
+        raise dienst.AntwortNichtMoeglich("Du hast schon gebuzzert.") from fehler
+
+
+async def buzzer_loeschen(sitzung: AsyncSession, runde_id: uuid.UUID, frage_id: uuid.UUID) -> None:
+    await sitzung.execute(
+        delete(Buzzer).where(Buzzer.runde_id == runde_id, Buzzer.frage_id == frage_id)
+    )
+
+
+# ------------------------------------------------------------- Punkte
+
+
+async def punktestaende(sitzung: AsyncSession, runde_id: uuid.UUID) -> dict[uuid.UUID, int]:
+    """Summe aus bewerteten Antworten, Buzzer-Urteilen und Korrekturen."""
+    staende: dict[uuid.UUID, int] = {}
+    for tabelle in (Antwort, Buzzer, Korrektur):
+        ergebnis = await sitzung.execute(
+            select(tabelle.spieler_id, func.coalesce(func.sum(tabelle.punkte), 0))
+            .where(tabelle.runde_id == runde_id)
+            .group_by(tabelle.spieler_id)
+        )
+        for spieler_id, summe in ergebnis.all():
+            staende[spieler_id] = staende.get(spieler_id, 0) + int(summe or 0)
+    return staende
+
+
+async def korrektur_anlegen(
+    sitzung: AsyncSession, runde_id: uuid.UUID, spieler_id: uuid.UUID, punkte: int, grund: str
+) -> None:
+    sitzung.add(Korrektur(runde_id=runde_id, spieler_id=spieler_id, punkte=punkte, grund=grund))
+    await sitzung.flush()

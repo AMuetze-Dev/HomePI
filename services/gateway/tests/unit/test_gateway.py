@@ -25,16 +25,17 @@ async def test_kein_modul_ist_defekt(angemeldet: AsyncClient) -> None:
 async def test_ohne_anmeldung_ist_nur_das_oeffentliche_zu_sehen(client: AsyncClient) -> None:
     """Ein Besucher ohne Konto soll nicht erfahren, was hier sonst laeuft.
 
-    Genau ein Artefakt ist oeffentlich: das Tischtennisturnier, dessen
+    Zwei Artefakte sind oeffentlich: das Tischtennisturnier, dessen
     Dashboard-Ansicht ohne Anmeldung erreichbar sein soll
-    (modules/tischtennis). Deshalb steht die Liste hier namentlich und nicht
-    als "alles, was sich oeffentlich nennt" - ein zweites oeffentliches
-    Artefakt soll eine Entscheidung sein, die jemand hier bestaetigt, und
-    kein Nebeneffekt.
+    (modules/tischtennis), und das Quiz, bei dem Mitspieler ohne Konto
+    beitreten (modules/quiz, bestaetigt am 2026-11-28). Deshalb steht die
+    Liste hier namentlich und nicht als "alles, was sich oeffentlich nennt" -
+    ein weiteres oeffentliches Artefakt soll eine Entscheidung sein, die
+    jemand hier bestaetigt, und kein Nebeneffekt.
     """
     sichtbar = {eintrag["id"] for eintrag in (await client.get("/module")).json()}
 
-    assert sichtbar == {"tischtennis"}
+    assert sichtbar == {"tischtennis", "quiz"}
 
 
 async def test_info_nennt_nur_die_anzahl(client: AsyncClient) -> None:
