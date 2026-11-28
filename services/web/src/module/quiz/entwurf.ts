@@ -14,6 +14,8 @@ export interface Entwurf {
   x: number | null;
   y: number | null;
   reihenfolge: string[];
+  /** Zuordnen: Zeile links (als Text) -> Kennung rechts. */
+  zuordnung: Record<string, string>;
 }
 
 export function leererEntwurf(frage: OeffentlicheFrage): Entwurf {
@@ -28,6 +30,7 @@ export function leererEntwurf(frage: OeffentlicheFrage): Entwurf {
     x: null,
     y: null,
     reihenfolge: frage.elemente.map((e) => e.kennung),
+    zuordnung: {},
   };
 }
 
@@ -46,6 +49,10 @@ export function entwurfAus(
     reihenfolge: Array.isArray(wert.reihenfolge)
       ? (wert.reihenfolge as string[])
       : leer.reihenfolge,
+    zuordnung:
+      typeof wert.zuordnung === "object" && wert.zuordnung !== null
+        ? (wert.zuordnung as Record<string, string>)
+        : leer.zuordnung,
   };
 }
 
@@ -56,7 +63,10 @@ export function alsEingabe(frage: OeffentlicheFrage, entwurf: Entwurf): AntwortE
     case "schaetzung":
       return { zahl: Number(entwurf.zahl.replace(",", ".")), eingeloggt: true };
     case "auswahl":
+    case "bildauswahl":
       return { auswahl: entwurf.auswahl, eingeloggt: true };
+    case "zuordnen":
+      return { zuordnung: entwurf.zuordnung, eingeloggt: true };
     case "hotspot":
       return entwurf.x === null || entwurf.y === null
         ? { eingeloggt: true }
@@ -78,7 +88,10 @@ export function vollstaendig(frage: OeffentlicheFrage, entwurf: Entwurf): boolea
         Number.isFinite(Number(entwurf.zahl.replace(",", ".")))
       );
     case "auswahl":
+    case "bildauswahl":
       return entwurf.auswahl.length > 0;
+    case "zuordnen":
+      return frage.links.every((_, i) => Boolean(entwurf.zuordnung[String(i)]));
     case "hotspot":
       return entwurf.x !== null && entwurf.y !== null;
     case "sortieren":

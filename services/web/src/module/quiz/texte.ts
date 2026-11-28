@@ -10,6 +10,8 @@ export const TYPWORT: Record<Fragetyp, string> = {
   bild: "Bildfrage",
   hotspot: "Bild antippen",
   sortieren: "Sortieren",
+  zuordnen: "Zuordnen",
+  bildauswahl: "Bildauswahl",
 };
 
 function zahl(wert: number, einheit = ""): string {
@@ -21,7 +23,7 @@ export function loesungstext(frage: Frage): string {
   const d = frage.daten;
   switch (d.typ) {
     case "freitext":
-      return d.loesungen.join(" / ");
+      return d.loesungen.length ? d.loesungen.join(" / ") : "bewertest du von Hand";
     case "bild":
       return d.loesungen.length ? d.loesungen.join(" / ") : "bewertest du von Hand";
     case "zahl":
@@ -41,5 +43,12 @@ export function loesungstext(frage: Frage): string {
       return `${d.ziele.length} ${d.ziele.length === 1 ? "Stelle" : "Stellen"} im Bild`;
     case "sortieren":
       return d.elemente.join(" → ");
+    case "zuordnen":
+      return d.paare.map((p) => `${p.links} → ${p.rechts}`).join(", ");
+    case "bildauswahl":
+      return d.optionen
+        .map((o, i) => (o.richtig ? o.text || `Bild ${i + 1}` : null))
+        .filter(Boolean)
+        .join(", ");
   }
 }

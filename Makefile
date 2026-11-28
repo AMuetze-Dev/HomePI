@@ -259,7 +259,7 @@ E2E := DEV_PROJEKT=homepi-e2e DEV_API_PORT=$(E2E_API_PORT) DEV_DB_PORT=$(E2E_DB_
 #: damit die CI sie auf getrennte Laeufe verteilen kann: ein roter Weg eines
 #: Artefakts soll dort als dieses Artefakt erscheinen und nicht als
 #: "Oberflaechentests kaputt" -- und er soll die anderen nicht mitnehmen.
-E2E_SPECS ?= weg einrichtung staffelpilot
+E2E_SPECS ?= weg einrichtung staffelpilot quiz
 
 # Jede Reise braucht eine **frische** Installation: die eine richtet die
 # Anlage ein, die zweite geht den Weg durch die Einrichtung des Artefakts,

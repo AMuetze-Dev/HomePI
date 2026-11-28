@@ -31,7 +31,16 @@ def _trimmen(wert: object) -> object:
 Kurztext = Annotated[str, Field(min_length=1, max_length=200)]
 
 Fragetyp = Literal[
-    "freitext", "zahl", "schaetzung", "auswahl", "buzzer", "bild", "hotspot", "sortieren"
+    "freitext",
+    "zahl",
+    "schaetzung",
+    "auswahl",
+    "buzzer",
+    "bild",
+    "hotspot",
+    "sortieren",
+    "zuordnen",
+    "bildauswahl",
 ]
 Rundenstatus = Literal["lobby", "laeuft", "beendet"]
 Phase = Literal["keine", "bereit", "offen", "gesperrt", "aufgeloest"]
@@ -70,7 +79,9 @@ class FreitextDaten(_Getrimmt):
     Ruecksicht auf Gross- und Kleinschreibung und Leerzeichen."""
 
     typ: Literal["freitext"] = "freitext"
-    loesungen: list[Kurztext] = Field(min_length=1, max_length=20)
+    #: Leer: die Leitung bewertet von Hand - so kommen Battle.Net-Fragen
+    #: ohne hinterlegte Loesung herein.
+    loesungen: list[Kurztext] = Field(default_factory=list, max_length=20)
 
 
 class ZahlDaten(_Getrimmt):
@@ -155,6 +166,48 @@ class SortierDaten(_Getrimmt):
     elemente: list[Kurztext] = Field(min_length=2, max_length=8)
 
 
+class Paar(_Getrimmt):
+    links: Kurztext
+    rechts: Kurztext
+
+
+class ZuordnenDaten(_Getrimmt):
+    """Jedem Begriff links das passende Gegenstueck rechts zuordnen. Die
+    rechte Seite bekommen die Spieler gemischt."""
+
+    typ: Literal["zuordnen"] = "zuordnen"
+    paare: list[Paar] = Field(min_length=2, max_length=8)
+
+    @model_validator(mode="after")
+    def _eindeutig(self) -> ZuordnenDaten:
+        for seite in ("links", "rechts"):
+            werte = [getattr(paar, seite).casefold() for paar in self.paare]
+            if len(set(werte)) != len(werte):
+                raise ValueError(f"Jeder Eintrag {seite} darf nur einmal vorkommen")
+        return self
+
+
+class BildOption(_Getrimmt):
+    """Eine Antwort als Bild. Das Bild selbst liegt als Medium ``option-<n>``
+    an der Frage; hier steht nur, ob sie richtig ist, und ein Alternativtext."""
+
+    text: str = Field(default="", max_length=80)
+    richtig: bool = False
+
+
+class BildauswahlDaten(_Getrimmt):
+    """Wie die Auswahl, nur dass die Antworten Bilder sind."""
+
+    typ: Literal["bildauswahl"] = "bildauswahl"
+    optionen: list[BildOption] = Field(min_length=2, max_length=6)
+
+    @model_validator(mode="after")
+    def _eine_richtig(self) -> BildauswahlDaten:
+        if not any(option.richtig for option in self.optionen):
+            raise ValueError("Mindestens ein Bild muss richtig sein")
+        return self
+
+
 FrageDaten = Annotated[
     FreitextDaten
     | ZahlDaten
@@ -163,7 +216,9 @@ FrageDaten = Annotated[
     | BuzzerDaten
     | BildDaten
     | HotspotDaten
-    | SortierDaten,
+    | SortierDaten
+    | ZuordnenDaten
+    | BildauswahlDaten,
     Field(discriminator="typ"),
 ]
 
@@ -205,6 +260,8 @@ class FrageAusgabe(BaseModel):
     punkte: int
     zeitlimit: int | None
     hat_bild: bool
+    #: Weitere Medien an der Frage: ``ton`` und ``option-<n>`` (Bildauswahl).
+    medien: list[str] = Field(default_factory=list)
     daten: FrageDaten
 
 
@@ -214,6 +271,13 @@ class KatalogDetail(KatalogAusgabe):
 
 class Reihenfolge(BaseModel):
     fragen: list[uuid.UUID] = Field(min_length=1)
+
+
+class ImportErgebnis(BaseModel):
+    """Was beim Uebernehmen passiert ist - auch, was nicht ging."""
+
+    katalog: KatalogDetail
+    hinweise: list[str]
 
 
 # ---------------------------------------------------------- Runden (Leitung)
@@ -231,6 +295,7 @@ class RundeAusgabe(BaseModel):
     status: Rundenstatus
     anzahl_spieler: int
     angelegt: dt.datetime
+    beitritt_offen: bool = True
 
 
 class FrageWaehlen(BaseModel):
@@ -244,6 +309,18 @@ class Zeigen(BaseModel):
 
 class BildSichtbar(BaseModel):
     sichtbar: bool
+
+
+class BeitrittOffen(BaseModel):
+    offen: bool
+
+
+class TeamAnlegen(_Getrimmt):
+    name: Annotated[str, Field(min_length=1, max_length=30)]
+
+
+class TeamZuweisen(BaseModel):
+    team_id: uuid.UUID | None
 
 
 class BuzzerUrteil(BaseModel):
@@ -295,6 +372,17 @@ class SpielerSicht(BaseModel):
     zuletzt_gesehen: dt.datetime
     #: In der letzten Dreiviertelminute gesehen - das Handy ist noch dabei.
     verbunden: bool
+    team_id: uuid.UUID | None = None
+
+
+class TeamPlatz(BaseModel):
+    """Ein Team in der Rangliste: die Summe seiner Mitglieder."""
+
+    id: uuid.UUID
+    name: str
+    punkte: int
+    rang: int
+    mitglieder: int
 
 
 class Steuerung(BaseModel):
@@ -311,6 +399,27 @@ class Steuerung(BaseModel):
     spieler: list[SpielerSicht]
     antworten: list[AntwortSicht]
     buzzer: list[BuzzerSicht]
+    teams: list[TeamPlatz] = Field(default_factory=list)
+
+
+class AuswertungAntwort(BaseModel):
+    spieler: str
+    anzeige: str
+    punkte: int | None
+    richtig: bool | None
+
+
+class FrageAuswertung(BaseModel):
+    """Eine gespielte Frage im Rueckblick."""
+
+    frage_id: uuid.UUID
+    nummer: int
+    text: str
+    typ: Fragetyp
+    loesung: str
+    antworten: list[AuswertungAntwort]
+    richtig: int
+    gesamt: int
 
 
 class Wiederkehrcode(BaseModel):
@@ -328,6 +437,8 @@ class Beitritt(_Getrimmt):
     #: Nur wer von der Leitung einen Wiederkehrcode bekommen hat - nach einem
     #: verlorenen Geraet. Ohne Code ist ein vergebener Name vergeben.
     wiederkehrcode: str | None = Field(default=None, max_length=20)
+    #: Pflicht, sobald die Leitung Teams angelegt hat.
+    team_id: uuid.UUID | None = None
 
 
 class AntwortEingabe(BaseModel):
@@ -339,6 +450,8 @@ class AntwortEingabe(BaseModel):
     x: float | None = Field(default=None, ge=0, le=100)
     y: float | None = Field(default=None, ge=0, le=100)
     reihenfolge: list[str] | None = Field(default=None, max_length=8)
+    #: Zuordnen: Index links (als Text) -> Kennung rechts.
+    zuordnung: dict[str, str] | None = Field(default=None, max_length=8)
     #: Eingeloggt heisst: fertig. Die Leitung sieht, wer noch tippt.
     eingeloggt: bool = False
 
@@ -358,6 +471,7 @@ class Loesung(BaseModel):
     optionen: list[int] = Field(default_factory=list)
     ziele: list[Ziel] = Field(default_factory=list)
     reihenfolge: list[str] = Field(default_factory=list)
+    zuordnung: dict[str, str] = Field(default_factory=dict)
 
 
 class OeffentlicheFrage(BaseModel):
@@ -378,6 +492,12 @@ class OeffentlicheFrage(BaseModel):
     maximum: float | None = None
     schritt: float | None = None
     einheit: str = ""
+    #: Zuordnen: die linke Seite in Reihenfolge, die rechte gemischt.
+    links: list[str] = Field(default_factory=list)
+    rechts: list[Element] = Field(default_factory=list)
+    #: Bildauswahl: so viele Bilder, abrufbar als Medium ``option-<n>``.
+    bildoptionen: list[str] = Field(default_factory=list)
+    hat_ton: bool = False
     loesung: Loesung | None = None
 
 
@@ -387,6 +507,7 @@ class Platz(BaseModel):
     name: str
     punkte: int
     rang: int
+    team: str | None = None
 
 
 class EigeneAntwort(BaseModel):
@@ -406,6 +527,7 @@ class Ich(BaseModel):
     #: Platz in der Buzzer-Reihenfolge, 1 ist dran. None: nicht gedrueckt.
     buzzer_position: int | None
     buzzer_urteil: Literal["wartet", "richtig", "falsch"] | None
+    team: str | None = None
 
 
 class Rundenstand(BaseModel):
@@ -424,6 +546,9 @@ class Rundenstand(BaseModel):
     #: Wer gerade dran ist, ein Name.
     buzzer: str | None
     ich: Ich | None
+    #: Zur Wahl beim Beitritt und als Team-Rangliste. Leer: jeder fuer sich.
+    teams: list[TeamPlatz] = Field(default_factory=list)
+    beitritt_offen: bool = True
 
 
 class Uebersicht(BaseModel):

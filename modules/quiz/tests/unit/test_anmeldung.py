@@ -21,12 +21,18 @@ OHNE_KONTO = {
     "GET /": "Kachel und Rauchtest - nur die Zahl laufender Runden",
     "GET /runden/{code}": "Stand fuer Spieler und Anzeigetafel, ohne Loesung bis zum Aufloesen",
     "GET /runden/{code}/bild": "Bild der gezeigten Frage, erst wenn die Leitung es freigibt",
+    "GET /runden/{code}/medien/{schluessel}": "Ton und Antwortbilder, erst mit der Frage",
+    "PUT /runden/{code}/team": "nur mit Spielertoken, nur vor dem Start",
     "POST /runden/{code}/beitreten": "Name waehlen - das Einzige, was ohne Token gehen muss",
     "PUT /runden/{code}/antwort": "nur mit Spielertoken",
     "POST /runden/{code}/buzzer": "nur mit Spielertoken",
 }
 #: Diese verlangen das Token im Cookie, ohne geht nichts.
-MIT_SPIELERTOKEN = {"PUT /runden/{code}/antwort", "POST /runden/{code}/buzzer"}
+MIT_SPIELERTOKEN = {
+    "PUT /runden/{code}/antwort",
+    "POST /runden/{code}/buzzer",
+    "PUT /runden/{code}/team",
+}
 
 
 def _routen(modul: Modul) -> list[tuple[str, APIRoute]]:

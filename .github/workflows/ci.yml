@@ -300,7 +300,7 @@ jobs:
       matrix:
         # "weg" ist die Huelle: Anmeldung, Konten, Passwortwechsel.
         # Die beiden anderen gehoeren dem Artefakt staffelpilot.
-        spec: [weg, einrichtung, staffelpilot]
+        spec: [weg, einrichtung, staffelpilot, quiz]
     steps:
       - uses: actions/checkout@v4
 

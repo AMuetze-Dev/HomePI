@@ -420,7 +420,7 @@ async def test_freitext_runde_von_anfang_bis_ende(
             ("Anna", 2, 1),
             ("Ben", 0, 2),
         ]
-        assert set(ende["rangliste"][0]) == {"name", "punkte", "rang"}, (
+        assert set(ende["rangliste"][0]) == {"name", "punkte", "rang", "team"}, (
             "Oeffentlich nur Name und Punkte"
         )
 

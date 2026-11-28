@@ -44,6 +44,16 @@ Es ist **öffentlich**. Drei Regeln, die daraus folgen:
    Code. Lösungen nur über `dienst.oeffentliche_frage` und erst bei
    `aufgeloest`; von Mitspielern nur Name und Punkte.
 
+Dazu zwei Regeln aus dem Ausbau:
+
+4. **Eine neue Spalte an einer bestehenden `quiz_*`-Tabelle braucht eine Datei
+   in `scripts/migrationen/`** - die Tabellen laufen auf dem Pi. Neue Tabellen
+   legt `homepi schema anlegen` selbst an; deshalb stehen Teams und Medien in
+   eigenen Tabellen und nicht als Spalten.
+5. **`austausch.py` holt nichts aus dem Netz.** Ein importiertes Quiz kann
+   beliebige Adressen enthalten; ein Abruf daraus waere ein Zugriff des Pi auf
+   Zuruf einer hochgeladenen Datei.
+
 Was das Artefakt kann und warum, steht in [README.md](README.md).
 
 ---
@@ -57,6 +67,7 @@ modules/quiz/
     schemas.py     Pydantic: was rein- und rausgeht
     modelle.py     SQLAlchemy: Tabellen (löschen, wenn kein DB-Bedarf)
     dienst.py      REINE Fachlogik - keine DB, kein await, keine Fixtures
+    austausch.py   REIN: Battle.Net- und eigene ZIPs lesen und schreiben
     speicher.py    DB-Zugriff - kein einziges if
     router.py      HTTP: übersetzt Anfrage ↔ Fachlichkeit, sonst nichts
   tests/

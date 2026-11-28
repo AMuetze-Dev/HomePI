@@ -116,7 +116,7 @@ describe("Mitspielen ohne Konto", () => {
     await userEvent.type(screen.getByLabelText(/Wiederkehrcode/), "ABCD-EFGH");
     await userEvent.click(screen.getByRole("button", { name: "Zurück ins Spiel" }));
 
-    expect(beitritt).toHaveBeenCalledWith("ABC234", "Anna", "ABCD-EFGH");
+    expect(beitritt).toHaveBeenCalledWith("ABC234", "Anna", "ABCD-EFGH", undefined);
     expect(await screen.findByLabelText("Deine Antwort")).toBeInTheDocument();
   });
 
@@ -219,6 +219,7 @@ describe("Mitspielen ohne Konto", () => {
             optionen: [],
             ziele: [],
             reihenfolge: [],
+            zuordnung: {},
           },
         }),
         ich: {
@@ -312,9 +313,9 @@ describe("Anzeigetafel", () => {
 
     abruf.mockResolvedValue(rundenstand({ status: "beendet" }));
     zeige(<QuizSeite unterseite="tafel" />, "/modul/quiz/tafel?code=ABC234");
-    expect(
-      await screen.findByText(/Gewonnen hat Anna mit 4 Punkten/),
-    ).toBeInTheDocument();
+    const podest = await screen.findByRole("list", { name: "Siegerpodest" });
+    expect(podest).toHaveTextContent("Anna");
+    expect(podest).toHaveTextContent("4 Punkte");
   });
 
   it("meldet einen Fehler wörtlich", async () => {

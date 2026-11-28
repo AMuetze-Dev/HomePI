@@ -13,7 +13,16 @@ import {
   Tafel,
 } from "../../ui";
 import { codeAusEingabe, useRundenstand } from "./abruf";
-import { antworte, buzzere, rundenbildAdresse, trittBei, type Rundenstand } from "./api";
+import {
+  antworte,
+  buzzere,
+  rundenbildAdresse,
+  trittBei,
+  type Rundenstand,
+  rundenmediumAdresse,
+  wechsleTeam,
+  type TeamPlatz,
+} from "./api";
 import { Countdown } from "./Countdown";
 import { Eingabe } from "./Eingabe";
 import {
@@ -121,7 +130,12 @@ function Runde({ code, zurueck }: { code: string; zurueck: () => void }) {
             <Rangliste plaetze={stand.rangliste} />
           </>
         ) : (
-          <NamensFormular code={code} uebernehmen={uebernehmen} />
+          <NamensFormular
+            code={code}
+            teams={stand.teams}
+            offen={stand.beitritt_offen}
+            uebernehmen={uebernehmen}
+          />
         )}
       </Tafel>
     );
@@ -132,7 +146,8 @@ function Runde({ code, zurueck }: { code: string; zurueck: () => void }) {
       titel={stand.titel}
       beiwort={
         <>
-          {stand.ich.name} · {stand.ich.punkte}{" "}
+          {stand.ich.name}
+          {stand.ich.team ? ` (${stand.ich.team})` : ""} · {stand.ich.punkte}{" "}
           {stand.ich.punkte === 1 ? "Punkt" : "Punkte"} · Platz {stand.ich.rang}
         </>
       }
@@ -144,13 +159,19 @@ function Runde({ code, zurueck }: { code: string; zurueck: () => void }) {
 
 function NamensFormular({
   code,
+  teams,
+  offen,
   uebernehmen,
 }: {
   code: string;
+  teams: TeamPlatz[];
+  offen: boolean;
   uebernehmen: (stand: Rundenstand) => void;
 }) {
   const [name, setName] = useState("");
-  const [wiederkehr, setWiederkehr] = useState(false);
+  const [team, setTeam] = useState("");
+  // Ist der Beitritt zu, bleibt nur der Weg zurueck - also gleich dorthin.
+  const [wiederkehr, setWiederkehr] = useState(!offen);
   const [wiederkehrcode, setWiederkehrcode] = useState("");
   const [fehler, setFehler] = useState("");
   const [sendet, setSendet] = useState(false);
@@ -160,7 +181,14 @@ function NamensFormular({
     setFehler("");
     setSendet(true);
     try {
-      uebernehmen(await trittBei(code, name, wiederkehr ? wiederkehrcode : undefined));
+      uebernehmen(
+        await trittBei(
+          code,
+          name,
+          wiederkehr ? wiederkehrcode : undefined,
+          wiederkehr ? undefined : team || undefined,
+        ),
+      );
     } catch (grund) {
       // Die Eingabe bleibt stehen - wer "Anna" tippt und hört, dass es Anna
       // schon gibt, ändert einen Buchstaben und tippt nicht alles neu.
@@ -173,10 +201,17 @@ function NamensFormular({
   return (
     <Karte>
       <form className={stil.formular} onSubmit={(e) => void absenden(e)}>
-        <p>
-          Wähle deinen Namen für diese Runde. Er gehört dann dir: Nur dieses Gerät kann
-          unter ihm antworten.
-        </p>
+        {offen ? (
+          <p>
+            Wähle deinen Namen für diese Runde. Er gehört dann dir: Nur dieses Gerät kann
+            unter ihm antworten.
+          </p>
+        ) : (
+          <Hinweis>
+            Die Spielleitung hat den Beitritt geschlossen. Wer schon dabei war, kommt mit
+            seinem Wiederkehrcode zurück.
+          </Hinweis>
+        )}
         <Feld
           beschriftung="Dein Name"
           value={name}
@@ -185,6 +220,9 @@ function NamensFormular({
           autoComplete="nickname"
           required
         />
+        {!wiederkehr && teams.length > 0 && (
+          <Teamwahl teams={teams} gewaehlt={team} waehlen={setTeam} />
+        )}
         {wiederkehr && (
           <Feld
             beschriftung="Wiederkehrcode"
@@ -202,19 +240,63 @@ function NamensFormular({
           </Hinweis>
         )}
         <div className={stil.knopfzeile}>
-          <Knopf type="submit" disabled={sendet || name.trim() === ""}>
+          <Knopf
+            type="submit"
+            disabled={
+              sendet ||
+              name.trim() === "" ||
+              (!wiederkehr && teams.length > 0 && team === "")
+            }
+          >
             {wiederkehr ? "Zurück ins Spiel" : "Mitspielen"}
           </Knopf>
-          <Knopf
-            auspraegung="leise"
-            type="button"
-            onClick={() => setWiederkehr(!wiederkehr)}
-          >
-            {wiederkehr ? "Neu beitreten" : "Ich war schon dabei"}
-          </Knopf>
+          {offen && (
+            <Knopf
+              auspraegung="leise"
+              type="button"
+              onClick={() => setWiederkehr(!wiederkehr)}
+            >
+              {wiederkehr ? "Neu beitreten" : "Ich war schon dabei"}
+            </Knopf>
+          )}
         </div>
       </form>
     </Karte>
+  );
+}
+
+function Teamwahl({
+  teams,
+  gewaehlt,
+  waehlen,
+  gesperrt = false,
+}: {
+  teams: TeamPlatz[];
+  gewaehlt: string;
+  waehlen: (team: string) => void;
+  gesperrt?: boolean;
+}) {
+  return (
+    <fieldset className={stil.optionen} disabled={gesperrt}>
+      <legend className={stil.nebensache}>Dein Team</legend>
+      {teams.map((t) => (
+        <label key={t.id} className={stil.option} data-gewaehlt={gewaehlt === t.id}>
+          <input
+            type="radio"
+            name="team"
+            checked={gewaehlt === t.id}
+            onChange={() => waehlen(t.id)}
+          />
+          <span>
+            {t.name}
+            <span className={stil.nebensache}>
+              {" "}
+              · {t.mitglieder} {t.mitglieder === 1 ? "Person" : "Personen"}
+            </span>
+          </span>
+        </label>
+      ))}
+    </fieldset>
   );
 }
 
@@ -268,8 +350,22 @@ function Spiel({
   }
 
   if (!frage || frage.text === null) {
+    const meinTeam = stand.teams.find((t) => t.name === ich?.team)?.id ?? "";
     return (
       <>
+        {stand.status === "lobby" && stand.teams.length > 0 && (
+          <Teamwahl
+            teams={stand.teams}
+            gewaehlt={meinTeam}
+            gesperrt={sendet}
+            waehlen={(team) => void handeln(() => wechsleTeam(stand.code, team))}
+          />
+        )}
+        {fehler && (
+          <Hinweis ton="fehler" dringend>
+            {fehler}
+          </Hinweis>
+        )}
         <Leerzustand
           titel={frage ? `Frage ${frage.nummer} kommt gleich` : "Gleich geht es los"}
         >
@@ -319,6 +415,9 @@ function Spiel({
               aendern={setEntwurf}
               bildAdresse={bild}
               gesperrt={!offen}
+              medienAdresse={(schluessel) =>
+                rundenmediumAdresse(stand.code, schluessel, frage.nummer)
+              }
             />
             <div className={stil.knopfzeile}>
               <Knopf

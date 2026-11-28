@@ -21,9 +21,21 @@ export type Fragetyp =
   | "buzzer"
   | "bild"
   | "hotspot"
-  | "sortieren";
+  | "sortieren"
+  | "zuordnen"
+  | "bildauswahl";
 
 export interface Option {
+  text: string;
+  richtig: boolean;
+}
+
+export interface Paar {
+  links: string;
+  rechts: string;
+}
+
+export interface BildOption {
   text: string;
   richtig: boolean;
 }
@@ -49,7 +61,9 @@ export type FrageDaten =
   | { typ: "buzzer"; loesung: string }
   | { typ: "bild"; loesungen: string[] }
   | { typ: "hotspot"; ziele: Ziel[] }
-  | { typ: "sortieren"; elemente: string[] };
+  | { typ: "sortieren"; elemente: string[] }
+  | { typ: "zuordnen"; paare: Paar[] }
+  | { typ: "bildauswahl"; optionen: BildOption[] };
 
 export interface FrageEingabe {
   text: string;
@@ -63,6 +77,8 @@ export interface Frage extends FrageEingabe {
   id: string;
   position: number;
   hat_bild: boolean;
+  /** Weitere Medien: "ton" und "option-<n>" (Bildauswahl). */
+  medien: string[];
 }
 
 export interface Katalog {
@@ -91,6 +107,15 @@ export interface Runde {
   status: Rundenstatus;
   anzahl_spieler: number;
   angelegt: string;
+  beitritt_offen: boolean;
+}
+
+export interface TeamPlatz {
+  id: string;
+  name: string;
+  punkte: number;
+  rang: number;
+  mitglieder: number;
 }
 
 export interface AntwortSicht {
@@ -111,6 +136,7 @@ export interface SpielerSicht {
   rang: number;
   zuletzt_gesehen: string;
   verbunden: boolean;
+  team_id: string | null;
 }
 
 export interface BuzzerSicht {
@@ -132,6 +158,30 @@ export interface Steuerung {
   spieler: SpielerSicht[];
   antworten: AntwortSicht[];
   buzzer: BuzzerSicht[];
+  teams: TeamPlatz[];
+}
+
+export interface AuswertungAntwort {
+  spieler: string;
+  anzeige: string;
+  punkte: number | null;
+  richtig: boolean | null;
+}
+
+export interface FrageAuswertung {
+  frage_id: string;
+  nummer: number;
+  text: string;
+  typ: Fragetyp;
+  loesung: string;
+  antworten: AuswertungAntwort[];
+  richtig: number;
+  gesamt: number;
+}
+
+export interface ImportErgebnis {
+  katalog: KatalogDetail;
+  hinweise: string[];
 }
 
 export interface Wiederkehrcode {
@@ -154,6 +204,7 @@ export interface Loesung {
   optionen: number[];
   ziele: Ziel[];
   reihenfolge: string[];
+  zuordnung: Record<string, string>;
 }
 
 export interface OeffentlicheFrage {
@@ -171,6 +222,10 @@ export interface OeffentlicheFrage {
   maximum: number | null;
   schritt: number | null;
   einheit: string;
+  links: string[];
+  rechts: Element[];
+  bildoptionen: string[];
+  hat_ton: boolean;
   loesung: Loesung | null;
 }
 
@@ -178,6 +233,7 @@ export interface Platz {
   name: string;
   punkte: number;
   rang: number;
+  team: string | null;
 }
 
 export interface EigeneAntwort {
@@ -194,6 +250,7 @@ export interface Ich {
   antwort: EigeneAntwort | null;
   buzzer_position: number | null;
   buzzer_urteil: Urteil | null;
+  team: string | null;
 }
 
 export interface Rundenstand {
@@ -209,6 +266,8 @@ export interface Rundenstand {
   anzahl_antworten: number;
   buzzer: string | null;
   ich: Ich | null;
+  teams: TeamPlatz[];
+  beitritt_offen: boolean;
 }
 
 export interface AntwortEingabe {
@@ -218,6 +277,7 @@ export interface AntwortEingabe {
   x?: number;
   y?: number;
   reihenfolge?: string[];
+  zuordnung?: Record<string, string>;
   eingeloggt?: boolean;
 }
 
@@ -236,11 +296,26 @@ export function trittBei(
   rundencode: string,
   name: string,
   wiederkehrcode?: string,
+  teamId?: string,
 ): Promise<Rundenstand> {
   return sende<Rundenstand>("POST", `${code(rundencode)}/beitreten`, {
     name,
     ...(wiederkehrcode ? { wiederkehrcode } : {}),
+    ...(teamId ? { team_id: teamId } : {}),
   });
+}
+
+export function wechsleTeam(rundencode: string, teamId: string): Promise<Rundenstand> {
+  return sende<Rundenstand>("PUT", `${code(rundencode)}/team`, { team_id: teamId });
+}
+
+/** Ton oder Antwortbild der gezeigten Frage. */
+export function rundenmediumAdresse(
+  rundencode: string,
+  schluessel: string,
+  frage: number,
+): string {
+  return adresse(`${code(rundencode)}/medien/${schluessel}?frage=${frage}`);
 }
 
 export function antworte(
@@ -319,6 +394,44 @@ export function entferneBild(frageId: string): Promise<void> {
   return sende<void>("DELETE", `/fragen/${frageId}/bild`);
 }
 
+export function importiereKatalog(datei: Blob): Promise<ImportErgebnis> {
+  return anfrage<ImportErgebnis>("/kataloge/import", {
+    method: "POST",
+    body: datei,
+    headers: { "Content-Type": datei.type || "application/zip" },
+  });
+}
+
+export function exportAdresse(katalogId: string): string {
+  return adresse(`/kataloge/${katalogId}/export`);
+}
+
+export function ladeMediumHoch(
+  frageId: string,
+  schluessel: string,
+  datei: Blob,
+): Promise<Frage> {
+  return anfrage<Frage>(`/fragen/${frageId}/medien/${schluessel}`, {
+    method: "PUT",
+    body: datei,
+    headers: { "Content-Type": datei.type || "application/octet-stream" },
+  });
+}
+
+export function entferneMedium(frageId: string, schluessel: string): Promise<void> {
+  return sende<void>("DELETE", `/fragen/${frageId}/medien/${schluessel}`);
+}
+
+export function mediumAdresse(
+  frageId: string,
+  schluessel: string,
+  stand: string,
+): string {
+  return adresse(
+    `/fragen/${frageId}/medien/${schluessel}?stand=${encodeURIComponent(stand)}`,
+  );
+}
+
 export function bildAdresse(frageId: string, stand: string): string {
   return adresse(`/fragen/${frageId}/bild?stand=${encodeURIComponent(stand)}`);
 }
@@ -350,7 +463,8 @@ export type Aktion =
   | { art: "bild"; sichtbar: boolean }
   | { art: "buzzer"; richtig: boolean }
   | { art: "buzzer/zuruecksetzen" }
-  | { art: "beenden" };
+  | { art: "beenden" }
+  | { art: "beitritt"; offen: boolean };
 
 export function steuere(rundeId: string, aktion: Aktion): Promise<Steuerung> {
   const { art, ...daten } = aktion;
@@ -391,4 +505,33 @@ export function stelleWiederkehrAus(
 
 export function entferneSpieler(rundeId: string, spielerId: string): Promise<void> {
   return sende<void>("DELETE", `/leitung/${rundeId}/spieler/${spielerId}`);
+}
+
+export function legeTeamAn(rundeId: string, name: string): Promise<Steuerung> {
+  return sende<Steuerung>("POST", `/leitung/${rundeId}/teams`, { name });
+}
+
+export function loescheTeam(rundeId: string, teamId: string): Promise<Steuerung> {
+  return sende<Steuerung>("DELETE", `/leitung/${rundeId}/teams/${teamId}`);
+}
+
+export function weiseTeamZu(
+  rundeId: string,
+  spielerId: string,
+  teamId: string | null,
+): Promise<Steuerung> {
+  return sende<Steuerung>("PUT", `/leitung/${rundeId}/spieler/${spielerId}/team`, {
+    team_id: teamId,
+  });
+}
+
+export function ladeAuswertung(
+  rundeId: string,
+  signal?: AbortSignal,
+): Promise<FrageAuswertung[]> {
+  return anfrage<FrageAuswertung[]>(`/leitung/${rundeId}/auswertung`, {}, signal);
+}
+
+export function ergebnisAdresse(rundeId: string): string {
+  return adresse(`/leitung/${rundeId}/ergebnis.csv`);
 }

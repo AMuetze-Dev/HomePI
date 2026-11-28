@@ -17,7 +17,19 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import dienst
-from .modelle import Antwort, Bild, Buzzer, Frage, Katalog, Korrektur, Runde, Spieler
+from .modelle import (
+    Antwort,
+    Bild,
+    Buzzer,
+    Frage,
+    Katalog,
+    Korrektur,
+    Medium,
+    Runde,
+    Spieler,
+    Team,
+    Teammitglied,
+)
 from .schemas import FrageEingabe, KatalogEingabe
 
 # ------------------------------------------------------------- Kataloge
@@ -397,3 +409,129 @@ async def korrektur_anlegen(
 ) -> None:
     sitzung.add(Korrektur(runde_id=runde_id, spieler_id=spieler_id, punkte=punkte, grund=grund))
     await sitzung.flush()
+
+
+# ------------------------------------------------------------- Medien
+
+
+async def medien_von(
+    sitzung: AsyncSession, frage_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, list[str]]:
+    if not frage_ids:
+        return {}
+    ergebnis = await sitzung.execute(
+        select(Medium.frage_id, Medium.schluessel)
+        .where(Medium.frage_id.in_(frage_ids))
+        .order_by(Medium.schluessel)
+    )
+    medien: dict[uuid.UUID, list[str]] = {}
+    for frage_id, schluessel in ergebnis.all():
+        medien.setdefault(frage_id, []).append(schluessel)
+    return medien
+
+
+async def medium(sitzung: AsyncSession, frage_id: uuid.UUID, schluessel: str) -> Medium | None:
+    return await sitzung.get(Medium, (frage_id, schluessel))
+
+
+async def medium_setzen(
+    sitzung: AsyncSession, frage_id: uuid.UUID, schluessel: str, mime: str, inhalt: bytes
+) -> None:
+    await sitzung.execute(
+        insert(Medium)
+        .values(frage_id=frage_id, schluessel=schluessel, mime=mime, inhalt=inhalt)
+        .on_conflict_do_update(
+            index_elements=[Medium.frage_id, Medium.schluessel],
+            set_={"mime": mime, "inhalt": inhalt},
+        )
+    )
+
+
+async def medium_loeschen(sitzung: AsyncSession, frage_id: uuid.UUID, schluessel: str) -> None:
+    await sitzung.execute(
+        delete(Medium).where(Medium.frage_id == frage_id, Medium.schluessel == schluessel)
+    )
+
+
+async def alle_medien(
+    sitzung: AsyncSession, frage_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, dict[str, tuple[str, bytes]]]:
+    """Fuer den Export: Bild und weitere Medien mit Inhalt."""
+    ergebnis: dict[uuid.UUID, dict[str, tuple[str, bytes]]] = {i: {} for i in frage_ids}
+    if not frage_ids:
+        return ergebnis
+    for bild_ in await sitzung.scalars(select(Bild).where(Bild.frage_id.in_(frage_ids))):
+        ergebnis[bild_.frage_id]["bild"] = (bild_.mime, bild_.inhalt)
+    for eintrag in await sitzung.scalars(select(Medium).where(Medium.frage_id.in_(frage_ids))):
+        ergebnis[eintrag.frage_id][eintrag.schluessel] = (eintrag.mime, eintrag.inhalt)
+    return ergebnis
+
+
+# ------------------------------------------------------------- Teams
+
+
+async def teams(sitzung: AsyncSession, runde_id: uuid.UUID) -> list[Team]:
+    ergebnis = await sitzung.execute(
+        select(Team).where(Team.runde_id == runde_id).order_by(Team.angelegt, Team.name)
+    )
+    return list(ergebnis.scalars())
+
+
+async def team_anlegen(
+    sitzung: AsyncSession, runde_id: uuid.UUID, name: str, schluessel: str
+) -> Team:
+    eintrag = Team(runde_id=runde_id, name=name, schluessel=schluessel)
+    try:
+        async with sitzung.begin_nested():
+            sitzung.add(eintrag)
+            await sitzung.flush()
+    except IntegrityError as fehler:
+        raise dienst.TeamVergeben(f"Ein Team „{name}“ gibt es in dieser Runde schon.") from fehler
+    return eintrag
+
+
+async def team(sitzung: AsyncSession, runde_id: uuid.UUID, team_id: uuid.UUID) -> Team:
+    eintrag = await sitzung.get(Team, team_id)
+    if eintrag is None or eintrag.runde_id != runde_id:
+        raise dienst.TeamUnbekannt("Dieses Team gibt es in der Runde nicht.")
+    return eintrag
+
+
+async def team_loeschen(sitzung: AsyncSession, eintrag: Team) -> None:
+    await sitzung.delete(eintrag)
+    await sitzung.flush()
+
+
+async def mitgliedschaften(
+    sitzung: AsyncSession, runde_id: uuid.UUID
+) -> dict[uuid.UUID, uuid.UUID]:
+    ergebnis = await sitzung.execute(
+        select(Teammitglied.spieler_id, Teammitglied.team_id)
+        .join(Team, Team.id == Teammitglied.team_id)
+        .where(Team.runde_id == runde_id)
+    )
+    return {spieler_id: team_id for spieler_id, team_id in ergebnis.all()}
+
+
+async def team_setzen(
+    sitzung: AsyncSession, spieler_id: uuid.UUID, team_id: uuid.UUID | None
+) -> None:
+    await sitzung.execute(delete(Teammitglied).where(Teammitglied.spieler_id == spieler_id))
+    if team_id is not None:
+        sitzung.add(Teammitglied(spieler_id=spieler_id, team_id=team_id))
+    await sitzung.flush()
+
+
+# ------------------------------------------------------------- Auswertung
+
+
+async def alle_antworten(sitzung: AsyncSession, runde_id: uuid.UUID) -> list[Antwort]:
+    return list(await sitzung.scalars(select(Antwort).where(Antwort.runde_id == runde_id)))
+
+
+async def alle_druecke(sitzung: AsyncSession, runde_id: uuid.UUID) -> list[Buzzer]:
+    return list(
+        await sitzung.scalars(
+            select(Buzzer).where(Buzzer.runde_id == runde_id).order_by(Buzzer.reihe)
+        )
+    )

@@ -14,6 +14,7 @@ import {
   Schalter,
   Statuspunkt,
   Tafel,
+  Feld,
 } from "../../ui";
 import { TAKT } from "./abruf";
 import {
@@ -35,6 +36,14 @@ import {
   type SpielerSicht,
   type Steuerung,
   type Wiederkehrcode,
+  mediumAdresse,
+  legeTeamAn,
+  loescheTeam,
+  weiseTeamZu,
+  ladeAuswertung,
+  ergebnisAdresse,
+  type TeamPlatz,
+  type FrageAuswertung,
 } from "./api";
 import { beitrittsAdresse, useBasisAdresse } from "./adresse";
 import { loesungstext, TYPWORT } from "./texte";
@@ -337,6 +346,14 @@ function RundenSteuerung({
                 <>
                   <h2 className={stil.fragetext}>{frage.text}</h2>
                   <p className={stil.nebensache}>Lösung: {loesungstext(frage)}</p>
+                  {frage.medien.includes("ton") && (
+                    <audio
+                      controls
+                      src={mediumAdresse(frage.id, "ton", frage.id)}
+                      className={stil.ton}
+                      aria-label="Ton zur Frage"
+                    />
+                  )}
                 </>
               ) : (
                 <p>
@@ -447,6 +464,8 @@ function RundenSteuerung({
               ))}
             </ol>
           </Abschnitt>
+
+          <Auswertung rundeId={id} gespielt={s.beantwortet.length} />
         </div>
 
         <aside className={stil.leitungSeite}>
@@ -465,6 +484,33 @@ function RundenSteuerung({
               </Link>
             </Karte>
           )}
+          {darfLeiten && !beendet && (
+            <span className={stil.schalterzeile}>
+              <Schalter
+                beschriftung="Beitritt offen"
+                an={runde.beitritt_offen}
+                beiWechsel={(offen) => tu({ art: "beitritt", offen })}
+              />
+              <span aria-hidden="true">
+                {runde.beitritt_offen
+                  ? "Beitritt offen"
+                  : "Beitritt geschlossen - nur Rückkehrer"}
+              </span>
+            </span>
+          )}
+          <Teams
+            teams={s.teams}
+            darfLeiten={darfLeiten && !beendet}
+            anlegen={(name) => handeln(() => legeTeamAn(id, name))}
+            aufloesen={(team) => {
+              if (
+                window.confirm(
+                  `Team „${team.name}“ auflösen? Die Mitglieder spielen allein weiter.`,
+                )
+              )
+                void handeln(() => loescheTeam(id, team.id));
+            }}
+          />
           {/* Neben der Spielerliste, nicht oben: dort hat die Leitung eben
               geklickt, und dort muss sie den Code ablesen. */}
           {wiederkehr && (
@@ -477,6 +523,8 @@ function RundenSteuerung({
           )}
           <SpielerListe
             spieler={s.spieler}
+            teams={s.teams}
+            zuordnen={(wer, team) => void handeln(() => weiseTeamZu(id, wer.id, team))}
             darfLeiten={darfLeiten}
             korrigieren={(wer, punkte) =>
               void handeln(() => korrigiere(id, wer.id, punkte))
@@ -682,12 +730,16 @@ function PunkteFeld({
 
 function SpielerListe({
   spieler,
+  teams,
+  zuordnen,
   darfLeiten,
   korrigieren,
   wiederkehr,
   entfernen,
 }: {
   spieler: SpielerSicht[];
+  teams: TeamPlatz[];
+  zuordnen: (wer: SpielerSicht, team: string | null) => void;
   darfLeiten: boolean;
   korrigieren: (wer: SpielerSicht, punkte: number) => void;
   wiederkehr: (wer: SpielerSicht) => void;
@@ -711,6 +763,23 @@ function SpielerListe({
                 </span>
                 <strong className={stil.platzpunkte}>{wer.punkte}</strong>
               </span>
+              {teams.length > 0 && (
+                <label className={stil.auswahl}>
+                  <span className="nur-vorlesen">Team von {wer.name}</span>
+                  <select
+                    value={wer.team_id ?? ""}
+                    disabled={!darfLeiten}
+                    onChange={(e) => zuordnen(wer, e.target.value || null)}
+                  >
+                    <option value="">ohne Team</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {darfLeiten && (
                 <span className={stil.sortierknoepfe}>
                   <Knopf
@@ -751,6 +820,165 @@ function SpielerListe({
           ))}
         </ul>
       )}
+    </Abschnitt>
+  );
+}
+
+function Teams({
+  teams,
+  darfLeiten,
+  anlegen,
+  aufloesen,
+}: {
+  teams: TeamPlatz[];
+  darfLeiten: boolean;
+  anlegen: (name: string) => Promise<void>;
+  aufloesen: (team: TeamPlatz) => void;
+}) {
+  const [name, setName] = useState("");
+  if (!darfLeiten && teams.length === 0) return null;
+  return (
+    <Abschnitt
+      titel="Teams"
+      beiwort={teams.length ? `${teams.length} Teams` : "jeder für sich"}
+    >
+      {teams.length === 0 ? (
+        <p className={stil.nebensache}>
+          Ohne Teams spielt jeder für sich. Legst du Teams an, wählen neue Spieler beim
+          Beitritt eines - und pro Team zählt nur ein Buzzer.
+        </p>
+      ) : (
+        <ol className={stil.liste}>
+          {teams.map((team) => (
+            <li key={team.id} className={stil.listenzeile}>
+              <span className={stil.zeilentext}>
+                {team.rang}. {team.name}
+                <span className={stil.nebensache}>
+                  {" "}
+                  · {team.mitglieder} {team.mitglieder === 1 ? "Person" : "Personen"}
+                </span>
+              </span>
+              <strong className={stil.platzpunkte}>{team.punkte}</strong>
+              {darfLeiten && (
+                <Knopf
+                  auspraegung="leise"
+                  groesse="sm"
+                  onClick={() => aufloesen(team)}
+                  aria-label={`Team ${team.name} auflösen`}
+                >
+                  ×
+                </Knopf>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+      {darfLeiten && (
+        <form
+          className={stil.eroeffnen}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void anlegen(name).then(() => setName(""));
+          }}
+        >
+          <Feld
+            beschriftung="Neues Team"
+            value={name}
+            maxLength={30}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Knopf type="submit" auspraegung="sekundaer" disabled={name.trim() === ""}>
+            Team anlegen
+          </Knopf>
+        </form>
+      )}
+    </Abschnitt>
+  );
+}
+
+type Rueckblick =
+  | { phase: "zu" }
+  | { phase: "laedt" }
+  | { phase: "fertig"; fragen: FrageAuswertung[] }
+  | { phase: "fehler"; nachricht: string };
+
+/** Die gespielten Fragen im Rückblick - auf Knopfdruck, nicht im Takt:
+ *  wer auswertet, will nicht, dass die Liste unter dem Lesen springt. */
+function Auswertung({ rundeId, gespielt }: { rundeId: string; gespielt: number }) {
+  const [rueckblick, setRueckblick] = useState<Rueckblick>({ phase: "zu" });
+
+  async function laden() {
+    setRueckblick({ phase: "laedt" });
+    try {
+      setRueckblick({ phase: "fertig", fragen: await ladeAuswertung(rundeId) });
+    } catch (grund) {
+      setRueckblick({ phase: "fehler", nachricht: meldung(grund) });
+    }
+  }
+
+  return (
+    <Abschnitt titel="Auswertung" beiwort={`${gespielt} gespielt`}>
+      <div className={stil.knopfzeile}>
+        <Knopf
+          auspraegung="sekundaer"
+          onClick={() => void laden()}
+          disabled={gespielt === 0}
+        >
+          {rueckblick.phase === "fertig"
+            ? "Auswertung aktualisieren"
+            : "Auswertung zeigen"}
+        </Knopf>
+        <a className={stil.verweis} href={ergebnisAdresse(rundeId)} download>
+          Ergebnis als CSV
+        </a>
+      </div>
+      {rueckblick.phase === "laedt" && (
+        <div role="status" aria-label="Auswertung wird geladen">
+          <Platzhalter hoehe="6rem" />
+        </div>
+      )}
+      {rueckblick.phase === "fehler" && (
+        <Hinweis ton="fehler" dringend>
+          {rueckblick.nachricht}
+        </Hinweis>
+      )}
+      {rueckblick.phase === "fertig" &&
+        (rueckblick.fragen.length === 0 ? (
+          <p className={stil.nebensache}>Noch keine Frage aufgelöst.</p>
+        ) : (
+          <div className={stil.auswertung}>
+            {rueckblick.fragen.map((f) => (
+              <Karte key={f.frage_id}>
+                <div className={stil.fragemeta}>
+                  <span>
+                    Frage {f.nummer} · {TYPWORT[f.typ]}
+                  </span>
+                  <Etikett ton={f.richtig > 0 ? "gut" : "neutral"}>
+                    {f.richtig} von {f.gesamt} richtig
+                  </Etikett>
+                </div>
+                <h3 className={stil.zeilentext}>{f.text}</h3>
+                <p className={stil.nebensache}>Lösung: {f.loesung}</p>
+                <ul className={stil.liste}>
+                  {f.antworten.map((a, i) => (
+                    <li key={i} className={stil.listenzeile}>
+                      <span className={stil.zeilentext}>
+                        <strong>{a.spieler}</strong> {a.anzeige}
+                      </span>
+                      <Etikett
+                        ton={
+                          a.richtig === null ? "warnung" : a.richtig ? "gut" : "neutral"
+                        }
+                      >
+                        {a.punkte ?? "?"} P.
+                      </Etikett>
+                    </li>
+                  ))}
+                </ul>
+              </Karte>
+            ))}
+          </div>
+        ))}
     </Abschnitt>
   );
 }

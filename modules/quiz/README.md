@@ -29,7 +29,8 @@ homepi benutzer recht <name> quiz nutzer
 
 ## Fragetypen
 
-Die acht aus Battle.Net, jeweils mit eigener Eingabe am Handy:
+Alle aus Battle.Net, jeweils mit eigener Eingabe am Handy - die acht aus der
+Spezifikation und die zwei, die der Battle.Net-Editor zusätzlich kannte:
 
 | Typ           | Spieler                       | Bewertung                                        |
 | ------------- | ----------------------------- | ------------------------------------------------ |
@@ -41,6 +42,11 @@ Die acht aus Battle.Net, jeweils mit eigener Eingabe am Handy:
 | Bildfrage     | Bild + Textfeld               | wie Freitext, ohne Lösung von Hand               |
 | Bild antippen | Tipp ins Bild                 | innerhalb eines Zielkreises                      |
 | Sortieren     | Liste mit ↑/↓                 | anteilig nach richtigen Plätzen                  |
+| Zuordnen      | je Zeile eine Auswahl         | anteilig nach richtigen Paaren                   |
+| Bildauswahl   | Bilder als Antworten          | wie Auswahl                                      |
+
+Jede Frage kann zusätzlich ein Bild und einen **Ton** tragen. Den Ton spielt
+die Leitung oder die Anzeigetafel ab, nicht das Handy.
 
 `punkte` einer Frage ist immer die Höchstzahl. Jede Bewertung lässt sich
 danach von Hand ändern, dazu kommen Korrekturen ±1 je Spieler.
@@ -66,6 +72,34 @@ danach von Hand ändern, dazu kommen Korrekturen ±1 je Spieler.
 - Die Sortier-Elemente haben Kennungen, die ihren Platz nicht verraten; die
   Mischung ist je Frage fest, damit die Liste beim Abruf nicht springt.
 
+## Teams
+
+Die Leitung legt je Runde Teams an. Ab dann wählt jeder neue Spieler beim
+Beitritt eines; vor dem Start darf er selbst wechseln, danach setzt nur die
+Leitung um. Ein Team zählt die **Summe** seiner Mitglieder, und beim Buzzer
+drückt jedes Team einmal. Ohne Teams spielt jeder für sich.
+
+## Beitritt schließen
+
+Ein Code am Beamer ist von jedem abfotografierbar, und die Seite ist aus dem
+Internet erreichbar. Deshalb kann die Leitung den Beitritt schließen - dann
+kommt nur noch zurück, wer einen Wiederkehrcode hat.
+
+## Import, Export, Auswertung
+
+- **Battle.Net übernehmen:** Unter „Kataloge“ ein gespeichertes Battle.Net-Quiz
+  hochladen (das ZIP aus `backend/data/quizzes/` mit `quiz.json`, Bilder und
+  Ton als Data-URL). Was nicht passt, steht danach als Hinweis im Katalog.
+  Bilder von **fremden Adressen werden nicht geholt** - der Pi greift nicht auf
+  Zuruf einer Datei ins Internet. Das XML-Format der Spezifikation gab es nur
+  als Beispieldatei und wird nicht übernommen.
+- **Sichern:** „Als ZIP sichern“ schreibt `katalog.json` plus `medien/`. Dasselbe
+  ZIP lässt sich wieder übernehmen, ohne Verlust.
+- **Auswertung:** In der Runde je gespielter Frage, wer was geantwortet hat,
+  dazu das Ergebnis als CSV (Semikolon, BOM - öffnet in Excel richtig).
+  Spielernamen, die mit `=`, `+`, `@` oder `-` beginnen, werden dort als Text
+  geschrieben und nicht als Formel.
+
 ## Live
 
 Kein WebSocket: Handy, Tafel und Leitung fragen alle anderthalb Sekunden nach,
@@ -82,15 +116,20 @@ HOMEPI_TEST_DATABASE_URL='postgresql+asyncpg://app:app@127.0.0.1:15432/test' \
   uv run pytest -m 'not smoke' --cov
 ```
 
+## Prüfen
+
+Neben Unit- und Integrationstests eine eigene Oberflächenreise
+(`services/web/e2e/quiz.spec.ts`, in `make e2e` und der CI-Matrix):
+Einrichtung, Recht, Battle.Net-Import, Spieler ohne Konto in eigenem
+Browser-Kontext, Namensschutz, Antwort, Auflösung, Podest, 375 px.
+
 ## Ausrollen
 
-Neue Tabellen (`quiz_*`). Auf dem Pi nach dem Update einmal:
+Tabellen `quiz_*`. Seit Teams und Medien zusätzlich eine Spalte an einer
+schon laufenden Tabelle - auf dem Pi **in dieser Reihenfolge**:
 
 ```bash
+docker exec -i postgres psql -U app -d app -v ON_ERROR_STOP=1 \
+  -f - < scripts/migrationen/2026-11-28-quiz-beitritt-offen.sql
 docker compose exec gateway homepi schema anlegen
 ```
-
-## Offen
-
-- Teams (in Battle.Net angelegt, dort ungetestet) - bewusst später.
-- Import der Battle.Net-Kataloge (ZIP mit `questions.xml` und Medien).

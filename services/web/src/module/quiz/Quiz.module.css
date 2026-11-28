@@ -246,7 +246,7 @@
 
 .option[data-gewaehlt="true"] {
   border-color: var(--farbe-akzent);
-  background: var(--farbe-akzent-hell);
+  background: var(--farbe-akzent-fuellung);
 }
 
 .option input {
@@ -589,6 +589,202 @@
   max-height: 12rem;
   border-radius: var(--rundung-sm);
   align-self: flex-start;
+}
+
+/* ------------------------------------------- Neue Fragetypen und Medien */
+
+.zuordnung {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  align-items: center;
+  gap: var(--raum-3);
+  min-height: 3rem;
+}
+
+.zuordnungLinks {
+  font-weight: var(--gewicht-mittel);
+  overflow-wrap: anywhere;
+}
+
+.zuordnung select,
+.paarzeile input {
+  font: inherit;
+  font-size: var(--text-md);
+  color: var(--farbe-text);
+  background: var(--farbe-flaeche);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  padding: var(--raum-2) var(--raum-3);
+  min-width: 0;
+  width: 100%;
+}
+
+.zuordnung select:focus-visible,
+.paarzeile input:focus-visible {
+  outline: 2px solid var(--farbe-fokus);
+  outline-offset: 1px;
+}
+
+.bildoptionen {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: var(--raum-3);
+  min-width: 0;
+}
+
+.bildoptionen legend {
+  grid-column: 1 / -1;
+  margin-bottom: var(--raum-2);
+}
+
+.bildoption {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-2);
+  padding: var(--raum-2);
+  border: 2px solid var(--farbe-rand);
+  border-radius: var(--rundung-md);
+  background: var(--farbe-flaeche);
+  cursor: pointer;
+}
+
+.bildoption[data-gewaehlt="true"] {
+  border-color: var(--farbe-akzent);
+  background: var(--farbe-akzent-fuellung);
+}
+
+.bildoption input {
+  position: absolute;
+  top: var(--raum-2);
+  left: var(--raum-2);
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--farbe-akzent);
+}
+
+.optionsbild {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  border-radius: var(--rundung-sm);
+}
+
+.ton {
+  width: 100%;
+}
+
+.anzeigeBilder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--raum-4);
+}
+
+.anzeigeBilder li {
+  border: 3px solid transparent;
+  border-radius: var(--rundung-md);
+}
+
+.anzeigeBilder li[data-richtig="true"] {
+  border-color: var(--signal-gut);
+}
+
+.anzeigeBilder li[data-richtig="false"] {
+  opacity: 0.4;
+}
+
+.anzeigeZuordnen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--raum-6);
+}
+
+.paarzeile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--raum-2);
+}
+
+/* ----------------------------------------------------- Siegerehrung */
+
+.siegerehrung {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-6);
+}
+
+.podest {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: var(--raum-3);
+}
+
+.stufe {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--raum-2);
+  text-align: center;
+  min-width: 0;
+}
+
+.stufenname {
+  font-size: var(--text-2xl);
+  font-weight: var(--gewicht-halbfett);
+  overflow-wrap: anywhere;
+}
+
+.stufenpunkte {
+  color: var(--farbe-text-gedaempft);
+}
+
+.stufenblock {
+  width: 100%;
+  display: grid;
+  place-items: center;
+  font-size: var(--text-3xl);
+  font-weight: var(--gewicht-halbfett);
+  color: var(--farbe-akzent-schrift);
+  background: var(--farbe-akzent-fuellung);
+  border-radius: var(--rundung-md) var(--rundung-md) 0 0;
+}
+
+.stufe[data-rang="1"] .stufenblock {
+  height: 10rem;
+}
+
+.stufe[data-rang="2"] .stufenblock {
+  height: 7rem;
+}
+
+.stufe[data-rang="3"] .stufenblock {
+  height: 5rem;
+}
+
+/* ---------------------------------------------------- Auswertung */
+
+.auswertung {
+  display: flex;
+  flex-direction: column;
+  gap: var(--raum-4);
+}
+
+.hinweisliste {
+  margin: 0;
+  padding-left: var(--raum-5);
+  font-size: var(--text-sm);
 }
 
 @media (max-width: 60rem) {

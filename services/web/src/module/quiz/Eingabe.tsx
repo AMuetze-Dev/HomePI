@@ -11,10 +11,33 @@ interface Props {
   aendern: (entwurf: Entwurf) => void;
   bildAdresse: string | null;
   gesperrt: boolean;
+  /** Adresse eines Mediums der gezeigten Frage, etwa "option-0". */
+  medienAdresse?: ((schluessel: string) => string) | undefined;
 }
 
-export function Eingabe({ frage, entwurf, aendern, bildAdresse, gesperrt }: Props) {
+export function Eingabe({
+  frage,
+  entwurf,
+  aendern,
+  bildAdresse,
+  gesperrt,
+  medienAdresse,
+}: Props) {
   switch (frage.typ) {
+    case "zuordnen":
+      return (
+        <Zuordnen frage={frage} entwurf={entwurf} aendern={aendern} gesperrt={gesperrt} />
+      );
+    case "bildauswahl":
+      return (
+        <Auswahl
+          frage={frage}
+          entwurf={entwurf}
+          aendern={aendern}
+          gesperrt={gesperrt}
+          medienAdresse={medienAdresse}
+        />
+      );
     case "zahl":
       return (
         <Feld
@@ -70,7 +93,45 @@ export function Eingabe({ frage, entwurf, aendern, bildAdresse, gesperrt }: Prop
   }
 }
 
-type TeilProps = Omit<Props, "bildAdresse">;
+type TeilProps = Omit<Props, "bildAdresse" | "medienAdresse">;
+
+function Zuordnen({ frage, entwurf, aendern, gesperrt }: TeilProps) {
+  const vergeben = new Set(Object.values(entwurf.zuordnung));
+  return (
+    <fieldset className={stil.optionen} disabled={gesperrt}>
+      <legend className={stil.nebensache}>Wähle zu jedem Eintrag das Gegenstück.</legend>
+      {frage.links.map((links, index) => {
+        const gewaehlt = entwurf.zuordnung[String(index)] ?? "";
+        return (
+          <label key={index} className={stil.zuordnung}>
+            <span className={stil.zuordnungLinks}>{links}</span>
+            <select
+              value={gewaehlt}
+              aria-label={`Gegenstück zu ${links}`}
+              onChange={(e) => {
+                const neu = { ...entwurf.zuordnung };
+                if (e.target.value) neu[String(index)] = e.target.value;
+                else delete neu[String(index)];
+                aendern({ ...entwurf, zuordnung: neu });
+              }}
+            >
+              <option value="">– wählen –</option>
+              {frage.rechts.map((rechts) => (
+                <option
+                  key={rechts.kennung}
+                  value={rechts.kennung}
+                  disabled={vergeben.has(rechts.kennung) && rechts.kennung !== gewaehlt}
+                >
+                  {rechts.text}
+                </option>
+              ))}
+            </select>
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
 
 function Schaetzung({ frage, entwurf, aendern, gesperrt }: TeilProps) {
   const einheit = frage.einheit ? ` ${frage.einheit}` : "";
@@ -98,7 +159,15 @@ function Schaetzung({ frage, entwurf, aendern, gesperrt }: TeilProps) {
   );
 }
 
-function Auswahl({ frage, entwurf, aendern, gesperrt }: TeilProps) {
+function Auswahl({
+  frage,
+  entwurf,
+  aendern,
+  gesperrt,
+  medienAdresse,
+}: TeilProps & { medienAdresse?: ((schluessel: string) => string) | undefined }) {
+  const mitBild = frage.typ === "bildauswahl";
+  const optionen = mitBild ? frage.bildoptionen : frage.optionen;
   function waehle(index: number) {
     if (!frage.mehrfach) {
       aendern({ ...entwurf, auswahl: [index] });
@@ -114,25 +183,38 @@ function Auswahl({ frage, entwurf, aendern, gesperrt }: TeilProps) {
   }
 
   return (
-    <fieldset className={stil.optionen} disabled={gesperrt}>
+    <fieldset className={mitBild ? stil.bildoptionen : stil.optionen} disabled={gesperrt}>
       <legend className={stil.nebensache}>
         {frage.mehrfach ? "Mehrere Antworten sind richtig" : "Eine Antwort ist richtig"}
       </legend>
-      {frage.optionen.map((option, index) => (
-        <label
-          key={index}
-          className={stil.option}
-          data-gewaehlt={entwurf.auswahl.includes(index)}
-        >
-          <input
-            type={frage.mehrfach ? "checkbox" : "radio"}
-            name="auswahl"
-            checked={entwurf.auswahl.includes(index)}
-            onChange={() => waehle(index)}
-          />
-          <span>{option}</span>
-        </label>
-      ))}
+      {optionen.map((option, index) => {
+        // Ohne Alternativtext waere das Bild fuer einen Screenreader stumm.
+        const name = option || `Bild ${index + 1}`;
+        return (
+          <label
+            key={index}
+            className={mitBild ? stil.bildoption : stil.option}
+            data-gewaehlt={entwurf.auswahl.includes(index)}
+          >
+            <input
+              type={frage.mehrfach ? "checkbox" : "radio"}
+              name="auswahl"
+              checked={entwurf.auswahl.includes(index)}
+              onChange={() => waehle(index)}
+              aria-label={mitBild ? name : undefined}
+            />
+            {mitBild && medienAdresse ? (
+              <img
+                src={medienAdresse(`option-${index}`)}
+                alt={name}
+                className={stil.optionsbild}
+              />
+            ) : (
+              <span>{option}</span>
+            )}
+          </label>
+        );
+      })}
     </fieldset>
   );
 }

@@ -29,6 +29,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    true,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -74,6 +75,24 @@ class Bild(Base):
     inhalt: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
 
+class Medium(Base):
+    """Weitere Medien an einer Frage: ``ton`` und ``option-<n>``.
+
+    Eigene Tabelle neben ``quiz_bilder`` und nicht deren Umbau: die laeuft
+    schon auf dem Pi, und ein neuer Schluessel waere eine Migration mit
+    Datenumzug fuer nichts.
+    """
+
+    __tablename__ = "quiz_medien"
+
+    frage_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("quiz_fragen.id", ondelete="CASCADE"), primary_key=True
+    )
+    schluessel: Mapped[str] = mapped_column(String(20), primary_key=True)
+    mime: Mapped[str] = mapped_column(String(40), nullable=False)
+    inhalt: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+
 class Runde(Base, ZeitstempelMixin):
     __tablename__ = "quiz_runden"
 
@@ -91,6 +110,25 @@ class Runde(Base, ZeitstempelMixin):
     frist: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: Fragen, die in dieser Runde schon aufgeloest wurden.
     erledigt: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    #: Nachgetragen: scripts/migrationen/2026-11-28-quiz-beitritt-offen.sql
+    beitritt_offen: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+
+
+class Team(Base):
+    __tablename__ = "quiz_teams"
+    __table_args__ = (UniqueConstraint("runde_id", "schluessel", name="uq_quiz_team_name"),)
+
+    id: Mapped[uuid.UUID] = _id()
+    runde_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("quiz_runden.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(30), nullable=False)
+    schluessel: Mapped[str] = mapped_column(String(100), nullable=False)
+    angelegt: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class Spieler(Base):
@@ -118,6 +156,21 @@ class Spieler(Base):
     )
     zuletzt_gesehen: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class Teammitglied(Base):
+    """Eigene Tabelle statt einer Spalte an ``quiz_spieler``: die Tabelle
+    laeuft schon, und eine neue Fremdschluesselspalte waere eine Migration
+    mehr. Ein Spieler ist in hoechstens einem Team - der Primaerschluessel."""
+
+    __tablename__ = "quiz_teammitglieder"
+
+    spieler_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("quiz_spieler.id", ondelete="CASCADE"), primary_key=True
+    )
+    team_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("quiz_teams.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
 

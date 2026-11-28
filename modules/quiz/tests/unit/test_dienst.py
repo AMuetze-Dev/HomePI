@@ -11,16 +11,20 @@ from homepi_quiz import dienst
 from homepi_quiz.schemas import (
     AntwortEingabe,
     AuswahlDaten,
+    BildauswahlDaten,
     BildDaten,
+    BildOption,
     BuzzerDaten,
     FrageAusgabe,
     FreitextDaten,
     HotspotDaten,
     Option,
+    Paar,
     SchaetzDaten,
     SortierDaten,
     ZahlDaten,
     Ziel,
+    ZuordnenDaten,
 )
 
 JETZT = dt.datetime(2026, 11, 28, 20, 0, tzinfo=dt.UTC)
@@ -73,10 +77,10 @@ class TestSpielername:
 
 class TestBeitritt:
     def test_nach_dem_ende_tritt_niemand_mehr_bei(self) -> None:
-        dienst.pruefe_beitritt("lobby")
-        dienst.pruefe_beitritt("laeuft")
+        dienst.pruefe_beitritt("lobby", offen=True)
+        dienst.pruefe_beitritt("laeuft", offen=True)
         with pytest.raises(dienst.AktionNichtMoeglich, match="beendet"):
-            dienst.pruefe_beitritt("beendet")
+            dienst.pruefe_beitritt("beendet", offen=True)
 
     def test_wiederkehr_nur_mit_passendem_gueltigem_code(self) -> None:
         from homepi_core.auth.passwoerter import hashe_token
@@ -564,3 +568,194 @@ class TestKatalog:
         with pytest.raises(dienst.KatalogLeer):
             dienst.pruefe_katalog_spielbar(0)
         dienst.pruefe_katalog_spielbar(3)
+
+
+# ===================================================================== Ausbau
+
+
+ZUORDNEN = ZuordnenDaten(
+    paare=[Paar(links="A", rechts="1"), Paar(links="B", rechts="2"), Paar(links="C", rechts="3")]
+)
+BILDAUSWAHL = BildauswahlDaten(
+    optionen=[BildOption(text="Karte A", richtig=True), BildOption(text="Karte B")]
+)
+
+
+def _richtige_zuordnung() -> dict[str, str]:
+    return {str(i): dienst.rechtskennung(FRAGE_ID, i) for i in range(3)}
+
+
+class TestZuordnen:
+    def test_rechte_kennung_verraet_nichts_und_unterscheidet_sich_von_sortieren(self) -> None:
+        assert dienst.rechtskennung(FRAGE_ID, 0) != dienst.elementkennung(FRAGE_ID, 0)
+        assert not dienst.rechtskennung(FRAGE_ID, 0).isdigit()
+
+    def test_antwort_braucht_jede_zeile_mit_gueltiger_kennung(self) -> None:
+        wert = dienst.pruefe_antwort(
+            ZUORDNEN, AntwortEingabe(zuordnung=_richtige_zuordnung()), FRAGE_ID
+        )
+        assert wert == {"zuordnung": _richtige_zuordnung()}
+        with pytest.raises(dienst.AntwortUngueltig):
+            dienst.pruefe_antwort(ZUORDNEN, AntwortEingabe(zuordnung={"0": "x"}), FRAGE_ID)
+        unvollstaendig = dict(list(_richtige_zuordnung().items())[:2])
+        with pytest.raises(dienst.AntwortUngueltig):
+            dienst.pruefe_antwort(ZUORDNEN, AntwortEingabe(zuordnung=unvollstaendig), FRAGE_ID)
+
+    def test_doppelt_vergebenes_gegenstueck_ist_ungueltig(self) -> None:
+        k = dienst.rechtskennung(FRAGE_ID, 0)
+        with pytest.raises(dienst.AntwortUngueltig, match="einmal"):
+            dienst.pruefe_antwort(
+                ZUORDNEN, AntwortEingabe(zuordnung={"0": k, "1": k, "2": k}), FRAGE_ID
+            )
+
+    def test_bewertung_anteilig(self) -> None:
+        r = [dienst.rechtskennung(FRAGE_ID, i) for i in range(3)]
+        ergebnis = dienst.bewerte(
+            ZUORDNEN,
+            3,
+            {
+                "alles": {"zuordnung": _richtige_zuordnung()},
+                "eins": {"zuordnung": {"0": r[0], "1": r[2], "2": r[1]}},
+            },
+            FRAGE_ID,
+        )
+        assert ergebnis["alles"] == dienst.Bewertung(3, True)
+        assert ergebnis["eins"] == dienst.Bewertung(1, False)
+
+    def test_oeffentlich_links_geordnet_rechts_gemischt(self) -> None:
+        sicht = dienst.oeffentliche_frage(_frage(ZUORDNEN), 0, 1, "offen")
+        assert sicht.links == ["A", "B", "C"]
+        assert sorted(e.text for e in sicht.rechts) == ["1", "2", "3"]
+        assert [e.text for e in sicht.rechts] != ["1", "2", "3"]
+        assert sicht.loesung is None
+
+    def test_loesung_und_anzeige(self) -> None:
+        assert dienst.loesung(ZUORDNEN, FRAGE_ID).anzeige == "A → 1, B → 2, C → 3"
+        assert dienst.loesung(ZUORDNEN, FRAGE_ID).zuordnung == _richtige_zuordnung()
+        r = dienst.rechtskennung(FRAGE_ID, 1)
+        assert dienst.anzeige(ZUORDNEN, {"zuordnung": {"0": r}}, FRAGE_ID) == "A → 2"
+
+
+class TestBildauswahl:
+    def test_wie_auswahl(self) -> None:
+        assert dienst.pruefe_antwort(BILDAUSWAHL, AntwortEingabe(auswahl=[0])) == {"auswahl": [0]}
+        ergebnis = dienst.bewerte(
+            BILDAUSWAHL, 2, {"a": {"auswahl": [0]}, "b": {"auswahl": [1]}}, FRAGE_ID
+        )
+        assert ergebnis == {"a": dienst.Bewertung(2, True), "b": dienst.Bewertung(0, False)}
+
+    def test_oeffentlich_nur_die_alternativtexte_ohne_richtig(self) -> None:
+        sicht = dienst.oeffentliche_frage(_frage(BILDAUSWAHL), 0, 1, "offen")
+        assert sicht.bildoptionen == ["Karte A", "Karte B"]
+        assert "richtig" not in sicht.model_dump_json()
+
+    def test_loesung_und_anzeige(self) -> None:
+        assert dienst.loesung(BILDAUSWAHL, FRAGE_ID).optionen == [0]
+        assert dienst.loesung(BILDAUSWAHL, FRAGE_ID).anzeige == "Karte A"
+        assert dienst.anzeige(BILDAUSWAHL, {"auswahl": [1]}, FRAGE_ID) == "Karte B"
+
+    def test_braucht_ein_bild_je_option(self) -> None:
+        frage = _frage(BILDAUSWAHL).model_copy(update={"medien": ["option-0"]})
+        with pytest.raises(dienst.AktionNichtMoeglich, match="Bild"):
+            dienst.pruefe_zeigbar(frage)
+        dienst.pruefe_zeigbar(frage.model_copy(update={"medien": ["option-0", "option-1"]}))
+
+
+class TestMedien:
+    def test_ton_an_jeder_frage(self) -> None:
+        assert dienst.pruefe_medium("ton", ZahlDaten(loesung=1), "audio/mpeg", 100) == "audio/mpeg"
+
+    def test_optionsbild_nur_bei_bildauswahl_und_im_bereich(self) -> None:
+        assert dienst.pruefe_medium("option-1", BILDAUSWAHL, "image/png", 10) == "image/png"
+        with pytest.raises(dienst.MediumUngueltig):
+            dienst.pruefe_medium("option-2", BILDAUSWAHL, "image/png", 10)
+        with pytest.raises(dienst.MediumUngueltig):
+            dienst.pruefe_medium("option-0", ZahlDaten(loesung=1), "image/png", 10)
+        with pytest.raises(dienst.MediumUngueltig):
+            dienst.pruefe_medium("irgendwas", ZahlDaten(loesung=1), "image/png", 10)
+
+    def test_falsches_format(self) -> None:
+        with pytest.raises(dienst.BildUngueltig):
+            dienst.pruefe_medium("ton", ZahlDaten(loesung=1), "image/png", 10)
+        with pytest.raises(dienst.BildUngueltig):
+            dienst.pruefe_medium("option-0", BILDAUSWAHL, "audio/mpeg", 10)
+        with pytest.raises(dienst.BildUngueltig, match="MB"):
+            dienst.pruefe_medium(
+                "ton", ZahlDaten(loesung=1), "audio/mpeg", dienst.MAX_TON_BYTES + 1
+            )
+
+    def test_oeffentlich_erst_mit_der_frage(self) -> None:
+        assert dienst.medium_oeffentlich("option-0", "offen")
+        assert dienst.medium_oeffentlich("ton", "aufgeloest")
+        assert not dienst.medium_oeffentlich("option-0", "bereit")
+        assert not dienst.medium_oeffentlich("ton", "keine")
+
+
+class TestTeams:
+    def test_mit_teams_muss_man_eines_waehlen(self) -> None:
+        a, b = uuid.uuid4(), uuid.uuid4()
+        dienst.pruefe_teamwahl({a, b}, a)
+        dienst.pruefe_teamwahl(set(), None)
+        with pytest.raises(dienst.TeamUngueltig, match="Team"):
+            dienst.pruefe_teamwahl({a, b}, None)
+        with pytest.raises(dienst.TeamUngueltig):
+            dienst.pruefe_teamwahl({a}, b)
+        with pytest.raises(dienst.TeamUngueltig):
+            dienst.pruefe_teamwahl(set(), a)
+
+    def test_wechsel_nur_vor_dem_start(self) -> None:
+        dienst.pruefe_teamwechsel("lobby")
+        with pytest.raises(dienst.AktionNichtMoeglich):
+            dienst.pruefe_teamwechsel("laeuft")
+
+    def test_team_rangliste_ist_die_summe_der_mitglieder(self) -> None:
+        rot, blau, leer = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        plaetze = dienst.teamrangliste(
+            [(rot, "Rot"), (blau, "Blau"), (leer, "Leer")],
+            [(rot, 3), (rot, 2), (blau, 4), (None, 9)],
+        )
+        assert [(p.name, p.punkte, p.rang, p.mitglieder) for p in plaetze] == [
+            ("Rot", 5, 1, 2),
+            ("Blau", 4, 2, 1),
+            ("Leer", 0, 3, 0),
+        ]
+        assert plaetze[0].id == rot
+
+    def test_ein_buzzer_je_team(self) -> None:
+        with pytest.raises(dienst.AntwortNichtMoeglich, match="Team"):
+            dienst.pruefe_buzzer_erlaubt(
+                "laeuft", "offen", "buzzer", schon_gedrueckt=False, team_schon_gedrueckt=True
+            )
+
+
+class TestBeitrittSperre:
+    def test_gesperrte_runde_nimmt_keine_neuen(self) -> None:
+        with pytest.raises(dienst.AktionNichtMoeglich, match="geschlossen"):
+            dienst.pruefe_beitritt("laeuft", offen=False)
+        dienst.pruefe_beitritt("laeuft", offen=False, wiederkehr=True)
+        dienst.pruefe_beitritt("lobby", offen=True)
+
+
+class TestErgebnistabelle:
+    def test_zeilen_je_spieler_mit_punkten_je_frage(self) -> None:
+        zeilen = dienst.ergebnistabelle(
+            fragen=["Hauptstadt?", "Berg?"],
+            spieler=[("Anna", "Rot", 5, [2, 3]), ("Ben", None, 0, [0, None])],
+        )
+        assert zeilen[0] == ["Platz", "Name", "Team", "Gesamt", "1: Hauptstadt?", "2: Berg?"]
+        assert zeilen[1] == ["1", "Anna", "Rot", "5", "2", "3"]
+        assert zeilen[2] == ["2", "Ben", "", "0", "0", ""]
+
+    def test_keine_formel_aus_einem_spielernamen(self) -> None:
+        """Ein Name wie =HYPERLINK(...) waere in Excel eine Formel."""
+        assert dienst.csv_zelle("=1+1") == "'=1+1"
+        assert dienst.csv_zelle("@x") == "'@x"
+        assert dienst.csv_zelle("+x") == "'+x"
+        assert dienst.csv_zelle("-5") == "-5", "Zahlen bleiben Zahlen"
+        assert dienst.csv_zelle("-x") == "'-x"
+        assert dienst.csv_zelle("Anna") == "Anna"
+
+    def test_csv_mit_semikolon_fuer_deutsches_excel(self) -> None:
+        text = dienst.als_csv([["a", "b;c"], ["1", "2"]])
+        assert text.lstrip("﻿").splitlines() == ['a;"b;c"', "1;2"]
+        assert text.startswith("﻿"), "Ohne BOM liest Excel die Umlaute falsch"

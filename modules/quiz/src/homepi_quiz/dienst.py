@@ -18,8 +18,10 @@ oeffentliches Quiz nicht zum Selbstbedienungsladen wird:
 
 from __future__ import annotations
 
+import csv
 import datetime as dt
 import hashlib
+import io
 import math
 import random
 import re
@@ -36,6 +38,7 @@ from homepi_core.auth.passwoerter import token_stimmt
 from .schemas import (
     AntwortEingabe,
     AuswahlDaten,
+    BildauswahlDaten,
     BildDaten,
     BuzzerDaten,
     Element,
@@ -50,6 +53,7 @@ from .schemas import (
     SchaetzDaten,
     SortierDaten,
     ZahlDaten,
+    ZuordnenDaten,
 )
 
 K = TypeVar("K", bound=Hashable)
@@ -175,9 +179,85 @@ def pruefe_spielername(name: str) -> tuple[str, str]:
     return anzeige, unicodedata.normalize("NFKC", anzeige).casefold()
 
 
-def pruefe_beitritt(status: Rundenstatus) -> None:
+def pruefe_beitritt(status: Rundenstatus, *, offen: bool, wiederkehr: bool = False) -> None:
+    """Wer noch hinein darf.
+
+    Die Leitung kann den Beitritt schliessen - eine oeffentliche Seite mit
+    einem Code am Beamer ist sonst offen fuer jeden, der ihn abfotografiert.
+    Wer mit einem Wiederkehrcode kommt, war schon dabei und darf zurueck.
+    """
     if status == "beendet":
         raise AktionNichtMoeglich("Diese Runde ist schon beendet.")
+    if not offen and not wiederkehr:
+        raise AktionNichtMoeglich("Die Spielleitung hat den Beitritt geschlossen.")
+
+
+class TeamUngueltig(ServiceError):
+    status = 422
+    title = "Team ungültig"
+
+
+class TeamUnbekannt(ServiceError):
+    status = 404
+    title = "Team unbekannt"
+
+
+class TeamVergeben(ServiceError):
+    status = 409
+    title = "Team vergeben"
+
+
+def pruefe_teamwahl(teams: set[uuid.UUID], gewaehlt: uuid.UUID | None) -> None:
+    """Mit Teams spielt niemand allein - ohne Teams spielt niemand in einem."""
+    if not teams:
+        if gewaehlt is not None:
+            raise TeamUngueltig("In dieser Runde gibt es keine Teams.")
+        return
+    if gewaehlt is None:
+        raise TeamUngueltig("Bitte wähle ein Team.")
+    if gewaehlt not in teams:
+        raise TeamUngueltig("Dieses Team gibt es in der Runde nicht.")
+
+
+def pruefe_teamwechsel(status: Rundenstatus) -> None:
+    """Selbst wechseln nur vor dem Start - danach wanderten Punkte mit."""
+    if status != "lobby":
+        raise AktionNichtMoeglich("Das Team lässt sich nur vor dem Start wechseln.")
+
+
+@dataclass(frozen=True, slots=True)
+class Teamrang:
+    id: uuid.UUID
+    name: str
+    punkte: int
+    rang: int
+    mitglieder: int
+
+
+def teamrangliste(
+    teams: Sequence[tuple[uuid.UUID, str]],
+    mitglieder: Iterable[tuple[uuid.UUID | None, int]],
+) -> list[Teamrang]:
+    """Die Summe der Mitglieder. Bewusst nicht der Schnitt: ein Team, das
+    mehr Leute mitbringt, bringt auch mehr Antworten - und ein Schnitt
+    bestrafte jeden, der dazukommt und bei der ersten Frage noch null hat."""
+    summen = {team_id: [0, 0] for team_id, _ in teams}
+    for team_id, punkte in mitglieder:
+        if team_id in summen:
+            summen[team_id][0] += punkte
+            summen[team_id][1] += 1
+    namen = dict(teams)
+    plaetze = rangliste((tid, namen[tid], summe) for tid, (summe, _) in summen.items())
+    return [
+        Teamrang(
+            id=platz.schluessel,  # type: ignore[arg-type]
+            name=platz.name,
+            punkte=platz.punkte,
+            rang=platz.rang,
+            mitglieder=summen[platz.schluessel][1],  # type: ignore[index]
+        )
+        for platz in plaetze
+    ]
 
 
 def wiederkehr_erlaubt(
@@ -312,6 +392,14 @@ def braucht_bild(daten: FrageDaten) -> bool:
 def pruefe_zeigbar(frage: FrageAusgabe) -> None:
     if braucht_bild(frage.daten) and not frage.hat_bild:
         raise AktionNichtMoeglich("Diese Frage braucht ein Bild. Lade im Katalog eines hoch.")
+    if isinstance(frage.daten, BildauswahlDaten):
+        fehlend = [
+            i + 1 for i in range(len(frage.daten.optionen)) if f"option-{i}" not in frage.medien
+        ]
+        if fehlend:
+            raise AktionNichtMoeglich(
+                f"Zu Antwort {', '.join(map(str, fehlend))} fehlt noch das Bild."
+            )
 
 
 def frist_fuer(zeitlimit: int | None, timer: bool, jetzt: dt.datetime) -> dt.datetime | None:
@@ -364,6 +452,12 @@ def elementkennung(frage_id: uuid.UUID, index: int) -> str:
     return "e" + hashlib.sha256(f"{frage_id}:{index}".encode()).hexdigest()[:9]
 
 
+def rechtskennung(frage_id: uuid.UUID, index: int) -> str:
+    """Wie ``elementkennung``, fuer die rechte Seite beim Zuordnen - mit
+    eigenem Salz, damit sich beide Typen nicht ineinander verraten."""
+    return "r" + hashlib.sha256(f"{frage_id}:rechts:{index}".encode()).hexdigest()[:9]
+
+
 def pruefe_antwort(
     daten: FrageDaten, eingabe: AntwortEingabe, frage_id: uuid.UUID | None = None
 ) -> dict[str, object]:
@@ -386,7 +480,7 @@ def pruefe_antwort(
                 f"Der Wert muss zwischen {_zahl(daten.minimum)} und {_zahl(daten.maximum)} liegen."
             )
         return {"zahl": eingabe.zahl}
-    if isinstance(daten, AuswahlDaten):
+    if isinstance(daten, AuswahlDaten | BildauswahlDaten):
         auswahl = sorted(set(eingabe.auswahl or []))
         if not auswahl:
             raise AntwortUngueltig("Bitte wähle eine Antwort.")
@@ -407,7 +501,27 @@ def pruefe_antwort(
         if len(reihenfolge) != len(erwartet) or set(reihenfolge) != erwartet:
             raise AntwortUngueltig("Bitte bring alle Elemente in eine Reihenfolge.")
         return {"reihenfolge": list(reihenfolge)}
+    if isinstance(daten, ZuordnenDaten):
+        return {"zuordnung": _pruefe_zuordnung(daten, eingabe, frage_id or uuid.UUID(int=0))}
     raise AntwortUngueltig("Bei dieser Frage wird gebuzzert, nicht geschrieben.")
+
+
+def _pruefe_zuordnung(
+    daten: ZuordnenDaten, eingabe: AntwortEingabe, frage_id: uuid.UUID
+) -> dict[str, str]:
+    zuordnung = eingabe.zuordnung or {}
+    erlaubt = {rechtskennung(frage_id, i) for i in range(len(daten.paare))}
+    zeilen = {str(i) for i in range(len(daten.paare))}
+    if set(zuordnung) != zeilen or not set(zuordnung.values()) <= erlaubt:
+        raise AntwortUngueltig("Bitte ordne jedem Eintrag ein Gegenstück zu.")
+    if len(set(zuordnung.values())) != len(zuordnung):
+        raise AntwortUngueltig("Jedes Gegenstück passt nur einmal.")
+    return dict(sorted(zuordnung.items(), key=lambda paar: int(paar[0])))
+
+
+def _optionstext(daten: AuswahlDaten | BildauswahlDaten, index: int) -> str:
+    text = daten.optionen[index].text
+    return text or f"Bild {index + 1}"
 
 
 def anzeige(daten: FrageDaten, wert: Mapping[str, object], frage_id: uuid.UUID) -> str:
@@ -415,9 +529,19 @@ def anzeige(daten: FrageDaten, wert: Mapping[str, object], frage_id: uuid.UUID) 
     if isinstance(daten, ZahlDaten | SchaetzDaten):
         zahl = wert.get("zahl")
         return _mit_einheit(float(zahl), daten.einheit) if isinstance(zahl, int | float) else ""
-    if isinstance(daten, AuswahlDaten):
+    if isinstance(daten, AuswahlDaten | BildauswahlDaten):
         indizes = _indizes(wert.get("auswahl"))
-        return ", ".join(daten.optionen[i].text for i in indizes if 0 <= i < len(daten.optionen))
+        return ", ".join(_optionstext(daten, i) for i in indizes if 0 <= i < len(daten.optionen))
+    if isinstance(daten, ZuordnenDaten):
+        rechts = {rechtskennung(frage_id, i): p.rechts for i, p in enumerate(daten.paare)}
+        zuordnung = wert.get("zuordnung")
+        if not isinstance(zuordnung, dict):
+            return ""
+        return ", ".join(
+            f"{daten.paare[int(links)].links} → {rechts.get(str(kennung), '?')}"
+            for links, kennung in zuordnung.items()
+            if str(links).isdigit() and int(links) < len(daten.paare)
+        )
     if isinstance(daten, HotspotDaten):
         x, y = wert.get("x"), wert.get("y")
         if isinstance(x, int | float) and isinstance(y, int | float):
@@ -438,8 +562,17 @@ def _liste(wert: object) -> list[object]:
     return list(wert) if isinstance(wert, list) else []
 
 
-def _mehrfach(daten: AuswahlDaten) -> bool:
-    return sum(1 for option in daten.optionen if option.richtig) > 1
+def _richtige(daten: AuswahlDaten | BildauswahlDaten) -> list[int]:
+    # Je Typ ausgeschrieben: die Optionen beider Typen haben ``richtig``,
+    # aber ihre Listen sind verschiedene Typen, und der gemeinsame Obertyp
+    # kennt das Feld nicht.
+    if isinstance(daten, AuswahlDaten):
+        return [i for i, option in enumerate(daten.optionen) if option.richtig]
+    return [i for i, bild in enumerate(daten.optionen) if bild.richtig]
+
+
+def _mehrfach(daten: AuswahlDaten | BildauswahlDaten) -> bool:
+    return len(_richtige(daten)) > 1
 
 
 # ------------------------------------------------------------- Bewertung
@@ -497,8 +630,17 @@ def _bewerte_eine(
         zahl = wert.get("zahl")
         treffer = isinstance(zahl, int | float) and abs(zahl - daten.loesung) <= daten.toleranz
         return Bewertung(punkte if treffer else 0, treffer)
-    if isinstance(daten, AuswahlDaten):
+    if isinstance(daten, AuswahlDaten | BildauswahlDaten):
         return _bewerte_auswahl(daten, punkte, set(_indizes(wert.get("auswahl"))))
+    if isinstance(daten, ZuordnenDaten):
+        zuordnung = wert.get("zuordnung")
+        zugeordnet = zuordnung if isinstance(zuordnung, dict) else {}
+        stimmt = sum(
+            1
+            for i in range(len(daten.paare))
+            if zugeordnet.get(str(i)) == rechtskennung(frage_id, i)
+        )
+        return _anteil(punkte, stimmt / len(daten.paare), stimmt == len(daten.paare))
     if isinstance(daten, HotspotDaten):
         x, y = wert.get("x"), wert.get("y")
         treffer = (
@@ -515,8 +657,10 @@ def _bewerte_eine(
     return Bewertung(None, None)
 
 
-def _bewerte_auswahl(daten: AuswahlDaten, punkte: int, gewaehlt: set[int]) -> Bewertung:
-    richtige = {i for i, option in enumerate(daten.optionen) if option.richtig}
+def _bewerte_auswahl(
+    daten: AuswahlDaten | BildauswahlDaten, punkte: int, gewaehlt: set[int]
+) -> Bewertung:
+    richtige = set(_richtige(daten))
     if not _mehrfach(daten):
         treffer = gewaehlt == richtige
         return Bewertung(punkte if treffer else 0, treffer)
@@ -557,7 +701,12 @@ def buzzer_dran[K: Hashable](druecke: Sequence[tuple[K, Urteil]]) -> K | None:
 
 
 def pruefe_buzzer_erlaubt(
-    status: Rundenstatus, phase: Phase, typ: str, *, schon_gedrueckt: bool
+    status: Rundenstatus,
+    phase: Phase,
+    typ: str,
+    *,
+    schon_gedrueckt: bool,
+    team_schon_gedrueckt: bool = False,
 ) -> None:
     if status != "laeuft" or typ != "buzzer":
         raise AntwortNichtMoeglich("Bei dieser Frage gibt es keinen Buzzer.")
@@ -565,6 +714,10 @@ def pruefe_buzzer_erlaubt(
         raise AntwortNichtMoeglich("Der Buzzer ist gerade gesperrt.")
     if schon_gedrueckt:
         raise AntwortNichtMoeglich("Du hast schon gebuzzert.")
+    # Mit Teams drueckt jedes Team einmal - wie am Buzzerpult in der Show.
+    # Sonst haette das groesste Team die meisten Finger am Knopf.
+    if team_schon_gedrueckt:
+        raise AntwortNichtMoeglich("Dein Team hat schon gebuzzert.")
 
 
 def pruefe_buzzer_urteil(typ: str, phase: Phase, dran: object | None) -> None:
@@ -605,6 +758,15 @@ def gemischt(frage_id: uuid.UUID, elemente: Sequence[str]) -> list[Element]:
     """Immer dieselbe Mischung je Frage - sonst sprang die Liste bei jedem
     Abruf, und das Handy pollt jede Sekunde. Nie die richtige Reihenfolge."""
     liste = [Element(kennung=elementkennung(frage_id, i), text=t) for i, t in enumerate(elemente)]
+    return _mischen(frage_id, liste)
+
+
+def _gemischt_rechts(frage_id: uuid.UUID, texte: Sequence[str]) -> list[Element]:
+    liste = [Element(kennung=rechtskennung(frage_id, i), text=t) for i, t in enumerate(texte)]
+    return _mischen(frage_id, liste)
+
+
+def _mischen(frage_id: uuid.UUID, liste: list[Element]) -> list[Element]:
     gemischte = list(liste)
     random.Random(str(frage_id)).shuffle(gemischte)
     if gemischte == liste and len(liste) > 1:
@@ -624,10 +786,15 @@ def loesung(daten: FrageDaten, frage_id: uuid.UUID) -> Loesung:
         return Loesung(anzeige=text, zahl=daten.loesung, toleranz=daten.toleranz)
     if isinstance(daten, SchaetzDaten):
         return Loesung(anzeige=_mit_einheit(daten.loesung, daten.einheit), zahl=daten.loesung)
-    if isinstance(daten, AuswahlDaten):
-        richtige = [i for i, option in enumerate(daten.optionen) if option.richtig]
+    if isinstance(daten, AuswahlDaten | BildauswahlDaten):
+        richtige = _richtige(daten)
         return Loesung(
-            anzeige=", ".join(daten.optionen[i].text for i in richtige), optionen=richtige
+            anzeige=", ".join(_optionstext(daten, i) for i in richtige), optionen=richtige
+        )
+    if isinstance(daten, ZuordnenDaten):
+        return Loesung(
+            anzeige=", ".join(f"{p.links} → {p.rechts}" for p in daten.paare),
+            zuordnung={str(i): rechtskennung(frage_id, i) for i in range(len(daten.paare))},
         )
     if isinstance(daten, HotspotDaten):
         return Loesung(anzeige="Die markierte Stelle im Bild", ziele=list(daten.ziele))
@@ -655,6 +822,7 @@ def oeffentliche_frage(
         punkte=frage.punkte,
         text=None,
         hat_bild=frage.hat_bild,
+        hat_ton="ton" in frage.medien,
     )
     if phase == "bereit":
         return sicht
@@ -671,6 +839,12 @@ def oeffentliche_frage(
         sicht.einheit = daten.einheit
     elif isinstance(daten, ZahlDaten):
         sicht.einheit = daten.einheit
+    elif isinstance(daten, ZuordnenDaten):
+        sicht.links = [paar.links for paar in daten.paare]
+        sicht.rechts = _gemischt_rechts(frage.id, [paar.rechts for paar in daten.paare])
+    elif isinstance(daten, BildauswahlDaten):
+        sicht.bildoptionen = [option.text for option in daten.optionen]
+        sicht.mehrfach = _mehrfach(daten)
     if phase == "aufgeloest":
         sicht.loesung = loesung(daten, frage.id)
     return sicht
@@ -707,6 +881,45 @@ def pruefe_bild(mime: str, groesse: int) -> str:
     return art
 
 
+class MediumUngueltig(ServiceError):
+    status = 422
+    title = "Medium ungültig"
+
+
+MAX_TON_BYTES = 8 * 1024 * 1024
+TONFORMATE = frozenset({"audio/mpeg", "audio/ogg", "audio/wav", "audio/mp4", "audio/webm"})
+_OPTION = re.compile(r"^option-(\d)$")
+
+
+def pruefe_medium(schluessel: str, daten: FrageDaten, mime: str, groesse: int) -> str:
+    """Ein weiteres Medium an der Frage: ein Ton zum Abspielen durch die
+    Leitung oder ein Bild je Antwort der Bildauswahl."""
+    if schluessel == "ton":
+        art = mime.split(";")[0].strip().lower()
+        if art not in TONFORMATE:
+            raise BildUngueltig("Erlaubt sind MP3, OGG, WAV, M4A und WebM.")
+        if groesse <= 0:
+            raise BildUngueltig("Die Datei ist leer.")
+        if groesse > MAX_TON_BYTES:
+            raise BildUngueltig(
+                f"Ein Ton darf höchstens {MAX_TON_BYTES // (1024 * 1024)} MB haben."
+            )
+        return art
+    treffer = _OPTION.match(schluessel)
+    if (
+        treffer is None
+        or not isinstance(daten, BildauswahlDaten)
+        or int(treffer.group(1)) >= len(daten.optionen)
+    ):
+        raise MediumUngueltig(f"Ein Medium „{schluessel}“ gibt es bei dieser Frage nicht.")
+    return pruefe_bild(mime, groesse)
+
+
+def medium_oeffentlich(schluessel: str, phase: Phase) -> bool:
+    """Ton und Antwortbilder gehoeren zur gezeigten Frage - vorher nicht."""
+    return phase in ("offen", "gesperrt", "aufgeloest")
+
+
 def pruefe_reihenfolge(vorhanden: Sequence[uuid.UUID], neu: Sequence[uuid.UUID]) -> None:
     if len(neu) != len(vorhanden) or set(neu) != set(vorhanden):
         raise ReihenfolgeUngueltig("Die neue Reihenfolge muss jede Frage genau einmal nennen.")
@@ -720,3 +933,57 @@ def pruefe_katalog_loeschbar(laufende_runden: int) -> None:
 def pruefe_katalog_spielbar(anzahl_fragen: int) -> None:
     if anzahl_fragen == 0:
         raise KatalogLeer("Der Katalog hat noch keine Fragen.")
+
+
+# ------------------------------------------------------------- Ergebnistabelle
+
+
+def csv_zelle(wert: str) -> str:
+    """Ein Spielername wie ``=HYPERLINK(...)`` waere in Excel eine Formel - und
+    die Spielernamen tippt hier jeder, der den Code kennt. Ein vorangestelltes
+    Hochkomma macht daraus Text. Zahlen bleiben Zahlen."""
+    if wert[:1] in ("=", "+", "@", "\t", "\r") or (wert[:1] == "-" and not _ist_zahl(wert)):
+        return "'" + wert
+    return wert
+
+
+def _ist_zahl(wert: str) -> bool:
+    try:
+        float(wert.replace(",", "."))
+    except ValueError:
+        return False
+    return True
+
+
+def ergebnistabelle(
+    fragen: Sequence[str],
+    spieler: Sequence[tuple[str, str | None, int, Sequence[int | None]]],
+) -> list[list[str]]:
+    """Eine Zeile je Spieler, eine Spalte je gespielter Frage.
+
+    ``spieler`` kommt schon in der Reihenfolge der Rangliste; der Platz wird
+    hier vergeben, mit geteilten Plaetzen wie auf der Tafel.
+    """
+    kopf = ["Platz", "Name", "Team", "Gesamt"] + [
+        f"{i}: {text}" for i, text in enumerate(fragen, start=1)
+    ]
+    plaetze = rangliste((index, name, gesamt) for index, (name, _, gesamt, _) in enumerate(spieler))
+    rang_von = {platz.schluessel: platz.rang for platz in plaetze}
+    zeilen = [kopf]
+    for index, (name, team, gesamt, je_frage) in enumerate(spieler):
+        zeilen.append(
+            [str(rang_von[index]), name, team or "", str(gesamt)]
+            + ["" if p is None else str(p) for p in je_frage]
+        )
+    return zeilen
+
+
+def als_csv(zeilen: Sequence[Sequence[str]]) -> str:
+    """Semikolon und BOM: so oeffnet ein deutsches Excel die Datei mit einem
+    Doppelklick richtig - mit Komma laege alles in Spalte A, ohne BOM stuenden
+    statt Umlauten Zeichensalat."""
+    puffer = io.StringIO()
+    schreiber = csv.writer(puffer, delimiter=";", lineterminator="\n")
+    for zeile in zeilen:
+        schreiber.writerow([csv_zelle(zelle) for zelle in zeile])
+    return "\ufeff" + puffer.getvalue()

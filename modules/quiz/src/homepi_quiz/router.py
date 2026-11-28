@@ -36,21 +36,25 @@ from homepi_core.auth.passwoerter import hashe_token
 from homepi_core.deps import DbSitzung, Einstellungen
 from pydantic import TypeAdapter
 
-from . import dienst, speicher
+from . import austausch, dienst, speicher
 from .modelle import Frage, Runde, Spieler
 from .schemas import (
     AntwortEingabe,
     AntwortSicht,
+    AuswertungAntwort,
     Beitritt,
+    BeitrittOffen,
     BildSichtbar,
     BuzzerSicht,
     BuzzerUrteil,
     EigeneAntwort,
     FrageAusgabe,
+    FrageAuswertung,
     FrageDaten,
     FrageEingabe,
     FrageWaehlen,
     Ich,
+    ImportErgebnis,
     KatalogAusgabe,
     KatalogDetail,
     KatalogEingabe,
@@ -65,6 +69,9 @@ from .schemas import (
     Rundenstatus,
     SpielerSicht,
     Steuerung,
+    TeamAnlegen,
+    TeamPlatz,
+    TeamZuweisen,
     Uebersicht,
     Wiederkehrcode,
     Zeigen,
@@ -141,7 +148,9 @@ def _setze_cookie(antwort: Response, code: str, token: str, einstellungen: Einst
 # ------------------------------------------------------------- Uebersetzung
 
 
-def _frage_ausgabe(frage: Frage, bilder: set[uuid.UUID]) -> FrageAusgabe:
+def _frage_ausgabe(
+    frage: Frage, bilder: set[uuid.UUID], medien: dict[uuid.UUID, list[str]] | None = None
+) -> FrageAusgabe:
     return FrageAusgabe(
         id=frage.id,
         position=frage.position,
@@ -150,14 +159,17 @@ def _frage_ausgabe(frage: Frage, bilder: set[uuid.UUID]) -> FrageAusgabe:
         punkte=frage.punkte,
         zeitlimit=frage.zeitlimit,
         hat_bild=frage.id in bilder,
+        medien=(medien or {}).get(frage.id, []),
         daten=_FRAGEDATEN.validate_python(frage.daten),
     )
 
 
 async def _fragen(sitzung: DbSitzung, katalog_id: uuid.UUID) -> list[FrageAusgabe]:
     alle = await speicher.fragen(sitzung, katalog_id)
-    bilder = await speicher.mit_bild(sitzung, [f.id for f in alle])
-    return [_frage_ausgabe(f, bilder) for f in alle]
+    ids = [f.id for f in alle]
+    bilder = await speicher.mit_bild(sitzung, ids)
+    medien = await speicher.medien_von(sitzung, ids)
+    return [_frage_ausgabe(f, bilder, medien) for f in alle]
 
 
 async def _katalog_detail(sitzung: DbSitzung, katalog_id: uuid.UUID) -> KatalogDetail:
@@ -183,6 +195,7 @@ async def _runde_ausgabe(sitzung: DbSitzung, runde: Runde) -> RundeAusgabe:
         status=_status(runde),
         anzahl_spieler=await speicher.anzahl_spieler(sitzung, runde.id),
         angelegt=runde.angelegt,
+        beitritt_offen=runde.beitritt_offen,
     )
 
 
@@ -198,17 +211,48 @@ def _aktuelle(fragen: list[FrageAusgabe], runde: Runde) -> tuple[int, FrageAusga
     return next(((i, f) for i, f in enumerate(fragen) if f.id == runde.frage_id), None)
 
 
-async def _rangliste(sitzung: DbSitzung, runde: Runde) -> tuple[list[Spieler], list[dienst.Rang]]:
+@dataclass(slots=True)
+class Lage:
+    """Wer mitspielt, mit welchen Punkten, in welchem Team."""
+
+    leute: list[Spieler]
+    plaetze: list[dienst.Rang]
+    teams: list[dienst.Teamrang]
+    team_von: dict[uuid.UUID, uuid.UUID]
+    teamname: dict[uuid.UUID, str]
+
+
+async def _lage(sitzung: DbSitzung, runde: Runde) -> Lage:
     leute = await speicher.spieler_der_runde(sitzung, runde.id)
     punkte = await speicher.punktestaende(sitzung, runde.id)
-    return leute, dienst.rangliste((s.id, s.name, punkte.get(s.id, 0)) for s in leute)
+    plaetze = dienst.rangliste((s.id, s.name, punkte.get(s.id, 0)) for s in leute)
+    teams = await speicher.teams(sitzung, runde.id)
+    team_von = await speicher.mitgliedschaften(sitzung, runde.id)
+    teamplaetze = dienst.teamrangliste(
+        [(t.id, t.name) for t in teams],
+        [(team_von.get(s.id), punkte.get(s.id, 0)) for s in leute],
+    )
+    return Lage(leute, plaetze, teamplaetze, team_von, {t.id: t.name for t in teams})
+
+
+def _teamplaetze(lage: Lage) -> list[TeamPlatz]:
+    return [
+        TeamPlatz(id=t.id, name=t.name, punkte=t.punkte, rang=t.rang, mitglieder=t.mitglieder)
+        for t in lage.teams
+    ]
+
+
+def _team_des(lage: Lage, spieler_id: object) -> str | None:
+    team_id = lage.team_von.get(spieler_id)  # type: ignore[call-overload]
+    return lage.teamname.get(team_id) if team_id else None
 
 
 async def _steuerung(sitzung: DbSitzung, runde: Runde) -> Steuerung:
     jetzt = _jetzt()
     fragen = await _fragen(sitzung, runde.katalog_id)
     aktuell = _aktuelle(fragen, runde)
-    leute, plaetze = await _rangliste(sitzung, runde)
+    lage = await _lage(sitzung, runde)
+    leute, plaetze = lage.leute, lage.plaetze
     namen = {s.id: s.name for s in leute}
     gesehen = {s.id: s.zuletzt_gesehen for s in leute}
 
@@ -259,18 +303,21 @@ async def _steuerung(sitzung: DbSitzung, runde: Runde) -> Steuerung:
                 rang=platz.rang,
                 zuletzt_gesehen=gesehen[platz.schluessel],  # type: ignore[index]
                 verbunden=dienst.verbunden(gesehen[platz.schluessel], jetzt),  # type: ignore[index]
+                team_id=lage.team_von.get(platz.schluessel),  # type: ignore[call-overload]
             )
             for platz in plaetze
         ],
         antworten=antworten,
         buzzer=buzzer,
+        teams=_teamplaetze(lage),
     )
 
 
 async def _rundenstand(sitzung: DbSitzung, runde: Runde, spieler: Spieler | None) -> Rundenstand:
     fragen = await _fragen(sitzung, runde.katalog_id)
     aktuell = _aktuelle(fragen, runde)
-    _, plaetze = await _rangliste(sitzung, runde)
+    lage = await _lage(sitzung, runde)
+    plaetze = lage.plaetze
     phase = _phase(runde)
 
     sicht = None
@@ -310,6 +357,7 @@ async def _rundenstand(sitzung: DbSitzung, runde: Runde, spieler: Spieler | None
             antwort=antwort,
             buzzer_position=position,
             buzzer_urteil=druecke[position - 1][1] if position else None,  # type: ignore[arg-type]
+            team=_team_des(lage, spieler.id),
         )
 
     return Rundenstand(
@@ -321,10 +369,15 @@ async def _rundenstand(sitzung: DbSitzung, runde: Runde, spieler: Spieler | None
         bild_sichtbar=dienst.bild_oeffentlich(phase, runde.bild_sichtbar),
         frist=runde.frist,
         jetzt=_jetzt(),
-        rangliste=[Platz(name=p.name, punkte=p.punkte, rang=p.rang) for p in plaetze],
+        rangliste=[
+            Platz(name=p.name, punkte=p.punkte, rang=p.rang, team=_team_des(lage, p.schluessel))
+            for p in plaetze
+        ],
         anzahl_antworten=anzahl_antworten,
         buzzer=dran,
         ich=ich,
+        teams=_teamplaetze(lage),
+        beitritt_offen=runde.beitritt_offen,
     )
 
 
@@ -332,7 +385,15 @@ async def _aktuelle_frage(sitzung: DbSitzung, runde: Runde) -> FrageAusgabe:
     if runde.frage_id is None:
         raise dienst.AktionNichtMoeglich("Es ist noch keine Frage gewählt.")
     frage = await speicher.frage(sitzung, runde.frage_id)
-    return _frage_ausgabe(frage, await speicher.mit_bild(sitzung, [frage.id]))
+    return await _eine_frage(sitzung, frage)
+
+
+async def _eine_frage(sitzung: DbSitzung, frage: Frage) -> FrageAusgabe:
+    return _frage_ausgabe(
+        frage,
+        await speicher.mit_bild(sitzung, [frage.id]),
+        await speicher.medien_von(sitzung, [frage.id]),
+    )
 
 
 async def _auswerten(sitzung: DbSitzung, runde: Runde, frage: FrageAusgabe) -> None:
@@ -400,7 +461,9 @@ async def beitreten(
         # Schon dabei - ein zweiter Druck auf "Mitspielen" legt niemanden an.
         return await _rundenstand(sitzung, runde, zugriff.spieler)
 
-    dienst.pruefe_beitritt(_status(runde))
+    dienst.pruefe_beitritt(
+        _status(runde), offen=runde.beitritt_offen, wiederkehr=bool(daten.wiederkehrcode)
+    )
     name, schluessel = dienst.pruefe_spielername(daten.name)
     token = neues_token()
 
@@ -419,9 +482,13 @@ async def beitreten(
         spieler.wiederkehr_bis = None
     else:
         dienst.pruefe_spielerzahl(await speicher.anzahl_spieler(sitzung, runde.id))
+        teams = {t.id for t in await speicher.teams(sitzung, runde.id)}
+        dienst.pruefe_teamwahl(teams, daten.team_id)
         spieler = await speicher.spieler_anlegen(
             sitzung, runde.id, name, schluessel, hashe_token(token)
         )
+        if daten.team_id is not None:
+            await speicher.team_setzen(sitzung, spieler.id, daten.team_id)
 
     _setze_cookie(antwort, runde.code, token, einstellungen)
     return await _rundenstand(sitzung, runde, spieler)
@@ -450,13 +517,48 @@ async def buzzern(zugriff: SpielerZugriff, sitzung: DbSitzung) -> Rundenstand:
     assert spieler is not None
     frage = await _aktuelle_frage(sitzung, runde)
     druecke = await speicher.druecke(sitzung, runde.id, frage.id)
+    team_von = await speicher.mitgliedschaften(sitzung, runde.id)
+    mein_team = team_von.get(spieler.id)
     dienst.pruefe_buzzer_erlaubt(
         _status(runde),
         _phase(runde),
         frage.daten.typ,
         schon_gedrueckt=any(d.spieler_id == spieler.id for d in druecke),
+        team_schon_gedrueckt=mein_team is not None
+        and any(team_von.get(d.spieler_id) == mein_team for d in druecke),
     )
     await speicher.druecken(sitzung, runde.id, frage.id, spieler.id)
+    return await _rundenstand(sitzung, runde, spieler)
+
+
+@router.get(
+    "/runden/{code}/medien/{schluessel}",
+    summary="Ton oder Antwortbild der gezeigten Frage",
+    response_class=Response,
+    responses={200: {"content": {"image/*": {}, "audio/*": {}}}},
+)
+async def oeffentliches_medium(
+    schluessel: str, zugriff: RundenZugriff, sitzung: DbSitzung
+) -> Response:
+    runde = zugriff.runde
+    if runde.frage_id is None or not dienst.medium_oeffentlich(schluessel, _phase(runde)):
+        raise dienst.BildFehlt("Gerade wird nichts gezeigt.")
+    eintrag = await speicher.medium(sitzung, runde.frage_id, schluessel)
+    if eintrag is None:
+        raise dienst.BildFehlt("Gerade wird nichts gezeigt.")
+    return Response(content=eintrag.inhalt, media_type=eintrag.mime)
+
+
+@router.put("/runden/{code}/team", summary="Eigenes Team wechseln (vor dem Start)")
+async def team_wechseln(
+    daten: TeamZuweisen, zugriff: SpielerZugriff, sitzung: DbSitzung
+) -> Rundenstand:
+    runde, spieler = zugriff.runde, zugriff.spieler
+    assert spieler is not None
+    dienst.pruefe_teamwechsel(_status(runde))
+    teams = {t.id for t in await speicher.teams(sitzung, runde.id)}
+    dienst.pruefe_teamwahl(teams, daten.team_id)
+    await speicher.team_setzen(sitzung, spieler.id, daten.team_id)
     return await _rundenstand(sitzung, runde, spieler)
 
 
@@ -488,11 +590,85 @@ async def katalog_anlegen(daten: KatalogEingabe, sitzung: DbSitzung) -> KatalogD
     return await _katalog_detail(sitzung, eintrag.id)
 
 
+@router.post(
+    "/kataloge/import",
+    status_code=status.HTTP_201_CREATED,
+    summary="Katalog aus Battle.Net oder einem Export übernehmen (ZIP/JSON roh)",
+    dependencies=[LEITEN],
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/zip": {"schema": {"type": "string", "format": "binary"}}},
+        }
+    },
+)
+async def katalog_importieren(request: Request, sitzung: DbSitzung) -> ImportErgebnis:
+    angegeben = int(request.headers.get("content-length") or 0)
+    if angegeben > austausch.MAX_PAKET_BYTES:
+        raise austausch.ImportUngueltig(
+            f"Die Datei ist größer als {austausch.MAX_PAKET_BYTES // (1024 * 1024)} MB."
+        )
+    paket = austausch.lies_paket(await request.body())
+    katalog = await speicher.katalog_anlegen(
+        sitzung, KatalogEingabe(titel=paket.titel, beschreibung=paket.beschreibung)
+    )
+    for frage in paket.fragen:
+        eintrag = await speicher.frage_anlegen(sitzung, katalog.id, frage.eingabe)
+        for schluessel, (mime, inhalt) in frage.medien.items():
+            if schluessel == "bild":
+                await speicher.bild_setzen(sitzung, eintrag.id, mime, inhalt)
+            else:
+                await speicher.medium_setzen(sitzung, eintrag.id, schluessel, mime, inhalt)
+    return ImportErgebnis(
+        katalog=await _katalog_detail(sitzung, katalog.id), hinweise=paket.hinweise
+    )
+
+
 @router.get(
     "/kataloge/{katalog_id}", summary="Katalog mit Fragen und Lösungen", dependencies=[LESEN]
 )
 async def katalog(katalog_id: uuid.UUID, sitzung: DbSitzung) -> KatalogDetail:
     return await _katalog_detail(sitzung, katalog_id)
+
+
+@router.get(
+    "/kataloge/{katalog_id}/export",
+    summary="Katalog als ZIP sichern",
+    response_class=Response,
+    responses={200: {"content": {"application/zip": {}}}},
+    dependencies=[LESEN],
+)
+async def katalog_exportieren(katalog_id: uuid.UUID, sitzung: DbSitzung) -> Response:
+    eintrag = await speicher.katalog(sitzung, katalog_id)
+    fragen = await speicher.fragen(sitzung, katalog_id)
+    medien = await speicher.alle_medien(sitzung, [f.id for f in fragen])
+    paket = austausch.schreibe_paket(
+        eintrag.titel,
+        eintrag.beschreibung,
+        [
+            austausch.ImportFrage(
+                eingabe=FrageEingabe(
+                    text=f.text,
+                    kategorie=f.kategorie,
+                    punkte=f.punkte,
+                    zeitlimit=f.zeitlimit,
+                    daten=_FRAGEDATEN.validate_python(f.daten),
+                ),
+                medien=medien[f.id],
+            )
+            for f in fragen
+        ],
+    )
+    name = _dateiname(eintrag.titel)
+    return Response(
+        content=paket,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{name}.zip"'},
+    )
+
+
+def _dateiname(titel: str) -> str:
+    return "".join(z if z.isalnum() else "-" for z in titel).strip("-")[:60] or "quiz"
 
 
 @router.put("/kataloge/{katalog_id}", summary="Katalog umbenennen", dependencies=[LEITEN])
@@ -546,7 +722,7 @@ async def frage_aendern(
 ) -> FrageAusgabe:
     eintrag = await speicher.frage(sitzung, frage_id)
     await speicher.frage_aendern(sitzung, eintrag, daten)
-    return _frage_ausgabe(eintrag, await speicher.mit_bild(sitzung, [frage_id]))
+    return await _eine_frage(sitzung, eintrag)
 
 
 @router.delete(
@@ -593,7 +769,7 @@ async def bild_hochladen(frage_id: uuid.UUID, request: Request, sitzung: DbSitzu
     inhalt = await request.body()
     mime = dienst.pruefe_bild(request.headers.get("content-type", ""), len(inhalt))
     await speicher.bild_setzen(sitzung, frage_id, mime, inhalt)
-    return _frage_ausgabe(eintrag, {frage_id})
+    return await _eine_frage(sitzung, eintrag)
 
 
 @router.delete(
@@ -605,6 +781,55 @@ async def bild_hochladen(frage_id: uuid.UUID, request: Request, sitzung: DbSitzu
 async def bild_entfernen(frage_id: uuid.UUID, sitzung: DbSitzung) -> None:
     await speicher.frage(sitzung, frage_id)
     await speicher.bild_loeschen(sitzung, frage_id)
+
+
+@router.get(
+    "/fragen/{frage_id}/medien/{schluessel}",
+    summary="Ton oder Antwortbild einer Frage",
+    response_class=Response,
+    responses={200: {"content": {"image/*": {}, "audio/*": {}}}},
+    dependencies=[LESEN],
+)
+async def medium_holen(frage_id: uuid.UUID, schluessel: str, sitzung: DbSitzung) -> Response:
+    eintrag = await speicher.medium(sitzung, frage_id, schluessel)
+    if eintrag is None:
+        raise dienst.BildFehlt("Dieses Medium gibt es an der Frage nicht.")
+    return Response(content=eintrag.inhalt, media_type=eintrag.mime)
+
+
+@router.put(
+    "/fragen/{frage_id}/medien/{schluessel}",
+    summary="Ton (ton) oder Antwortbild (option-<n>) hochladen",
+    dependencies=[LEITEN],
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"*/*": {"schema": {"type": "string", "format": "binary"}}},
+        }
+    },
+)
+async def medium_hochladen(
+    frage_id: uuid.UUID, schluessel: str, request: Request, sitzung: DbSitzung
+) -> FrageAusgabe:
+    eintrag = await speicher.frage(sitzung, frage_id)
+    daten = _FRAGEDATEN.validate_python(eintrag.daten)
+    typ = request.headers.get("content-type", "")
+    dienst.pruefe_medium(schluessel, daten, typ, int(request.headers.get("content-length") or 1))
+    inhalt = await request.body()
+    mime = dienst.pruefe_medium(schluessel, daten, typ, len(inhalt))
+    await speicher.medium_setzen(sitzung, frage_id, schluessel, mime, inhalt)
+    return await _eine_frage(sitzung, eintrag)
+
+
+@router.delete(
+    "/fragen/{frage_id}/medien/{schluessel}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Ton oder Antwortbild entfernen",
+    dependencies=[LEITEN],
+)
+async def medium_entfernen(frage_id: uuid.UUID, schluessel: str, sitzung: DbSitzung) -> None:
+    await speicher.frage(sitzung, frage_id)
+    await speicher.medium_loeschen(sitzung, frage_id, schluessel)
 
 
 # ===================================================== mit Konto: Runden leiten
@@ -621,6 +846,7 @@ async def runden(sitzung: DbSitzung) -> list[RundeAusgabe]:
             status=_status(r),
             anzahl_spieler=n,
             angelegt=r.angelegt,
+            beitritt_offen=r.beitritt_offen,
         )
         for r, titel, n in await speicher.runden(sitzung)
     ]
@@ -836,3 +1062,141 @@ async def wiederkehr(
 )
 async def spieler_entfernen(runde_id: uuid.UUID, spieler_id: uuid.UUID, sitzung: DbSitzung) -> None:
     await speicher.spieler_loeschen(sitzung, await speicher.spieler(sitzung, runde_id, spieler_id))
+
+
+@router.post(
+    "/leitung/{runde_id}/beitritt",
+    summary="Beitritt neuer Spieler öffnen oder schließen",
+    dependencies=[LEITEN],
+)
+async def beitritt_schalten(
+    runde_id: uuid.UUID, daten: BeitrittOffen, sitzung: DbSitzung
+) -> Steuerung:
+    runde = await speicher.runde(sitzung, runde_id)
+    runde.beitritt_offen = daten.offen
+    await speicher.speichern(sitzung, runde)
+    return await _steuerung(sitzung, runde)
+
+
+@router.post("/leitung/{runde_id}/teams", summary="Team anlegen", dependencies=[LEITEN])
+async def team_anlegen(runde_id: uuid.UUID, daten: TeamAnlegen, sitzung: DbSitzung) -> Steuerung:
+    runde = await speicher.runde(sitzung, runde_id)
+    name, schluessel = dienst.pruefe_spielername(daten.name)
+    await speicher.team_anlegen(sitzung, runde.id, name, schluessel)
+    return await _steuerung(sitzung, runde)
+
+
+@router.delete(
+    "/leitung/{runde_id}/teams/{team_id}",
+    summary="Team auflösen (Mitglieder spielen ohne Team weiter)",
+    dependencies=[LEITEN],
+)
+async def team_loeschen(runde_id: uuid.UUID, team_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
+    runde = await speicher.runde(sitzung, runde_id)
+    await speicher.team_loeschen(sitzung, await speicher.team(sitzung, runde.id, team_id))
+    return await _steuerung(sitzung, runde)
+
+
+@router.put(
+    "/leitung/{runde_id}/spieler/{spieler_id}/team",
+    summary="Spieler einem Team zuordnen",
+    dependencies=[LEITEN],
+)
+async def team_zuweisen(
+    runde_id: uuid.UUID, spieler_id: uuid.UUID, daten: TeamZuweisen, sitzung: DbSitzung
+) -> Steuerung:
+    runde = await speicher.runde(sitzung, runde_id)
+    await speicher.spieler(sitzung, runde.id, spieler_id)
+    if daten.team_id is not None:
+        await speicher.team(sitzung, runde.id, daten.team_id)
+    await speicher.team_setzen(sitzung, spieler_id, daten.team_id)
+    return await _steuerung(sitzung, runde)
+
+
+async def _auswertung(sitzung: DbSitzung, runde: Runde) -> list[FrageAuswertung]:
+    fragen = await _fragen(sitzung, runde.katalog_id)
+    namen = {s.id: s.name for s in await speicher.spieler_der_runde(sitzung, runde.id)}
+    antworten = await speicher.alle_antworten(sitzung, runde.id)
+    druecke = await speicher.alle_druecke(sitzung, runde.id)
+    ergebnis: list[FrageAuswertung] = []
+    for nummer, frage in enumerate(fragen, start=1):
+        if str(frage.id) not in runde.erledigt:
+            continue
+        zeilen = [
+            AuswertungAntwort(
+                spieler=namen.get(a.spieler_id, "?"),
+                anzeige=dienst.anzeige(frage.daten, a.wert, frage.id),
+                punkte=a.punkte,
+                richtig=a.richtig,
+            )
+            for a in antworten
+            if a.frage_id == frage.id
+        ] + [
+            AuswertungAntwort(
+                spieler=namen.get(d.spieler_id, "?"),
+                anzeige=f"Buzzer ({d.urteil})",
+                punkte=d.punkte,
+                richtig={"richtig": True, "falsch": False}.get(d.urteil),
+            )
+            for d in druecke
+            if d.frage_id == frage.id
+        ]
+        zeilen.sort(key=lambda z: z.spieler.casefold())
+        ergebnis.append(
+            FrageAuswertung(
+                frage_id=frage.id,
+                nummer=nummer,
+                text=frage.text,
+                typ=frage.daten.typ,
+                loesung=dienst.loesung(frage.daten, frage.id).anzeige,
+                antworten=zeilen,
+                richtig=sum(1 for z in zeilen if z.richtig),
+                gesamt=len(zeilen),
+            )
+        )
+    return ergebnis
+
+
+@router.get(
+    "/leitung/{runde_id}/auswertung",
+    summary="Gespielte Fragen im Rückblick",
+    dependencies=[LESEN],
+)
+async def auswertung(runde_id: uuid.UUID, sitzung: DbSitzung) -> list[FrageAuswertung]:
+    return await _auswertung(sitzung, await speicher.runde(sitzung, runde_id))
+
+
+@router.get(
+    "/leitung/{runde_id}/ergebnis.csv",
+    summary="Ergebnis als CSV für Excel",
+    response_class=Response,
+    responses={200: {"content": {"text/csv": {}}}},
+    dependencies=[LESEN],
+)
+async def ergebnis_csv(runde_id: uuid.UUID, sitzung: DbSitzung) -> Response:
+    runde = await speicher.runde(sitzung, runde_id)
+    lage = await _lage(sitzung, runde)
+    fragen = await _auswertung(sitzung, runde)
+    je_spieler: dict[str, list[int | None]] = {}
+    for spalte, frage in enumerate(fragen):
+        for zeile in frage.antworten:
+            punkte = je_spieler.setdefault(zeile.spieler, [None] * len(fragen))
+            if zeile.punkte is not None:
+                punkte[spalte] = (punkte[spalte] or 0) + zeile.punkte
+    tabelle = dienst.ergebnistabelle(
+        [f.text for f in fragen],
+        [
+            (
+                platz.name,
+                _team_des(lage, platz.schluessel),
+                platz.punkte,
+                je_spieler.get(platz.name, [None] * len(fragen)),
+            )
+            for platz in lage.plaetze
+        ],
+    )
+    return Response(
+        content=dienst.als_csv(tabelle).encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="quiz-{runde.code}.csv"'},
+    )

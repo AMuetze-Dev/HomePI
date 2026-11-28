@@ -7,7 +7,15 @@ import {
 } from "react";
 
 import { Feld, Hinweis, Knopf } from "../../ui";
-import type { FrageDaten, FrageEingabe, Fragetyp, Option, Ziel } from "./api";
+import type {
+  BildOption,
+  FrageDaten,
+  FrageEingabe,
+  Fragetyp,
+  Option,
+  Paar,
+  Ziel,
+} from "./api";
 import { TYPWORT } from "./texte";
 import { bereinigt, TYPEN, vorlage, zeilen } from "./vorlage";
 import stil from "./Quiz.module.css";
@@ -228,7 +236,125 @@ function TypFelder({
           onChange={(e) => setzen({ ...d, elemente: zeilen(e.target.value) })}
         />
       );
+    case "zuordnen":
+      return <Paare paare={d.paare} setzen={(paare) => setzen({ ...d, paare })} />;
+    case "bildauswahl":
+      return (
+        <Bildoptionen
+          optionen={d.optionen}
+          setzen={(optionen) => setzen({ ...d, optionen })}
+        />
+      );
   }
+}
+
+function Paare({ paare, setzen }: { paare: Paar[]; setzen: (p: Paar[]) => void }) {
+  const aendern = (index: number, neu: Partial<Paar>) =>
+    setzen(paare.map((p, i) => (i === index ? { ...p, ...neu } : p)));
+  return (
+    <fieldset className={stil.optionen}>
+      <legend className={stil.nebensache}>
+        Paare - links steht, was die Spieler sehen; rechts das Gegenstück, das sie
+        gemischt zuordnen.
+      </legend>
+      {paare.map((paar, index) => (
+        <div key={index} className={stil.paarzeile}>
+          <input
+            value={paar.links}
+            maxLength={200}
+            onChange={(e) => aendern(index, { links: e.target.value })}
+            aria-label={`Paar ${index + 1} links`}
+          />
+          <span aria-hidden="true">→</span>
+          <input
+            value={paar.rechts}
+            maxLength={200}
+            onChange={(e) => aendern(index, { rechts: e.target.value })}
+            aria-label={`Paar ${index + 1} rechts`}
+          />
+          <Knopf
+            type="button"
+            auspraegung="leise"
+            groesse="sm"
+            disabled={paare.length <= 2}
+            onClick={() => setzen(paare.filter((_, i) => i !== index))}
+            aria-label={`Paar ${index + 1} entfernen`}
+          >
+            ×
+          </Knopf>
+        </div>
+      ))}
+      <div>
+        <Knopf
+          type="button"
+          auspraegung="sekundaer"
+          groesse="sm"
+          disabled={paare.length >= 8}
+          onClick={() => setzen([...paare, { links: "", rechts: "" }])}
+        >
+          Paar hinzufügen
+        </Knopf>
+      </div>
+    </fieldset>
+  );
+}
+
+function Bildoptionen({
+  optionen,
+  setzen,
+}: {
+  optionen: BildOption[];
+  setzen: (o: BildOption[]) => void;
+}) {
+  const aendern = (index: number, neu: Partial<BildOption>) =>
+    setzen(optionen.map((o, i) => (i === index ? { ...o, ...neu } : o)));
+  return (
+    <fieldset className={stil.optionen}>
+      <legend className={stil.nebensache}>
+        Antworten als Bilder - kreuze die richtigen an. Die Bilder lädst du nach dem
+        Speichern hoch; die Beschreibung lesen Screenreader vor.
+      </legend>
+      {optionen.map((option, index) => (
+        <div key={index} className={stil.optionzeile}>
+          <input
+            type="checkbox"
+            checked={option.richtig}
+            onChange={(e) => aendern(index, { richtig: e.target.checked })}
+            aria-label={`Bild ${index + 1} ist richtig`}
+          />
+          <input
+            className={stil.optiontext}
+            value={option.text}
+            maxLength={80}
+            placeholder={`Bild ${index + 1}`}
+            onChange={(e) => aendern(index, { text: e.target.value })}
+            aria-label={`Beschreibung Bild ${index + 1}`}
+          />
+          <Knopf
+            type="button"
+            auspraegung="leise"
+            groesse="sm"
+            disabled={optionen.length <= 2}
+            onClick={() => setzen(optionen.filter((_, i) => i !== index))}
+            aria-label={`Bild ${index + 1} entfernen`}
+          >
+            ×
+          </Knopf>
+        </div>
+      ))}
+      <div>
+        <Knopf
+          type="button"
+          auspraegung="sekundaer"
+          groesse="sm"
+          disabled={optionen.length >= 6}
+          onClick={() => setzen([...optionen, { text: "", richtig: false }])}
+        >
+          Bild hinzufügen
+        </Knopf>
+      </div>
+    </fieldset>
+  );
 }
 
 /** Mehrzeiliges Feld. Der Hinweis steht neben der Beschriftung, nicht in

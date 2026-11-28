@@ -28,6 +28,11 @@ import {
   type FrageEingabe,
   type Katalog,
   type KatalogDetail,
+  exportAdresse,
+  importiereKatalog,
+  ladeMediumHoch,
+  entferneMedium,
+  mediumAdresse,
 } from "./api";
 import { FrageFormular } from "./FrageFormular";
 import { LEERE_FRAGE } from "./vorlage";
@@ -43,6 +48,9 @@ export function KatalogTafel({
   darfVerwalten: boolean;
 }) {
   const [suche, setSuche] = useSearchParams();
+  // Was beim Uebernehmen nicht ging - im neuen Katalog angezeigt, wo man es
+  // nachbessert, und beim Verlassen vergessen.
+  const [hinweise, setHinweise] = useState<string[]>([]);
   const id = suche.get("katalog");
   if (id) {
     return (
@@ -50,12 +58,22 @@ export function KatalogTafel({
         id={id}
         darfLeiten={darfLeiten}
         darfVerwalten={darfVerwalten}
-        zurueck={() => setSuche({})}
+        hinweise={hinweise}
+        zurueck={() => {
+          setHinweise([]);
+          setSuche({});
+        }}
       />
     );
   }
   return (
-    <KatalogListe darfLeiten={darfLeiten} oeffnen={(neu) => setSuche({ katalog: neu })} />
+    <KatalogListe
+      darfLeiten={darfLeiten}
+      oeffnen={(neu, gemeldet = []) => {
+        setHinweise(gemeldet);
+        setSuche({ katalog: neu });
+      }}
+    />
   );
 }
 
@@ -69,7 +87,7 @@ function KatalogListe({
   oeffnen,
 }: {
   darfLeiten: boolean;
-  oeffnen: (id: string) => void;
+  oeffnen: (id: string, hinweise?: string[]) => void;
 }) {
   const [liste, setListe] = useState<Liste>({ phase: "laedt" });
   const [titel, setTitel] = useState("");
@@ -136,6 +154,7 @@ function KatalogListe({
               {fehler}
             </Hinweis>
           )}
+          <Uebernahme oeffnen={oeffnen} />
         </Karte>
       )}
       {liste.kataloge.length === 0 ? (
@@ -172,11 +191,13 @@ function KatalogBearbeiten({
   id,
   darfLeiten,
   darfVerwalten,
+  hinweise,
   zurueck,
 }: {
   id: string;
   darfLeiten: boolean;
   darfVerwalten: boolean;
+  hinweise: string[];
   zurueck: () => void;
 }) {
   const [detail, setDetail] = useState<Detail>({ phase: "laedt" });
@@ -256,9 +277,14 @@ function KatalogBearbeiten({
       titel={katalog.titel}
       beiwort={`${katalog.fragen.length} Fragen`}
       aktionen={
-        <Knopf auspraegung="leise" groesse="sm" onClick={zurueck}>
-          Alle Kataloge
-        </Knopf>
+        <>
+          <a className={stil.verweis} href={exportAdresse(id)} download>
+            Als ZIP sichern
+          </a>
+          <Knopf auspraegung="leise" groesse="sm" onClick={zurueck}>
+            Alle Kataloge
+          </Knopf>
+        </>
       }
     >
       {fehler && (
@@ -267,10 +293,23 @@ function KatalogBearbeiten({
         </Hinweis>
       )}
 
+      {hinweise.length > 0 && (
+        <Hinweis ton="warnung">
+          Übernommen - bis auf{" "}
+          {hinweise.length === 1 ? "eine Stelle" : `${hinweise.length} Stellen`}:
+          <ul className={stil.hinweisliste}>
+            {hinweise.map((h) => (
+              <li key={h}>{h}</li>
+            ))}
+          </ul>
+        </Hinweis>
+      )}
+
       {katalog.fragen.length === 0 && offen !== "neu" && (
         <Leerzustand titel="Noch keine Fragen">
-          Acht Fragetypen stehen bereit: von Freitext über Schätzfrage und Buzzer bis zum
-          Bild, auf das man tippt.
+          Zehn Fragetypen stehen bereit: von Freitext über Schätzfrage und Buzzer bis zum
+          Bild, auf das man tippt. Ein Quiz aus Battle.Net übernimmst du auf der Seite
+          aller Kataloge.
         </Leerzustand>
       )}
 
@@ -305,6 +344,7 @@ function KatalogBearbeiten({
                   </span>
                 </span>
                 {frage.hat_bild && <Etikett>Bild</Etikett>}
+                {frage.medien.includes("ton") && <Etikett>Ton</Etikett>}
                 {darfLeiten && (
                   <span className={stil.sortierknoepfe}>
                     <Knopf
@@ -435,6 +475,131 @@ function BildVerwaltung({
             Bild entfernen
           </Knopf>
         </div>
+      )}
+      {frage.daten.typ === "bildauswahl" &&
+        frage.daten.optionen.map((option, index) => (
+          <Medium
+            key={index}
+            frage={frage}
+            schluessel={`option-${index}`}
+            wort={`Bild zu Antwort ${index + 1}${option.text ? ` (${option.text})` : ""}`}
+            annehmen="image/png,image/jpeg,image/webp,image/gif"
+            stand={stand}
+            handeln={handeln}
+          />
+        ))}
+      <Medium
+        frage={frage}
+        schluessel="ton"
+        wort="Ton zur Frage (MP3, OGG, WAV, M4A, höchstens 8 MB) - spielt die Leitung ab"
+        annehmen="audio/mpeg,audio/ogg,audio/wav,audio/mp4,audio/webm"
+        stand={stand}
+        handeln={handeln}
+      />
+    </div>
+  );
+}
+
+function Medium({
+  frage,
+  schluessel,
+  wort,
+  annehmen,
+  stand,
+  handeln,
+}: {
+  frage: Frage;
+  schluessel: string;
+  wort: string;
+  annehmen: string;
+  stand: string;
+  handeln: (aktion: () => Promise<unknown>) => Promise<boolean>;
+}) {
+  const da = frage.medien.includes(schluessel);
+  const adresse = mediumAdresse(frage.id, schluessel, stand);
+  return (
+    <div className={stil.formular}>
+      {da &&
+        (schluessel === "ton" ? (
+          <audio controls src={adresse} className={stil.ton} aria-label={wort} />
+        ) : (
+          <img src={adresse} alt={wort} className={stil.vorschau} />
+        ))}
+      <label className={stil.auswahl}>
+        <span>{wort}</span>
+        <input
+          type="file"
+          accept={annehmen}
+          onChange={(e) => {
+            const datei = e.target.files?.[0];
+            if (datei) void handeln(() => ladeMediumHoch(frage.id, schluessel, datei));
+          }}
+        />
+      </label>
+      {da && (
+        <div>
+          <Knopf
+            auspraegung="leise"
+            groesse="sm"
+            onClick={() => void handeln(() => entferneMedium(frage.id, schluessel))}
+            aria-label={`${wort} entfernen`}
+          >
+            Entfernen
+          </Knopf>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type Uebernahmestand =
+  { phase: "bereit" } | { phase: "laedt" } | { phase: "fehler"; nachricht: string };
+
+/**
+ * Ein Quiz aus Battle.Net (oder ein eigenes ZIP) übernehmen.
+ *
+ * Danach geht es direkt in den neuen Katalog - mit den Hinweisen darüber,
+ * was nicht übernommen wurde. Die stehen dort, wo man sie nachbessert.
+ */
+function Uebernahme({ oeffnen }: { oeffnen: (id: string, hinweise: string[]) => void }) {
+  const [stand, setStand] = useState<Uebernahmestand>({ phase: "bereit" });
+
+  async function uebernehmen(datei: File) {
+    setStand({ phase: "laedt" });
+    try {
+      const ergebnis = await importiereKatalog(datei);
+      oeffnen(ergebnis.katalog.id, ergebnis.hinweise);
+    } catch (grund) {
+      setStand({ phase: "fehler", nachricht: meldung(grund) });
+    }
+  }
+
+  return (
+    <div className={stil.formular}>
+      <label className={stil.auswahl}>
+        <span>
+          Quiz übernehmen - ein gespeichertes Battle.Net-Quiz (ZIP mit quiz.json) oder ein
+          hier gesichertes ZIP
+        </span>
+        <input
+          type="file"
+          accept=".zip,.json,application/zip,application/json"
+          disabled={stand.phase === "laedt"}
+          onChange={(e) => {
+            const datei = e.target.files?.[0];
+            if (datei) void uebernehmen(datei);
+          }}
+        />
+      </label>
+      {stand.phase === "laedt" && (
+        <p role="status" className={stil.nebensache}>
+          Wird übernommen …
+        </p>
+      )}
+      {stand.phase === "fehler" && (
+        <Hinweis ton="fehler" dringend>
+          {stand.nachricht}
+        </Hinweis>
       )}
     </div>
   );

@@ -27,6 +27,10 @@ export function oeffentlicheFrage(
     maximum: null,
     schritt: null,
     einheit: "",
+    links: [],
+    rechts: [],
+    bildoptionen: [],
+    hat_ton: false,
     loesung: null,
     ...mehr,
   };
@@ -43,11 +47,13 @@ export function rundenstand(mehr: Partial<Rundenstand> = {}): Rundenstand {
     frist: null,
     jetzt: JETZT,
     rangliste: [
-      { name: "Anna", punkte: 4, rang: 1 },
-      { name: "Ben", punkte: 1, rang: 2 },
+      { name: "Anna", punkte: 4, rang: 1, team: null },
+      { name: "Ben", punkte: 1, rang: 2, team: null },
     ],
     anzahl_antworten: 1,
     buzzer: null,
+    teams: [],
+    beitritt_offen: true,
     ich: {
       name: "Anna",
       punkte: 4,
@@ -55,6 +61,7 @@ export function rundenstand(mehr: Partial<Rundenstand> = {}): Rundenstand {
       antwort: null,
       buzzer_position: null,
       buzzer_urteil: null,
+      team: null,
     },
     ...mehr,
   };
@@ -69,6 +76,7 @@ export function frage(mehr: Partial<Frage> = {}): Frage {
     punkte: 2,
     zeitlimit: 30,
     hat_bild: false,
+    medien: [],
     daten: { typ: "freitext", loesungen: ["Paris"] },
     ...mehr,
   };
@@ -83,6 +91,7 @@ export function runde(mehr: Partial<Runde> = {}): Runde {
     status: "laeuft",
     anzahl_spieler: 2,
     angelegt: JETZT,
+    beitritt_offen: true,
     ...mehr,
   };
 }
@@ -124,6 +133,7 @@ export function steuerung(mehr: Partial<Steuerung> = {}): Steuerung {
         rang: 1,
         zuletzt_gesehen: JETZT,
         verbunden: true,
+        team_id: null,
       },
       {
         id: "s2",
@@ -132,6 +142,7 @@ export function steuerung(mehr: Partial<Steuerung> = {}): Steuerung {
         rang: 2,
         zuletzt_gesehen: JETZT,
         verbunden: false,
+        team_id: null,
       },
     ],
     antworten: [
@@ -147,6 +158,7 @@ export function steuerung(mehr: Partial<Steuerung> = {}): Steuerung {
       },
     ],
     buzzer: [],
+    teams: [],
     ...mehr,
   };
 }
