@@ -103,6 +103,7 @@ export function katalog(mehr: Partial<Katalog> = {}): Katalog {
     beschreibung: "",
     anzahl_fragen: 2,
     geaendert: JETZT,
+    freigegeben: false,
     ...mehr,
   };
 }

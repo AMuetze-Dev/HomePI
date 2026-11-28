@@ -87,6 +87,21 @@ export interface Katalog {
   beschreibung: string;
   anzahl_fragen: number;
   geaendert: string;
+  freigegeben: boolean;
+}
+
+/** Was ohne Konto von einem freigegebenen Katalog zu sehen ist. */
+export interface FreierKatalog {
+  id: string;
+  titel: string;
+  beschreibung: string;
+  anzahl_fragen: number;
+}
+
+export interface RundeGestartet {
+  runde: Runde;
+  moderatorcode: string;
+  hinweise: string[];
 }
 
 export interface KatalogDetail extends Katalog {
@@ -534,4 +549,46 @@ export function ladeAuswertung(
 
 export function ergebnisAdresse(rundeId: string): string {
   return adresse(`/leitung/${rundeId}/ergebnis.csv`);
+}
+
+// ------------------------------------------------------------- ohne Konto leiten
+
+export function ladeFreieKataloge(signal?: AbortSignal): Promise<FreierKatalog[]> {
+  return anfrage<FreierKatalog[]>("/kataloge/frei", {}, signal);
+}
+
+export function starteRunde(katalogId: string): Promise<RundeGestartet> {
+  return sende<RundeGestartet>("POST", "/starten", { katalog_id: katalogId });
+}
+
+export function starteEigenes(datei: Blob): Promise<RundeGestartet> {
+  return anfrage<RundeGestartet>("/starten/eigenes", {
+    method: "POST",
+    body: datei,
+    headers: { "Content-Type": datei.type || "application/zip" },
+  });
+}
+
+/** Mit dem Moderatorcode eine Runde übernehmen - auf einem anderen Gerät. */
+export function uebernimmLeitung(moderatorcode: string): Promise<Runde> {
+  return sende<Runde>("POST", "/leitung/zugang", { code: moderatorcode });
+}
+
+export function neuerModeratorcode(rundeId: string): Promise<RundeGestartet> {
+  return sende<RundeGestartet>("POST", `/leitung/${rundeId}/moderatorcode`);
+}
+
+export function gibFrei(katalogId: string, frei: boolean): Promise<KatalogDetail> {
+  return sende<KatalogDetail>("PUT", `/kataloge/${katalogId}/freigabe`, { frei });
+}
+
+/** Bild oder Ton der aktuellen Frage - für die Leitung, auch ohne Konto. */
+export function leitungsmediumAdresse(
+  rundeId: string,
+  schluessel: string,
+  stand: string,
+): string {
+  return adresse(
+    `/leitung/${rundeId}/medien/${schluessel}?stand=${encodeURIComponent(stand)}`,
+  );
 }

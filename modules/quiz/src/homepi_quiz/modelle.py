@@ -75,6 +75,19 @@ class Bild(Base):
     inhalt: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
 
+class Freigabe(Base):
+    """Ein Katalog, aus dem jeder ohne Konto eine Runde starten darf."""
+
+    __tablename__ = "quiz_freigaben"
+
+    katalog_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("quiz_kataloge.id", ondelete="CASCADE"), primary_key=True
+    )
+    angelegt: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class Medium(Base):
     """Weitere Medien an einer Frage: ``ton`` und ``option-<n>``.
 
@@ -113,6 +126,28 @@ class Runde(Base, ZeitstempelMixin):
     #: Nachgetragen: scripts/migrationen/2026-11-28-quiz-beitritt-offen.sql
     beitritt_offen: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=true()
+    )
+
+
+class Moderation(Base):
+    """Wer eine Runde leitet, ohne Konto: der Hash seines Moderatorcodes.
+
+    Eigene Tabelle statt Spalten an ``quiz_runden`` - die laeuft schon auf dem
+    Pi, und neue Tabellen legt ``homepi schema anlegen`` ohne Migration an.
+    """
+
+    __tablename__ = "quiz_moderation"
+
+    runde_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("quiz_runden.id", ondelete="CASCADE"), primary_key=True
+    )
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    #: Ohne Konto gestartet: wird nach zwei Tagen Ruhe aufgeraeumt.
+    ohne_konto: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Der Katalog wurde mit der Runde hochgeladen und geht mit ihr.
+    eigener_katalog: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    zuletzt_aktiv: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 

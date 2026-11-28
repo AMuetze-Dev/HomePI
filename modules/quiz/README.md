@@ -1,8 +1,9 @@
 # homepi-quiz
 
-Quizrunden für einen Abend: Die Leitung schreibt Fragenkataloge und steuert
-die Runde, die Mitspieler antworten mit dem Handy **ohne Konto**, eine
-Anzeigetafel zeigt Frage, Countdown und Rangliste am Beamer.
+Quizrunden für einen Abend: **Jeder** kann eine Runde starten und leiten,
+die Mitspieler antworten mit dem Handy, beides **ohne Konto**. Eine
+Anzeigetafel zeigt Frage, Countdown und Rangliste am Beamer. Ein Konto
+braucht nur, wer Fragenkataloge pflegt.
 
 Nachgebaut aus dem eigenen Projekt Battle.Net (`D:\DevLibrary\Battle.Net`),
 mit einem bewussten Unterschied: Dort kam man allein über den Namen zurück
@@ -16,16 +17,47 @@ gehört ein Name dem Gerät, das ihn gewählt hat.
 | Bereich        | Adresse                          | Konto                |
 | -------------- | -------------------------------- | -------------------- |
 | Mitspielen     | `/modul/quiz/spielen?code=…`     | nein                 |
-| Anzeigetafel   | `/modul/quiz/tafel?code=…`       | nein                 |
-| Runden         | `/modul/quiz/runden`             | `quiz` ab `leser`    |
+| Leiten         | `/modul/quiz/leiten`             | nein                 |
+| Anzeigetafel   | `/modul/quiz/tafel?code=…`       | nein - nicht im Menü, das Dashboard öffnet sie |
 | Kataloge       | `/modul/quiz/kataloge`           | `quiz` ab `leser`    |
 
-Leiten und Fragen schreiben braucht `nutzer`, einen Katalog löschen
-`verwalter`:
+Fragen schreiben und Kataloge freigeben braucht `nutzer`, einen Katalog
+löschen `verwalter`:
 
 ```bash
 homepi benutzer recht <name> quiz nutzer
 ```
+
+## Leiten ohne Konto
+
+- **Starten:** Unter „Leiten“ einen **freigegebenen** Katalog wählen oder ein
+  eigenes Quiz hochladen (Battle.Net-ZIP oder hier gesichertes ZIP). Ein
+  eigenes Quiz gehört nur dieser Runde und taucht unter „Kataloge“ nicht auf.
+- **Moderatorcode:** Nach dem Start steht er genau einmal da, mit QR-Code
+  (`/modul/quiz/leiten?zugang=…`). Damit übernimmt jedes Gerät die Leitung.
+  Gespeichert wird nur sein SHA-256; das Gerät, das ihn eingelöst hat, merkt
+  sich die Leitung in einem Cookie je Runde. Wer ihn verloren hat, stellt im
+  Dashboard einen neuen aus - der alte gilt dann nicht mehr.
+- **Freigabe:** Wer `nutzer` hat, gibt im Katalog „Für alle frei“. Ohne
+  Freigabe kann ein Gast den Katalog nicht starten und nicht einmal sehen.
+- **Aufräumen:** Runden ohne Konto verschwinden **48 Stunden nach der letzten
+  Aktivität**, samt eigenem Quiz. Geprüft wird beim Laden der Startseite und
+  beim Starten - einen Zeitplaner braucht es dafür nicht.
+- **Grenzen:** höchstens 40 offene Runden ohne Konto, ein eigenes Quiz
+  höchstens 20 MB.
+
+Mit Konto (`nutzer`) leitet man jede Runde auch ohne Code; ein `leser` darf
+zusehen.
+
+## Dashboard
+
+Die Leitung ist ein Dashboard in Bildschirmhöhe, ohne Seitenscrollen: links
+die Fragen, in der Mitte die Bühne mit **der einen** nächsten Handlung
+(zeigen, sperren, auflösen, nächste Frage), rechts die Spieler. Was nicht
+dauernd zu sehen sein muss, liegt hinter einem Symbol in der Kopfleiste und
+öffnet sich als Dialog: QR-Code zum Mitspielen, Anzeigetafel, Teams,
+Beitritt, Auswertung, Moderatorcode, Beenden. Ein Klick auf einen Spieler
+öffnet Punktkorrektur, Wiederkehrcode und Entfernen.
 
 ## Fragetypen
 

@@ -27,10 +27,12 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Request, Response, status
-from homepi_core.auth import Rolle, erfordert
+from fastapi.params import Depends as Abhaengigkeit
+from homepi_core.auth import Benutzer, MoeglicherBenutzer, Rolle, darf, erfordert
+from homepi_core.auth import speicher as auth_speicher
 from homepi_core.auth.dienst import neues_token
 from homepi_core.auth.passwoerter import hashe_token
 from homepi_core.deps import DbSitzung, Einstellungen
@@ -53,6 +55,8 @@ from .schemas import (
     FrageDaten,
     FrageEingabe,
     FrageWaehlen,
+    FreierKatalog,
+    Freigabe,
     Ich,
     ImportErgebnis,
     KatalogAusgabe,
@@ -65,8 +69,10 @@ from .schemas import (
     Reihenfolge,
     RundeAnlegen,
     RundeAusgabe,
+    RundeGestartet,
     Rundenstand,
     Rundenstatus,
+    RundeStarten,
     SpielerSicht,
     Steuerung,
     TeamAnlegen,
@@ -75,6 +81,7 @@ from .schemas import (
     Uebersicht,
     Wiederkehrcode,
     Zeigen,
+    Zugang,
 )
 
 ARTEFAKT = "quiz"
@@ -86,6 +93,11 @@ LEITEN = erfordert(ARTEFAKT, Rolle.NUTZER)
 #: Einen ganzen Katalog wegwerfen.
 VERWALTEN = erfordert(ARTEFAKT, Rolle.VERWALTER)
 
+#: Fuehren: Leitung einer Runde - mit Recht auf das Artefakt oder mit dem
+#: Moderatorcode genau dieser Runde. Wer ohne Konto startet, ist so Leitung.
+LEITUNG_COOKIE = "homepi_quiz_leitung_"
+LEITUNG_DAUER = dt.timedelta(days=7)
+
 COOKIE_PRAEFIX = "homepi_quiz_"
 #: Ein Quizabend, nicht ein Konto: zwei Tage reichen fuer jede Runde, die
 #: ueber Mitternacht geht.
@@ -94,6 +106,81 @@ COOKIE_DAUER = dt.timedelta(days=2)
 _FRAGEDATEN: TypeAdapter[FrageDaten] = TypeAdapter(FrageDaten)
 
 router = APIRouter()
+
+
+def _leitungs_cookie(runde_id: uuid.UUID) -> str:
+    return f"{LEITUNG_COOKIE}{runde_id.hex}"
+
+
+def _darf(benutzer: Benutzer | None, rolle: Rolle) -> bool:
+    return benutzer is not None and darf(auth_speicher.rechte_von(benutzer), ARTEFAKT, rolle)
+
+
+def _leitung(rolle: Rolle) -> Abhaengigkeit:
+    async def pruefen(
+        runde_id: uuid.UUID, request: Request, sitzung: DbSitzung, benutzer: MoeglicherBenutzer
+    ) -> None:
+        eintrag = await speicher.moderation(sitzung, runde_id)
+        if not dienst.leitung_erlaubt(
+            mit_recht=_darf(benutzer, rolle),
+            gespeicherter_hash=eintrag.code_hash if eintrag else None,
+            token=request.cookies.get(_leitungs_cookie(runde_id)),
+        ):
+            raise dienst.LeitungVerweigert(
+                "Diese Runde leitest du nicht. Gib den Moderatorcode ein, um sie zu übernehmen."
+            )
+        if eintrag is not None and dienst.aktivitaet_merken(eintrag.zuletzt_aktiv, _jetzt()):
+            eintrag.zuletzt_aktiv = _jetzt()
+
+    return cast(Abhaengigkeit, Depends(pruefen))
+
+
+#: Ansehen: Steuerung, Auswertung, Ergebnis.
+ZUSEHEN = _leitung(Rolle.LESER)
+#: Steuern: alles, was die Runde veraendert.
+FUEHREN = _leitung(Rolle.NUTZER)
+
+
+def _setze_leitungs_cookie(
+    antwort: Response, runde_id: uuid.UUID, code: str, einstellungen: Einstellungen
+) -> None:
+    antwort.set_cookie(
+        _leitungs_cookie(runde_id),
+        code,
+        max_age=int(LEITUNG_DAUER.total_seconds()),
+        httponly=True,
+        secure=einstellungen.ist_produktion,
+        samesite="lax",
+        path="/",
+    )
+
+
+async def _moderation_anlegen(
+    sitzung: DbSitzung, runde: Runde, *, ohne_konto: bool, eigener_katalog: bool = False
+) -> str:
+    code = dienst.neuer_moderatorcode()
+    await speicher.moderation_setzen(
+        sitzung,
+        runde.id,
+        hashe_token(code),
+        ohne_konto=ohne_konto,
+        eigener_katalog=eigener_katalog,
+    )
+    return code
+
+
+async def _aufraeumen(sitzung: DbSitzung) -> None:
+    """Runden ohne Konto, die zwei Tage ruhen, samt eigenem Katalog.
+
+    Kein Zeitplan-Dienst dafuer: aufgeraeumt wird, wenn ohnehin jemand
+    vorbeikommt - beim Blick auf die Kachel und beim Starten.
+    """
+    for runde_id, katalog_id, eigener in await speicher.abgelaufene(
+        sitzung, dienst.aufraeumgrenze(_jetzt())
+    ):
+        await speicher.runde_und_katalog_loeschen(
+            sitzung, runde_id, katalog_id if eigener else None
+        )
 
 
 def _jetzt() -> dt.datetime:
@@ -181,6 +268,7 @@ async def _katalog_detail(sitzung: DbSitzung, katalog_id: uuid.UUID) -> KatalogD
         beschreibung=eintrag.beschreibung,
         anzahl_fragen=len(fragen),
         geaendert=eintrag.geaendert,
+        freigegeben=await speicher.ist_frei(sitzung, katalog_id),
         fragen=fragen,
     )
 
@@ -420,6 +508,7 @@ def _erledigen(runde: Runde, frage_id: uuid.UUID) -> None:
 
 @router.get("/", summary="Überblick für die Kachel")
 async def uebersicht(sitzung: DbSitzung) -> Uebersicht:
+    await _aufraeumen(sitzung)
     return Uebersicht(laufende_runden=await speicher.anzahl_laufend(sitzung))
 
 
@@ -567,6 +656,7 @@ async def team_wechseln(
 
 @router.get("/kataloge", summary="Alle Fragenkataloge", dependencies=[LESEN])
 async def kataloge(sitzung: DbSitzung) -> list[KatalogAusgabe]:
+    frei = await speicher.freigaben(sitzung)
     return [
         KatalogAusgabe(
             id=k.id,
@@ -574,8 +664,18 @@ async def kataloge(sitzung: DbSitzung) -> list[KatalogAusgabe]:
             beschreibung=k.beschreibung,
             anzahl_fragen=n,
             geaendert=k.geaendert,
+            freigegeben=k.id in frei,
         )
         for k, n in await speicher.kataloge(sitzung)
+    ]
+
+
+@router.get("/kataloge/frei", summary="Kataloge, aus denen jeder eine Runde starten darf")
+async def freie_kataloge(sitzung: DbSitzung) -> list[FreierKatalog]:
+    return [
+        FreierKatalog(id=k.id, titel=k.titel, beschreibung=k.beschreibung, anzahl_fragen=n)
+        for k, n in await speicher.freie_kataloge(sitzung)
+        if n > 0
     ]
 
 
@@ -612,13 +712,7 @@ async def katalog_importieren(request: Request, sitzung: DbSitzung) -> ImportErg
     katalog = await speicher.katalog_anlegen(
         sitzung, KatalogEingabe(titel=paket.titel, beschreibung=paket.beschreibung)
     )
-    for frage in paket.fragen:
-        eintrag = await speicher.frage_anlegen(sitzung, katalog.id, frage.eingabe)
-        for schluessel, (mime, inhalt) in frage.medien.items():
-            if schluessel == "bild":
-                await speicher.bild_setzen(sitzung, eintrag.id, mime, inhalt)
-            else:
-                await speicher.medium_setzen(sitzung, eintrag.id, schluessel, mime, inhalt)
+    await _fragen_uebernehmen(sitzung, katalog.id, paket)
     return ImportErgebnis(
         katalog=await _katalog_detail(sitzung, katalog.id), hinweise=paket.hinweise
     )
@@ -669,6 +763,19 @@ async def katalog_exportieren(katalog_id: uuid.UUID, sitzung: DbSitzung) -> Resp
 
 def _dateiname(titel: str) -> str:
     return "".join(z if z.isalnum() else "-" for z in titel).strip("-")[:60] or "quiz"
+
+
+@router.put(
+    "/kataloge/{katalog_id}/freigabe",
+    summary="Für alle freigeben oder zurückziehen",
+    dependencies=[LEITEN],
+)
+async def katalog_freigeben(
+    katalog_id: uuid.UUID, daten: Freigabe, sitzung: DbSitzung
+) -> KatalogDetail:
+    await speicher.katalog(sitzung, katalog_id)
+    await speicher.freigeben(sitzung, katalog_id, daten.frei)
+    return await _katalog_detail(sitzung, katalog_id)
 
 
 @router.put("/kataloge/{katalog_id}", summary="Katalog umbenennen", dependencies=[LEITEN])
@@ -861,10 +968,91 @@ async def runden(sitzung: DbSitzung) -> list[RundeAusgabe]:
 async def runde_anlegen(daten: RundeAnlegen, sitzung: DbSitzung) -> RundeAusgabe:
     await speicher.katalog(sitzung, daten.katalog_id)
     dienst.pruefe_katalog_spielbar(len(await speicher.fragen(sitzung, daten.katalog_id)))
-    return await _runde_ausgabe(sitzung, await speicher.runde_anlegen(sitzung, daten.katalog_id))
+    runde = await speicher.runde_anlegen(sitzung, daten.katalog_id)
+    await _moderation_anlegen(sitzung, runde, ohne_konto=False)
+    return await _runde_ausgabe(sitzung, runde)
 
 
-@router.get("/leitung/{runde_id}", summary="Steuerung einer Runde", dependencies=[LESEN])
+@router.post(
+    "/starten",
+    status_code=status.HTTP_201_CREATED,
+    summary="Runde starten und selbst leiten (auch ohne Konto)",
+)
+async def starten(
+    daten: RundeStarten,
+    antwort: Response,
+    sitzung: DbSitzung,
+    einstellungen: Einstellungen,
+    benutzer: MoeglicherBenutzer,
+) -> RundeGestartet:
+    await _aufraeumen(sitzung)
+    mit_recht = _darf(benutzer, Rolle.NUTZER)
+    await speicher.katalog(sitzung, daten.katalog_id)
+    dienst.pruefe_startkatalog(
+        freigegeben=await speicher.ist_frei(sitzung, daten.katalog_id), mit_recht=mit_recht
+    )
+    dienst.pruefe_katalog_spielbar(len(await speicher.fragen(sitzung, daten.katalog_id)))
+    if not mit_recht:
+        dienst.pruefe_neue_runde(await speicher.offene_ohne_konto(sitzung))
+    runde = await speicher.runde_anlegen(sitzung, daten.katalog_id)
+    code = await _moderation_anlegen(sitzung, runde, ohne_konto=not mit_recht)
+    _setze_leitungs_cookie(antwort, runde.id, code, einstellungen)
+    return RundeGestartet(runde=await _runde_ausgabe(sitzung, runde), moderatorcode=code)
+
+
+@router.post(
+    "/starten/eigenes",
+    status_code=status.HTTP_201_CREATED,
+    summary="Mit eigenem Quiz (Battle.Net-ZIP oder Export) starten - ohne Konto",
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/zip": {"schema": {"type": "string", "format": "binary"}}},
+        }
+    },
+)
+async def starten_eigenes(
+    request: Request,
+    antwort: Response,
+    sitzung: DbSitzung,
+    einstellungen: Einstellungen,
+    benutzer: MoeglicherBenutzer,
+) -> RundeGestartet:
+    await _aufraeumen(sitzung)
+    mit_recht = _darf(benutzer, Rolle.NUTZER)
+    dienst.pruefe_eigenes_paket(int(request.headers.get("content-length") or 0))
+    roh = await request.body()
+    dienst.pruefe_eigenes_paket(len(roh))
+    if not mit_recht:
+        dienst.pruefe_neue_runde(await speicher.offene_ohne_konto(sitzung))
+    paket = austausch.lies_paket(roh)
+    dienst.pruefe_katalog_spielbar(len(paket.fragen))
+    katalog = await speicher.katalog_anlegen(
+        sitzung, KatalogEingabe(titel=paket.titel, beschreibung=paket.beschreibung)
+    )
+    await _fragen_uebernehmen(sitzung, katalog.id, paket)
+    runde = await speicher.runde_anlegen(sitzung, katalog.id)
+    code = await _moderation_anlegen(sitzung, runde, ohne_konto=not mit_recht, eigener_katalog=True)
+    _setze_leitungs_cookie(antwort, runde.id, code, einstellungen)
+    return RundeGestartet(
+        runde=await _runde_ausgabe(sitzung, runde), moderatorcode=code, hinweise=paket.hinweise
+    )
+
+
+@router.post("/leitung/zugang", summary="Mit dem Moderatorcode eine Runde übernehmen")
+async def leitung_uebernehmen(
+    daten: Zugang, antwort: Response, sitzung: DbSitzung, einstellungen: Einstellungen
+) -> RundeAusgabe:
+    code = dienst.normalisiere_moderatorcode(daten.code)
+    eintrag = await speicher.moderation_mit_hash(sitzung, hashe_token(code))
+    if eintrag is None:
+        raise dienst.LeitungVerweigert("Zu diesem Moderatorcode gibt es keine Runde.")
+    eintrag.zuletzt_aktiv = _jetzt()
+    _setze_leitungs_cookie(antwort, eintrag.runde_id, code, einstellungen)
+    return await _runde_ausgabe(sitzung, await speicher.runde(sitzung, eintrag.runde_id))
+
+
+@router.get("/leitung/{runde_id}", summary="Steuerung einer Runde", dependencies=[ZUSEHEN])
 async def steuerung(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
     return await _steuerung(sitzung, await speicher.runde(sitzung, runde_id))
 
@@ -873,13 +1061,13 @@ async def steuerung(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
     "/leitung/{runde_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Runde löschen",
-    dependencies=[LEITEN],
+    dependencies=[FUEHREN],
 )
 async def runde_loeschen(runde_id: uuid.UUID, sitzung: DbSitzung) -> None:
     await speicher.runde_loeschen(sitzung, await speicher.runde(sitzung, runde_id))
 
 
-@router.post("/leitung/{runde_id}/frage", summary="Frage auswählen", dependencies=[LEITEN])
+@router.post("/leitung/{runde_id}/frage", summary="Frage auswählen", dependencies=[FUEHREN])
 async def frage_waehlen(runde_id: uuid.UUID, daten: FrageWaehlen, sitzung: DbSitzung) -> Steuerung:
     runde = await speicher.runde(sitzung, runde_id)
     frage = await speicher.frage(sitzung, daten.frage_id)
@@ -898,7 +1086,7 @@ async def frage_waehlen(runde_id: uuid.UUID, daten: FrageWaehlen, sitzung: DbSit
 
 
 @router.post(
-    "/leitung/{runde_id}/zeigen", summary="Frage den Spielern zeigen", dependencies=[LEITEN]
+    "/leitung/{runde_id}/zeigen", summary="Frage den Spielern zeigen", dependencies=[FUEHREN]
 )
 async def zeigen(runde_id: uuid.UUID, daten: Zeigen, sitzung: DbSitzung) -> Steuerung:
     runde = await speicher.runde(sitzung, runde_id)
@@ -911,7 +1099,7 @@ async def zeigen(runde_id: uuid.UUID, daten: Zeigen, sitzung: DbSitzung) -> Steu
     return await _steuerung(sitzung, runde)
 
 
-@router.post("/leitung/{runde_id}/sperren", summary="Eingabe sperren", dependencies=[LEITEN])
+@router.post("/leitung/{runde_id}/sperren", summary="Eingabe sperren", dependencies=[FUEHREN])
 async def sperren(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
     runde = await speicher.runde(sitzung, runde_id)
     runde.phase = dienst.naechste_phase(_status(runde), _phase(runde), "sperren")
@@ -920,7 +1108,7 @@ async def sperren(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
     return await _steuerung(sitzung, runde)
 
 
-@router.post("/leitung/{runde_id}/oeffnen", summary="Eingabe wieder öffnen", dependencies=[LEITEN])
+@router.post("/leitung/{runde_id}/oeffnen", summary="Eingabe wieder öffnen", dependencies=[FUEHREN])
 async def oeffnen(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
     runde = await speicher.runde(sitzung, runde_id)
     runde.phase = dienst.naechste_phase(_status(runde), _phase(runde), "oeffnen")
@@ -932,7 +1120,7 @@ async def oeffnen(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
 @router.post(
     "/leitung/{runde_id}/aufloesen",
     summary="Auflösen und Punkte vergeben",
-    dependencies=[LEITEN],
+    dependencies=[FUEHREN],
 )
 async def aufloesen(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
     runde = await speicher.runde(sitzung, runde_id)
@@ -945,7 +1133,7 @@ async def aufloesen(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
 
 
 @router.post(
-    "/leitung/{runde_id}/bild", summary="Bild zeigen oder verbergen", dependencies=[LEITEN]
+    "/leitung/{runde_id}/bild", summary="Bild zeigen oder verbergen", dependencies=[FUEHREN]
 )
 async def bild_umschalten(
     runde_id: uuid.UUID, daten: BildSichtbar, sitzung: DbSitzung
@@ -959,7 +1147,7 @@ async def bild_umschalten(
 
 
 @router.post(
-    "/leitung/{runde_id}/buzzer", summary="Urteil über den, der dran ist", dependencies=[LEITEN]
+    "/leitung/{runde_id}/buzzer", summary="Urteil über den, der dran ist", dependencies=[FUEHREN]
 )
 async def buzzer_urteil(runde_id: uuid.UUID, daten: BuzzerUrteil, sitzung: DbSitzung) -> Steuerung:
     runde = await speicher.runde(sitzung, runde_id)
@@ -984,7 +1172,7 @@ async def buzzer_urteil(runde_id: uuid.UUID, daten: BuzzerUrteil, sitzung: DbSit
 @router.post(
     "/leitung/{runde_id}/buzzer/zuruecksetzen",
     summary="Buzzer freigeben (alle Drücke verwerfen)",
-    dependencies=[LEITEN],
+    dependencies=[FUEHREN],
 )
 async def buzzer_zuruecksetzen(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
     runde = await speicher.runde(sitzung, runde_id)
@@ -993,7 +1181,7 @@ async def buzzer_zuruecksetzen(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steue
     return await _steuerung(sitzung, runde)
 
 
-@router.post("/leitung/{runde_id}/beenden", summary="Runde beenden", dependencies=[LEITEN])
+@router.post("/leitung/{runde_id}/beenden", summary="Runde beenden", dependencies=[FUEHREN])
 async def beenden(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
     runde = await speicher.runde(sitzung, runde_id)
     vorher = _phase(runde)
@@ -1011,7 +1199,7 @@ async def beenden(runde_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
 @router.put(
     "/leitung/{runde_id}/antworten/{antwort_id}",
     summary="Punkte einer Antwort von Hand setzen",
-    dependencies=[LEITEN],
+    dependencies=[FUEHREN],
 )
 async def antwort_bewerten(
     runde_id: uuid.UUID, antwort_id: uuid.UUID, daten: PunkteSetzen, sitzung: DbSitzung
@@ -1027,7 +1215,7 @@ async def antwort_bewerten(
 @router.post(
     "/leitung/{runde_id}/spieler/{spieler_id}/korrektur",
     summary="Punkte gutschreiben oder abziehen",
-    dependencies=[LEITEN],
+    dependencies=[FUEHREN],
 )
 async def korrektur(
     runde_id: uuid.UUID, spieler_id: uuid.UUID, daten: Korrektur, sitzung: DbSitzung
@@ -1041,7 +1229,7 @@ async def korrektur(
 @router.post(
     "/leitung/{runde_id}/spieler/{spieler_id}/wiederkehr",
     summary="Wiederkehrcode für ein verlorenes Gerät",
-    dependencies=[LEITEN],
+    dependencies=[FUEHREN],
 )
 async def wiederkehr(
     runde_id: uuid.UUID, spieler_id: uuid.UUID, sitzung: DbSitzung
@@ -1058,7 +1246,7 @@ async def wiederkehr(
     "/leitung/{runde_id}/spieler/{spieler_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Spieler aus der Runde entfernen",
-    dependencies=[LEITEN],
+    dependencies=[FUEHREN],
 )
 async def spieler_entfernen(runde_id: uuid.UUID, spieler_id: uuid.UUID, sitzung: DbSitzung) -> None:
     await speicher.spieler_loeschen(sitzung, await speicher.spieler(sitzung, runde_id, spieler_id))
@@ -1067,7 +1255,7 @@ async def spieler_entfernen(runde_id: uuid.UUID, spieler_id: uuid.UUID, sitzung:
 @router.post(
     "/leitung/{runde_id}/beitritt",
     summary="Beitritt neuer Spieler öffnen oder schließen",
-    dependencies=[LEITEN],
+    dependencies=[FUEHREN],
 )
 async def beitritt_schalten(
     runde_id: uuid.UUID, daten: BeitrittOffen, sitzung: DbSitzung
@@ -1078,7 +1266,7 @@ async def beitritt_schalten(
     return await _steuerung(sitzung, runde)
 
 
-@router.post("/leitung/{runde_id}/teams", summary="Team anlegen", dependencies=[LEITEN])
+@router.post("/leitung/{runde_id}/teams", summary="Team anlegen", dependencies=[FUEHREN])
 async def team_anlegen(runde_id: uuid.UUID, daten: TeamAnlegen, sitzung: DbSitzung) -> Steuerung:
     runde = await speicher.runde(sitzung, runde_id)
     name, schluessel = dienst.pruefe_spielername(daten.name)
@@ -1089,7 +1277,7 @@ async def team_anlegen(runde_id: uuid.UUID, daten: TeamAnlegen, sitzung: DbSitzu
 @router.delete(
     "/leitung/{runde_id}/teams/{team_id}",
     summary="Team auflösen (Mitglieder spielen ohne Team weiter)",
-    dependencies=[LEITEN],
+    dependencies=[FUEHREN],
 )
 async def team_loeschen(runde_id: uuid.UUID, team_id: uuid.UUID, sitzung: DbSitzung) -> Steuerung:
     runde = await speicher.runde(sitzung, runde_id)
@@ -1100,7 +1288,7 @@ async def team_loeschen(runde_id: uuid.UUID, team_id: uuid.UUID, sitzung: DbSitz
 @router.put(
     "/leitung/{runde_id}/spieler/{spieler_id}/team",
     summary="Spieler einem Team zuordnen",
-    dependencies=[LEITEN],
+    dependencies=[FUEHREN],
 )
 async def team_zuweisen(
     runde_id: uuid.UUID, spieler_id: uuid.UUID, daten: TeamZuweisen, sitzung: DbSitzung
@@ -1160,7 +1348,7 @@ async def _auswertung(sitzung: DbSitzung, runde: Runde) -> list[FrageAuswertung]
 @router.get(
     "/leitung/{runde_id}/auswertung",
     summary="Gespielte Fragen im Rückblick",
-    dependencies=[LESEN],
+    dependencies=[ZUSEHEN],
 )
 async def auswertung(runde_id: uuid.UUID, sitzung: DbSitzung) -> list[FrageAuswertung]:
     return await _auswertung(sitzung, await speicher.runde(sitzung, runde_id))
@@ -1171,7 +1359,7 @@ async def auswertung(runde_id: uuid.UUID, sitzung: DbSitzung) -> list[FrageAuswe
     summary="Ergebnis als CSV für Excel",
     response_class=Response,
     responses={200: {"content": {"text/csv": {}}}},
-    dependencies=[LESEN],
+    dependencies=[ZUSEHEN],
 )
 async def ergebnis_csv(runde_id: uuid.UUID, sitzung: DbSitzung) -> Response:
     runde = await speicher.runde(sitzung, runde_id)
@@ -1200,3 +1388,59 @@ async def ergebnis_csv(runde_id: uuid.UUID, sitzung: DbSitzung) -> Response:
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="quiz-{runde.code}.csv"'},
     )
+
+
+async def _fragen_uebernehmen(
+    sitzung: DbSitzung, katalog_id: uuid.UUID, paket: austausch.Paket
+) -> None:
+    for frage in paket.fragen:
+        eintrag = await speicher.frage_anlegen(sitzung, katalog_id, frage.eingabe)
+        for schluessel, (mime, inhalt) in frage.medien.items():
+            if schluessel == "bild":
+                await speicher.bild_setzen(sitzung, eintrag.id, mime, inhalt)
+            else:
+                await speicher.medium_setzen(sitzung, eintrag.id, schluessel, mime, inhalt)
+
+
+@router.post(
+    "/leitung/{runde_id}/moderatorcode",
+    summary="Neuen Moderatorcode ausstellen (der alte gilt nicht mehr)",
+    dependencies=[FUEHREN],
+)
+async def moderatorcode_neu(
+    runde_id: uuid.UUID, antwort: Response, sitzung: DbSitzung, einstellungen: Einstellungen
+) -> RundeGestartet:
+    runde = await speicher.runde(sitzung, runde_id)
+    vorher = await speicher.moderation(sitzung, runde.id)
+    code = dienst.neuer_moderatorcode()
+    await speicher.moderation_setzen(
+        sitzung,
+        runde.id,
+        hashe_token(code),
+        ohne_konto=vorher.ohne_konto if vorher else False,
+        eigener_katalog=vorher.eigener_katalog if vorher else False,
+    )
+    _setze_leitungs_cookie(antwort, runde.id, code, einstellungen)
+    return RundeGestartet(runde=await _runde_ausgabe(sitzung, runde), moderatorcode=code)
+
+
+@router.get(
+    "/leitung/{runde_id}/medien/{schluessel}",
+    summary="Bild, Ton oder Antwortbild der aktuellen Frage für die Leitung",
+    response_class=Response,
+    responses={200: {"content": {"image/*": {}, "audio/*": {}}}},
+    dependencies=[ZUSEHEN],
+)
+async def leitung_medium(runde_id: uuid.UUID, schluessel: str, sitzung: DbSitzung) -> Response:
+    runde = await speicher.runde(sitzung, runde_id)
+    if runde.frage_id is None:
+        raise dienst.BildFehlt("Es ist noch keine Frage gewählt.")
+    if schluessel == "bild":
+        bild_ = await speicher.bild(sitzung, runde.frage_id)
+        inhalt = (bild_.mime, bild_.inhalt) if bild_ else None
+    else:
+        medium_ = await speicher.medium(sitzung, runde.frage_id, schluessel)
+        inhalt = (medium_.mime, medium_.inhalt) if medium_ else None
+    if inhalt is None:
+        raise dienst.BildFehlt("Dieses Medium hat die aktuelle Frage nicht.")
+    return Response(content=inhalt[1], media_type=inhalt[0])

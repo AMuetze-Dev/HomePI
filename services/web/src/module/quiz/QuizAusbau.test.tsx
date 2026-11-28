@@ -12,7 +12,7 @@ import * as api from "./api";
 import { Eingabe } from "./Eingabe";
 import { alsEingabe, leererEntwurf, vollstaendig } from "./entwurf";
 import { QuizSeite } from "./QuizSeite";
-import { frage, katalog, oeffentlicheFrage, rundenstand, steuerung } from "./testdaten";
+import { frage, katalog, oeffentlicheFrage, rundenstand } from "./testdaten";
 
 const LEITUNG: Benutzer = { ...TESTBENUTZER, rechte: { quiz: "verwalter" } };
 const TEAMS: api.TeamPlatz[] = [
@@ -254,98 +254,6 @@ describe("Anzeigetafel, erweitert", () => {
 
 // ======================================================= Leitung
 
-describe("Leitung, erweitert", () => {
-  it("schließt den Beitritt, legt Teams an und ordnet Spieler zu", async () => {
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(steuerung({ teams: TEAMS }));
-    const steuern = vi
-      .spyOn(api, "steuere")
-      .mockResolvedValue(steuerung({ teams: TEAMS }));
-    const anlegen = vi
-      .spyOn(api, "legeTeamAn")
-      .mockResolvedValue(steuerung({ teams: TEAMS }));
-    const zuordnen = vi
-      .spyOn(api, "weiseTeamZu")
-      .mockResolvedValue(steuerung({ teams: TEAMS }));
-    const aufloesen = vi.spyOn(api, "loescheTeam").mockResolvedValue(steuerung());
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LEITUNG);
-
-    await userEvent.click(
-      await screen.findByRole("checkbox", { name: "Beitritt offen" }),
-    );
-    expect(steuern).toHaveBeenCalledWith("r1", { art: "beitritt", offen: false });
-
-    await userEvent.type(screen.getByLabelText("Neues Team"), "Grün");
-    await userEvent.click(screen.getByRole("button", { name: "Team anlegen" }));
-    expect(anlegen).toHaveBeenCalledWith("r1", "Grün");
-    await waitFor(() => expect(screen.getByLabelText("Neues Team")).toHaveValue(""));
-
-    await userEvent.selectOptions(screen.getByLabelText("Team von Ben"), "t1");
-    expect(zuordnen).toHaveBeenCalledWith("r1", "s2", "t1");
-    await userEvent.selectOptions(screen.getByLabelText("Team von Anna"), "");
-    expect(zuordnen).toHaveBeenCalledWith("r1", "s1", null);
-
-    await userEvent.click(screen.getByRole("button", { name: "Team Blau auflösen" }));
-    expect(aufloesen).toHaveBeenCalledWith("r1", "t2");
-  });
-
-  it("zeigt die Auswertung auf Knopfdruck und bietet die CSV an", async () => {
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(steuerung({ beantwortet: ["f1"] }));
-    const laden = vi.spyOn(api, "ladeAuswertung").mockResolvedValue([
-      {
-        frage_id: "f1",
-        nummer: 1,
-        text: "Hauptstadt?",
-        typ: "freitext",
-        loesung: "Paris",
-        richtig: 1,
-        gesamt: 2,
-        antworten: [
-          { spieler: "Anna", anzeige: "Paris", punkte: 2, richtig: true },
-          { spieler: "Ben", anzeige: "Bonn", punkte: 0, richtig: false },
-        ],
-      },
-    ]);
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LEITUNG);
-
-    expect(await screen.findByRole("link", { name: "Ergebnis als CSV" })).toHaveAttribute(
-      "href",
-      "/quiz/leitung/r1/ergebnis.csv",
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Auswertung zeigen" }));
-    expect(laden).toHaveBeenCalledWith("r1");
-    expect(await screen.findByText("1 von 2 richtig")).toBeInTheDocument();
-    expect(screen.getByText("Bonn")).toBeInTheDocument();
-  });
-
-  it("meldet eine fehlgeschlagene Auswertung und eine leere", async () => {
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(steuerung({ beantwortet: ["f1"] }));
-    const laden = vi
-      .spyOn(api, "ladeAuswertung")
-      .mockRejectedValue(new ApiError("Gateway weg", 503));
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LEITUNG);
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Auswertung zeigen" }),
-    );
-    expect(await screen.findByRole("alert")).toHaveTextContent("Gateway weg");
-
-    laden.mockResolvedValue([]);
-    await userEvent.click(screen.getByRole("button", { name: "Auswertung zeigen" }));
-    expect(await screen.findByText("Noch keine Frage aufgelöst.")).toBeInTheDocument();
-  });
-
-  it("spielt den Ton der aktuellen Frage ab", async () => {
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(
-      steuerung({ frage: frage({ medien: ["ton"] }) }),
-    );
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LEITUNG);
-    expect(await screen.findByLabelText("Ton zur Frage")).toHaveAttribute(
-      "src",
-      "/quiz/fragen/f1/medien/ton?stand=f1",
-    );
-  });
-});
-
 // ======================================================= Kataloge
 
 describe("Kataloge, erweitert", () => {
@@ -502,5 +410,43 @@ describe("API, erweitert", () => {
       name: "Anna",
       team_id: "t1",
     });
+  });
+
+  it("startet, übernimmt und gibt frei - auf den Pfaden ohne Konto", async () => {
+    const aufrufe: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init: RequestInit) => {
+        aufrufe.push({ url, init });
+        return Promise.resolve(new Response("[]", { status: 200 }));
+      }),
+    );
+    await api.ladeFreieKataloge();
+    await api.starteRunde("k1");
+    await api.starteEigenes(new Blob(["x"]));
+    await api.uebernimmLeitung("ABCD-EFGH-JKLM-NPQR");
+    await api.neuerModeratorcode("r1");
+    await api.gibFrei("k1", true);
+    vi.unstubAllGlobals();
+
+    expect(aufrufe.map((a) => `${a.init.method ?? "GET"} ${a.url}`)).toEqual([
+      "GET /quiz/kataloge/frei",
+      "POST /quiz/starten",
+      "POST /quiz/starten/eigenes",
+      "POST /quiz/leitung/zugang",
+      "POST /quiz/leitung/r1/moderatorcode",
+      "PUT /quiz/kataloge/k1/freigabe",
+    ]);
+    expect(JSON.parse(aufrufe[1]!.init.body as string)).toEqual({ katalog_id: "k1" });
+    expect(new Headers(aufrufe[2]!.init.headers).get("Content-Type")).toBe(
+      "application/zip",
+    );
+    expect(JSON.parse(aufrufe[3]!.init.body as string)).toEqual({
+      code: "ABCD-EFGH-JKLM-NPQR",
+    });
+    expect(JSON.parse(aufrufe[5]!.init.body as string)).toEqual({ frei: true });
+    expect(api.leitungsmediumAdresse("r1", "bild", "f 1")).toBe(
+      "/quiz/leitung/r1/medien/bild?stand=f%201",
+    );
   });
 });

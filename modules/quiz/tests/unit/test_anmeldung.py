@@ -23,6 +23,10 @@ OHNE_KONTO = {
     "GET /runden/{code}/bild": "Bild der gezeigten Frage, erst wenn die Leitung es freigibt",
     "GET /runden/{code}/medien/{schluessel}": "Ton und Antwortbilder, erst mit der Frage",
     "PUT /runden/{code}/team": "nur mit Spielertoken, nur vor dem Start",
+    "GET /kataloge/frei": "Titel und Anzahl freigegebener Kataloge - keine Fragen",
+    "POST /starten": "jeder startet und leitet eine Runde aus einem freigegebenen Katalog",
+    "POST /starten/eigenes": "jeder startet mit eigenem Quiz; Groesse und Zahl begrenzt",
+    "POST /leitung/zugang": "Wiedereinstieg mit dem Moderatorcode",
     "POST /runden/{code}/beitreten": "Name waehlen - das Einzige, was ohne Token gehen muss",
     "PUT /runden/{code}/antwort": "nur mit Spielertoken",
     "POST /runden/{code}/buzzer": "nur mit Spielertoken",
@@ -94,6 +98,8 @@ def test_fragen_und_loesungen_nur_mit_konto(modul: Modul) -> None:
     """Die Gegenprobe zur offenen Liste: wer ohne Konto die Kataloge lesen
     koennte, kennte alle Loesungen vor der Runde."""
     for name, route in _routen(modul):
+        if name in OHNE_KONTO:
+            continue
         if name.split(" ")[1].startswith(("/kataloge", "/fragen", "/leitung")):
             assert route.dependencies, f"{name} ist ohne Konto erreichbar"
 

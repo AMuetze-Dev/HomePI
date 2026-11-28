@@ -987,3 +987,98 @@ def als_csv(zeilen: Sequence[Sequence[str]]) -> str:
     for zeile in zeilen:
         schreiber.writerow([csv_zelle(zelle) for zelle in zeile])
     return "\ufeff" + puffer.getvalue()
+
+
+# ------------------------------------------------------------- Moderation ohne Konto
+#
+# Jeder darf eine Runde starten und leiten - ohne Konto. Was ihn als Leitung
+# ausweist, ist ein Moderatorcode: einmal angezeigt, nur als Hash gespeichert,
+# im Cookie mitgefuehrt und als QR-Code zum Wiedereinstieg auf einem anderen
+# Geraet. 16 Zeichen aus 31 sind rund 80 Bit - mehr als genug fuer etwas, das
+# nur eine Runde beherrscht und nach zwei Tagen Ruhe verschwindet.
+
+
+class KatalogNichtFrei(ServiceError):
+    status = 403
+    title = "Katalog nicht freigegeben"
+
+
+class ZuVieleRunden(ServiceError):
+    status = 429
+    title = "Zu viele Runden"
+
+
+class PaketZuGross(ServiceError):
+    status = 413
+    title = "Datei zu groß"
+
+
+class LeitungVerweigert(ServiceError):
+    status = 401
+    title = "Keine Leitung"
+
+
+#: So viele Runden ohne Konto gleichzeitig. Die Seite ist aus dem Internet
+#: erreichbar; ohne Grenze fuellte ein Skript die Datenbank des Pi.
+MAX_RUNDEN_OHNE_KONTO = 40
+#: Ein eigenes Quiz ohne Konto. Das echte Battle.Net-Quiz hat 7 MB.
+MAX_EIGENES_PAKET = 20 * 1024 * 1024
+#: Ohne Aktivitaet so lange, dann wird aufgeraeumt (Entscheidung 2026-11-28).
+RUHEZEIT = dt.timedelta(hours=48)
+#: Aktivitaet wird hoechstens so oft geschrieben - fuer eine Frist von zwei
+#: Tagen reicht es auf fuenf Minuten genau.
+AKTIVITAET_TAKT = dt.timedelta(minutes=5)
+
+
+def neuer_moderatorcode() -> str:
+    zeichen = "".join(secrets.choice(CODEALPHABET) for _ in range(16))
+    return "-".join(zeichen[i : i + 4] for i in range(0, 16, 4))
+
+
+def normalisiere_moderatorcode(code: str) -> str:
+    roh = re.sub(r"[^0-9A-Za-z]", "", code).upper()
+    return "-".join(roh[i : i + 4] for i in range(0, len(roh), 4))
+
+
+def leitung_erlaubt(*, mit_recht: bool, gespeicherter_hash: str | None, token: str | None) -> bool:
+    """Leiten darf, wer ein Recht auf das Artefakt hat - oder den Code dieser
+    einen Runde kennt."""
+    if mit_recht:
+        return True
+    if gespeicherter_hash is None or not token:
+        return False
+    return token_stimmt(gespeicherter_hash, normalisiere_moderatorcode(token))
+
+
+def pruefe_startkatalog(*, freigegeben: bool, mit_recht: bool) -> None:
+    """Ohne Konto nur aus freigegebenen Katalogen: wer leitet, sieht die
+    Loesungen, und ein nicht freigegebener Katalog ist vielleicht der vom
+    naechsten Quizabend."""
+    if not freigegeben and not mit_recht:
+        raise KatalogNichtFrei("Dieser Katalog ist nicht für alle freigegeben.")
+
+
+def pruefe_neue_runde(offene_ohne_konto: int) -> None:
+    if offene_ohne_konto >= MAX_RUNDEN_OHNE_KONTO:
+        raise ZuVieleRunden(
+            "Gerade laufen zu viele Runden ohne Konto. Versuch es später noch einmal."
+        )
+
+
+def pruefe_eigenes_paket(groesse: int) -> None:
+    if groesse > MAX_EIGENES_PAKET:
+        raise PaketZuGross(
+            f"Ein eigenes Quiz darf höchstens {MAX_EIGENES_PAKET // (1024 * 1024)} MB haben."
+        )
+
+
+def runde_abgelaufen(zuletzt_aktiv: dt.datetime, jetzt: dt.datetime) -> bool:
+    return jetzt - zuletzt_aktiv > RUHEZEIT
+
+
+def aufraeumgrenze(jetzt: dt.datetime) -> dt.datetime:
+    return jetzt - RUHEZEIT
+
+
+def aktivitaet_merken(zuletzt: dt.datetime | None, jetzt: dt.datetime) -> bool:
+    return zuletzt is None or jetzt - zuletzt >= AKTIVITAET_TAKT

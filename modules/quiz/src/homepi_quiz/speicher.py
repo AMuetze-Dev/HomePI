@@ -7,11 +7,12 @@ Datensatz existiert, ob ein Name in der Runde schon belegt ist.
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import Select, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,9 +23,11 @@ from .modelle import (
     Bild,
     Buzzer,
     Frage,
+    Freigabe,
     Katalog,
     Korrektur,
     Medium,
+    Moderation,
     Runde,
     Spieler,
     Team,
@@ -40,9 +43,40 @@ async def kataloge(sitzung: AsyncSession) -> list[tuple[Katalog, int]]:
     ergebnis = await sitzung.execute(
         select(Katalog, func.coalesce(anzahl.c.n, 0))
         .outerjoin(anzahl, anzahl.c.katalog_id == Katalog.id)
+        .where(Katalog.id.not_in(_eigene_kataloge()))
         .order_by(Katalog.titel)
     )
     return [(katalog, int(n)) for katalog, n in ergebnis.all()]
+
+
+def _eigene_kataloge() -> Select[uuid.UUID]:
+    # Ein Quiz, das jemand ohne Konto zu seiner Runde hochgeladen hat, gehoert
+    # dieser Runde - nicht in die Liste, aus der alle anderen waehlen.
+    return (
+        select(Runde.katalog_id)
+        .join(Moderation, Moderation.runde_id == Runde.id)
+        .where(Moderation.eigener_katalog.is_(True))
+    )
+
+
+async def freie_kataloge(sitzung: AsyncSession) -> list[tuple[Katalog, int]]:
+    frei = set(await sitzung.scalars(select(Freigabe.katalog_id)))
+    return [(k, n) for k, n in await kataloge(sitzung) if k.id in frei]
+
+
+async def freigaben(sitzung: AsyncSession) -> set[uuid.UUID]:
+    return set(await sitzung.scalars(select(Freigabe.katalog_id)))
+
+
+async def ist_frei(sitzung: AsyncSession, katalog_id: uuid.UUID) -> bool:
+    return await sitzung.get(Freigabe, katalog_id) is not None
+
+
+async def freigeben(sitzung: AsyncSession, katalog_id: uuid.UUID, frei: bool) -> None:
+    await sitzung.execute(delete(Freigabe).where(Freigabe.katalog_id == katalog_id))
+    if frei:
+        sitzung.add(Freigabe(katalog_id=katalog_id))
+    await sitzung.flush()
 
 
 async def katalog(sitzung: AsyncSession, katalog_id: uuid.UUID) -> Katalog:
@@ -535,3 +569,68 @@ async def alle_druecke(sitzung: AsyncSession, runde_id: uuid.UUID) -> list[Buzze
             select(Buzzer).where(Buzzer.runde_id == runde_id).order_by(Buzzer.reihe)
         )
     )
+
+
+# ------------------------------------------------------------- Moderation
+
+
+async def moderation(sitzung: AsyncSession, runde_id: uuid.UUID) -> Moderation | None:
+    return await sitzung.get(Moderation, runde_id)
+
+
+async def moderation_mit_hash(sitzung: AsyncSession, code_hash: str) -> Moderation | None:
+    return await sitzung.scalar(select(Moderation).where(Moderation.code_hash == code_hash))
+
+
+async def moderation_setzen(
+    sitzung: AsyncSession,
+    runde_id: uuid.UUID,
+    code_hash: str,
+    *,
+    ohne_konto: bool = False,
+    eigener_katalog: bool = False,
+) -> None:
+    await sitzung.execute(
+        insert(Moderation)
+        .values(
+            runde_id=runde_id,
+            code_hash=code_hash,
+            ohne_konto=ohne_konto,
+            eigener_katalog=eigener_katalog,
+        )
+        .on_conflict_do_update(index_elements=[Moderation.runde_id], set_={"code_hash": code_hash})
+    )
+
+
+async def offene_ohne_konto(sitzung: AsyncSession) -> int:
+    return int(
+        await sitzung.scalar(
+            select(func.count())
+            .select_from(Moderation)
+            .join(Runde, Runde.id == Moderation.runde_id)
+            .where(Moderation.ohne_konto.is_(True), Runde.status != "beendet")
+        )
+        or 0
+    )
+
+
+async def abgelaufene(
+    sitzung: AsyncSession, grenze: dt.datetime
+) -> list[tuple[uuid.UUID, uuid.UUID, bool]]:
+    """(runde_id, katalog_id, eigener_katalog) jeder Runde ohne Konto, die
+    seit ``grenze`` ruht."""
+    ergebnis = await sitzung.execute(
+        select(Runde.id, Runde.katalog_id, Moderation.eigener_katalog)
+        .join(Moderation, Moderation.runde_id == Runde.id)
+        .where(Moderation.ohne_konto.is_(True), Moderation.zuletzt_aktiv < grenze)
+    )
+    return [(r, k, bool(e)) for r, k, e in ergebnis.all()]
+
+
+async def runde_und_katalog_loeschen(
+    sitzung: AsyncSession, runde_id: uuid.UUID, katalog_id: uuid.UUID | None
+) -> None:
+    await sitzung.execute(delete(Runde).where(Runde.id == runde_id))
+    if katalog_id is not None:
+        await sitzung.execute(delete(Katalog).where(Katalog.id == katalog_id))
+    await sitzung.flush()

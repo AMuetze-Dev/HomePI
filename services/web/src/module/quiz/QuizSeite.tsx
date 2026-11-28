@@ -4,47 +4,46 @@ import { Hinweis, Tafel } from "../../ui";
 import type { ModulProps } from "../typen";
 import { AnzeigeTafel } from "./AnzeigeTafel";
 import { KatalogTafel } from "./KatalogTafel";
-import { LeitungTafel } from "./LeitungTafel";
+import { Leiten } from "./Leiten";
 import { SpielerTafel } from "./SpielerTafel";
 
 /**
- * Vier Bereiche, und zwei davon gehen ohne Konto.
+ * Drei Wege, und zwei davon gehen ohne Konto.
  *
- * „Mitspielen“ und „Anzeigetafel“ sind der Grund, warum dieses Artefakt
- * öffentlich ist - wer die Kachel ohne Konto antippt, landet beim
- * Mitspielen. „Runden“ und „Kataloge“ gehören der Leitung; dort hängt
- * alles an `darf("quiz", …)` und wird im Backend noch einmal geprüft.
+ * **Mitspielen** und **Leiten** stehen jedem offen: Wer eine Runde startet,
+ * leitet sie mit einem Moderatorcode, nicht mit einem Konto. Die
+ * **Anzeigetafel** ist kein eigener Bereich mehr - sie öffnet die Leitung
+ * für den Beamer. **Kataloge** pflegt nur, wer ein Recht hat; geprüft wird
+ * im Backend noch einmal.
  */
 export function QuizSeite({ unterseite = "spielen" }: ModulProps) {
   const { darf, zustand } = useAnmeldung();
 
   if (unterseite === "spielen") return <SpielerTafel />;
   if (unterseite === "tafel") return <AnzeigeTafel />;
+  if (unterseite === "leiten") return <Leiten />;
 
-  const titel = unterseite === "kataloge" ? "Fragenkataloge" : "Runden";
   if (!darf("quiz", "leser")) {
     return (
-      <Tafel titel={titel}>
+      <Tafel titel="Fragenkataloge">
         <Hinweis>
-          Diesen Bereich führt die Spielleitung. Mitspielen geht ohne Konto - unter
-          „Mitspielen“ mit dem Code der Runde.
+          Kataloge pflegt, wer ein Konto mit Recht auf das Quiz hat. Eine Runde leiten
+          kann jeder - unter „Leiten“, mit einem freigegebenen oder dem eigenen Quiz.
         </Hinweis>
         {zustand === "abgemeldet" && (
           <Anmeldeformular
             titel="Anmeldung nötig"
-            beschreibung="Zum Leiten einer Runde brauchst du ein Recht auf diesem Artefakt."
+            beschreibung="Zum Pflegen von Katalogen brauchst du ein Recht auf diesem Artefakt."
           />
         )}
       </Tafel>
     );
   }
 
-  return unterseite === "kataloge" ? (
+  return (
     <KatalogTafel
       darfLeiten={darf("quiz", "nutzer")}
       darfVerwalten={darf("quiz", "verwalter")}
     />
-  ) : (
-    <LeitungTafel darfLeiten={darf("quiz", "nutzer")} />
   );
 }

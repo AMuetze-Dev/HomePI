@@ -33,8 +33,10 @@ import {
   ladeMediumHoch,
   entferneMedium,
   mediumAdresse,
+  gibFrei,
 } from "./api";
 import { FrageFormular } from "./FrageFormular";
+import { Symbol } from "./Symbol";
 import { LEERE_FRAGE } from "./vorlage";
 import { loesungstext, TYPWORT } from "./texte";
 import stil from "./Quiz.module.css";
@@ -173,6 +175,7 @@ function KatalogListe({
               >
                 <span className={stil.zeilentext}>{k.titel}</span>
                 <span className={stil.nebensache}>{k.anzahl_fragen} Fragen</span>
+                {k.freigegeben && <Etikett ton="gut">für alle</Etikett>}
               </button>
             </li>
           ))}
@@ -278,6 +281,17 @@ function KatalogBearbeiten({
       beiwort={`${katalog.fragen.length} Fragen`}
       aktionen={
         <>
+          {darfLeiten && (
+            <Knopf
+              auspraegung={katalog.freigegeben ? "sekundaer" : "leise"}
+              groesse="sm"
+              aria-pressed={katalog.freigegeben}
+              onClick={() => void handeln(() => gibFrei(id, !katalog.freigegeben))}
+            >
+              <Symbol name={katalog.freigegeben ? "offen" : "schloss"} />
+              {katalog.freigegeben ? "Für alle freigegeben" : "Für alle freigeben"}
+            </Knopf>
+          )}
           <a className={stil.verweis} href={exportAdresse(id)} download>
             Als ZIP sichern
           </a>

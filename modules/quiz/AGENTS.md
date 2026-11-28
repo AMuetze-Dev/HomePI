@@ -34,9 +34,12 @@ Datenbank-Engine, Logging-Konfiguration, Dockerfile, Compose-Fragment.
 
 Es ist **öffentlich**. Drei Regeln, die daraus folgen:
 
-1. **Ein neuer Endpunkt der Leitung bekommt `dependencies=[LESEN|LEITEN|VERWALTEN]`.**
-   Sonst macht `test_ohne_konto_geht_genau_die_liste` die CI rot - und das
-   ist gewollt. Ein neuer öffentlicher Endpunkt gehört dort mit Begründung in
+1. **Ein neuer Endpunkt bekommt eine Prüfung.** Kataloge:
+   `dependencies=[LESEN|LEITEN|VERWALTEN]`. Unter `/leitung/{runde_id}`:
+   `ZUSEHEN` oder `FUEHREN` - die lassen ein Recht auf das Artefakt **oder**
+   das Moderator-Cookie dieser Runde gelten. Ohne Prüfung macht
+   `test_ohne_konto_geht_genau_die_liste` die CI rot - und das ist gewollt.
+   Ein neuer öffentlicher Endpunkt gehört dort mit Begründung in
    `OHNE_KONTO`.
 2. **Spieler-Endpunkte hängen an `hole_spieler`** (Token im Cookie). Nur der
    Beitritt geht ohne.
@@ -178,7 +181,7 @@ make test-modul N=quiz
 | Coverage Frontend | ≥ 85 % Zeilen, ≥ 80 % Zweige |
 | `mypy --strict` | keine Fehler |
 | `GET /module` | `quiz` mit `status: "bereit"` (angemeldet) |
-| `GET /quiz/` ohne Cookie | 200 mit `laufende_runden` (öffentlich); `GET /quiz/kataloge` ohne Cookie 401 |
+| `GET /quiz/` ohne Cookie | 200 mit `laufende_runden` (öffentlich); `GET /quiz/kataloge` ohne Cookie 401, `GET /quiz/kataloge/frei` 200 |
 | Rauchtests | grün |
 
 Zusätzlich, was kein Werkzeug prüft:

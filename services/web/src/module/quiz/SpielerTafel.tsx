@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { meldung } from "../../api/client";
 import {
@@ -84,6 +84,10 @@ function CodeFormular({ weiter }: { weiter: (code: string) => void }) {
         <Knopf type="submit" disabled={code.length !== 6}>
           Weiter
         </Knopf>
+        <p className={stil.nebensache}>
+          Du willst selbst ein Quiz leiten?{" "}
+          <Link to="/modul/quiz/leiten">Runde starten</Link>
+        </p>
       </form>
     </Karte>
   );

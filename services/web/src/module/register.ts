@@ -36,10 +36,18 @@ export const OBERFLAECHEN: readonly ModulOberflaeche[] = [
       // Artefakt oeffentlich ist. Wer die Kachel ohne Konto antippt, landet
       // hier - mit dem Handy, also schmal.
       { id: "spielen", wort: "Mitspielen", breite: "text", eigenerTitel: true },
-      // Fuer den Beamer: Frage gross links, QR-Code und Rangliste rechts.
-      { id: "tafel", wort: "Anzeigetafel", breite: "voll", eigenerTitel: true },
-      { id: "runden", wort: "Runden", breite: "weit", eigenerTitel: true },
+      // Jeder darf leiten, mit oder ohne Konto. Das Dashboard braucht die
+      // ganze Breite - es zeigt Fragen, Bühne und Spieler nebeneinander.
+      { id: "leiten", wort: "Leiten", breite: "voll", eigenerTitel: true },
       { id: "kataloge", wort: "Kataloge", eigenerTitel: true },
+      // Für den Beamer, geöffnet aus der Leitung - kein Menüpunkt.
+      {
+        id: "tafel",
+        wort: "Anzeigetafel",
+        breite: "voll",
+        eigenerTitel: true,
+        versteckt: true,
+      },
     ],
   },
   {

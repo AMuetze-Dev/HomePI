@@ -10,17 +10,9 @@ import { ApiError } from "../../api/client";
 import { TESTBENUTZER, mitAnmeldung } from "../../testhilfen";
 import * as api from "./api";
 import { QuizSeite } from "./QuizSeite";
-import {
-  frage,
-  katalog,
-  oeffentlicheFrage,
-  runde,
-  rundenstand,
-  steuerung,
-} from "./testdaten";
+import { frage, katalog, oeffentlicheFrage, rundenstand } from "./testdaten";
 
 const LEITUNG: Benutzer = { ...TESTBENUTZER, rechte: { quiz: "verwalter" } };
-const LESER: Benutzer = { ...TESTBENUTZER, rechte: { quiz: "leser" } };
 
 function zeige(kind: ReactNode, adresse: string, benutzer: Benutzer | null = null) {
   return render(
@@ -294,8 +286,11 @@ describe("Anzeigetafel", () => {
       rundenstand({ status: "lobby", phase: "keine", frage: null }),
     );
     zeige(<QuizSeite unterseite="tafel" />, "/modul/quiz/tafel?code=ABC234");
-    expect(await screen.findByText("Gleich geht es los")).toBeInTheDocument();
-    expect(screen.getByText(/2 Personen spielen/)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Code ABC234")).toBeInTheDocument();
+    expect(screen.getByText(/Personen sind dabei/)).toHaveTextContent(
+      "2 Personen sind dabei",
+    );
+    expect(screen.getByRole("list", { name: "Mitspieler" })).toHaveTextContent("Ben");
   });
 
   it("zeigt den Buzzer, die Lösung und den Endstand", async () => {
@@ -325,158 +320,12 @@ describe("Anzeigetafel", () => {
   });
 });
 
-// ===================================================================== Leitung
+// ===================================================================== Bereiche
 
-describe("Leitung", () => {
-  it("schickt Besucher ohne Konto zur Anmeldung und zum Mitspielen", async () => {
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden");
-    expect(await screen.findByText(/Mitspielen geht ohne Konto/)).toBeInTheDocument();
-  });
-
-  it("führt ohne Katalog zu den Katalogen", async () => {
-    vi.spyOn(api, "ladeRunden").mockResolvedValue([]);
-    vi.spyOn(api, "ladeKataloge").mockResolvedValue([]);
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden", LEITUNG);
-
-    expect(await screen.findByText("Noch kein Katalog mit Fragen")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Zu den Fragenkatalogen" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Noch keine Runde")).toBeInTheDocument();
-  });
-
-  it("eröffnet eine Runde und öffnet ihre Steuerung", async () => {
-    vi.spyOn(api, "ladeRunden").mockResolvedValue([runde({ status: "beendet" })]);
-    vi.spyOn(api, "ladeKataloge").mockResolvedValue([katalog()]);
-    vi.spyOn(api, "eroeffneRunde").mockResolvedValue(runde());
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(steuerung());
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden", LEITUNG);
-
-    await userEvent.click(await screen.findByRole("button", { name: "Runde eröffnen" }));
-    expect(api.eroeffneRunde).toHaveBeenCalledWith("k1");
-    expect(await screen.findByText("Lösung: Paris")).toBeInTheDocument();
-  });
-
-  it("zeigt den Fehler beim Eröffnen wörtlich", async () => {
-    vi.spyOn(api, "ladeRunden").mockResolvedValue([]);
-    vi.spyOn(api, "ladeKataloge").mockResolvedValue([katalog()]);
-    vi.spyOn(api, "eroeffneRunde").mockRejectedValue(
-      new ApiError("Der Katalog hat noch keine Fragen.", 409),
-    );
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden", LEITUNG);
-    await userEvent.click(await screen.findByRole("button", { name: "Runde eröffnen" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Der Katalog hat noch keine Fragen.",
-    );
-  });
-
-  it("steuert eine offene Frage und vergibt Punkte von Hand", async () => {
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(
-      steuerung({ phase: "aufgeloest", beantwortet: ["f1"] }),
-    );
-    const steuern = vi
-      .spyOn(api, "steuere")
-      .mockResolvedValue(steuerung({ phase: "bereit" }));
-    const bewerten = vi
-      .spyOn(api, "bewerteAntwort")
-      .mockResolvedValue(steuerung({ phase: "aufgeloest", beantwortet: ["f1"] }));
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LEITUNG);
-
-    const punkte = await screen.findByLabelText("Punkte für Anna");
-    await userEvent.type(punkte, "2");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Punkte für Anna speichern" }),
-    );
-    expect(bewerten).toHaveBeenCalledWith("r1", "a1", 2);
-
-    await userEvent.click(screen.getByRole("button", { name: "Nächste Frage" }));
-    expect(steuern).toHaveBeenCalledWith("r1", { art: "frage", frage_id: "f2" });
-    expect(
-      await screen.findByRole("button", { name: "Frage zeigen" }),
-    ).toBeInTheDocument();
-  });
-
-  it("zeigt, sperrt und löst auf", async () => {
-    const stand = vi
-      .spyOn(api, "ladeSteuerung")
-      .mockResolvedValue(steuerung({ phase: "bereit" }));
-    const steuern = vi
-      .spyOn(api, "steuere")
-      .mockResolvedValue(steuerung({ phase: "offen" }));
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LEITUNG);
-
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Timer 30 s" }));
-    await userEvent.click(screen.getByRole("button", { name: "Frage zeigen" }));
-    expect(steuern).toHaveBeenCalledWith("r1", { art: "zeigen", timer: false });
-
-    await userEvent.click(await screen.findByRole("button", { name: "Eingabe sperren" }));
-    expect(steuern).toHaveBeenCalledWith("r1", { art: "sperren" });
-    await userEvent.click(screen.getByRole("button", { name: "Auflösen" }));
-    expect(steuern).toHaveBeenCalledWith("r1", { art: "aufloesen" });
-
-    steuern.mockResolvedValue(steuerung({ phase: "gesperrt" }));
-    await userEvent.click(screen.getByRole("button", { name: "Auflösen" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Wieder öffnen" }));
-    expect(steuern).toHaveBeenCalledWith("r1", { art: "oeffnen" });
-    stand.mockRestore();
-  });
-
-  it("urteilt über den Buzzer", async () => {
-    const buzzerfrage = steuerung().fragen[1]!;
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(
-      steuerung({
-        frage: buzzerfrage,
-        antworten: [],
-        buzzer: [
-          { spieler_id: "s2", spieler: "Ben", position: 1, urteil: "falsch" },
-          { spieler_id: "s1", spieler: "Anna", position: 2, urteil: "wartet" },
-        ],
-      }),
-    );
-    const steuern = vi.spyOn(api, "steuere").mockResolvedValue(steuerung());
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LEITUNG);
-
-    expect(await screen.findByText("Anna ist dran")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Falsch - nächster" }));
-    expect(steuern).toHaveBeenCalledWith("r1", { art: "buzzer", richtig: false });
-  });
-
-  it("stellt einen Wiederkehrcode aus und zeigt ihn einmal", async () => {
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(steuerung());
-    vi.spyOn(api, "stelleWiederkehrAus").mockResolvedValue({
-      code: "ABCD-EFGH",
-      gueltig_bis: "x",
-    });
-    const korrektur = vi.spyOn(api, "korrigiere").mockResolvedValue(steuerung());
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LEITUNG);
-
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Wiederkehrcode für Ben" }),
-    );
-    expect(await screen.findByText("ABCD-EFGH")).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Anna einen Punkt geben" }));
-    expect(korrektur).toHaveBeenCalledWith("r1", "s1", 1);
-  });
-
-  it("zeigt einer Leserin die Runde ohne Bedienelemente", async () => {
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(steuerung());
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LESER);
-    expect(await screen.findByText("Lösung: Paris")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Auflösen" })).not.toBeInTheDocument();
-  });
-
-  it("meldet eine abgelehnte Aktion wörtlich und behält die Steuerung", async () => {
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(steuerung());
-    vi.spyOn(api, "steuere").mockRejectedValue(
-      new ApiError("Die Frage ist nicht offen.", 409),
-    );
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LEITUNG);
-    await userEvent.click(await screen.findByRole("button", { name: "Auflösen" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Die Frage ist nicht offen.",
-    );
-    expect(screen.getByText("Lösung: Paris")).toBeInTheDocument();
+describe("Bereiche", () => {
+  it("schickt Besucher ohne Recht von den Katalogen zum Leiten", async () => {
+    zeige(<QuizSeite unterseite="kataloge" />, "/modul/quiz/kataloge");
+    expect(await screen.findByText(/Eine Runde leiten\s+kann jeder/)).toBeInTheDocument();
   });
 });
 
@@ -614,67 +463,6 @@ describe("Kataloge", () => {
 });
 
 describe("Seltene Handgriffe", () => {
-  it("beendet, löscht, entfernt Spieler und schaltet das Bild", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(
-      steuerung({ frage: frage({ hat_bild: true }), bild_sichtbar: true }),
-    );
-    const steuern = vi.spyOn(api, "steuere").mockResolvedValue(steuerung());
-    const entfernen = vi.spyOn(api, "entferneSpieler").mockResolvedValue();
-    const loeschen = vi.spyOn(api, "loescheRunde").mockResolvedValue();
-    vi.spyOn(api, "ladeRunden").mockResolvedValue([]);
-    vi.spyOn(api, "ladeKataloge").mockResolvedValue([]);
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LEITUNG);
-
-    await userEvent.click(await screen.findByRole("button", { name: "Bild verbergen" }));
-    expect(steuern).toHaveBeenCalledWith("r1", { art: "bild", sichtbar: false });
-    await userEvent.click(screen.getByRole("button", { name: "Ben entfernen" }));
-    expect(entfernen).toHaveBeenCalledWith("r1", "s2");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Anna einen Punkt abziehen" }),
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Runde beenden" }));
-    expect(steuern).toHaveBeenCalledWith("r1", { art: "beenden" });
-    await userEvent.click(screen.getByRole("button", { name: "Runde löschen" }));
-    expect(loeschen).toHaveBeenCalledWith("r1");
-    expect(await screen.findByRole("heading", { name: "Runden" })).toBeInTheDocument();
-  });
-
-  it("gibt den Buzzer frei und wählt eine andere Frage", async () => {
-    const buzzerfrage = steuerung().fragen[1]!;
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(
-      steuerung({
-        frage: buzzerfrage,
-        antworten: [],
-        buzzer: [{ spieler_id: "s1", spieler: "Anna", position: 1, urteil: "wartet" }],
-      }),
-    );
-    const steuern = vi
-      .spyOn(api, "steuere")
-      .mockImplementation(() => api.ladeSteuerung("r1"));
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden?runde=r1", LEITUNG);
-
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Buzzer freigeben" }),
-    );
-    expect(steuern).toHaveBeenCalledWith("r1", { art: "buzzer/zuruecksetzen" });
-    await userEvent.click(screen.getByRole("button", { name: "Frage 1 wählen" }));
-    expect(steuern).toHaveBeenCalledWith("r1", { art: "frage", frage_id: "f1" });
-  });
-
-  it("öffnet eine Runde aus der Liste und kehrt zurück", async () => {
-    vi.spyOn(api, "ladeRunden").mockResolvedValue([runde()]);
-    vi.spyOn(api, "ladeKataloge").mockResolvedValue([katalog()]);
-    vi.spyOn(api, "ladeSteuerung").mockResolvedValue(steuerung());
-    zeige(<QuizSeite unterseite="runden" />, "/modul/quiz/runden", LEITUNG);
-
-    await userEvent.click(await screen.findByRole("button", { name: /ABC234/ }));
-    await userEvent.click(await screen.findByRole("button", { name: "Alle Runden" }));
-    expect(
-      await screen.findByRole("button", { name: "Runde eröffnen" }),
-    ).toBeInTheDocument();
-  });
-
   it("löscht einen Katalog und ein Bild, setzt das Ziel eines Hotspots", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const hotspot = frage({

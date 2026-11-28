@@ -7,7 +7,9 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
  * Konto** wirklich hineinkommt (das Artefakt ist öffentlich), dass sein Name
  * an seinem Cookie hängt und ein zweites Gerät ihn nicht bekommt, und dass
  * die Antwort vom Handy über das Gateway bis in die Wertung der Leitung
- * läuft. Drei Browser-Kontexte: Leitung, Anna, ein Fremder.
+ * läuft - und dass eine Runde sich **ohne Konto** leiten lässt: Ein zweites
+ * Gerät übernimmt sie mit dem Moderatorcode. Mehrere Browser-Kontexte:
+ * Leitung, Moderation ohne Konto, Anna, ein Fremder.
  *
  * Die Tests bauen aufeinander auf (`mode: serial`).
  */
@@ -30,6 +32,7 @@ const BATTLENET = {
 };
 
 let code = "";
+let moderatorcode = "";
 
 function artefakt(page: Page, name: string | RegExp) {
   return page.getByRole("list", { name: "Artefakte" }).getByRole("link", { name });
@@ -51,6 +54,15 @@ async function anmelden(page: Page): Promise<void> {
   await page.getByLabel("Passwort").fill(LEITUNG.passwort);
   await page.getByRole("button", { name: "Anmelden" }).click();
   await expect(konto(page)).toBeVisible();
+}
+
+/** Ein Gerät ohne Konto übernimmt die Leitung über den Link im QR-Code. */
+async function moderation(browser: Browser): Promise<Page> {
+  const kontext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const seite = await kontext.newPage();
+  await seite.goto(`/modul/quiz/leiten?zugang=${moderatorcode}`);
+  await expect(seite.getByLabel(`Rundencode ${code}`)).toBeVisible();
+  return seite;
 }
 
 /** Ein Handy: eigener Kontext, eigene Cookies, kein Konto. */
@@ -76,7 +88,7 @@ test.describe("Ein Quizabend", () => {
     await expect(konto(page)).toBeVisible();
   });
 
-  test("das Quiz ist ohne Konto sichtbar, Leiten braucht das Recht", async ({
+  test("das Quiz ist ohne Konto sichtbar, Kataloge brauchen das Recht", async ({
     browser,
     page,
   }) => {
@@ -94,7 +106,10 @@ test.describe("Ein Quizabend", () => {
     );
   });
 
-  test("sie übernimmt ein Battle.Net-Quiz und eröffnet eine Runde", async ({ page }) => {
+  test("sie übernimmt ein Battle.Net-Quiz, gibt es frei und startet", async ({
+    browser,
+    page,
+  }) => {
     await anmelden(page);
     await artefakt(page, "Quiz").click();
     await bereich(page, "Kataloge").click();
@@ -106,21 +121,33 @@ test.describe("Ein Quizabend", () => {
     });
     await expect(page.getByRole("heading", { name: "Kneipenquiz" })).toBeVisible();
     await expect(page.getByText(/tanzen/)).toBeVisible();
+    await page.getByRole("button", { name: "Für alle freigeben" }).click();
+    await expect(
+      page.getByRole("button", { name: "Für alle freigegeben" }),
+    ).toBeVisible();
 
-    await bereich(page, "Runden").click();
-    await page.getByRole("button", { name: "Runde eröffnen" }).click();
-    await expect(page.getByText("Lösung: Paris")).toBeHidden();
-    await expect(page.getByText(/Wähle unten die erste Frage/)).toBeVisible();
+    // Ohne Konto sieht man den freigegebenen Katalog - und nur den.
+    const gast = await handy(browser);
+    await gast.goto("/modul/quiz/leiten");
+    await expect(gast.getByRole("radio", { name: /Kneipenquiz/ })).toBeVisible();
+    await gast.close();
 
-    const beiwort = await page
-      .getByRole("heading", { name: "Kneipenquiz" })
-      .locator("..")
-      .innerText();
-    code = /[A-Z0-9]{6}/.exec(beiwort)?.[0] ?? "";
-    expect(code).toHaveLength(6);
+    await bereich(page, "Leiten").click();
+    await page.getByRole("button", { name: "Runde starten" }).click();
+    const einmal = page.getByRole("dialog", { name: "Dein Moderatorcode" });
+    await expect(einmal).toBeVisible();
+    moderatorcode =
+      /[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}/.exec(await einmal.innerText())?.[0] ?? "";
+    expect(moderatorcode).toHaveLength(19);
+    await einmal.getByRole("button", { name: "Verstanden - zur Runde" }).click();
+
+    const chip = page.getByLabel(/^Rundencode /);
+    code = ((await chip.getAttribute("aria-label")) ?? "").replace("Rundencode ", "");
+    expect(code).toMatch(/^[A-Z0-9]{6}$/);
+    await expect(page.getByText(/Wähle links eine Frage/)).toBeVisible();
   });
 
-  test("Anna spielt ohne Konto, ihr Name gehört ihr", async ({ browser, page }) => {
+  test("Anna spielt ohne Konto, ihr Name gehört ihr", async ({ browser }) => {
     const anna = await handy(browser);
     await anna.goto("/modul/quiz/spielen");
     await anna.getByLabel("Rundencode").fill(code.toLowerCase());
@@ -141,13 +168,10 @@ test.describe("Ein Quizabend", () => {
     await expect(fremder.getByLabel("Dein Name")).toHaveValue("ANNA");
     await fremder.close();
 
-    // Die Leitung stellt die Frage.
-    await anmelden(page);
-    await artefakt(page, "Quiz").click();
-    await bereich(page, "Runden").click();
-    await page.getByRole("button", { name: new RegExp(code) }).click();
-    await page.getByRole("button", { name: "Frage 1 wählen" }).click();
-    await page.getByRole("button", { name: "Frage zeigen" }).click();
+    // Ein Gerät ohne Konto übernimmt mit dem Moderatorcode und stellt die Frage.
+    const leitung = await moderation(browser);
+    await leitung.getByRole("button", { name: /^Frage 1 wählen/ }).click();
+    await leitung.getByRole("button", { name: "Frage zeigen" }).click();
 
     await expect(
       anna.getByRole("heading", { name: "Hauptstadt von Frankreich?" }),
@@ -156,8 +180,8 @@ test.describe("Ein Quizabend", () => {
     await anna.getByRole("button", { name: "Antwort abgeben" }).click();
     await expect(anna.getByText("Abgegeben")).toBeVisible();
 
-    await expect(page.getByText("paris")).toBeVisible();
-    await page.getByRole("button", { name: "Auflösen" }).click();
+    await expect(leitung.getByText("paris")).toBeVisible();
+    await leitung.getByRole("button", { name: "Auflösen" }).click();
 
     await expect(anna.getByText("Richtig! +2")).toBeVisible();
     await expect(anna.getByText(/Anna · 2 Punkte · Platz 1/)).toBeVisible();
@@ -169,15 +193,25 @@ test.describe("Ein Quizabend", () => {
     ]);
     expect(breite[0]).toBeLessThanOrEqual(breite[1]!);
     await anna.close();
+
+    // Das Dashboard der Leitung scrollt auf dem Desktop nicht.
+    const hoehe = await leitung.evaluate(() => [
+      document.documentElement.scrollHeight,
+      document.documentElement.clientHeight,
+    ]);
+    expect(hoehe[0]).toBeLessThanOrEqual(hoehe[1]!);
+    await leitung.close();
   });
 
-  test("am Ende steht Anna auf dem Podest", async ({ browser, page }) => {
-    await anmelden(page);
-    await artefakt(page, "Quiz").click();
-    await bereich(page, "Runden").click();
-    await page.getByRole("button", { name: new RegExp(code) }).click();
-    page.once("dialog", (dialog) => void dialog.accept());
-    await page.getByRole("button", { name: "Runde beenden" }).click();
+  test("am Ende steht Anna auf dem Podest", async ({ browser }) => {
+    const leitung = await moderation(browser);
+    await leitung.getByRole("button", { name: "Runde beenden oder löschen" }).click();
+    await leitung
+      .getByRole("dialog", { name: "Runde" })
+      .getByRole("button", { name: /Runde beenden/ })
+      .click();
+    await expect(leitung.getByText("Beendet", { exact: true })).toBeVisible();
+    await leitung.close();
 
     const tafel = await handy(browser);
     await tafel.goto(`/modul/quiz/tafel?code=${code}`);

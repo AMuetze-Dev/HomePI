@@ -759,3 +759,65 @@ class TestErgebnistabelle:
         text = dienst.als_csv([["a", "b;c"], ["1", "2"]])
         assert text.lstrip("﻿").splitlines() == ['a;"b;c"', "1;2"]
         assert text.startswith("﻿"), "Ohne BOM liest Excel die Umlaute falsch"
+
+
+# ===================================================================== Moderation ohne Konto
+
+
+class TestModeratorcode:
+    def test_sechzehn_zeichen_in_vierergruppen(self) -> None:
+        code = dienst.neuer_moderatorcode()
+        teile = code.split("-")
+        assert [len(t) for t in teile] == [4, 4, 4, 4]
+        assert set("".join(teile)) <= set(dienst.CODEALPHABET)
+
+    def test_schreibweise_beim_eintippen_egal(self) -> None:
+        assert dienst.normalisiere_moderatorcode(" abcd efgh-ijkl mnpq ") == "ABCD-EFGH-IJKL-MNPQ"
+
+    def test_leiten_mit_recht_oder_passendem_code(self) -> None:
+        from homepi_core.auth.passwoerter import hashe_token
+
+        gespeichert = hashe_token("ABCD-EFGH-IJKL-MNPQ")
+        assert dienst.leitung_erlaubt(mit_recht=True, gespeicherter_hash=None, token=None)
+        assert dienst.leitung_erlaubt(
+            mit_recht=False, gespeicherter_hash=gespeichert, token="ABCD-EFGH-IJKL-MNPQ"
+        )
+        assert not dienst.leitung_erlaubt(
+            mit_recht=False, gespeicherter_hash=gespeichert, token="ABCD-EFGH-IJKL-MNPX"
+        )
+        assert not dienst.leitung_erlaubt(mit_recht=False, gespeicherter_hash=None, token="x")
+        assert not dienst.leitung_erlaubt(
+            mit_recht=False, gespeicherter_hash=gespeichert, token=None
+        )
+
+
+class TestStarten:
+    def test_ohne_konto_nur_freigegebene_kataloge(self) -> None:
+        dienst.pruefe_startkatalog(freigegeben=True, mit_recht=False)
+        dienst.pruefe_startkatalog(freigegeben=False, mit_recht=True)
+        with pytest.raises(dienst.KatalogNichtFrei):
+            dienst.pruefe_startkatalog(freigegeben=False, mit_recht=False)
+
+    def test_nicht_unbegrenzt_viele_offene_runden(self) -> None:
+        dienst.pruefe_neue_runde(dienst.MAX_RUNDEN_OHNE_KONTO - 1)
+        with pytest.raises(dienst.ZuVieleRunden):
+            dienst.pruefe_neue_runde(dienst.MAX_RUNDEN_OHNE_KONTO)
+
+    def test_eigenes_quiz_hat_ein_kleineres_limit(self) -> None:
+        dienst.pruefe_eigenes_paket(dienst.MAX_EIGENES_PAKET)
+        with pytest.raises(dienst.PaketZuGross, match="MB"):
+            dienst.pruefe_eigenes_paket(dienst.MAX_EIGENES_PAKET + 1)
+
+
+class TestAufraeumen:
+    def test_nach_achtundvierzig_stunden_ohne_aktivitaet(self) -> None:
+        assert not dienst.runde_abgelaufen(JETZT - dt.timedelta(hours=47), JETZT)
+        assert dienst.runde_abgelaufen(JETZT - dt.timedelta(hours=49), JETZT)
+
+    def test_aktivitaet_wird_nicht_bei_jedem_abruf_geschrieben(self) -> None:
+        assert dienst.aktivitaet_merken(None, JETZT)
+        assert not dienst.aktivitaet_merken(JETZT - dt.timedelta(minutes=2), JETZT)
+        assert dienst.aktivitaet_merken(JETZT - dt.timedelta(minutes=10), JETZT)
+
+    def test_aufraeumgrenze(self) -> None:
+        assert dienst.aufraeumgrenze(JETZT) == JETZT - dt.timedelta(hours=48)

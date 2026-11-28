@@ -239,6 +239,8 @@ class KatalogAusgabe(BaseModel):
     beschreibung: str
     anzahl_fragen: int = 0
     geaendert: dt.datetime
+    #: Jeder darf daraus ohne Konto eine Runde starten.
+    freigegeben: bool = False
 
 
 class FrageEingabe(_Getrimmt):
@@ -273,6 +275,19 @@ class Reihenfolge(BaseModel):
     fragen: list[uuid.UUID] = Field(min_length=1)
 
 
+class FreierKatalog(BaseModel):
+    """Was jemand ohne Konto von einem Katalog sieht: nicht die Fragen."""
+
+    id: uuid.UUID
+    titel: str
+    beschreibung: str
+    anzahl_fragen: int
+
+
+class Freigabe(BaseModel):
+    frei: bool
+
+
 class ImportErgebnis(BaseModel):
     """Was beim Uebernehmen passiert ist - auch, was nicht ging."""
 
@@ -296,6 +311,22 @@ class RundeAusgabe(BaseModel):
     anzahl_spieler: int
     angelegt: dt.datetime
     beitritt_offen: bool = True
+
+
+class RundeStarten(BaseModel):
+    katalog_id: uuid.UUID
+
+
+class RundeGestartet(BaseModel):
+    """Der Moderatorcode steht hier genau einmal."""
+
+    runde: RundeAusgabe
+    moderatorcode: str
+    hinweise: list[str] = Field(default_factory=list)
+
+
+class Zugang(BaseModel):
+    code: str = Field(min_length=1, max_length=40)
 
 
 class FrageWaehlen(BaseModel):
